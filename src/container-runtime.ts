@@ -11,6 +11,25 @@ import { log } from './log.js';
 /** The container runtime binary name. */
 export const CONTAINER_RUNTIME_BIN = 'docker';
 
+/** Cached result of rootless-podman detection. */
+let _isRootlessPodman: boolean | null = null;
+
+/** Detect whether the runtime is rootless Podman (needs --userns=keep-id). */
+export function isRootlessPodman(): boolean {
+  if (_isRootlessPodman !== null) return _isRootlessPodman;
+  try {
+    const out = execSync(`${CONTAINER_RUNTIME_BIN} info --format '{{.Host.Security.Rootless}}'`, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
+    _isRootlessPodman = out === 'true';
+  } catch {
+    _isRootlessPodman = false;
+  }
+  return _isRootlessPodman;
+}
+
 /** CLI args needed for the container to resolve the host gateway. */
 export function hostGatewayArgs(): string[] {
   // On Linux, host.docker.internal isn't built-in — add it explicitly
