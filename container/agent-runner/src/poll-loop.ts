@@ -204,47 +204,58 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 
     log(`Processing ${keep.length} message(s), kinds: ${[...new Set(keep.map((m) => m.kind))].join(',')}`);
 
-    const query = config.provider.query({
-      prompt,
-      continuation,
-      cwd: config.cwd,
-      systemContext: config.systemContext,
-    });
-
     // Process the query while concurrently polling for new messages
     const skippedSet = new Set(skipped);
     const processingIds = ids.filter((id) => !commandIds.includes(id) && !skippedSet.has(id));
     // Publish the batch's in_reply_to so MCP tools (send_message, send_file)
     // can stamp it on outbound rows — needed for a2a return-path routing.
     setCurrentInReplyTo(routing.inReplyTo);
+
+    // Stale-session retry: if the first attempt fails because the stored
+    // continuation is unusable (Claude Code returns "No conversation found
+    // with session ID …" when the server-side session has expired or the
+    // local transcript is gone), clear the continuation and retry once
+    // with a fresh session — silently, so the user never sees the error.
+    let attempt = 0;
     try {
-      const result = await processQuery(query, routing, processingIds, config.providerName);
-      if (result.continuation && result.continuation !== continuation) {
-        continuation = result.continuation;
-        setContinuation(config.providerName, continuation);
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      log(`Query error: ${errMsg}`);
+      while (true) {
+        const query = config.provider.query({
+          prompt,
+          continuation,
+          cwd: config.cwd,
+          systemContext: config.systemContext,
+        });
+        try {
+          const result = await processQuery(query, routing, processingIds, config.providerName);
+          if (result.continuation && result.continuation !== continuation) {
+            continuation = result.continuation;
+            setContinuation(config.providerName, continuation);
+          }
+          break;
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          log(`Query error: ${errMsg}`);
 
-      // Stale/corrupt continuation recovery: ask the provider whether
-      // this error means the stored continuation is unusable, and clear
-      // it so the next attempt starts fresh.
-      if (continuation && config.provider.isSessionInvalid(err)) {
-        log(`Stale session detected (${continuation}) — clearing for next retry`);
-        continuation = undefined;
-        clearContinuation(config.providerName);
-      }
+          if (attempt === 0 && continuation && config.provider.isSessionInvalid(err)) {
+            log(`Stale session detected (${continuation}) — clearing and retrying with fresh session`);
+            continuation = undefined;
+            clearContinuation(config.providerName);
+            attempt++;
+            continue;
+          }
 
-      // Write error response so the user knows something went wrong
-      writeMessageOut({
-        id: generateId(),
-        kind: 'chat',
-        platform_id: routing.platformId,
-        channel_type: routing.channelType,
-        thread_id: routing.threadId,
-        content: JSON.stringify({ text: `Error: ${errMsg}` }),
-      });
+          // Non-recoverable, or retry already exhausted — surface to the user.
+          writeMessageOut({
+            id: generateId(),
+            kind: 'chat',
+            platform_id: routing.platformId,
+            channel_type: routing.channelType,
+            thread_id: routing.threadId,
+            content: JSON.stringify({ text: `Error: ${errMsg}` }),
+          });
+          break;
+        }
+      }
     } finally {
       clearCurrentInReplyTo();
     }
