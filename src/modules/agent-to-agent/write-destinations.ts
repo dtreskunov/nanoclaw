@@ -26,7 +26,16 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
   for (const row of rows) {
     if (row.target_type === 'channel') {
       const mg = getMessagingGroup(row.target_id);
-      if (!mg) continue;
+      if (!mg) {
+        log.warn('Destination references missing messaging_group; skipping projection', {
+          agentGroupId,
+          sessionId,
+          localName: row.local_name,
+          targetType: row.target_type,
+          targetId: row.target_id,
+        });
+        continue;
+      }
       resolved.push({
         name: row.local_name,
         display_name: mg.name ?? row.local_name,
@@ -37,7 +46,16 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
       });
     } else if (row.target_type === 'agent') {
       const ag = getAgentGroup(row.target_id);
-      if (!ag) continue;
+      if (!ag) {
+        log.warn('Destination references missing agent_group; skipping projection', {
+          agentGroupId,
+          sessionId,
+          localName: row.local_name,
+          targetType: row.target_type,
+          targetId: row.target_id,
+        });
+        continue;
+      }
       resolved.push({
         name: row.local_name,
         display_name: ag.name,
