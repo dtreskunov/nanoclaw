@@ -246,13 +246,6 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 
     log(`Processing ${keep.length} message(s), kinds: ${[...new Set(keep.map((m) => m.kind))].join(',')}`);
 
-    const query = config.provider.query({
-      prompt,
-      continuation,
-      cwd: config.cwd,
-      systemContext: config.systemContext,
-    });
-
     // Process the query while concurrently polling for new messages
     const skippedSet = new Set(skipped);
     const processingIds = ids.filter((id) => !commandIds.includes(id) && !skippedSet.has(id));
@@ -265,52 +258,72 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // *that* prompt as the failed turn — not the initial one, which
     // may have completed cleanly turns earlier in the same query.
     const promptTracker = { latest: prompt };
+    // Stale-session retry: if the first attempt fails because the stored
+    // continuation is unusable (Claude Code returns "No conversation found
+    // with session ID …" when the server-side session has expired or the
+    // local transcript is gone), clear the continuation and retry once
+    // with a fresh session — silently, so the user never sees the error.
+    let attempt = 0;
     try {
-      const result = await processQuery(
-        query,
-        routing,
-        processingIds,
-        config.providerName,
-        continuation,
-        true,
-        promptTracker,
-      );
-      if (result.continuation && result.continuation !== continuation) {
-        continuation = result.continuation;
-        setContinuation(config.providerName, continuation);
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      log(`Query error: ${errMsg}`);
-
-      // Stale/corrupt continuation recovery: ask the provider whether
-      // this error means the stored continuation is unusable, and clear
-      // it so the next attempt starts fresh.
-      if (continuation && config.provider.isSessionInvalid(err)) {
-        log(`Stale session detected (${continuation}) — clearing for next retry`);
-        continuation = undefined;
-        clearContinuation(config.providerName);
-      }
-
-      try {
-        setFailedTurn({ prompt: promptTracker.latest, error: errMsg, recorded_at: Date.now() });
-      } catch (e) {
-        log(`Failed to persist failed-turn record: ${e instanceof Error ? e.message : String(e)}`);
-      }
-      const ack = await tryAcknowledgeFailure(config, routing, errMsg, undefined);
-      // Intentionally do NOT persist ack.continuation — the ack runs
-      // in a fresh one-shot session with no real conversation state;
-      // the user's next turn should resume the rolled-back
-      // `continuation` we already have.
-      if (!ack.delivered) {
-        writeMessageOut({
-          id: generateId(),
-          kind: 'chat',
-          platform_id: routing.platformId,
-          channel_type: routing.channelType,
-          thread_id: routing.threadId,
-          content: JSON.stringify({ text: friendlyProviderErrorFallback(errMsg) }),
+      while (true) {
+        const query = config.provider.query({
+          prompt,
+          continuation,
+          cwd: config.cwd,
+          systemContext: config.systemContext,
         });
+        try {
+          const result = await processQuery(
+            query,
+            routing,
+            processingIds,
+            config.providerName,
+            continuation,
+            true,
+            promptTracker,
+          );
+          if (result.continuation && result.continuation !== continuation) {
+            continuation = result.continuation;
+            setContinuation(config.providerName, continuation);
+          }
+          break;
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          log(`Query error: ${errMsg}`);
+
+          if (attempt === 0 && continuation && config.provider.isSessionInvalid(err)) {
+            log(`Stale session detected (${continuation}) — clearing and retrying with fresh session`);
+            continuation = undefined;
+            clearContinuation(config.providerName);
+            attempt++;
+            continue;
+          }
+
+          // Non-recoverable, or retry already exhausted — record the
+          // failed turn for replay, try a natural-language in-turn ack,
+          // and fall back to a short static error message if the ack
+          // also fails. Intentionally do NOT persist ack.continuation —
+          // the ack runs in a fresh one-shot session with no real
+          // conversation state; the user's next turn should resume the
+          // rolled-back `continuation` we already have.
+          try {
+            setFailedTurn({ prompt: promptTracker.latest, error: errMsg, recorded_at: Date.now() });
+          } catch (e) {
+            log(`Failed to persist failed-turn record: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          const ack = await tryAcknowledgeFailure(config, routing, errMsg, undefined);
+          if (!ack.delivered) {
+            writeMessageOut({
+              id: generateId(),
+              kind: 'chat',
+              platform_id: routing.platformId,
+              channel_type: routing.channelType,
+              thread_id: routing.threadId,
+              content: JSON.stringify({ text: friendlyProviderErrorFallback(errMsg) }),
+            });
+          }
+          break;
+        }
       }
     } finally {
       clearCurrentInReplyTo();

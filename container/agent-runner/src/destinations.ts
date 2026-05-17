@@ -105,13 +105,11 @@ function buildDestinationsSection(): string {
   const lines = ['## Sending messages', ''];
   if (all.length === 1) {
     const d = all[0];
-    const label = d.displayName && d.displayName !== d.name ? ` (${d.displayName})` : '';
-    lines.push(`Your destination is \`${d.name}\`${label}.`);
+    lines.push(`Your destination is ${describeDestination(d)}.`);
   } else {
     lines.push('You can send messages to the following destinations:', '');
     for (const d of all) {
-      const label = d.displayName && d.displayName !== d.name ? ` (${d.displayName})` : '';
-      lines.push(`- \`${d.name}\`${label}`);
+      lines.push(`- ${describeDestination(d)}`);
     }
   }
   lines.push('');
@@ -120,11 +118,23 @@ function buildDestinationsSection(): string {
   );
   lines.push('');
   lines.push(
-    'When replying to an incoming message, default to addressing the destination it came `from` (every inbound `<message>` tag carries a `from="name"` attribute). Pick a different destination when the request asks for it (e.g., "tell Laura that…").',
+    '**Routing rule:** every inbound `<message>` tag carries a `from="name"` attribute. Default to addressing the destination it came `from` — a human channel message gets a human-channel reply; a peer-agent message gets a peer-agent reply. Cross-routing (forwarding a human request to a peer agent, or relaying a peer\'s answer back to the human) is fine when the request explicitly asks for it, but never silently swap destinations.',
   );
+  if (all.some((d) => d.type === 'agent') && all.some((d) => d.type === 'channel')) {
+    lines.push('');
+    lines.push(
+      '_Common mistake to avoid:_ when a human user messages you, do not reply by addressing a peer agent destination — the human will see nothing. Reply to the channel destination the user wrote `from`, and only loop in a peer agent if the task actually calls for it.',
+    );
+  }
   lines.push('');
   lines.push(
     'The `send_message` MCP tool is the same delivery, available mid-turn — handy for a quick acknowledgment ("on it") before a slow tool call. Each `send_message` call and each final-response `<message>` block lands as its own message in the conversation, so they read as a sequence rather than as one combined reply.',
   );
   return lines.join('\n');
+}
+
+function describeDestination(d: DestinationEntry): string {
+  const label = d.displayName && d.displayName !== d.name ? ` — ${d.displayName}` : '';
+  const kind = d.type === 'agent' ? 'peer agent' : `${d.channelType ?? 'channel'} channel`;
+  return `\`${d.name}\` (${kind}${label})`;
 }
