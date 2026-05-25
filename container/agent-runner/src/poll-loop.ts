@@ -314,6 +314,9 @@ async function processQuery(
   let queryContinuation: string | undefined;
   let done = false;
   let unwrappedNudged = false;
+  let lastProviderError: { message: string; classification?: string } | null = null;
+  let providerErrorSurfaced = false;
+  let sentAny = false;
 
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open avoids
@@ -443,6 +446,10 @@ async function processQuery(
         // effectively orphaned and the next message started a blank
         // Claude session with no prior context.
         setContinuation(providerName, event.continuation);
+      } else if (event.type === 'error' && !event.retryable) {
+        // Capture non-retryable provider errors so we can surface them to
+        // the user if the turn ends without producing a deliverable message.
+        lastProviderError = { message: event.message, classification: event.classification };
       } else if (event.type === 'result') {
         // A result — with or without text — means the turn is done. Mark
         // the initial batch completed now so the host sweep doesn't see
@@ -452,7 +459,8 @@ async function processQuery(
         // at all — either way the turn is finished.
         markCompleted(initialBatchIds);
         if (event.text) {
-          const { hasUnwrapped } = dispatchResultText(event.text, routing);
+          const { sent, hasUnwrapped } = dispatchResultText(event.text, routing);
+          if (sent > 0) sentAny = true;
           if (hasUnwrapped && !unwrappedNudged) {
             unwrappedNudged = true;
             const destinations = getAllDestinations();
@@ -464,6 +472,27 @@ async function processQuery(
                 `Please re-send your response with the correct wrapping.</system>`,
             );
           }
+        }
+        // If the provider reported a non-retryable error and the turn
+        // produced nothing to send, surface a single user-visible notice
+        // so the user isn't left wondering why their message was silently
+        // dropped (e.g. low credit balance, expired API key).
+        if (!sentAny && lastProviderError && !providerErrorSurfaced) {
+          providerErrorSurfaced = true;
+          const tag = lastProviderError.classification
+            ? ` [${lastProviderError.classification}]`
+            : '';
+          writeMessageOut({
+            id: generateId(),
+            kind: 'chat',
+            platform_id: routing.platformId,
+            channel_type: routing.channelType,
+            thread_id: routing.threadId,
+            content: JSON.stringify({
+              text: `⚠️ Agent provider error${tag}: ${lastProviderError.message}\n\nYour message was not processed.`,
+            }),
+          });
+          log(`Surfaced provider error to user: ${lastProviderError.message}`);
         }
       }
     }
