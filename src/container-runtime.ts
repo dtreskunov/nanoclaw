@@ -49,7 +49,9 @@ function resolveHostDockerTarget(): string {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 5000,
-    }).trim().split(/\s+/)[0];
+    })
+      .trim()
+      .split(/\s+/)[0];
     return resolved || 'host-gateway';
   } catch {
     return 'host-gateway';
