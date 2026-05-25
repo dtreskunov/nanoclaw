@@ -231,6 +231,22 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
             continuation = result.continuation;
             setContinuation(config.providerName, continuation);
           }
+          if (result.unsurfacedError) {
+            const tag = result.unsurfacedError.classification
+              ? ` [${result.unsurfacedError.classification}]`
+              : '';
+            writeMessageOut({
+              id: generateId(),
+              kind: 'chat',
+              platform_id: routing.platformId,
+              channel_type: routing.channelType,
+              thread_id: routing.threadId,
+              content: JSON.stringify({
+                text: `⚠️ Agent provider error${tag}: ${result.unsurfacedError.message}\n\nYour message was not processed.`,
+              }),
+            });
+            log(`Surfaced provider error to user: ${result.unsurfacedError.message}`);
+          }
           break;
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
@@ -303,6 +319,14 @@ function formatMessagesWithCommands(messages: MessageInRow[], nativeSlashCommand
 
 interface QueryResult {
   continuation?: string;
+  /**
+   * Last non-retryable provider error seen during the turn. Only set when
+   * the turn produced no deliverable output (`sentAny === false`) and the
+   * stream completed without throwing. If the SDK throws after yielding
+   * the error result, that throw goes through the outer retry/error path
+   * in runPollLoop instead — preserving the silent stale-session retry.
+   */
+  unsurfacedError?: { message: string; classification?: string };
 }
 
 async function processQuery(
@@ -315,7 +339,6 @@ async function processQuery(
   let done = false;
   let unwrappedNudged = false;
   let lastProviderError: { message: string; classification?: string } | null = null;
-  let providerErrorSurfaced = false;
   let sentAny = false;
 
   // Concurrent polling: push follow-ups into the active query as they arrive.
@@ -447,8 +470,11 @@ async function processQuery(
         // Claude session with no prior context.
         setContinuation(providerName, event.continuation);
       } else if (event.type === 'error' && !event.retryable) {
-        // Capture non-retryable provider errors so we can surface them to
-        // the user if the turn ends without producing a deliverable message.
+        // Capture non-retryable provider errors. Don't write to outbound
+        // here — the SDK may still throw immediately after (e.g. the
+        // stale-session case yields an is_error result then throws
+        // "No conversation found"). If it does, the outer catch handles
+        // the retry and the user never sees this transient error.
         lastProviderError = { message: event.message, classification: event.classification };
       } else if (event.type === 'result') {
         // A result — with or without text — means the turn is done. Mark
@@ -473,27 +499,6 @@ async function processQuery(
             );
           }
         }
-        // If the provider reported a non-retryable error and the turn
-        // produced nothing to send, surface a single user-visible notice
-        // so the user isn't left wondering why their message was silently
-        // dropped (e.g. low credit balance, expired API key).
-        if (!sentAny && lastProviderError && !providerErrorSurfaced) {
-          providerErrorSurfaced = true;
-          const tag = lastProviderError.classification
-            ? ` [${lastProviderError.classification}]`
-            : '';
-          writeMessageOut({
-            id: generateId(),
-            kind: 'chat',
-            platform_id: routing.platformId,
-            channel_type: routing.channelType,
-            thread_id: routing.threadId,
-            content: JSON.stringify({
-              text: `⚠️ Agent provider error${tag}: ${lastProviderError.message}\n\nYour message was not processed.`,
-            }),
-          });
-          log(`Surfaced provider error to user: ${lastProviderError.message}`);
-        }
       }
     }
   } finally {
@@ -501,7 +506,14 @@ async function processQuery(
     clearInterval(pollHandle);
   }
 
-  return { continuation: queryContinuation };
+  return {
+    continuation: queryContinuation,
+    // Only surface a provider error if the stream completed cleanly AND
+    // the turn produced nothing deliverable. If the SDK threw, that path
+    // takes over (with stale-session retry); if a message did get sent,
+    // a trailing error is best left in the logs.
+    unsurfacedError: !sentAny && lastProviderError ? lastProviderError : undefined,
+  };
 }
 
 function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
