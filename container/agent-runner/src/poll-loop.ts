@@ -286,6 +286,22 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
             continuation = result.continuation;
             setContinuation(config.providerName, continuation);
           }
+          if (result.unsurfacedError) {
+            const tag = result.unsurfacedError.classification
+              ? ` [${result.unsurfacedError.classification}]`
+              : '';
+            writeMessageOut({
+              id: generateId(),
+              kind: 'chat',
+              platform_id: routing.platformId,
+              channel_type: routing.channelType,
+              thread_id: routing.threadId,
+              content: JSON.stringify({
+                text: `⚠️ Agent provider error${tag}: ${result.unsurfacedError.message}\n\nYour message was not processed.`,
+              }),
+            });
+            log(`Surfaced provider error to user: ${result.unsurfacedError.message}`);
+          }
           break;
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
@@ -469,6 +485,14 @@ async function tryAcknowledgeFailure(
 
 interface QueryResult {
   continuation?: string;
+  /**
+   * Last non-retryable provider error seen during the turn. Only set when
+   * the turn produced no deliverable output (`sentAny === false`) and the
+   * stream completed without throwing. If the SDK throws after yielding
+   * the error result, that throw goes through the outer retry/error path
+   * in runPollLoop instead — preserving the silent stale-session retry.
+   */
+  unsurfacedError?: { message: string; classification?: string };
 }
 
 async function processQuery(
@@ -484,6 +508,8 @@ async function processQuery(
   let resultSeen = false;
   let done = false;
   let unwrappedNudged = false;
+  let lastProviderError: { message: string; classification?: string } | null = null;
+  let sentAny = false;
 
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open avoids
@@ -619,6 +645,24 @@ async function processQuery(
         if (persistContinuation) {
           setContinuation(providerName, event.continuation);
         }
+      } else if (event.type === 'error' && !event.retryable) {
+        // Capture non-retryable provider errors. Don't write to outbound
+        // here — the SDK may still throw immediately after (e.g. the
+        // stale-session case yields an is_error result then throws
+        // "No conversation found"). If it does, the outer catch handles
+        // the retry and the user never sees this transient error.
+        lastProviderError = { message: event.message, classification: event.classification };
+
+        // Force the stream closed so the turn ends now. Without this, the
+        // SDK can keep the stream alive after a non-retryable error (e.g.
+        // a 429 rate-limit) and the next user message gets pushed in,
+        // transparently "recovering" — but the user never finds out their
+        // original request failed. End early so the unsurfacedError path
+        // notifies them; the next message starts a fresh query.
+        if (!endedForCommand) {
+          endedForCommand = true;
+          query.end();
+        }
       } else if (event.type === 'result') {
         resultSeen = true;
         // A result — with or without text — means the turn is done. Mark
@@ -629,7 +673,8 @@ async function processQuery(
         // at all — either way the turn is finished.
         markCompleted(initialBatchIds);
         if (event.text) {
-          const { hasUnwrapped } = dispatchResultText(event.text, routing);
+          const { sent, hasUnwrapped } = dispatchResultText(event.text, routing);
+          if (sent > 0) sentAny = true;
           if (hasUnwrapped && !unwrappedNudged) {
             unwrappedNudged = true;
             const destinations = getAllDestinations();
@@ -673,7 +718,14 @@ async function processQuery(
     }
   }
 
-  return { continuation: queryContinuation };
+  return {
+    continuation: queryContinuation,
+    // Only surface a provider error if the stream completed cleanly AND
+    // the turn produced nothing deliverable. If the SDK threw, that path
+    // takes over (with stale-session retry); if a message did get sent,
+    // a trailing error is best left in the logs.
+    unsurfacedError: !sentAny && lastProviderError ? lastProviderError : undefined,
+  };
 }
 
 function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {

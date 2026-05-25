@@ -444,7 +444,24 @@ export class ClaudeProvider implements AgentProvider {
           yield { type: 'init', continuation: message.session_id };
         } else if (message.type === 'result') {
           const text = 'result' in message ? (message as { result?: string }).result ?? null : null;
-          yield { type: 'result', text };
+          const m = message as { is_error?: boolean; subtype?: string };
+          if (m.is_error || (m.subtype && m.subtype !== 'success')) {
+            const lower = (text || m.subtype || 'unknown error').toLowerCase();
+            const classification = /credit|quota|balance|insufficient|payment/.test(lower)
+              ? 'quota'
+              : /unauthor|forbidden|api key|auth/.test(lower)
+                ? 'auth'
+                : m.subtype || 'provider_error';
+            yield {
+              type: 'error',
+              message: text || m.subtype || 'provider error',
+              retryable: false,
+              classification,
+            };
+            yield { type: 'result', text: null };
+          } else {
+            yield { type: 'result', text };
+          }
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'api_retry') {
           yield { type: 'error', message: 'API retry', retryable: true };
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'rate_limit_event') {
