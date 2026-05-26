@@ -25,10 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createAgentGroup, getAgentGroupByFolder } from './db/agent-groups.js';
-import {
-  ensureContainerConfig,
-  updateContainerConfigScalars,
-} from './db/container-configs.js';
+import { ensureContainerConfig, updateContainerConfigScalars } from './db/container-configs.js';
 import {
   createMessagingGroup,
   createMessagingGroupAgent,
