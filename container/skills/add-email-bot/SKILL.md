@@ -1,6 +1,6 @@
 ---
 name: add-email-bot
-description: Create a new per-alias email bot under groups/<alias>@<domain>/. Each alias maps to its own agent group with its own persona, ncl scope, and sender allow-list. Use when the user (an operator chatting with you) wants to stand up a new email persona. Requires global ncl scope.
+description: Stand up a new email persona at a specific address on the host's bot domain. Use whenever the operator says things like "set up <email>", "create an email bot at <alias>", "add a bot for <email>", "new bot at <alias>", "I want a bot that answers <alias>", or otherwise asks to create/register/onboard an email-receiving persona. Writes groups/<alias>/{CLAUDE.local.md, allowed-senders.txt, bot.json} via `ncl email-bots create`. Requires global ncl scope (other scopes will get a forbidden error).
 ---
 
 # Add Email Bot
