@@ -13,35 +13,37 @@ Stand up a new per-alias email bot. Each alias maps to its own agent group with 
 - **Service running.** A recent `Resend inbound` line in `logs/nanoclaw.log` is the cheapest sanity check.
 - **Inbound webhook configured at Resend.** Emails to the bot domain reach the host. If unsure, ask the user to send a test email to their existing default address and grep the log.
 
-## 1. Collect the bot details
+## 1. Collect the bot details (interactive)
 
-Ask the user in plain text (free-form answers — do not use AskUserQuestion for these):
+Ask each of the following via AskUserQuestion. Use one call per field so the user can answer them one at a time. For free-form fields, pass `allowFreeformInput=true` with no options; for choice fields, pass the option list below.
 
-1. **Email alias** — the full email address the bot will receive on, e.g. `support@bot.example.com`. Must be on a domain Resend will deliver to your host. Record as `ALIAS`.
-2. **Bot name** — display name used as the agent group name and assistant persona name. Default: the local-part of `ALIAS` (e.g. `support`). Record as `BOT_NAME`.
-3. **Persona** — a paragraph or two describing how the bot should behave, what it knows, its tone. This becomes `CLAUDE.local.md`. Don't put rules about *who can email* here — that's the allow-list (step 2 below). Record as `PERSONA`.
+1. **AskUserQuestion: "What email alias should the bot receive on?"** — free-form. Expect a full address like `support@bot.example.com`. Must be on a domain Resend will deliver to your host. Record as `ALIAS`.
 
-Then ask via AskUserQuestion: **"What ncl scope should this bot have?"** with options:
+2. **AskUserQuestion: "What display name for the bot?"** — free-form. Suggest the local-part of `ALIAS` (e.g. `support`) as the default in the question text. Record as `BOT_NAME`.
 
-- `disabled` (recommended) — bot has no `ncl` access. Pure persona-only. Cannot modify its own config; cannot manage destinations or members. Folder edits are the only way to evolve it. Best for untrusted inbound / prompt-injection-sensitive bots.
-- `group` — bot can manage its own agent group via `ncl` (own config, destinations, members, sessions). Risky-action changes (`install_packages`, `add_mcp_server`) still go through approval. Choose when the bot needs to be conversationally evolvable.
-- `global` — full admin. Reserved for owner bots — do not pick this for an email bot unless you fully trust every sender in the allow-list.
+3. **AskUserQuestion: "Describe the bot's persona, tone, and what it knows."** — free-form, multi-line accepted. This becomes the body of `CLAUDE.local.md`. Tell the user inline: *don't put rules about who can email here — the next step handles that.* Record as `PERSONA`.
 
-Record the choice as `CLI_SCOPE`.
+4. **AskUserQuestion: "What ncl scope should this bot have?"** with options:
+   - `disabled` (recommended) — no `ncl` access. Pure persona-only. Best for untrusted inbound / prompt-injection-sensitive bots.
+   - `group` — can manage its own agent group via `ncl` (own config, destinations, members, sessions). Risky-action changes (`install_packages`, `add_mcp_server`) still go through approval.
+   - `global` — full admin. Reserved for owner bots — only pick if you fully trust every sender in the allow-list.
 
-## 2. Collect the allowed-senders list
+   Record the choice as `CLI_SCOPE`.
 
-Tell the user:
+## 2. Collect the allowed-senders list (interactive)
 
-> Email bots without a sender allow-list will be silently dropped — no exceptions. List one regex per line; blank lines and `#` comments are ignored. Senders are matched case-insensitively against the bare email address (e.g. `alice@example.com`, not `Alice <alice@example.com>`).
+Tell the user inline before asking:
 
-AskUserQuestion: **"Start with which default?"** with options:
+> Email bots without a sender allow-list silently drop every inbound message — no exceptions. List one regex per line; blank lines and `#` comments are ignored. Senders are matched case-insensitively against the bare email address (e.g. `alice@example.com`, not `Alice <alice@example.com>`).
 
-- `.*@.*` — permissive; any well-formed email passes. New senders still go through the `request_approval` flow (DM to owner) before their first reply lands.
-- `.*@<their domain>` — domain-locked; only senders inside a specific domain. Ask the user for the domain string and substitute.
-- `custom` — collect a multi-line list from the user in plain text.
+**AskUserQuestion: "How should the allow-list start?"** with options:
 
-Record as `ALLOWED_SENDERS` (the full text content of `allowed-senders.txt`).
+- `me-only` — just the operator's own email address. Recommended for any bot with `cli_scope=global` or sensitive tooling. Follow up with a free-form AskUserQuestion: *"What's your email address?"* and write `^<escaped-email>$` as the only line.
+- `domain` — domain-locked. Follow up with a free-form AskUserQuestion: *"Which domain should be allowed?"* and write `.*@<escaped-domain>$` as the only line.
+- `open` — permissive `.*@.*`. New senders still hit the `request_approval` flow (DM to owner) before their first reply lands. Use only when the agent group is also opt-in safe.
+- `custom` — follow up with a free-form AskUserQuestion: *"Paste the regex lines, one per line."* — accept multi-line input verbatim.
+
+Record the resulting full text content as `ALLOWED_SENDERS` — this is exactly what gets written to `allowed-senders.txt`. Always escape `.` and `@` with backslashes inside regex literals when building from a concrete email or domain. Anchor with `^` and `$` for `me-only` so a substring match (e.g. `evil-denis@…`) cannot slip through.
 
 ## 3. Create the folder
 
