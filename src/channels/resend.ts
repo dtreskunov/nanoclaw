@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto';
 import { createResendAdapter } from '@resend/chat-sdk-adapter';
 import { Message, parseMarkdown } from 'chat';
 
+import { isSenderAllowed, provisionEmailBot, readBotFolder } from '../auto-provision.js';
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { createChatSdkBridge } from './chat-sdk-bridge.js';
@@ -120,6 +121,34 @@ registerChannelAdapter('resend', {
       const senderAddress = parseEmailAddress(email.from);
       const alias = email.to?.[0] ? parseEmailAddress(email.to[0]) : FROM;
       log.info('Resend inbound', { from: senderAddress, alias, to: email.to, subject: email.subject });
+
+      // ── Email-bot gate ───────────────────────────────────────────────
+      // Filesystem-driven allow-list: groups/<alias>/CLAUDE.local.md must
+      // exist for the alias to be enabled, and the sender must match a
+      // regex in allowed-senders.txt. Missing folder / missing regex file /
+      // no regex match → silent drop. The default alias (FROM) bypasses
+      // this gate so the legacy single-mailbox setup keeps working without
+      // a folder.
+      if (alias !== FROM) {
+        const bot = readBotFolder(alias);
+        if (!bot) {
+          log.info('Resend dropped — alias not enabled (no groups/<alias>/CLAUDE.local.md)', {
+            alias,
+            from: senderAddress,
+          });
+          return new Response(null, { status: 200 });
+        }
+        if (!isSenderAllowed(bot, senderAddress)) {
+          log.info('Resend dropped — sender not in allowed-senders.txt', {
+            alias,
+            from: senderAddress,
+          });
+          return new Response(null, { status: 200 });
+        }
+        // Lazy-register the bot (idempotent — no-op once wired).
+        provisionEmailBot({ channelType: 'resend', platformId: `resend:${alias}`, bot });
+      }
+
       const headers = email.headers || {};
       const inReplyTo = headers['In-Reply-To'] || headers['in-reply-to'] || undefined;
       const references = headers.References || headers.references || undefined;

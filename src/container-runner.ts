@@ -138,7 +138,13 @@ async function spawnContainer(session: Session): Promise<void> {
   const { provider, contribution } = resolveProviderContribution(session, agentGroup, containerConfig);
 
   const mounts = buildMounts(agentGroup, session, containerConfig, contribution);
-  const containerName = `nanoclaw-v2-${agentGroup.folder}-${Date.now()}`;
+  // Docker/podman container names allow only [a-zA-Z0-9_.-]. Folder names
+  // can include characters that are legal on disk but not in container
+  // names — notably `@` for email-alias bots (groups/leet@bot.example.com/).
+  // Sanitize for the container-name slot only; mount paths use the raw
+  // folder (those tolerate `@`).
+  const folderSlug = agentGroup.folder.replace(/@/g, '_at_').replace(/[^a-zA-Z0-9_.-]/g, '-');
+  const containerName = `nanoclaw-v2-${folderSlug}-${Date.now()}`;
   // OneCLI agent identifier is always the agent group id — stable across
   // sessions and reversible via getAgentGroup() for approval routing.
   const agentIdentifier = agentGroup.id;
