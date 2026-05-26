@@ -47,38 +47,22 @@ Record the resulting full text content as `ALLOWED_SENDERS` — this is exactly 
 
 ## 3. Create the folder
 
-Use the absolute workspace path. Replace `<ALIAS>`, `<BOT_NAME>`, `<CLI_SCOPE>`, `<PERSONA>`, `<ALLOWED_SENDERS>` literally.
+## 3. Scaffold the folder
+
+Use the `ncl email-bots create` verb — it writes the three files atomically and validates the inputs. Pass each multi-line field on stdin via a here-doc style invocation (or as a single `--arg=value` if it's short):
 
 ```bash
-mkdir -p "groups/<ALIAS>"
+ncl email-bots create \
+  --alias '<ALIAS>' \
+  --name '<BOT_NAME>' \
+  --cli-scope '<CLI_SCOPE>' \
+  --persona '<PERSONA>' \
+  --allowed-senders '<ALLOWED_SENDERS>'
 ```
 
-Then write three files inside:
+The verb refuses to overwrite an existing folder, validates the alias is a well-formed email, and rejects empty `--allowed-senders` (fail-safe). On success it returns the folder path and a "send a test email" hint.
 
-**`groups/<ALIAS>/CLAUDE.local.md`** — the persona body:
-
-```markdown
-# <BOT_NAME>
-
-<PERSONA>
-```
-
-**`groups/<ALIAS>/allowed-senders.txt`** — one regex per line:
-
-```
-<ALLOWED_SENDERS>
-```
-
-**`groups/<ALIAS>/bot.json`** — name + cli_scope:
-
-```json
-{
-  "name": "<BOT_NAME>",
-  "cli_scope": "<CLI_SCOPE>"
-}
-```
-
-That is the entire scaffold. No DB rows, no service restart. The Resend adapter reads these files on the first inbound email to `<ALIAS>` and registers the agent group, container config, wiring, and destination atomically.
+No DB rows, no service restart. The Resend adapter reads the folder on the first inbound email to `<ALIAS>` and lazily registers the agent group, container config, wiring, and destination.
 
 ## 4. Verify
 
@@ -120,4 +104,4 @@ The host sanitizes `@` → `_at_` in container names, so `groups/leet@bot.exampl
 - **Edit the allow-list** — change `allowed-senders.txt`. Effective immediately for the next inbound email.
 - **Change `cli_scope` or name** — edit `bot.json`, then run `ncl groups config update --id <agentGroupId> --cli-scope <new>` to push to the DB (the auto-provisioner only writes `bot.json` values on first registration). For name changes, also `ncl groups update --id <agentGroupId> --name <new>`.
 - **Disable the alias** — `rm -rf groups/<ALIAS>`. New inbound emails will be dropped. Existing sessions keep working until they idle out, then any subsequent email also drops. To clean up the DB rows too: `ncl groups delete --id <agentGroupId>`.
-- **List all email bots** — `ls -d groups/*@*/`.
+- **List all email bots** — `ncl email-bots list` (or `ls -d groups/*@*/`).

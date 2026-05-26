@@ -103,6 +103,77 @@ export function isSenderAllowed(bot: BotFolder, senderEmail: string): boolean {
 }
 
 /**
+ * Write the three scaffold files for a new email-bot alias. Refuses to
+ * overwrite an existing folder — callers should check first or treat the
+ * thrown error as "alias is already taken".
+ *
+ * The alias must be a well-formed email and may only contain characters
+ * filesystems and Docker container names tolerate after the host's
+ * `@` → `_at_` sanitization in container-runner.
+ */
+export interface ScaffoldInput {
+  alias: string;
+  persona: string;
+  name?: string;
+  cliScope?: CliScope;
+  allowedSenders: string; // raw contents of allowed-senders.txt
+}
+
+export interface ScaffoldResult {
+  folder: string;
+  absPath: string;
+}
+
+const ALIAS_RE = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+export function scaffoldEmailBotFolder(input: ScaffoldInput): ScaffoldResult {
+  const alias = input.alias.trim().toLowerCase();
+  if (!ALIAS_RE.test(alias)) {
+    throw new Error(`Invalid email alias: ${input.alias}`);
+  }
+  const persona = input.persona.trim();
+  if (!persona) throw new Error('Persona is required (becomes CLAUDE.local.md body).');
+  const allowed = input.allowedSenders.trim();
+  if (!allowed) throw new Error('Allowed senders are required — fail-safe denies all when empty.');
+  const cliScope: CliScope = input.cliScope ?? 'disabled';
+  if (!['disabled', 'group', 'global'].includes(cliScope)) {
+    throw new Error(`Invalid cli_scope: ${cliScope}`);
+  }
+  const name = (input.name ?? alias.split('@')[0]).trim();
+  if (!name) throw new Error('Bot name cannot be empty.');
+
+  const absPath = path.join(GROUPS_DIR, alias);
+  if (fs.existsSync(absPath)) {
+    throw new Error(`Folder already exists: groups/${alias}`);
+  }
+
+  fs.mkdirSync(absPath, { recursive: true });
+  fs.writeFileSync(path.join(absPath, 'CLAUDE.local.md'), `# ${name}\n\n${persona}\n`);
+  fs.writeFileSync(path.join(absPath, 'allowed-senders.txt'), `${allowed}\n`);
+  fs.writeFileSync(
+    path.join(absPath, 'bot.json'),
+    JSON.stringify({ name, cli_scope: cliScope }, null, 2) + '\n',
+  );
+
+  log.info('Scaffolded email-bot folder', { folder: alias, name, cliScope });
+
+  return { folder: alias, absPath };
+}
+
+/** List all email-bot folders under groups/ (folders containing CLAUDE.local.md). */
+export function listEmailBotFolders(): BotFolder[] {
+  if (!fs.existsSync(GROUPS_DIR)) return [];
+  const out: BotFolder[] = [];
+  for (const entry of fs.readdirSync(GROUPS_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (!entry.name.includes('@')) continue; // email-bot folders are full addresses
+    const bot = readBotFolder(entry.name);
+    if (bot) out.push(bot);
+  }
+  return out;
+}
+
+/**
  * Lazily register an email-bot alias. Creates the messaging_group,
  * agent_group, container_config, wiring, and destination if they don't
  * already exist. Returns the resolved messaging_group + agent_group.
