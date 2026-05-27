@@ -3,19 +3,19 @@ import type { Migration } from './index.js';
 
 export const migration016: Migration = {
   version: 16,
-  name: 'file-browser',
+  name: 'ui',
   up(db: Database.Database) {
     db.exec(`
-      CREATE TABLE file_browser_sessions (
+      CREATE TABLE ui_sessions (
         token_hash  TEXT PRIMARY KEY,
         user_id     TEXT NOT NULL REFERENCES users(id),
         created_at  TEXT NOT NULL,
         expires_at  TEXT NOT NULL,
         last_used   TEXT
       );
-      CREATE INDEX idx_file_browser_sessions_user ON file_browser_sessions(user_id);
+      CREATE INDEX idx_ui_sessions_user ON ui_sessions(user_id);
 
-      CREATE TABLE file_browser_magic_links (
+      CREATE TABLE ui_magic_links (
         token_hash  TEXT PRIMARY KEY,
         user_id     TEXT NOT NULL REFERENCES users(id),
         created_at  TEXT NOT NULL,
@@ -23,7 +23,7 @@ export const migration016: Migration = {
         redeemed_at TEXT
       );
 
-      CREATE TABLE file_browser_access_log (
+      CREATE TABLE ui_access_log (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id     TEXT,
         group_id    TEXT,
@@ -32,7 +32,7 @@ export const migration016: Migration = {
         ip          TEXT,
         ts          TEXT NOT NULL
       );
-      CREATE INDEX idx_file_browser_access_log_ts ON file_browser_access_log(ts);
+      CREATE INDEX idx_ui_access_log_ts ON ui_access_log(ts);
     `);
   },
 };

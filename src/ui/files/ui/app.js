@@ -1,0 +1,246 @@
+// Minimal vanilla file browser client.
+// URL hash format: #<groupId>/<path>[/]
+//   no hash               → first accessible group, root
+//   #ag-xyz               → group root
+//   #ag-xyz/sub/dir/      → directory (trailing slash)
+//   #ag-xyz/sub/file.txt  → file (no trailing slash)
+(() => {
+  const state = { groupId: null, path: '', file: null, groups: [] };
+  let suppressHash = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  async function api(url) {
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (r.status === 401) {
+      document.body.innerHTML =
+        '<div style="padding:24px;font:14px system-ui">Not logged in. Visit the magic link your operator sent you.</div>';
+      throw new Error('unauthorized');
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  function fmtBytes(n) {
+    if (n == null) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' K';
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' M';
+    return (n / 1024 / 1024 / 1024).toFixed(1) + ' G';
+  }
+
+  // ── hash routing ──────────────────────────────────────────────────────
+  function parseHash() {
+    const h = decodeURI(location.hash.replace(/^#/, ''));
+    if (!h) return null;
+    const slash = h.indexOf('/');
+    if (slash < 0) return { groupId: h, path: '', isDir: true };
+    const groupId = h.slice(0, slash);
+    const rest = h.slice(slash + 1);
+    const isDir = rest === '' || rest.endsWith('/');
+    const path = isDir ? rest.replace(/\/$/, '') : rest;
+    return { groupId, path, isDir };
+  }
+
+  function writeHash() {
+    if (!state.groupId) return;
+    let h = '#' + encodeURI(state.groupId);
+    if (state.file) {
+      h += '/' + encodeURI(state.file);
+    } else if (state.path) {
+      h += '/' + encodeURI(state.path) + '/';
+    }
+    if (location.hash !== h) {
+      suppressHash = true;
+      location.hash = h;
+    }
+  }
+
+  async function applyHash() {
+    const parsed = parseHash();
+    if (!parsed) {
+      if (state.groups.length) await selectGroup(state.groups[0].id);
+      return;
+    }
+    if (!state.groups.find((g) => g.id === parsed.groupId)) {
+      $('preview').innerHTML = '<div class="empty">No access to group ' + escapeHtml(parsed.groupId) + '</div>';
+      return;
+    }
+    state.groupId = parsed.groupId;
+    state.file = null;
+    highlightGroup();
+    if (parsed.isDir) {
+      await loadTree(parsed.path);
+      $('preview').innerHTML = '<div class="empty">Select a file</div>';
+    } else {
+      const parent = parentPath(parsed.path);
+      await loadTree(parent);
+      const name = parent ? parsed.path.slice(parent.length + 1) : parsed.path;
+      await selectFile({ path: parsed.path, name });
+    }
+  }
+
+  // ── init ──────────────────────────────────────────────────────────────
+  async function init() {
+    const me = await api('api/me');
+    $('me').textContent = me.userId;
+    const { groups } = await api('api/groups');
+    state.groups = groups;
+    const nav = $('groups');
+    nav.innerHTML = '';
+    if (!groups.length) {
+      nav.innerHTML = '<div class="empty">No accessible groups.</div>';
+      return;
+    }
+    for (const g of groups) {
+      const row = document.createElement('div');
+      row.className = 'group';
+      row.dataset.id = g.id;
+      row.innerHTML = `<div>${escapeHtml(g.name)}${g.isAdmin ? ' <span class="meta">admin</span>' : ''}</div><div class="meta">${escapeHtml(g.folder)}</div>`;
+      row.onclick = () => selectGroup(g.id);
+      nav.appendChild(row);
+    }
+    window.addEventListener('hashchange', () => {
+      if (suppressHash) {
+        suppressHash = false;
+        return;
+      }
+      applyHash().catch(console.error);
+    });
+    await applyHash();
+  }
+
+  function highlightGroup() {
+    for (const el of document.querySelectorAll('nav .group')) {
+      el.classList.toggle('active', el.dataset.id === state.groupId);
+    }
+  }
+
+  async function selectGroup(id) {
+    state.groupId = id;
+    state.path = '';
+    state.file = null;
+    highlightGroup();
+    await loadTree('');
+    $('preview').innerHTML = '<div class="empty">Select a file</div>';
+    writeHash();
+  }
+
+  async function loadTree(p) {
+    state.path = p;
+    state.file = null;
+    renderCrumb(p);
+    const { entries } = await api(`api/groups/${encodeURIComponent(state.groupId)}/tree?path=${encodeURIComponent(p)}`);
+    const list = $('listing');
+    list.innerHTML = '';
+    if (p) {
+      const up = document.createElement('div');
+      up.className = 'row';
+      up.innerHTML = '<div class="name">..</div>';
+      up.onclick = () => navTree(parentPath(p));
+      list.appendChild(up);
+    }
+    if (!entries.length) {
+      list.appendChild(emptyDiv('Empty directory'));
+      return;
+    }
+    for (const e of entries) {
+      const row = document.createElement('div');
+      row.className = 'row tier-' + e.tier;
+      row.dataset.path = e.path;
+      const icon = e.type === 'dir' ? '📁' : '📄';
+      row.innerHTML = `<div>${icon}</div><div class="name">${escapeHtml(e.name)}</div><div class="size">${fmtBytes(e.size)}</div>`;
+      row.onclick = () => {
+        if (e.type === 'dir') navTree(e.path);
+        else navFile(e);
+      };
+      list.appendChild(row);
+    }
+  }
+
+  async function navTree(p) {
+    await loadTree(p);
+    writeHash();
+  }
+
+  async function navFile(entry) {
+    await selectFile(entry);
+    writeHash();
+  }
+
+  async function selectFile(entry) {
+    state.file = entry.path;
+    for (const el of document.querySelectorAll('.listing .row')) {
+      el.classList.toggle('active', el.dataset.path === entry.path);
+    }
+    const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
+    const pv = $('preview');
+    const ext = entry.name.toLowerCase().split('.').pop();
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+      pv.innerHTML = `<img alt="${escapeHtml(entry.name)}" src="${url}"/>`;
+      return;
+    }
+    if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) {
+      pv.innerHTML = `<audio controls preload="metadata" src="${url}"></audio><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      return;
+    }
+    if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) {
+      pv.innerHTML = `<video controls preload="metadata" src="${url}" style="max-width:100%;max-height:80vh"></video><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      return;
+    }
+    if (ext === 'pdf') {
+      pv.innerHTML = `<iframe src="${url}" style="width:100%;height:90vh;border:0"></iframe>`;
+      return;
+    }
+    // Default: try text.
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (!r.ok) {
+      pv.innerHTML = `<div class="empty">HTTP ${r.status}</div>`;
+      return;
+    }
+    const ct = r.headers.get('content-type') || '';
+    if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml')) {
+      const t = await r.text();
+      pv.innerHTML = `<pre></pre><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.querySelector('pre').textContent = t;
+    } else {
+      pv.innerHTML = `<div class="empty">Binary file (${escapeHtml(ct)}). <a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+    }
+  }
+
+  function renderCrumb(p) {
+    const segs = p ? p.split('/') : [];
+    const parts = [`<a data-path="">/</a>`];
+    let acc = '';
+    for (const s of segs) {
+      acc = acc ? acc + '/' + s : s;
+      parts.push(`<a data-path="${escapeAttr(acc)}">${escapeHtml(s)}</a>`);
+    }
+    const c = $('crumb');
+    c.innerHTML = parts.join(' / ');
+    for (const a of c.querySelectorAll('a')) {
+      a.onclick = () => navTree(a.dataset.path);
+    }
+  }
+
+  function parentPath(p) {
+    const i = p.lastIndexOf('/');
+    return i < 0 ? '' : p.slice(0, i);
+  }
+
+  function emptyDiv(text) {
+    const d = document.createElement('div');
+    d.className = 'empty';
+    d.textContent = text;
+    return d;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s);
+  }
+
+  init().catch((err) => console.error(err));
+})();

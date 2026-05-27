@@ -5,11 +5,19 @@
  * - Filtered commands: dropped silently (never reach the container)
  * - Admin commands: checked against user_roles; denied senders get a
  *   "Permission denied" response written directly to messages_out
+ * - Intercepted commands: handled by the host (e.g. /web-login mints a
+ *   UI magic link); the host writes a direct outbound reply.
  * - Normal messages: pass through unchanged
  */
 import { getDb, hasTable } from './db/connection.js';
+import { issueMagicLink } from './ui/auth.js';
+import { isUiEnabled, uiBaseUrl } from './ui/server.js';
 
-export type GateResult = { action: 'pass' } | { action: 'filter' } | { action: 'deny'; command: string };
+export type GateResult =
+  | { action: 'pass' }
+  | { action: 'filter' }
+  | { action: 'deny'; command: string }
+  | { action: 'reply'; text: string };
 
 const FILTERED_COMMANDS = new Set(['/help', '/login', '/logout', '/doctor', '/config', '/remote-control']);
 const ADMIN_COMMANDS = new Set(['/clear', '/compact', '/context', '/cost', '/files', '/upload-trace']);
@@ -18,7 +26,7 @@ const ADMIN_COMMANDS = new Set(['/clear', '/compact', '/context', '/cost', '/fil
  * Classify a message and decide whether it should reach the container.
  * Returns 'pass' for normal messages and authorized admin commands,
  * 'filter' for silently-dropped commands, 'deny' for unauthorized
- * admin commands.
+ * admin commands, 'reply' for host-handled commands.
  */
 export function gateCommand(content: string, userId: string | null, agentGroupId: string): GateResult {
   let text: string;
@@ -33,6 +41,8 @@ export function gateCommand(content: string, userId: string | null, agentGroupId
 
   const command = text.split(/\s/)[0].toLowerCase();
 
+  if (command === '/web-login') return handleWebLogin(userId);
+
   if (FILTERED_COMMANDS.has(command)) return { action: 'filter' };
 
   if (ADMIN_COMMANDS.has(command)) {
@@ -44,6 +54,18 @@ export function gateCommand(content: string, userId: string | null, agentGroupId
 
   // Unknown slash commands pass through (the agent/SDK handles them)
   return { action: 'pass' };
+}
+
+function handleWebLogin(userId: string | null): GateResult {
+  if (!userId) {
+    return { action: 'reply', text: 'Could not identify your account for login.' };
+  }
+  if (!isUiEnabled()) {
+    return { action: 'reply', text: 'Web UI is not enabled on this server.' };
+  }
+  const { token } = issueMagicLink(userId);
+  const url = `${uiBaseUrl()}/auth/redeem?t=${token}`;
+  return { action: 'reply', text: `Your one-time login link (expires in 10 minutes, single use):\n${url}` };
 }
 
 function isAdmin(userId: string | null, agentGroupId: string): boolean {
