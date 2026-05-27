@@ -13,27 +13,22 @@ description: >-
 # Web UI — File Browser
 
 Users can browse their per-agent-group filesystem (the same `groups/<folder>/`
-directory you see in the container) through a read-only web UI hosted by the
-host on `/ui/files`. They authenticate with a single-use magic link.
+directory you see in the container) through a read-only web UI at `/ui/files`.
+They authenticate with a single-use magic link.
 
 ## How to respond
 
-**You cannot mint the link yourself.** The login command is intercepted by the
-host *before* it reaches you. When a user asks to see their files, tell them
-to send this message exactly:
-
-> `/web-login`
-
-The host will reply with a one-time URL that expires in 10 minutes. Opening it
-sets a 30-day session cookie scoped to `/ui`. After login they land on
-`/ui/files/`.
+Call the `request_login_link` MCP tool with the requesting user's namespaced
+id (e.g. `resend:user@example.com`, `telegram:12345`, `slack:U01ABCD`). The
+**host** mints the link and delivers it to the user as a follow-up message on
+the current channel — your own reply should *not* try to include a URL
+(you don't have one) and should *not* ask the user to send `/web-login`.
 
 A reasonable reply when someone asks "show me my files":
 
-> Send me `/web-login` (just that command, on its own line) and I'll have the
-> host mint you a one-time link to the web file browser. The link expires in
-> 10 minutes and gives you a 30-day browser session to view files in this
-> agent group.
+> I've sent you a one-time login link — check your messages on this channel.
+> It's valid for 10 minutes and gives you a 30-day browser session to the
+> read-only file browser for this agent group.
 
 ## What they can do once logged in
 
@@ -62,5 +57,3 @@ through chat with you.
 - The user wants you to send them a specific file — attach it directly in
   your reply if the channel supports attachments, rather than pointing them
   at the file browser.
-- The web UI is disabled on this host. (If they send `/web-login` and get
-  "Web UI is not enabled on this server.", that's the signal.)
