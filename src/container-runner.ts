@@ -22,6 +22,7 @@ import {
 import { materializeContainerJson } from './container-config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { updateContainerConfigScalars, updateContainerConfigJson } from './db/container-configs.js';
+import { isUiEnabled } from './ui/server.js';
 import {
   CONTAINER_RUNTIME_BIN,
   dumpContainerProcesses,
@@ -391,6 +392,12 @@ function syncSkillSymlinks(claudeDir: string, containerConfig: import('./contain
       : [];
   } else {
     desired = containerConfig.skills;
+  }
+
+  // Skip skills whose host-side feature is disabled, so the agent doesn't
+  // surface commands the host gate will only reject.
+  if (!isUiEnabled()) {
+    desired = desired.filter((s) => s !== 'web-ui');
   }
 
   const desiredSet = new Set(desired);
