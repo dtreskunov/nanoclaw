@@ -2,37 +2,96 @@
 name: web-ui
 requires_env: UI_ENABLED
 description: >-
-  Web UI access: how the user opens a browser to see their files. Use this
-  skill when the user asks to "show me my files", "browse my files",
+  Web UI access: how the user opens a browser to see their files, and how
+  to send them a single-file download link instead of attaching bytes
+  inline. Use when the user asks to "show me my files", "browse my files",
   "open the file browser", "see my files in a browser", "download a file",
-  "give me a link to my files", or any similar request to view the
-  agent-group filesystem visually. Also use when the user asks how to log
-  into the web UI or get a magic link.
+  "give me a link to my files", or when you want to send a specific file
+  but inline attachment isn't a good fit (large file, channel that handles
+  attachments poorly, sensitive/revocable, etc.).
 ---
 
-# Web UI — File Browser
+# Web UI — File Browser + File Links
 
-Users can browse their per-agent-group filesystem (the same `groups/<folder>/`
-directory you see in the container) through a read-only web UI at `/ui/files`.
-They authenticate with a single-use magic link.
+Two distinct primitives, both deliver via the user's DM:
 
-## How to respond
+| Tool | What it sends | When to use |
+|------|---------------|-------------|
+| `request_login_link` | Magic link → 30-day browser session to the whole file browser | User asks to browse / see their files / open the file browser |
+| `mint_file_link` | Single-use short-TTL URL to one specific file | You want to send one file and inline attachment isn't a good fit |
 
-Call the `request_login_link` MCP tool with the requesting user's namespaced
-id (e.g. `resend:user@example.com`, `telegram:12345`, `slack:U01ABCD`). The
-**host** mints the link and DMs it to that user privately — never to the
-current thread. This is important in group chats: even though the user asked
-in the group, the link is sensitive and lands in their DM. Your own reply
-should *not* try to include a URL (you don't have one) and should *not* ask
-the user to send `/web-login`.
+Both are delivered by the **host** as a follow-up DM. Your own reply must
+not try to include a URL (you don't have one) and must not ask the user to
+send `/web-login`.
 
-A reasonable reply when someone asks "show me my files" (in a group or DM):
+## When to attach a file vs. send a `mint_file_link`
 
-> I've sent you a one-time login link in a direct message. It's valid for 10
-> minutes and gives you a 30-day browser session to the read-only file
+Default: attach inline if the channel supports it and the file is small
+and non-sensitive. Prefer `mint_file_link` when **any** of these is true:
+
+- **Size** — file is larger than ~5 MB (email caps at 10–25 MB total;
+  Slack 50 MB; SMS basically nothing).
+- **Channel** — current channel doesn't carry attachments well (SMS,
+  GitHub/Linear comments, X DMs).
+- **Sensitivity** — file is private/credentialed and you want a revocable,
+  audited download (single-use, 15-min TTL by default).
+- **Context** — file is one of many and the recipient might want the
+  folder view; offer the file link plus a `request_login_link` for the
+  browser.
+- **Freshness** — the file will keep changing and you want them to see
+  the current version on download, not a snapshot in their inbox.
+
+When attaching inline still wins:
+
+- Small (< 5 MB), non-sensitive, recipient is on email/Slack/Telegram and
+  benefits from having it archived in their inbox.
+- Recipient may be offline when they read it.
+- One-shot, ephemeral.
+
+## Calling `mint_file_link`
+
+```
+mint_file_link(
+  userId: "resend:user@example.com",     // recipient's namespaced id
+  path:   "reports/q3.pdf",              // relative to the agent group workspace
+  ttlMinutes: 15,                        // optional, default 15, max 1440
+  uses:       1                          // optional, default 1, max 5
+)
+```
+
+The host will:
+1. Verify the recipient has access to this agent group (member / admin /
+   owner). If not, the link is silently refused.
+2. Verify the file exists and isn't hidden or admin-tier-without-admin.
+3. Mint a file-bound token (the token is NOT a login — it only downloads
+   this one file, and does not create a browser session).
+4. DM the URL to the user. In a group chat, the link lands in their DM
+   and is never visible to other group members.
+
+A reasonable reply when you've called `mint_file_link` in a group:
+
+> I've sent you a download link in a direct message.
+
+Don't name the file in the public reply — that itself can be a small
+information leak in a group setting.
+
+## Calling `request_login_link`
+
+```
+request_login_link(userId: "resend:user@example.com")
+```
+
+Use when the user asks to browse or see "my files" generally. Same DM
+delivery, same group-safe behavior. The link mints a 30-day browser
+session for the read-only file browser.
+
+A reasonable reply (in a group or DM):
+
+> I've sent you a one-time login link in a direct message. It's valid for
+> 10 minutes and gives you a 30-day browser session to the read-only file
 > browser for this agent group.
 
-## What they can do once logged in
+## What they can do once logged in (browser session)
 
 Read-only:
 
@@ -41,21 +100,19 @@ Read-only:
 - Preview images, audio, video, PDFs, and text files inline in the browser
 - Download anything else
 
-They cannot upload, rename, delete, or edit anything from the web UI — only
-through chat with you.
+They cannot upload, rename, delete, or edit anything from the web UI —
+only through chat with you.
 
 ## Visibility rules (so you can answer "why don't I see X?")
 
 - `.git`, `node_modules`, `.claude-fragments`, dotfiles, and the composed
   `CLAUDE.md` are always hidden.
 - `CLAUDE.local.md` is visible read-only.
-- Admin-tier files (`container.json`, `bot.json`, `allowed-senders.txt`) are
-  visible only to users with the admin role on that group.
+- Admin-tier files (`container.json`, `bot.json`, `allowed-senders.txt`)
+  are visible only to users with the admin role on that group, and
+  `mint_file_link` refuses to issue them to non-admins.
 
 ## When NOT to use this skill
 
 - The user wants you to read, summarize, or modify a file — just do that
   yourself using your filesystem tools.
-- The user wants you to send them a specific file — attach it directly in
-  your reply if the channel supports attachments, rather than pointing them
-  at the file browser.

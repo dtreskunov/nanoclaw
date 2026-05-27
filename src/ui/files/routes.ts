@@ -14,6 +14,7 @@ import { log } from '../../log.js';
 import { listAccessibleAgentGroups } from '../../modules/permissions/access.js';
 import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
 import { authenticate, recordAccess } from '../auth.js';
+import { redeemDownloadToken } from '../download-tokens.js';
 import { classify, resolveSafe } from './classify.js';
 
 // UI assets live under src/ (not compiled by tsc); resolve from project root,
@@ -51,6 +52,10 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     // Public static routes.
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return serveStatic(ctx, 'index.html');
     if (req.method === 'GET' && pathname.startsWith('/ui/')) return serveStatic(ctx, pathname.slice('/ui/'.length));
+
+    // Public token-based download (no cookie required). Always sent as
+    // attachment; never sets a session.
+    if (req.method === 'GET' && pathname === '/dl') return handleTokenDownload(ctx);
 
     // Authenticated routes.
     const session = authenticate(req);
@@ -187,6 +192,63 @@ function handleFile(ctx: Ctx, userId: string, groupId: string, relPath: string):
 
   recordAccess({ userId, groupId: group.id, path: relPath, action: 'file', req: ctx.req });
   ctx.res.writeHead(200, headers);
+  fs.createReadStream(abs).pipe(ctx.res);
+}
+
+function handleTokenDownload(ctx: Ctx): void {
+  const token = ctx.url.searchParams.get('t');
+  if (!token) return text(ctx, 400, 'Missing token');
+
+  const fwd = ctx.req.headers['x-forwarded-for'];
+  const ip = (typeof fwd === 'string' ? fwd.split(',')[0]?.trim() : null) || ctx.req.socket.remoteAddress || null;
+  const ua = (ctx.req.headers['user-agent'] as string | undefined) ?? null;
+
+  const row = redeemDownloadToken(token, ip, ua);
+  if (!row) {
+    recordAccess({ userId: null, groupId: null, path: null, action: 'dl_invalid', req: ctx.req });
+    return text(ctx, 404, 'Link is invalid, expired, or already used.');
+  }
+
+  const group = getAgentGroup(row.group_id);
+  if (!group) {
+    log.warn('download token references missing group', { groupId: row.group_id });
+    return text(ctx, 404, 'Not found');
+  }
+
+  // Re-validate visibility — file may have been moved/hidden since issuance.
+  const cls = classify(row.rel_path);
+  if (cls.kind === 'hidden') return text(ctx, 404, 'Not found');
+
+  const groupDir = path.resolve(GROUPS_DIR, group.folder);
+  const abs = resolveSafe(groupDir, row.rel_path);
+  if (!abs) return text(ctx, 400, 'Invalid path');
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(abs);
+  } catch {
+    return text(ctx, 404, 'Not found');
+  }
+  if (!stat.isFile()) return text(ctx, 400, 'Not a file');
+  if (stat.size > MAX_DOWNLOAD_BYTES) return text(ctx, 413, 'File too large');
+
+  const filename = path.basename(abs);
+  const ext = path.extname(filename).toLowerCase();
+  const mime = mimeFor(ext);
+  recordAccess({
+    userId: row.recipient_user_id ?? row.issuer_user_id,
+    groupId: row.group_id,
+    path: row.rel_path,
+    action: 'dl_token',
+    req: ctx.req,
+  });
+  ctx.res.writeHead(200, {
+    'Content-Type': mime.type,
+    'Content-Length': stat.size,
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'private, no-store',
+    'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+  });
   fs.createReadStream(abs).pipe(ctx.res);
 }
 
