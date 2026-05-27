@@ -476,6 +476,17 @@ async function processQuery(
         // "No conversation found"). If it does, the outer catch handles
         // the retry and the user never sees this transient error.
         lastProviderError = { message: event.message, classification: event.classification };
+
+        // Force the stream closed so the turn ends now. Without this, the
+        // SDK can keep the stream alive after a non-retryable error (e.g.
+        // a 429 rate-limit) and the next user message gets pushed in,
+        // transparently "recovering" — but the user never finds out their
+        // original request failed. End early so the unsurfacedError path
+        // notifies them; the next message starts a fresh query.
+        if (!endedForCommand) {
+          endedForCommand = true;
+          query.end();
+        }
       } else if (event.type === 'result') {
         // A result — with or without text — means the turn is done. Mark
         // the initial batch completed now so the host sweep doesn't see
