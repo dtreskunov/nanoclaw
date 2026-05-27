@@ -427,6 +427,9 @@ async function buildContainerArgs(
   // which hangs or takes minutes on large images in nested container envs.
   if (isRootlessPodman()) {
     args.push('--user=0:0');
+    // Forcing UID 0 bypasses the Dockerfile's USER node, so HOME defaults to
+    // /root instead of /home/node where .claude is mounted. Pin it explicitly.
+    args.push('-e', 'HOME=/home/node');
   }
 
   // Environment — only vars read by code we don't own.
