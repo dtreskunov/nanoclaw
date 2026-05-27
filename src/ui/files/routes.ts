@@ -1,67 +1,54 @@
 /**
- * HTTP route handlers for the file browser. One dispatcher; the server
- * module wraps it in a real `http.Server`.
+ * HTTP route handlers for the file browser (mounted at /ui/files by the
+ * UI shell in ../server.ts). The shell owns shared auth at /ui/auth/* and
+ * mints the cookie this dispatcher reads.
  */
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { URL } from 'url';
 
-import { GROUPS_DIR } from '../config.js';
-import { getAgentGroup } from '../db/agent-groups.js';
-import { log } from '../log.js';
-import { listAccessibleAgentGroups } from '../modules/permissions/access.js';
-import { hasAdminPrivilege } from '../modules/permissions/db/user-roles.js';
-import {
-  authenticate,
-  buildClearCookie,
-  buildSessionCookie,
-  logout as authLogout,
-  recordAccess,
-  redeemAndCreateSession,
-} from './auth.js';
+import { GROUPS_DIR } from '../../config.js';
+import { getAgentGroup } from '../../db/agent-groups.js';
+import { log } from '../../log.js';
+import { listAccessibleAgentGroups } from '../../modules/permissions/access.js';
+import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
+import { authenticate, recordAccess } from '../auth.js';
 import { classify, resolveSafe } from './classify.js';
 
 // UI assets live under src/ (not compiled by tsc); resolve from project root,
 // which the host always runs from.
-const UI_DIR = path.resolve(process.cwd(), 'src', 'file-browser', 'ui');
+const UI_DIR = path.resolve(process.cwd(), 'src', 'ui', 'files', 'ui');
 const MAX_INLINE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 
 /** Path prefix the file browser is mounted under on the shared HTTP server. */
-export const MOUNT_PREFIX = '/files';
+export const FILES_MOUNT_PREFIX = '/ui/files';
 
 interface Ctx {
   req: http.IncomingMessage;
   res: http.ServerResponse;
   url: URL;
-  secureCookie: boolean;
 }
 
-export async function handle(
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-  secureCookie: boolean,
-): Promise<void> {
+export async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  const ctx: Ctx = { req, res, url, secureCookie };
+  const ctx: Ctx = { req, res, url };
 
   // Strip the mount prefix so internal route matching stays local.
   let pathname = url.pathname;
-  if (pathname === MOUNT_PREFIX) {
-    // /files (no trailing slash) → redirect to /files/ so relative URLs resolve.
-    res.writeHead(308, { Location: MOUNT_PREFIX + '/' });
+  if (pathname === FILES_MOUNT_PREFIX) {
+    // /ui/files (no trailing slash) → redirect to /ui/files/ so relative URLs resolve.
+    res.writeHead(308, { Location: FILES_MOUNT_PREFIX + '/' });
     res.end();
     return;
   }
-  if (pathname.startsWith(MOUNT_PREFIX + '/')) {
-    pathname = pathname.slice(MOUNT_PREFIX.length) || '/';
+  if (pathname.startsWith(FILES_MOUNT_PREFIX + '/')) {
+    pathname = pathname.slice(FILES_MOUNT_PREFIX.length) || '/';
   }
 
   try {
-    // Public routes.
-    if (req.method === 'GET' && pathname === '/auth/redeem') return handleRedeem(ctx);
-    if (req.method === 'POST' && pathname === '/auth/logout') return handleLogout(ctx);
+    // Public static routes.
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return serveStatic(ctx, 'index.html');
     if (req.method === 'GET' && pathname.startsWith('/ui/')) return serveStatic(ctx, pathname.slice('/ui/'.length));
 
@@ -88,29 +75,6 @@ export async function handle(
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────
-
-function handleRedeem(ctx: Ctx): void {
-  const token = ctx.url.searchParams.get('t');
-  if (!token) return text(ctx, 400, 'Missing token');
-  const result = redeemAndCreateSession(token);
-  if (!result) {
-    recordAccess({ userId: null, groupId: null, path: null, action: 'auth.redeem_failed', req: ctx.req });
-    return text(ctx, 400, 'Invalid or expired link');
-  }
-  recordAccess({ userId: result.userId, groupId: null, path: null, action: 'auth.login', req: ctx.req });
-  ctx.res.writeHead(303, {
-    Location: MOUNT_PREFIX + '/',
-    'Set-Cookie': buildSessionCookie(result.token, ctx.secureCookie),
-  });
-  ctx.res.end();
-}
-
-function handleLogout(ctx: Ctx): void {
-  authLogout(ctx.req);
-  recordAccess({ userId: null, groupId: null, path: null, action: 'auth.logout', req: ctx.req });
-  ctx.res.writeHead(303, { Location: MOUNT_PREFIX + '/', 'Set-Cookie': buildClearCookie(ctx.secureCookie) });
-  ctx.res.end();
-}
 
 function handleMe(ctx: Ctx, userId: string): void {
   json(ctx, 200, { userId });

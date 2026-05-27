@@ -6,12 +6,12 @@
  * - Admin commands: checked against user_roles; denied senders get a
  *   "Permission denied" response written directly to messages_out
  * - Intercepted commands: handled by the host (e.g. /web-login mints a
- *   file-browser magic link); the host writes a direct outbound reply.
+ *   UI magic link); the host writes a direct outbound reply.
  * - Normal messages: pass through unchanged
  */
 import { getDb, hasTable } from './db/connection.js';
-import { issueMagicLink } from './file-browser/auth.js';
-import { fileBrowserBaseUrl, isFileBrowserEnabled } from './file-browser/server.js';
+import { issueMagicLink } from './ui/auth.js';
+import { isUiEnabled, uiBaseUrl } from './ui/server.js';
 
 export type GateResult =
   | { action: 'pass' }
@@ -60,14 +60,13 @@ function handleWebLogin(userId: string | null): GateResult {
   if (!userId) {
     return { action: 'reply', text: 'Could not identify your account for login.' };
   }
-  if (!isFileBrowserEnabled()) {
-    return { action: 'reply', text: 'File browser is not enabled on this server.' };
+  if (!isUiEnabled()) {
+    return { action: 'reply', text: 'Web UI is not enabled on this server.' };
   }
   const { token } = issueMagicLink(userId);
-  const url = `${fileBrowserBaseUrl()}/auth/redeem?t=${token}`;
+  const url = `${uiBaseUrl()}/auth/redeem?t=${token}`;
   return { action: 'reply', text: `Your one-time login link (expires in 10 minutes, single use):\n${url}` };
 }
-
 
 function isAdmin(userId: string | null, agentGroupId: string): boolean {
   if (!userId) return false;

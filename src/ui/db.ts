@@ -1,5 +1,5 @@
 /**
- * File browser DB layer.
+ * UI auth + audit DB layer (shared across all UI apps mounted under /ui).
  *
  * Sessions and magic links store only sha256(token) — the bearer token is
  * shown to the user exactly once (at issuance) and never persisted in
@@ -10,7 +10,7 @@ import crypto from 'crypto';
 
 import { getDb } from '../db/connection.js';
 
-export interface FileBrowserSession {
+export interface UiSession {
   token_hash: string;
   user_id: string;
   created_at: string;
@@ -18,7 +18,7 @@ export interface FileBrowserSession {
   last_used: string | null;
 }
 
-export interface FileBrowserMagicLink {
+export interface UiMagicLink {
   token_hash: string;
   user_id: string;
   created_at: string;
@@ -36,7 +36,7 @@ export function createMagicLink(userId: string, ttlMs: number): { token: string;
   const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
   getDb()
     .prepare(
-      `INSERT INTO file_browser_magic_links (token_hash, user_id, created_at, expires_at)
+      `INSERT INTO ui_magic_links (token_hash, user_id, created_at, expires_at)
        VALUES (?, ?, ?, ?)`,
     )
     .run(hashToken(token), userId, now.toISOString(), expiresAt);
@@ -47,15 +47,15 @@ export function createMagicLink(userId: string, ttlMs: number): { token: string;
 export function redeemMagicLink(token: string): string | null {
   const db = getDb();
   const hash = hashToken(token);
-  const row = db.prepare('SELECT * FROM file_browser_magic_links WHERE token_hash = ?').get(hash) as
-    | FileBrowserMagicLink
+  const row = db.prepare('SELECT * FROM ui_magic_links WHERE token_hash = ?').get(hash) as
+    | UiMagicLink
     | undefined;
   if (!row) return null;
   if (row.redeemed_at) return null;
   if (new Date(row.expires_at).getTime() < Date.now()) return null;
   const res = db
     .prepare(
-      "UPDATE file_browser_magic_links SET redeemed_at = datetime('now') WHERE token_hash = ? AND redeemed_at IS NULL",
+      "UPDATE ui_magic_links SET redeemed_at = datetime('now') WHERE token_hash = ? AND redeemed_at IS NULL",
     )
     .run(hash);
   if (res.changes !== 1) return null;
@@ -68,7 +68,7 @@ export function createSession(userId: string, ttlMs: number): { token: string; e
   const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
   getDb()
     .prepare(
-      `INSERT INTO file_browser_sessions (token_hash, user_id, created_at, expires_at, last_used)
+      `INSERT INTO ui_sessions (token_hash, user_id, created_at, expires_at, last_used)
        VALUES (?, ?, ?, ?, ?)`,
     )
     .run(hashToken(token), userId, now.toISOString(), expiresAt, now.toISOString());
@@ -77,24 +77,24 @@ export function createSession(userId: string, ttlMs: number): { token: string; e
 
 export function lookupSession(token: string): { userId: string; expiresAt: string } | null {
   const hash = hashToken(token);
-  const row = getDb().prepare('SELECT * FROM file_browser_sessions WHERE token_hash = ?').get(hash) as
-    | FileBrowserSession
+  const row = getDb().prepare('SELECT * FROM ui_sessions WHERE token_hash = ?').get(hash) as
+    | UiSession
     | undefined;
   if (!row) return null;
   if (new Date(row.expires_at).getTime() < Date.now()) return null;
   // Best-effort touch; not in the hot path enough to batch.
-  getDb().prepare("UPDATE file_browser_sessions SET last_used = datetime('now') WHERE token_hash = ?").run(hash);
+  getDb().prepare("UPDATE ui_sessions SET last_used = datetime('now') WHERE token_hash = ?").run(hash);
   return { userId: row.user_id, expiresAt: row.expires_at };
 }
 
 export function deleteSession(token: string): void {
-  getDb().prepare('DELETE FROM file_browser_sessions WHERE token_hash = ?').run(hashToken(token));
+  getDb().prepare('DELETE FROM ui_sessions WHERE token_hash = ?').run(hashToken(token));
 }
 
 export function purgeExpired(): void {
   const now = new Date().toISOString();
-  getDb().prepare('DELETE FROM file_browser_sessions WHERE expires_at < ?').run(now);
-  getDb().prepare('DELETE FROM file_browser_magic_links WHERE expires_at < ? OR redeemed_at IS NOT NULL').run(now);
+  getDb().prepare('DELETE FROM ui_sessions WHERE expires_at < ?').run(now);
+  getDb().prepare('DELETE FROM ui_magic_links WHERE expires_at < ? OR redeemed_at IS NOT NULL').run(now);
 }
 
 export function logAccess(args: {
@@ -106,7 +106,7 @@ export function logAccess(args: {
 }): void {
   getDb()
     .prepare(
-      `INSERT INTO file_browser_access_log (user_id, group_id, path, action, ip, ts)
+      `INSERT INTO ui_access_log (user_id, group_id, path, action, ip, ts)
        VALUES (?, ?, ?, ?, ?, datetime('now'))`,
     )
     .run(args.userId, args.groupId, args.path, args.action, args.ip);

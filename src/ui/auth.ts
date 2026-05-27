@@ -1,5 +1,6 @@
 /**
- * Cookie + magic-link authentication for the file browser.
+ * Cookie + magic-link authentication shared across all UI apps mounted
+ * under /ui.
  *
  * Bearer-token model with server-side session table — no signed cookies, no
  * shared HMAC key. The token in the cookie / URL is opaque; the DB stores
@@ -9,16 +10,16 @@ import http from 'http';
 
 import { log } from '../log.js';
 import { createMagicLink, createSession, deleteSession, lookupSession, logAccess, redeemMagicLink } from './db.js';
-import { MOUNT_PREFIX } from './routes.js';
+import { UI_MOUNT_PREFIX } from './server.js';
 
-const COOKIE_NAME = 'file_browser_session';
-const COOKIE_PATH = MOUNT_PREFIX;
+export const COOKIE_NAME = 'ui_session';
+export const COOKIE_PATH = UI_MOUNT_PREFIX; // /ui — covers every UI app
 export const MAGIC_LINK_TTL_MS = 10 * 60 * 1000; // 10 min
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export function issueMagicLink(userId: string): { token: string; expiresAt: string } {
   const out = createMagicLink(userId, MAGIC_LINK_TTL_MS);
-  log.info('File browser magic link issued', { userId, expiresAt: out.expiresAt });
+  log.info('UI magic link issued', { userId, expiresAt: out.expiresAt });
   return out;
 }
 
@@ -27,7 +28,7 @@ export function redeemAndCreateSession(token: string): { token: string; userId: 
   const userId = redeemMagicLink(token);
   if (!userId) return null;
   const session = createSession(userId, SESSION_TTL_MS);
-  log.info('File browser session created', { userId, expiresAt: session.expiresAt });
+  log.info('UI session created', { userId, expiresAt: session.expiresAt });
   return { token: session.token, userId, expiresAt: session.expiresAt };
 }
 
