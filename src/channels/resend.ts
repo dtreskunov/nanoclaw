@@ -85,20 +85,30 @@ registerChannelAdapter('resend', {
     // Override resolveThreadId so the alias is actually propagated into
     // encodeThreadId. Upstream destructures only {toAddress, messageId,
     // inReplyTo, references} from input and drops alias on the floor.
+    //
+    // Also: the fallback root is now the FIRST entry of References (the
+    // conversation root per RFC 5322), not the current messageId. The
+    // in-memory messageToThread map is wiped on every host restart, so the
+    // original hash(messageId) fallback minted a new thread for every reply
+    // received after a restart - and a new thread means a new session with
+    // no history. Using references[0] makes the threadId deterministic
+    // across restarts for any reply chain.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tr.resolveThreadId = async function (input: any): Promise<string> {
       const { toAddress, alias, messageId, inReplyTo, references } = input;
-      if (inReplyTo || references) {
-        const candidateIds = this.extractMessageIds(inReplyTo, references);
-        for (const candidate of candidateIds) {
-          const existingThread = this.messageToThread.get(candidate);
-          if (existingThread) {
-            this.trackMessage(existingThread, messageId);
-            return existingThread;
-          }
+      const candidateIds: string[] = inReplyTo || references ? this.extractMessageIds(inReplyTo, references) : [];
+      for (const candidate of candidateIds) {
+        const existingThread = this.messageToThread.get(candidate);
+        if (existingThread) {
+          this.trackMessage(existingThread, messageId);
+          return existingThread;
         }
       }
-      const hash = createHash('sha256').update(messageId).digest('hex').slice(0, 16);
+      // Deterministic root: first reference if any (extractMessageIds returns
+      // References in order, then In-Reply-To). Falls back to messageId only
+      // for true thread roots (no prior history).
+      const rootId = candidateIds[0] || messageId;
+      const hash = createHash('sha256').update(rootId).digest('hex').slice(0, 16);
       const threadId = this.encodeThreadId({ alias, toAddress, rootMessageIdHash: hash });
       this.trackMessage(threadId, messageId);
       return threadId;
