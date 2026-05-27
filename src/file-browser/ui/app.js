@@ -180,6 +180,14 @@
       pv.innerHTML = `<img alt="${escapeHtml(entry.name)}" src="${url}"/>`;
       return;
     }
+    if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) {
+      pv.innerHTML = `<audio controls preload="metadata" src="${url}"></audio><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      return;
+    }
+    if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) {
+      pv.innerHTML = `<video controls preload="metadata" src="${url}" style="max-width:100%;max-height:80vh"></video><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      return;
+    }
     if (ext === 'pdf') {
       pv.innerHTML = `<iframe src="${url}" style="width:100%;height:90vh;border:0"></iframe>`;
       return;

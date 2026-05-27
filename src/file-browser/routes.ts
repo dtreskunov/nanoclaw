@@ -268,10 +268,30 @@ const IMAGE_EXTS: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
 };
+const AUDIO_EXTS: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.weba': 'audio/webm',
+};
+const VIDEO_EXTS: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+  '.ogv': 'video/ogg',
+};
 const PDF_MIME = 'application/pdf';
 
 function mimeFor(ext: string): { type: string; inlineSafe: boolean } {
   if (ext in IMAGE_EXTS) return { type: IMAGE_EXTS[ext], inlineSafe: ext !== '.svg' };
+  if (ext in AUDIO_EXTS) return { type: AUDIO_EXTS[ext], inlineSafe: true };
+  if (ext in VIDEO_EXTS) return { type: VIDEO_EXTS[ext], inlineSafe: true };
   if (ext === '.pdf') return { type: PDF_MIME, inlineSafe: true };
   if (TEXT_EXTS.has(ext)) return { type: 'text/plain; charset=utf-8', inlineSafe: true };
   return { type: 'application/octet-stream', inlineSafe: false };
