@@ -12,6 +12,8 @@
  * import from src/index.ts, or the cycle returns.
  */
 
+import { log } from './log.js';
+
 export interface ResponsePayload {
   questionId: string;
   value: string;
@@ -42,4 +44,22 @@ export function onShutdown(cb: ShutdownCallback): void {
 
 export function getShutdownCallbacks(): readonly ShutdownCallback[] {
   return shutdownCallbacks;
+}
+
+/**
+ * Dispatch a response (button click, email reply, etc.) through the registered
+ * handler chain. Returns true if a handler claimed it. Logs an unclaimed
+ * warning when none did. Errors thrown by a handler are logged but don't stop
+ * subsequent handlers from trying.
+ */
+export async function dispatchResponse(payload: ResponsePayload): Promise<boolean> {
+  for (const handler of responseHandlers) {
+    try {
+      if (await handler(payload)) return true;
+    } catch (err) {
+      log.error('Response handler threw', { questionId: payload.questionId, err });
+    }
+  }
+  log.warn('Unclaimed response', { questionId: payload.questionId, value: payload.value });
+  return false;
 }
