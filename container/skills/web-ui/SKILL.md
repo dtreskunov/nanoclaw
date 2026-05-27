@@ -20,15 +20,17 @@ They authenticate with a single-use magic link.
 
 Call the `request_login_link` MCP tool with the requesting user's namespaced
 id (e.g. `resend:user@example.com`, `telegram:12345`, `slack:U01ABCD`). The
-**host** mints the link and delivers it to the user as a follow-up message on
-the current channel — your own reply should *not* try to include a URL
-(you don't have one) and should *not* ask the user to send `/web-login`.
+**host** mints the link and DMs it to that user privately — never to the
+current thread. This is important in group chats: even though the user asked
+in the group, the link is sensitive and lands in their DM. Your own reply
+should *not* try to include a URL (you don't have one) and should *not* ask
+the user to send `/web-login`.
 
-A reasonable reply when someone asks "show me my files":
+A reasonable reply when someone asks "show me my files" (in a group or DM):
 
-> I've sent you a one-time login link — check your messages on this channel.
-> It's valid for 10 minutes and gives you a 30-day browser session to the
-> read-only file browser for this agent group.
+> I've sent you a one-time login link in a direct message. It's valid for 10
+> minutes and gives you a 30-day browser session to the read-only file
+> browser for this agent group.
 
 ## What they can do once logged in
 
