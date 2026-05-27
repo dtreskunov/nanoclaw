@@ -320,6 +320,15 @@ registerChannelAdapter('resend', {
           filename: f.filename,
           content: f.data.toString('base64'),
         }));
+        // Resend rejects emails with no html/text body. When the agent
+        // sends attachments with empty text ("here are your files"
+        // implicit in the attachment list), supply a minimal placeholder
+        // so delivery doesn't fail.
+        const md = typeof message?.markdown === 'string' ? message.markdown : '';
+        if (!md.trim()) {
+          const names = files.map((f) => `- ${f.filename}`).join('\n');
+          message = { ...message, markdown: `Attached:\n\n${names}` };
+        }
       }
       try {
         return await origPostMessage(threadId, message);
