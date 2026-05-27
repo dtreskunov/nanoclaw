@@ -47,6 +47,7 @@ import './modules/index.js';
 import './cli/commands/index.js';
 import './cli/delivery-action.js';
 import { startCliServer, stopCliServer } from './cli/socket-server.js';
+import { startFileBrowser, stopFileBrowser } from './file-browser/server.js';
 
 import type { ChannelAdapter, ChannelSetup } from './channels/adapter.js';
 import { initChannelAdapters, teardownChannelAdapters, getChannelAdapter } from './channels/channel-registry.js';
@@ -165,6 +166,9 @@ async function main(): Promise<void> {
   // 7. Start the `ncl` CLI socket server (data/ncl.sock).
   await startCliServer();
 
+  // 8. Start the file browser (no-op unless FILE_BROWSER_ENABLED=true).
+  startFileBrowser();
+
   log.info('NanoClaw running');
 }
 
@@ -181,6 +185,7 @@ async function shutdown(signal: string): Promise<void> {
   stopDeliveryPolls();
   stopHostSweep();
   await stopCliServer();
+  await stopFileBrowser();
   try {
     await teardownChannelAdapters();
   } finally {

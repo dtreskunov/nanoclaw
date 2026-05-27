@@ -1,4 +1,6 @@
 import { registerResource } from '../crud.js';
+import { issueMagicLink } from '../../file-browser/auth.js';
+import { getUser } from '../../modules/permissions/db/users.js';
 
 registerResource({
   name: 'user',
@@ -32,4 +34,23 @@ registerResource({
     { name: 'created_at', type: 'string', description: 'Auto-set.', generated: true },
   ],
   operations: { list: 'open', get: 'open', create: 'approval', update: 'approval' },
+  customOperations: {
+    'issue-link': {
+      access: 'open',
+      description:
+        'Issue a one-time file-browser magic link for a user. Use --user <id>. Optionally --base-url <url> (defaults to http://127.0.0.1:3001). The link expires in 10 minutes and is single-use.',
+      handler: async (args) => {
+        const userId = (args.user as string) ?? (args.id as string);
+        if (!userId) throw new Error('--user is required');
+        if (!getUser(userId)) throw new Error(`unknown user: ${userId}`);
+        const baseUrl = (args['base-url'] as string) || 'http://127.0.0.1:3001';
+        const { token, expiresAt } = issueMagicLink(userId);
+        return {
+          user_id: userId,
+          url: `${baseUrl.replace(/\/$/, '')}/auth/redeem?t=${token}`,
+          expires_at: expiresAt,
+        };
+      },
+    },
+  },
 });

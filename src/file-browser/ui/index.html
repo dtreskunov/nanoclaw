@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NanoClaw — File Browser</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --border: rgba(127, 127, 127, 0.25);
+        --muted: rgba(127, 127, 127, 0.7);
+      }
+      * { box-sizing: border-box; }
+      body { font: 14px/1.4 system-ui, -apple-system, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+      header { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+      header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+      header .spacer { flex: 1; }
+      header .user { font-size: 12px; color: var(--muted); }
+      main { flex: 1; display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+      nav { border-right: 1px solid var(--border); overflow: auto; padding: 8px 0; }
+      nav .group { padding: 6px 12px; cursor: pointer; }
+      nav .group:hover { background: rgba(127, 127, 127, 0.1); }
+      nav .group.active { background: rgba(100, 150, 255, 0.15); font-weight: 600; }
+      nav .group .meta { font-size: 11px; color: var(--muted); }
+      section { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+      .breadcrumb { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: 12px; }
+      .breadcrumb a { color: inherit; cursor: pointer; text-decoration: underline; }
+      .panes { display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
+      .listing { border-right: 1px solid var(--border); overflow: auto; }
+      .listing .row { display: flex; align-items: center; gap: 8px; padding: 4px 12px; cursor: pointer; }
+      .listing .row:hover { background: rgba(127, 127, 127, 0.1); }
+      .listing .row.active { background: rgba(100, 150, 255, 0.15); }
+      .listing .row .name { flex: 1; }
+      .listing .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .listing .row.tier-admin .name::after { content: ' admin'; font-size: 10px; color: var(--muted); }
+      .preview { overflow: auto; padding: 12px; }
+      .preview pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, monospace; }
+      .preview img, .preview iframe { max-width: 100%; }
+      .empty { color: var(--muted); padding: 16px; font-style: italic; }
+      button { font: inherit; padding: 4px 10px; border: 1px solid var(--border); background: transparent; border-radius: 4px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>NanoClaw · File Browser</h1>
+      <div class="spacer"></div>
+      <span class="user" id="me"></span>
+      <form method="POST" action="/auth/logout"><button type="submit">Log out</button></form>
+    </header>
+    <main>
+      <nav id="groups"><div class="empty">Loading…</div></nav>
+      <section>
+        <div class="breadcrumb" id="crumb"></div>
+        <div class="panes">
+          <div class="listing" id="listing"><div class="empty">Select a group</div></div>
+          <div class="preview" id="preview"><div class="empty">Select a file</div></div>
+        </div>
+      </section>
+    </main>
+    <script src="/ui/app.js"></script>
+  </body>
+</html>
