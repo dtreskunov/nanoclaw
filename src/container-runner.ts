@@ -22,6 +22,7 @@ import {
 import { materializeContainerJson } from './container-config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { updateContainerConfigScalars, updateContainerConfigJson } from './db/container-configs.js';
+import { readEnvFile } from './env.js';
 import {
   CONTAINER_RUNTIME_BIN,
   dumpContainerProcesses,
@@ -383,6 +384,14 @@ function isTruthyEnv(v: string | undefined): boolean {
   return ['1', 'true', 'yes', 'on'].includes(v.trim().toLowerCase());
 }
 
+// Resolve an env var via process.env first, then the .env file (which the
+// systemd unit doesn't load). Mirrors what isUiEnabled() etc. do.
+function resolveEnv(name: string): string | undefined {
+  if (process.env[name] !== undefined) return process.env[name];
+  const file = readEnvFile([name]);
+  return file[name];
+}
+
 /**
  * Sync skill symlinks in .claude-shared/skills/ to match the container.json
  * selection. Each symlink points to a container path (/app/skills/<name>)
@@ -418,7 +427,7 @@ function syncSkillSymlinks(claudeDir: string, containerConfig: import('./contain
   desired = desired.filter((s) => {
     const required = readRequiredEnv(path.join(sharedSkillsDir, s, 'SKILL.md'));
     if (!required) return true;
-    return isTruthyEnv(process.env[required]);
+    return isTruthyEnv(resolveEnv(required));
   });
 
   const desiredSet = new Set(desired);
