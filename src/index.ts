@@ -25,26 +25,14 @@ import { log } from './log.js';
 // here so existing callers see the same surface.
 import {
   registerResponseHandler,
-  getResponseHandlers,
   onShutdown,
   getShutdownCallbacks,
+  dispatchResponse,
   type ResponsePayload,
   type ResponseHandler,
 } from './response-registry.js';
 export { registerResponseHandler, onShutdown };
 export type { ResponsePayload, ResponseHandler };
-
-async function dispatchResponse(payload: ResponsePayload): Promise<void> {
-  for (const handler of getResponseHandlers()) {
-    try {
-      const claimed = await handler(payload);
-      if (claimed) return;
-    } catch (err) {
-      log.error('Response handler threw', { questionId: payload.questionId, err });
-    }
-  }
-  log.warn('Unclaimed response', { questionId: payload.questionId, value: payload.value });
-}
 
 // Channel barrel — each enabled channel self-registers on import.
 // Channel skills uncomment lines in channels/index.ts to enable them.
