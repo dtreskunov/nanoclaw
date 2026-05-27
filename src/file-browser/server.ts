@@ -30,6 +30,11 @@ function readConfig(): { enabled: boolean; secure: boolean } {
   return { enabled, secure };
 }
 
+/** Whether the file browser is enabled and mounted (set via FILE_BROWSER_ENABLED). */
+export function isFileBrowserEnabled(): boolean {
+  return readConfig().enabled;
+}
+
 export function startFileBrowser(): void {
   const cfg = readConfig();
   if (!cfg.enabled) {
