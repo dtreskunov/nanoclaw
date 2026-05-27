@@ -21,6 +21,13 @@ export function getMembers(agentGroupId: string): AgentGroupMember[] {
     .all(agentGroupId) as AgentGroupMember[];
 }
 
+/** All membership rows for a user. Does not include implicit admin/owner membership. */
+export function getMembershipsForUser(userId: string): AgentGroupMember[] {
+  return getDb()
+    .prepare('SELECT * FROM agent_group_members WHERE user_id = ? ORDER BY added_at')
+    .all(userId) as AgentGroupMember[];
+}
+
 /**
  * Is the user "known" in this agent group?
  * Owner, global admin, and scoped admin are implicitly members.
