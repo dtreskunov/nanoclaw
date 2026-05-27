@@ -10,10 +10,12 @@ import http from 'http';
 
 import { log } from '../log.js';
 import { createMagicLink, createSession, deleteSession, lookupSession, logAccess, redeemMagicLink } from './db.js';
-import { UI_MOUNT_PREFIX } from './server.js';
+
+// Cookie scope. Kept in sync with UI_MOUNT_PREFIX in server.ts; inlined to
+// avoid a server.ts ↔ auth.ts ESM TDZ cycle.
+export const COOKIE_PATH = '/ui';
 
 export const COOKIE_NAME = 'ui_session';
-export const COOKIE_PATH = UI_MOUNT_PREFIX; // /ui — covers every UI app
 export const MAGIC_LINK_TTL_MS = 10 * 60 * 1000; // 10 min
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
