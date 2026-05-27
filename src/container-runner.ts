@@ -24,6 +24,7 @@ import { getContainerConfig } from './db/container-configs.js';
 import { updateContainerConfigScalars, updateContainerConfigJson } from './db/container-configs.js';
 import {
   CONTAINER_RUNTIME_BIN,
+  dumpContainerProcesses,
   hostGatewayArgs,
   isRootlessPodman,
   readonlyMountArgs,
@@ -211,6 +212,22 @@ export function killContainer(sessionId: string, reason: string, onExit?: () => 
   }
 
   log.info('Killing container', { sessionId, reason, containerName: entry.containerName });
+
+  // Forensic snapshot before kill — the container's stdout/stderr is lost on
+  // --rm exit, so a stuck agent leaves no trace otherwise. Limited to silent-
+  // stuck reasons so normal shutdowns stay quiet.
+  if (reason === 'absolute-ceiling' || reason === 'claim-stuck') {
+    const procs = dumpContainerProcesses(entry.containerName);
+    if (procs) {
+      log.warn('Container process snapshot before kill', {
+        sessionId,
+        containerName: entry.containerName,
+        reason,
+        processes: procs,
+      });
+    }
+  }
+
   try {
     stopContainer(entry.containerName);
   } catch {

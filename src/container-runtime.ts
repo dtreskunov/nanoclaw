@@ -83,6 +83,36 @@ export function stopContainer(name: string): void {
   execSync(`${CONTAINER_RUNTIME_BIN} stop -t 1 ${name}`, { stdio: 'pipe' });
 }
 
+/**
+ * Snapshot the running processes inside a container by reading /proc. Used as
+ * forensics before killing a container that's been silently stuck (no `ps`
+ * binary in node:22-slim, so we walk /proc directly). Returns the raw text or
+ * null on failure — never throws.
+ */
+export function dumpContainerProcesses(name: string): string | null {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) return null;
+  const script =
+    'for d in /proc/[0-9]*; do ' +
+    'pid="${d#/proc/}"; ' +
+    'state=$(awk "/^State:/{print \\$2,\\$3}" "$d/status" 2>/dev/null); ' +
+    'ppid=$(awk "/^PPid:/{print \\$2}" "$d/status" 2>/dev/null); ' +
+    'wchan=$(cat "$d/wchan" 2>/dev/null); ' +
+    'cmd=$(tr "\\0" " " < "$d/cmdline" 2>/dev/null); ' +
+    '[ -z "$cmd" ] && cmd="[$(cat $d/comm 2>/dev/null)]"; ' +
+    'printf "PID=%s PPID=%s STATE=%s WCHAN=%s CMD=%s\\n" "$pid" "$ppid" "$state" "$wchan" "$cmd"; ' +
+    'done';
+  try {
+    return execFileSync(CONTAINER_RUNTIME_BIN, ['exec', name, 'sh', '-c', script], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 5000,
+    });
+  } catch (err) {
+    log.warn('dumpContainerProcesses failed', { name, err: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
 /** Ensure the container runtime is running, starting it if needed. */
 export function ensureContainerRuntimeRunning(): void {
   try {
