@@ -28,6 +28,9 @@ const UI_DIR = path.resolve(process.cwd(), 'src', 'file-browser', 'ui');
 const MAX_INLINE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 
+/** Path prefix the file browser is mounted under on the shared HTTP server. */
+export const MOUNT_PREFIX = '/files';
+
 interface Ctx {
   req: http.IncomingMessage;
   res: http.ServerResponse;
@@ -43,23 +46,33 @@ export async function handle(
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const ctx: Ctx = { req, res, url, secureCookie };
 
+  // Strip the mount prefix so internal route matching stays local.
+  let pathname = url.pathname;
+  if (pathname === MOUNT_PREFIX) {
+    // /files (no trailing slash) → redirect to /files/ so relative URLs resolve.
+    res.writeHead(308, { Location: MOUNT_PREFIX + '/' });
+    res.end();
+    return;
+  }
+  if (pathname.startsWith(MOUNT_PREFIX + '/')) {
+    pathname = pathname.slice(MOUNT_PREFIX.length) || '/';
+  }
+
   try {
     // Public routes.
-    if (req.method === 'GET' && url.pathname === '/auth/redeem') return handleRedeem(ctx);
-    if (req.method === 'POST' && url.pathname === '/auth/logout') return handleLogout(ctx);
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html'))
-      return serveStatic(ctx, 'index.html');
-    if (req.method === 'GET' && url.pathname.startsWith('/ui/'))
-      return serveStatic(ctx, url.pathname.slice('/ui/'.length));
+    if (req.method === 'GET' && pathname === '/auth/redeem') return handleRedeem(ctx);
+    if (req.method === 'POST' && pathname === '/auth/logout') return handleLogout(ctx);
+    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return serveStatic(ctx, 'index.html');
+    if (req.method === 'GET' && pathname.startsWith('/ui/')) return serveStatic(ctx, pathname.slice('/ui/'.length));
 
     // Authenticated routes.
     const session = authenticate(req);
     if (!session) return json(ctx, 401, { error: 'unauthorized' });
 
-    if (req.method === 'GET' && url.pathname === '/api/me') return handleMe(ctx, session.userId);
-    if (req.method === 'GET' && url.pathname === '/api/groups') return handleGroups(ctx, session.userId);
+    if (req.method === 'GET' && pathname === '/api/me') return handleMe(ctx, session.userId);
+    if (req.method === 'GET' && pathname === '/api/groups') return handleGroups(ctx, session.userId);
 
-    const groupMatch = url.pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file)$/);
+    const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file)$/);
     if (req.method === 'GET' && groupMatch) {
       const [, groupId, kind] = groupMatch;
       const relPath = url.searchParams.get('path') ?? '';
@@ -86,7 +99,7 @@ function handleRedeem(ctx: Ctx): void {
   }
   recordAccess({ userId: result.userId, groupId: null, path: null, action: 'auth.login', req: ctx.req });
   ctx.res.writeHead(303, {
-    Location: '/',
+    Location: MOUNT_PREFIX + '/',
     'Set-Cookie': buildSessionCookie(result.token, ctx.secureCookie),
   });
   ctx.res.end();
@@ -95,7 +108,7 @@ function handleRedeem(ctx: Ctx): void {
 function handleLogout(ctx: Ctx): void {
   authLogout(ctx.req);
   recordAccess({ userId: null, groupId: null, path: null, action: 'auth.logout', req: ctx.req });
-  ctx.res.writeHead(303, { Location: '/', 'Set-Cookie': buildClearCookie(ctx.secureCookie) });
+  ctx.res.writeHead(303, { Location: MOUNT_PREFIX + '/', 'Set-Cookie': buildClearCookie(ctx.secureCookie) });
   ctx.res.end();
 }
 

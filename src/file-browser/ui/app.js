@@ -82,9 +82,9 @@
 
   // ── init ──────────────────────────────────────────────────────────────
   async function init() {
-    const me = await api('/api/me');
+    const me = await api('api/me');
     $('me').textContent = me.userId;
-    const { groups } = await api('/api/groups');
+    const { groups } = await api('api/groups');
     state.groups = groups;
     const nav = $('groups');
     nav.innerHTML = '';
@@ -130,7 +130,7 @@
     state.path = p;
     state.file = null;
     renderCrumb(p);
-    const { entries } = await api(`/api/groups/${encodeURIComponent(state.groupId)}/tree?path=${encodeURIComponent(p)}`);
+    const { entries } = await api(`api/groups/${encodeURIComponent(state.groupId)}/tree?path=${encodeURIComponent(p)}`);
     const list = $('listing');
     list.innerHTML = '';
     if (p) {
@@ -173,7 +173,7 @@
     for (const el of document.querySelectorAll('.listing .row')) {
       el.classList.toggle('active', el.dataset.path === entry.path);
     }
-    const url = `/api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
+    const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
     const pv = $('preview');
     const ext = entry.name.toLowerCase().split('.').pop();
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {

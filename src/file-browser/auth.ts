@@ -9,8 +9,10 @@ import http from 'http';
 
 import { log } from '../log.js';
 import { createMagicLink, createSession, deleteSession, lookupSession, logAccess, redeemMagicLink } from './db.js';
+import { MOUNT_PREFIX } from './routes.js';
 
 const COOKIE_NAME = 'file_browser_session';
+const COOKIE_PATH = MOUNT_PREFIX;
 export const MAGIC_LINK_TTL_MS = 10 * 60 * 1000; // 10 min
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -44,13 +46,13 @@ export function logout(req: http.IncomingMessage): void {
 
 export function buildSessionCookie(token: string, secure: boolean): string {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-  const parts = [`${COOKIE_NAME}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAge}`];
+  const parts = [`${COOKIE_NAME}=${token}`, `Path=${COOKIE_PATH}`, 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAge}`];
   if (secure) parts.push('Secure');
   return parts.join('; ');
 }
 
 export function buildClearCookie(secure: boolean): string {
-  const parts = [`${COOKIE_NAME}=`, 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0'];
+  const parts = [`${COOKIE_NAME}=`, `Path=${COOKIE_PATH}`, 'HttpOnly', 'SameSite=Lax', 'Max-Age=0'];
   if (secure) parts.push('Secure');
   return parts.join('; ');
 }

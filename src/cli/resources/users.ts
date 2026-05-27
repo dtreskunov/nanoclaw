@@ -1,5 +1,6 @@
 import { registerResource } from '../crud.js';
 import { issueMagicLink } from '../../file-browser/auth.js';
+import { fileBrowserBaseUrl } from '../../file-browser/server.js';
 import { getUser } from '../../modules/permissions/db/users.js';
 
 registerResource({
@@ -38,12 +39,12 @@ registerResource({
     'issue-link': {
       access: 'open',
       description:
-        'Issue a one-time file-browser magic link for a user. Use --user <id>. Optionally --base-url <url> (defaults to http://127.0.0.1:3001). The link expires in 10 minutes and is single-use.',
+        'Issue a one-time file-browser magic link for a user. Use --user <id>. Optionally --base-url <url> (defaults to FILE_BROWSER_BASE_URL or http://localhost:${WEBHOOK_PORT}/files). The link expires in 10 minutes and is single-use.',
       handler: async (args) => {
         const userId = (args.user as string) ?? (args.id as string);
         if (!userId) throw new Error('--user is required');
         if (!getUser(userId)) throw new Error(`unknown user: ${userId}`);
-        const baseUrl = (args['base-url'] as string) || 'http://127.0.0.1:3001';
+        const baseUrl = (args['base_url'] as string) || fileBrowserBaseUrl();
         const { token, expiresAt } = issueMagicLink(userId);
         return {
           user_id: userId,
