@@ -22,6 +22,7 @@ import {
 import { materializeContainerJson } from './container-config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { updateContainerConfigScalars, updateContainerConfigJson } from './db/container-configs.js';
+import { readEnvFile } from './env.js';
 import {
   CONTAINER_RUNTIME_BIN,
   dumpContainerProcesses,
@@ -363,6 +364,34 @@ function buildMounts(
   return mounts;
 }
 
+function readRequiredEnv(skillMdPath: string): string | null {
+  let text: string;
+  try {
+    text = fs.readFileSync(skillMdPath, 'utf8');
+  } catch {
+    return null;
+  }
+  if (!text.startsWith('---')) return null;
+  const end = text.indexOf('\n---', 3);
+  if (end === -1) return null;
+  const fm = text.slice(3, end);
+  const m = fm.match(/^requires_env:\s*([A-Za-z_][A-Za-z0-9_]*)\s*$/m);
+  return m ? m[1] : null;
+}
+
+function isTruthyEnv(v: string | undefined): boolean {
+  if (!v) return false;
+  return ['1', 'true', 'yes', 'on'].includes(v.trim().toLowerCase());
+}
+
+// Resolve an env var via process.env first, then the .env file (which the
+// systemd unit doesn't load). Mirrors what isUiEnabled() etc. do.
+function resolveEnv(name: string): string | undefined {
+  if (process.env[name] !== undefined) return process.env[name];
+  const file = readEnvFile([name]);
+  return file[name];
+}
+
 /**
  * Sync skill symlinks in .claude-shared/skills/ to match the container.json
  * selection. Each symlink points to a container path (/app/skills/<name>)
@@ -392,6 +421,14 @@ function syncSkillSymlinks(claudeDir: string, containerConfig: import('./contain
   } else {
     desired = containerConfig.skills;
   }
+
+  // Skip skills whose `requires_env: FOO` frontmatter names an env var that
+  // isn't truthy, so the agent doesn't surface commands the host won't honor.
+  desired = desired.filter((s) => {
+    const required = readRequiredEnv(path.join(sharedSkillsDir, s, 'SKILL.md'));
+    if (!required) return true;
+    return isTruthyEnv(resolveEnv(required));
+  });
 
   const desiredSet = new Set(desired);
 
