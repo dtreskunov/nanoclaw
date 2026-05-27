@@ -150,10 +150,7 @@ export function scaffoldEmailBotFolder(input: ScaffoldInput): ScaffoldResult {
   fs.mkdirSync(absPath, { recursive: true });
   fs.writeFileSync(path.join(absPath, 'CLAUDE.local.md'), `# ${name}\n\n${persona}\n`);
   fs.writeFileSync(path.join(absPath, 'allowed-senders.txt'), `${allowed}\n`);
-  fs.writeFileSync(
-    path.join(absPath, 'bot.json'),
-    JSON.stringify({ name, cli_scope: cliScope }, null, 2) + '\n',
-  );
+  fs.writeFileSync(path.join(absPath, 'bot.json'), JSON.stringify({ name, cli_scope: cliScope }, null, 2) + '\n');
 
   log.info('Scaffolded email-bot folder', { folder: alias, name, cliScope });
 

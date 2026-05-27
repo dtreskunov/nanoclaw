@@ -22,8 +22,14 @@ import { createResendAdapter } from '@resend/chat-sdk-adapter';
 import { Message, parseMarkdown } from 'chat';
 
 import { isSenderAllowed, provisionEmailBot, readBotFolder } from '../auto-provision.js';
+import { getMessagingGroupByPlatform, getMessagingGroupAgents } from '../db/messaging-groups.js';
+import { getAskQuestionRender } from '../db/sessions.js';
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
+import { getUserDmByMessagingGroup } from '../modules/permissions/db/user-dms.js';
+import { getOwners, getGlobalAdmins, getAdminsOfAgentGroup } from '../modules/permissions/db/user-roles.js';
+import { dispatchResponse } from '../response-registry.js';
+import { normalizeOptions } from './ask-question.js';
 import { createChatSdkBridge } from './chat-sdk-bridge.js';
 import { registerChannelAdapter } from './channel-registry.js';
 
@@ -89,9 +95,9 @@ registerChannelAdapter('resend', {
     // Also: the fallback root is now the FIRST entry of References (the
     // conversation root per RFC 5322), not the current messageId. The
     // in-memory messageToThread map is wiped on every host restart, so the
-    // original hash(messageId) fallback minted a new thread for every reply
-    // received after a restart - and a new thread means a new session with
-    // no history. Using references[0] makes the threadId deterministic
+    // original "hash(messageId)" fallback minted a new thread for every
+    // reply received after a restart — and a new thread means a new session
+    // with no history. Using references[0] makes the threadId deterministic
     // across restarts for any reply chain.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tr.resolveThreadId = async function (input: any): Promise<string> {
@@ -131,6 +137,43 @@ registerChannelAdapter('resend', {
       const senderAddress = parseEmailAddress(email.from);
       const alias = email.to?.[0] ? parseEmailAddress(email.to[0]) : FROM;
       log.info('Resend inbound', { from: senderAddress, alias, to: email.to, subject: email.subject });
+
+      // ── Approval-reply matcher ───────────────────────────────────────
+      // If the inbound email is a reply to an approval card we sent —
+      // recognised by the "[ref:appr-...]" tag we embed in the outbound
+      // subject (preserved across "Re:" prefixes) — parse the answer and
+      // dispatch through the response-handler chain. Subject-tag is
+      // primary because Gmail's text/plain reply often omits the quoted
+      // history that holds the body footer; the body fallback is a
+      // defense-in-depth for clients that DO quote. This bypasses the
+      // alias gate because cold-DM approvals are sent from the default
+      // FROM alias and the approver may not be in any allow-list.
+      const approvalReply =
+        matchApprovalReplyFromSubject(email.subject || '', email.text || '') || matchApprovalReply(email.text || '');
+      if (approvalReply) {
+        const { approvalId, optionValue } = approvalReply;
+        log.info('Resend approval reply detected', { approvalId, from: senderAddress, optionValue });
+        const platformId = `resend:${alias}`;
+        const threadIdForReply = await tr.resolveThreadId({
+          toAddress: senderAddress,
+          alias,
+          messageId: email.message_id,
+          inReplyTo: headersOf(email)['In-Reply-To'] || headersOf(email)['in-reply-to'],
+          references: headersOf(email).References || headersOf(email).references,
+        });
+        const claimed = await dispatchResponse({
+          questionId: approvalId,
+          value: optionValue,
+          userId: `resend:${senderAddress}`,
+          channelType: 'resend',
+          platformId,
+          threadId: threadIdForReply,
+        });
+        if (!claimed) {
+          log.warn('Resend approval reply not claimed by any handler', { approvalId, from: senderAddress });
+        }
+        return new Response(null, { status: 200 });
+      }
 
       // ── Email-bot gate ───────────────────────────────────────────────
       // Filesystem-driven allow-list: groups/<alias>/CLAUDE.local.md must
@@ -213,24 +256,248 @@ registerChannelAdapter('resend', {
     };
 
     // ── Outbound: send from the alias encoded in the threadId ────────
+    // Also override fromName per-alias: bot.json.name wins, else the
+    // local-part of the alias. Without this, every alias would send as
+    // RESEND_FROM_NAME (the global default).
+    //
+    // Also handle file attachments. The chat-sdk-adapter's postMessage
+    // accepts a `files` field but its normalizer silently drops it on
+    // the way to `resend.emails.send`. Monkey-patch the Resend client so
+    // a per-call closure stash can inject `attachments: [...]` (base64
+    // per Resend's API) before the real send. Safe because the bridge
+    // is `concurrency: 'queue'` — deliveries are serialized.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resendClient = (adapter as any).getResend();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const origSend = resendClient.emails.send.bind(resendClient.emails);
+    let pendingAttachments: Array<{ filename: string; content: string }> | null = null;
+    // For email_compose (new outbound emails): override the subject postMessage
+    // would otherwise build ("Re: <stored>" or "New message"). Cleared after one send.
+    let pendingSubjectOverride: string | null = null;
+    // Extra Reply-To address (e.g. routing replies to a human owner). Set
+    // before postMessage; consumed by the next send. Resend exposes this as
+    // top-level `replyTo` — passing it via custom headers does NOT work.
+    let pendingReplyTo: string | null = null;
+    // Extra BCC for audit trail of bot-initiated outreach. Owner sees every
+    // outbound and any Reply-All response; recipient does not see the BCC.
+    let pendingBcc: string | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resendClient.emails.send = async (payload: any) => {
+      if (pendingSubjectOverride) {
+        payload = { ...payload, subject: pendingSubjectOverride };
+        pendingSubjectOverride = null;
+      }
+      if (pendingReplyTo) {
+        payload = { ...payload, replyTo: pendingReplyTo };
+        pendingReplyTo = null;
+      }
+      if (pendingBcc) {
+        const existing = payload.bcc ? (Array.isArray(payload.bcc) ? payload.bcc : [payload.bcc]) : [];
+        payload = { ...payload, bcc: [...existing, pendingBcc] };
+        pendingBcc = null;
+      }
+      if (pendingAttachments) {
+        payload = { ...payload, attachments: pendingAttachments };
+        pendingAttachments = null;
+      }
+      return origSend(payload);
+    };
+
     const origPostMessage = adapter.postMessage.bind(adapter);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     adapter.postMessage = async function (threadId: string, message: any) {
       const { alias } = tr.decodeThreadId(threadId);
-      const saved = this.config.fromAddress;
+      const savedAddress = this.config.fromAddress;
+      const savedName = this.config.fromName;
       this.config.fromAddress = alias;
+      if (alias !== FROM) {
+        const bot = readBotFolder(alias);
+        this.config.fromName = bot?.config?.name || alias.split('@')[0];
+      }
+      const files = message?.files as Array<{ data: Buffer; filename: string }> | undefined;
+      if (files && files.length > 0) {
+        pendingAttachments = files.map((f) => ({
+          filename: f.filename,
+          content: f.data.toString('base64'),
+        }));
+      }
       try {
         return await origPostMessage(threadId, message);
       } finally {
-        this.config.fromAddress = saved;
+        this.config.fromAddress = savedAddress;
+        this.config.fromName = savedName;
+        pendingAttachments = null;
       }
     };
 
-    return createChatSdkBridge({
+    const bridge = createChatSdkBridge({
       adapter,
       concurrency: 'queue',
       supportsThreads: true,
       transformOutboundText: hardenSoftBreaks,
     });
+
+    // ── Outbound deliver wrapper ─────────────────────────────────────
+    // 1. Cold-DM MGs (platform_id "resend:<alias>" with no recipient) have
+    //    a null threadId — the chat-sdk-bridge falls back to threadId =
+    //    platformId, which our 4-part decoder rejects. Look up the recipient
+    //    via user_dms and ask the adapter to mint a real threadId.
+    // 2. ask_question cards render as Card+Buttons, which has no equivalent
+    //    in email. Intercept and send a plain markdown body with the option
+    //    list and an "Approval ref: <id>" footer; the inbound webhook
+    //    parses that footer to route the reply back to the right approval.
+    const origDeliver = bridge.deliver.bind(bridge);
+    bridge.deliver = async function (platformId, threadId, message) {
+      const content = (message.content || {}) as Record<string, unknown>;
+
+      // email_compose: send a NEW email to an arbitrary recipient (not a
+      // reply in an existing thread). The MCP `send_email` tool writes this.
+      // Sender = alias encoded in platformId ("resend:<alias>"). We mint a
+      // fresh threadId via encodeThreadId, then route through postMessage
+      // so per-alias from-name swap + attachment stash still apply. The
+      // pendingSubjectOverride bypasses postMessage's "Re: <stored>" logic.
+      if (content.type === 'email_compose') {
+        const aliasMatch = platformId.match(/^resend:(.+)$/);
+        if (!aliasMatch) throw new Error(`email_compose: bad platformId ${platformId}`);
+        const alias = aliasMatch[1];
+        const to = String(content.to || '')
+          .trim()
+          .toLowerCase();
+        if (!to || !/^[^@\s]+@[^@\s]+$/.test(to)) {
+          throw new Error(`email_compose: invalid "to" address: ${to || '(empty)'}`);
+        }
+        const subject = String(content.subject || 'New message');
+        const body = String(content.body || '');
+        const seedId = `<${createHash('sha256').update(`${Date.now()}-${Math.random()}`).digest('hex').slice(0, 32)}@${alias.split('@')[1] || alias}>`;
+        const hash = createHash('sha256').update(seedId).digest('hex').slice(0, 16);
+        const newTid = tr.encodeThreadId({ alias, toAddress: to, rootMessageIdHash: hash });
+        tr.trackMessage(newTid, seedId);
+        pendingSubjectOverride = subject;
+        // Reply-To: prefer a scoped admin of the agent group sending this
+        // email, then global admin, then owner. Any resend: identity wins.
+        // Routes replies from unknown recipients straight to a human instead
+        // of into the silent-drop allow-list path.
+        const mgForReplyTo = getMessagingGroupByPlatform('resend', platformId);
+        const agentGroupId = mgForReplyTo ? getMessagingGroupAgents(mgForReplyTo.id)[0]?.agent_group_id : undefined;
+        const ownerEmail = pickReplyToEmail(agentGroupId);
+        if (ownerEmail && ownerEmail !== to) {
+          pendingReplyTo = ownerEmail;
+          pendingBcc = ownerEmail;
+        }
+        const result = await adapter.postMessage(newTid, { markdown: body, files: message.files });
+        return result?.id;
+      }
+
+      let tid = threadId;
+      if (!tid && /^resend:[^:]+$/.test(platformId)) {
+        const mg = getMessagingGroupByPlatform('resend', platformId);
+        const dm = mg ? getUserDmByMessagingGroup(mg.id) : undefined;
+        const recipient = dm?.user_id.startsWith('resend:') ? dm.user_id.slice('resend:'.length) : undefined;
+        if (!recipient) {
+          throw new Error(`Resend cold DM: no user_dms row for messaging group ${platformId} — cannot infer recipient`);
+        }
+        tid = await adapter.openDM(recipient);
+      }
+
+      if (content.type === 'ask_question' && content.questionId && tid) {
+        const questionId = content.questionId as string;
+        const title = (content.title as string) || '';
+        const question = (content.question as string) || '';
+        const options = normalizeOptions((content.options as never) || []);
+        const lines: string[] = [];
+        if (title) lines.push(`**${title}**`, '');
+        if (question) lines.push(question, '');
+        lines.push('Reply with one of:');
+        for (const o of options) lines.push(`- ${o.label}`);
+        lines.push('', `(Approval ref: ${questionId})`);
+        // Embed the approval ref in the subject too so reply matching
+        // survives clients that strip the quoted body. The adapter reads
+        // the stored subject and prepends "Re:" automatically.
+        const subjectBase = title || 'Approval';
+        tr.trackSubject(tid, `${subjectBase} [ref:${questionId}]`);
+        const result = await adapter.postMessage(tid, { markdown: lines.join('\n') });
+        return result?.id;
+      }
+
+      return origDeliver(platformId, tid, message);
+    };
+
+    return bridge;
   },
 });
+// every callsite — type is opaque to us, so just shape-narrow here.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function headersOf(email: any): Record<string, string> {
+  return (email.headers || {}) as Record<string, string>;
+}
+
+// Match the "Approval ref: appr-..." footer we embed in outbound approval
+// emails, plus the answer the human typed above the quoted original.
+// Returns { approvalId, optionValue } where optionValue is matched against
+// the persisted options of the pending question (case-insensitive substring
+// match on label or value). Falls back to the raw extracted text when no
+// option list is on file so the response handlers can still try to match.
+function matchApprovalReply(plain: string): { approvalId: string; optionValue: string } | null {
+  const m = plain.match(/Approval ref:\s*(appr-[A-Za-z0-9_-]+|nsa-[A-Za-z0-9_-]+|mg-[A-Za-z0-9_-]+)/);
+  if (!m) return null;
+  return resolveOptionForReply(m[1], extractUnquotedReply(plain));
+}
+
+// Match a "[ref:<id>]" tag in the subject (preserved across "Re:" prefixes).
+// More reliable than body parsing because Gmail's text/plain replies often
+// omit the quoted history. The reply body still has to be parsed to figure
+// out which option the user picked.
+function matchApprovalReplyFromSubject(
+  subject: string,
+  body: string,
+): { approvalId: string; optionValue: string } | null {
+  const m = subject.match(/\[ref:(appr-[A-Za-z0-9_-]+|nsa-[A-Za-z0-9_-]+|mg-[A-Za-z0-9_-]+)\]/);
+  if (!m) return null;
+  return resolveOptionForReply(m[1], extractUnquotedReply(body));
+}
+
+// Strip quoted lines + the "On <date> someone wrote:" attribution that sits
+// just above them, then take the surviving prefix as the user's answer.
+function extractUnquotedReply(plain: string): string {
+  const lines = plain.split(/\r?\n/);
+  const reply: string[] = [];
+  for (const line of lines) {
+    if (/^\s*>/.test(line)) break;
+    if (/^On .+ wrote:\s*$/.test(line)) break;
+    reply.push(line);
+  }
+  return reply.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function resolveOptionForReply(approvalId: string, answer: string): { approvalId: string; optionValue: string } {
+  if (!answer) return { approvalId, optionValue: '' };
+  const render = getAskQuestionRender(approvalId);
+  if (!render) return { approvalId, optionValue: answer };
+  const lower = answer.toLowerCase();
+  const match = render.options.find(
+    (o) => lower.includes(o.value.toLowerCase()) || lower.includes(o.label.toLowerCase()),
+  );
+  return { approvalId, optionValue: match?.value || answer };
+}
+
+// Pick the email address of an owner reachable on Resend, for use as Reply-To.
+// First owner whose user_id is "resend:<email>" wins (deterministic by
+// granted_at order). Returns null if no resend owner is configured.
+// Pick a Reply-To email for outbound new emails. Resolution order:
+//   1. scoped admin of the sending agent group with a resend: identity
+//   2. global admin with a resend: identity
+//   3. owner with a resend: identity
+// Returns null if none match.
+function pickReplyToEmail(agentGroupId: string | undefined): string | null {
+  const candidates: { user_id: string }[] = [];
+  if (agentGroupId) candidates.push(...getAdminsOfAgentGroup(agentGroupId));
+  candidates.push(...getGlobalAdmins());
+  candidates.push(...getOwners());
+  for (const c of candidates) {
+    if (c.user_id.startsWith('resend:')) {
+      const email = c.user_id.slice('resend:'.length).trim().toLowerCase();
+      if (/^[^@\s]+@[^@\s]+$/.test(email)) return email;
+    }
+  }
+  return null;
+}
