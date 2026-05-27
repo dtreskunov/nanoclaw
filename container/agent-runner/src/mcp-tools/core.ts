@@ -260,4 +260,76 @@ export const addReaction: McpToolDefinition = {
   },
 };
 
-registerTools([sendMessage, sendFile, editMessage, addReaction]);
+export const sendEmail: McpToolDefinition = {
+  tool: {
+    name: 'send_email',
+    description:
+      'Compose a NEW email to an arbitrary recipient using your wired email channel (Resend). Sender = your bot alias. Optional file attachments (paths under /workspace/agent or absolute). Use this when the user asks you to email someone other than the current correspondent. For replies in your existing email thread, use send_message / send_file instead.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        to: { type: 'string', description: 'Recipient email address.' },
+        subject: { type: 'string', description: 'Email subject line.' },
+        body: { type: 'string', description: 'Email body (Markdown supported).' },
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional file paths to attach (relative to /workspace/agent/ or absolute).',
+        },
+      },
+      required: ['to', 'subject', 'body'],
+    },
+  },
+  async handler(args) {
+    const to = String(args.to || '').trim();
+    const subject = String(args.subject || '').trim();
+    const body = String(args.body || '');
+    if (!to || !/^[^@\s]+@[^@\s]+$/.test(to)) return err(`Invalid "to" address: ${to || '(empty)'}`);
+    if (!subject) return err('subject is required');
+    if (!body) return err('body is required');
+
+    const resendDest = getAllDestinations().find((d) => d.type === 'channel' && d.channelType === 'resend');
+    if (!resendDest || !resendDest.platformId) {
+      return err('No Resend (email) channel destination configured for this agent.');
+    }
+
+    const id = generateId();
+
+    // Stage any attachments in the outbox dir — same pattern as send_file.
+    // Delivery reads /workspace/outbox/<id>/<filename> for each entry in content.files.
+    const inputFiles = Array.isArray(args.files) ? (args.files as unknown[]).map(String) : [];
+    const filenames: string[] = [];
+    if (inputFiles.length > 0) {
+      const outboxDir = path.join('/workspace/outbox', id);
+      fs.mkdirSync(outboxDir, { recursive: true });
+      for (const f of inputFiles) {
+        const resolved = path.isAbsolute(f) ? f : path.resolve('/workspace/agent', f);
+        if (!fs.existsSync(resolved)) return err(`File not found: ${f}`);
+        const filename = path.basename(resolved);
+        fs.copyFileSync(resolved, path.join(outboxDir, filename));
+        filenames.push(filename);
+      }
+    }
+
+    const seq = writeMessageOut({
+      id,
+      in_reply_to: getCurrentInReplyTo(),
+      kind: 'chat',
+      platform_id: resendDest.platformId,
+      channel_type: 'resend',
+      thread_id: null,
+      content: JSON.stringify({
+        type: 'email_compose',
+        to,
+        subject,
+        body,
+        ...(filenames.length > 0 ? { files: filenames } : {}),
+      }),
+    });
+
+    log(`send_email: #${seq} → ${to} (subject: ${subject}, files: ${filenames.length})`);
+    return ok(`Email queued to ${to} (id: ${seq}${filenames.length ? `, ${filenames.length} attachment(s)` : ''})`);
+  },
+};
+
+registerTools([sendMessage, sendFile, editMessage, addReaction, sendEmail]);
