@@ -1,5 +1,6 @@
 ---
 name: web-ui
+requires_env: UI_ENABLED
 description: >-
   Web UI access: how the user opens a browser to see their files. Use this
   skill when the user asks to "show me my files", "browse my files",
