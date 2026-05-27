@@ -34,12 +34,16 @@ export function createMagicLink(userId: string, ttlMs: number): { token: string;
   const token = crypto.randomBytes(32).toString('base64url');
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
-  getDb()
-    .prepare(
-      `INSERT INTO ui_magic_links (token_hash, user_id, created_at, expires_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .run(hashToken(token), userId, now.toISOString(), expiresAt);
+  const db = getDb();
+  // Supersede any still-valid unredeemed links for this user — only the
+  // most recently issued link should work.
+  db.prepare("UPDATE ui_magic_links SET redeemed_at = datetime('now') WHERE user_id = ? AND redeemed_at IS NULL").run(
+    userId,
+  );
+  db.prepare(
+    `INSERT INTO ui_magic_links (token_hash, user_id, created_at, expires_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(hashToken(token), userId, now.toISOString(), expiresAt);
   return { token, expiresAt };
 }
 
@@ -47,16 +51,12 @@ export function createMagicLink(userId: string, ttlMs: number): { token: string;
 export function redeemMagicLink(token: string): string | null {
   const db = getDb();
   const hash = hashToken(token);
-  const row = db.prepare('SELECT * FROM ui_magic_links WHERE token_hash = ?').get(hash) as
-    | UiMagicLink
-    | undefined;
+  const row = db.prepare('SELECT * FROM ui_magic_links WHERE token_hash = ?').get(hash) as UiMagicLink | undefined;
   if (!row) return null;
   if (row.redeemed_at) return null;
   if (new Date(row.expires_at).getTime() < Date.now()) return null;
   const res = db
-    .prepare(
-      "UPDATE ui_magic_links SET redeemed_at = datetime('now') WHERE token_hash = ? AND redeemed_at IS NULL",
-    )
+    .prepare("UPDATE ui_magic_links SET redeemed_at = datetime('now') WHERE token_hash = ? AND redeemed_at IS NULL")
     .run(hash);
   if (res.changes !== 1) return null;
   return row.user_id;
@@ -77,9 +77,7 @@ export function createSession(userId: string, ttlMs: number): { token: string; e
 
 export function lookupSession(token: string): { userId: string; expiresAt: string } | null {
   const hash = hashToken(token);
-  const row = getDb().prepare('SELECT * FROM ui_sessions WHERE token_hash = ?').get(hash) as
-    | UiSession
-    | undefined;
+  const row = getDb().prepare('SELECT * FROM ui_sessions WHERE token_hash = ?').get(hash) as UiSession | undefined;
   if (!row) return null;
   if (new Date(row.expires_at).getTime() < Date.now()) return null;
   // Best-effort touch; not in the hot path enough to batch.
