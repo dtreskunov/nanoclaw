@@ -1,11 +1,12 @@
 /**
- * Minimal HTTP server for Chat SDK adapter webhooks.
+ * Shared HTTP server. Hosts Chat SDK adapter webhooks under /webhook/{name}
+ * and any modules that mount themselves under a path prefix via
+ * {@link mountHandler}.
  *
- * Starts lazily on first adapter registration. Routes requests by path:
- *   /webhook/{adapterName} → chat.webhooks[adapterName](request)
- *
- * Multiple Chat instances can register adapters — each adapter name maps
- * to its owning Chat instance.
+ * Lazy-started: either {@link registerWebhookAdapter} or
+ * {@link ensureSharedHttpServer} brings it up. Binds 0.0.0.0:WEBHOOK_PORT
+ * (default 3000) — mounts inherit that public interface, so authentication
+ * is on the mount.
  */
 import http from 'http';
 
@@ -20,7 +21,15 @@ interface WebhookEntry {
   adapterName: string;
 }
 
+type MountHandler = (req: http.IncomingMessage, res: http.ServerResponse) => void | Promise<void>;
+
+interface Mount {
+  prefix: string; // e.g. '/files' (no trailing slash)
+  handler: MountHandler;
+}
+
 const routes = new Map<string, WebhookEntry>();
+const mounts: Mount[] = [];
 let server: http.Server | null = null;
 
 /** Convert Node.js IncomingMessage to a Web API Request. */
@@ -72,8 +81,25 @@ async function fromWebResponse(webRes: Response, nodeRes: http.ServerResponse): 
  */
 export function registerWebhookAdapter(chat: Chat, adapterName: string): void {
   routes.set(adapterName, { chat, adapterName });
-  ensureServer();
+  ensureSharedHttpServer();
   log.info('Webhook adapter registered', { adapter: adapterName, path: `/webhook/${adapterName}` });
+}
+
+/**
+ * Mount a request handler under a path prefix on the shared server.
+ * Starts the server lazily on first call. The handler receives requests
+ * whose `req.url` path starts with `prefix` (or equals it).
+ */
+export function mountHandler(prefix: string, handler: MountHandler): void {
+  const normalized = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  mounts.push({ prefix: normalized, handler });
+  ensureSharedHttpServer();
+  log.info('HTTP mount registered', { prefix: normalized });
+}
+
+/** Public for modules that want the shared server up without registering a route. */
+export function ensureSharedHttpServer(): void {
+  ensureServer();
 }
 
 function ensureServer(): void {
@@ -83,8 +109,25 @@ function ensureServer(): void {
 
   server = http.createServer(async (req, res) => {
     const url = req.url || '/';
+    const pathname = url.split('?')[0];
 
-    // Route: /webhook/{adapterName}
+    // 1. Mounts (longest prefix first so '/files/x' beats '/files' when both exist).
+    for (const m of [...mounts].sort((a, b) => b.prefix.length - a.prefix.length)) {
+      if (pathname === m.prefix || pathname.startsWith(m.prefix + '/')) {
+        try {
+          await m.handler(req, res);
+        } catch (err) {
+          log.error('Mount handler threw', { prefix: m.prefix, url: req.url, err });
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Internal Server Error');
+          }
+        }
+        return;
+      }
+    }
+
+    // 2. Built-in /webhook/{adapterName} routing.
     const match = url.match(/^\/webhook\/([^/?]+)/);
     if (!match) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -119,16 +162,21 @@ function ensureServer(): void {
   });
 
   server.listen(port, '0.0.0.0', () => {
-    log.info('Webhook server started', { port, adapters: [...routes.keys()] });
+    log.info('Shared HTTP server started', {
+      port,
+      adapters: [...routes.keys()],
+      mounts: mounts.map((m) => m.prefix),
+    });
   });
 }
 
-/** Shut down the webhook server. */
+/** Shut down the shared HTTP server. */
 export async function stopWebhookServer(): Promise<void> {
   if (server) {
     await new Promise<void>((resolve) => server!.close(() => resolve()));
     server = null;
     routes.clear();
-    log.info('Webhook server stopped');
+    mounts.length = 0;
+    log.info('Shared HTTP server stopped');
   }
 }
