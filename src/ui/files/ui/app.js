@@ -296,8 +296,8 @@
     const log = $('chat-log');
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + kind;
-    // Render outbound (agent) as markdown; user echo stays plain text.
-    const md = kind === 'out' ? renderMarkdown(text) : null;
+    // Render both inbound (user echo) and outbound (agent) as markdown.
+    const md = renderMarkdown(text);
     if (md != null) {
       wrap.classList.add('markdown');
       wrap.innerHTML = md;
