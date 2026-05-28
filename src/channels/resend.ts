@@ -22,6 +22,7 @@ import { createResendAdapter } from '@resend/chat-sdk-adapter';
 import { Message, parseMarkdown } from 'chat';
 
 import { isSenderAllowed, provisionEmailBot, readBotFolder } from '../auto-provision.js';
+import { getDb } from '../db/connection.js';
 import { getMessagingGroupByPlatform, getMessagingGroupAgents } from '../db/messaging-groups.js';
 import { getAskQuestionRender } from '../db/sessions.js';
 import { readEnvFile } from '../env.js';
@@ -116,6 +117,40 @@ registerChannelAdapter('resend', {
     // reply received after a restart — and a new thread means a new session
     // with no history. Using references[0] makes the threadId deterministic
     // across restarts for any reply chain.
+    //
+    // Cross-restart fix #2: persist `threadId → rootMessageId` so outbound
+    // replies can set RFC 5322 In-Reply-To/References headers even after a
+    // restart wipes the in-memory threadMessages map. Without these headers
+    // the agent's reply looks like a brand-new email; the user's next reply
+    // then builds References starting from the agent's Message-ID, so our
+    // resolveThreadId picks a different references[0] and mints a NEW
+    // thread. Result: a 34-email Gmail conversation gets sharded across
+    // many sessions, one per host restart.
+    const db = getDb();
+    const selectRoot = db.prepare<[string], { root_message_id: string }>(
+      'SELECT root_message_id FROM resend_thread_roots WHERE thread_id = ?',
+    );
+    const insertRoot = db.prepare<[string, string, string]>(
+      'INSERT OR IGNORE INTO resend_thread_roots (thread_id, root_message_id, created_at) VALUES (?, ?, ?)',
+    );
+    const recordRoot = (threadId: string, rootMessageId: string): void => {
+      // INSERT OR IGNORE makes this first-writer-wins, so a later message
+      // can't clobber the true root.
+      try {
+        insertRoot.run(threadId, rootMessageId, new Date().toISOString());
+      } catch (err) {
+        log.warn('resend: failed to persist thread root', { err, threadId });
+      }
+    };
+    const lookupRoot = (threadId: string): string | undefined => {
+      try {
+        return selectRoot.get(threadId)?.root_message_id;
+      } catch (err) {
+        log.warn('resend: failed to lookup thread root', { err, threadId });
+        return undefined;
+      }
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tr.resolveThreadId = async function (input: any): Promise<string> {
       const { toAddress, alias, messageId, inReplyTo, references } = input;
@@ -134,7 +169,24 @@ registerChannelAdapter('resend', {
       const hash = createHash('sha256').update(rootId).digest('hex').slice(0, 16);
       const threadId = this.encodeThreadId({ alias, toAddress, rootMessageIdHash: hash });
       this.trackMessage(threadId, messageId);
+      recordRoot(threadId, rootId);
       return threadId;
+    };
+
+    // After restart `threadMessages` is empty so the upstream impl returns
+    // undefined and our outbound replies ship without In-Reply-To /
+    // References — breaking Gmail threading. Fall back to the persisted
+    // root so the conversation chain survives. We deliberately set both
+    // headers to the same root id: clients build References from the email
+    // they're replying to, so as long as our reply references the root,
+    // the user's subsequent reply will include the root in their chain.
+    const origGetReplyHeaders = tr.getReplyHeaders.bind(tr);
+    tr.getReplyHeaders = function (threadId: string): Record<string, string> | undefined {
+      const fromMemory = origGetReplyHeaders(threadId);
+      if (fromMemory) return fromMemory;
+      const root = lookupRoot(threadId);
+      if (!root) return undefined;
+      return { 'In-Reply-To': root, References: root };
     };
 
     // ── Inbound: key messaging_group on recipient alias ──────────────
