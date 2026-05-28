@@ -30,16 +30,25 @@
   }
 
   // ── hash routing ──────────────────────────────────────────────────────
+  // Hash format: #<groupId>/<path>[/]?t=<threadId>
+  // The ?t= suffix preserves the active chat thread across page reloads.
   function parseHash() {
-    const h = decodeURI(location.hash.replace(/^#/, ''));
-    if (!h) return null;
+    const raw = location.hash.replace(/^#/, '');
+    if (!raw) return null;
+    const qIdx = raw.indexOf('?');
+    const pathPart = qIdx < 0 ? raw : raw.slice(0, qIdx);
+    const queryPart = qIdx < 0 ? '' : raw.slice(qIdx + 1);
+    const params = new URLSearchParams(queryPart);
+    const threadId = params.get('t') || null;
+    const h = decodeURI(pathPart);
+    if (!h) return threadId ? { groupId: '', path: '', isDir: true, threadId } : null;
     const slash = h.indexOf('/');
-    if (slash < 0) return { groupId: h, path: '', isDir: true };
+    if (slash < 0) return { groupId: h, path: '', isDir: true, threadId };
     const groupId = h.slice(0, slash);
     const rest = h.slice(slash + 1);
     const isDir = rest === '' || rest.endsWith('/');
     const path = isDir ? rest.replace(/\/$/, '') : rest;
-    return { groupId, path, isDir };
+    return { groupId, path, isDir, threadId };
   }
 
   function writeHash() {
@@ -49,6 +58,9 @@
       h += '/' + encodeURI(state.file);
     } else if (state.path) {
       h += '/' + encodeURI(state.path) + '/';
+    }
+    if (chat.threadId && chat.groupId === state.groupId) {
+      h += '?t=' + encodeURIComponent(chat.threadId);
     }
     if (location.hash !== h) {
       suppressHash = true;
@@ -66,9 +78,13 @@
       $('preview').innerHTML = '<div class="empty">No access to group ' + escapeHtml(parsed.groupId) + '</div>';
       return;
     }
+    const groupChanged = state.groupId !== parsed.groupId;
     state.groupId = parsed.groupId;
     state.file = null;
     highlightGroup();
+    if (groupChanged) {
+      openChat(parsed.groupId, parsed.threadId).catch((err) => console.error('chat open failed', err));
+    }
     if (parsed.isDir) {
       await loadTree(parsed.path);
       $('preview').innerHTML = '<div class="empty">Select a file</div>';
@@ -124,6 +140,7 @@
     await loadTree('');
     $('preview').innerHTML = '<div class="empty">Select a file</div>';
     writeHash();
+    openChat(id).catch((err) => console.error('chat open failed', err));
   }
 
   async function loadTree(p) {
@@ -201,6 +218,14 @@
     const ct = r.headers.get('content-type') || '';
     if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml')) {
       const t = await r.text();
+      if (ext === 'md' || ext === 'markdown') {
+        const html = renderMarkdown(t);
+        if (html != null) {
+          pv.innerHTML = `<div class="markdown-preview"></div><div style="margin:8px 16px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+          pv.querySelector('.markdown-preview').innerHTML = html;
+          return;
+        }
+      }
       pv.innerHTML = `<pre></pre><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
       pv.querySelector('pre').textContent = t;
     } else {
@@ -243,4 +268,171 @@
   }
 
   init().catch((err) => console.error(err));
+
+  // ── chat side panel ───────────────────────────────────────────────────
+  const chat = { groupId: null, threadId: null, ws: null, reconnectTimer: null, reconnectAttempt: 0 };
+
+  function setChatStatus(text) {
+    $('chat-status').textContent = text;
+  }
+
+  function renderMarkdown(text) {
+    if (typeof window.marked === 'undefined') return null;
+    try {
+      return window.marked.parse(text || '', { breaks: true, gfm: true });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function appendChatMsg(kind, text, files) {
+    const log = $('chat-log');
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + kind;
+    // Render both inbound (user echo) and outbound (agent) as markdown.
+    const md = renderMarkdown(text);
+    if (md != null) {
+      wrap.classList.add('markdown');
+      wrap.innerHTML = md;
+    } else {
+      wrap.textContent = text || '';
+    }
+    if (files && files.length) {
+      const fl = document.createElement('div');
+      fl.className = 'files';
+      fl.textContent = files.map((f) => `📎 ${f.filename} (${fmtBytes(f.size)})`).join('  ');
+      wrap.appendChild(fl);
+    }
+    log.appendChild(wrap);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function openChat(groupId, resumeThreadId) {
+    // Tear down any prior session for the previously-selected group.
+    if (chat.ws) {
+      try { chat.ws.close(); } catch (_) { /* swallow */ }
+      chat.ws = null;
+    }
+    if (chat.reconnectTimer) {
+      clearTimeout(chat.reconnectTimer);
+      chat.reconnectTimer = null;
+    }
+    chat.groupId = groupId;
+    chat.threadId = null;
+    chat.reconnectAttempt = 0;
+    $('chat').hidden = false;
+    $('chat-log').innerHTML = '';
+
+    if (resumeThreadId) {
+      // Resume existing thread — skip /start, load history, then connect WS.
+      chat.threadId = resumeThreadId;
+      setChatStatus('loading history…');
+      try {
+        const r = await fetch(
+          `api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(resumeThreadId)}/history`,
+          { credentials: 'same-origin' },
+        );
+        if (r.ok) {
+          const { messages } = await r.json();
+          for (const msg of messages || []) {
+            appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null);
+          }
+        }
+      } catch (err) {
+        console.error('history load failed', err);
+      }
+      connectChatWs();
+      return;
+    }
+
+    setChatStatus('connecting…');
+    let started;
+    try {
+      const r = await fetch(`api/groups/${encodeURIComponent(groupId)}/chat/start`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      started = await r.json();
+    } catch (err) {
+      setChatStatus('failed to start chat: ' + err.message);
+      return;
+    }
+    chat.threadId = started.threadId;
+    writeHash();
+    connectChatWs();
+  }
+
+  function connectChatWs() {
+    if (!chat.groupId || !chat.threadId) return;
+    const groupId = chat.groupId;
+    const threadId = chat.threadId;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${location.host}/ui/files/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/ws`;
+    const ws = new WebSocket(wsUrl);
+    chat.ws = ws;
+    ws.onopen = () => {
+      chat.reconnectAttempt = 0;
+      setChatStatus('connected');
+    };
+    ws.onclose = () => {
+      if (chat.ws !== ws) return;
+      chat.ws = null;
+      // Only reconnect if the user hasn't switched groups.
+      if (chat.groupId !== groupId || chat.threadId !== threadId) return;
+      const attempt = ++chat.reconnectAttempt;
+      const delay = Math.min(15000, 500 * Math.pow(2, attempt - 1));
+      setChatStatus(`disconnected · reconnecting in ${Math.round(delay / 1000)}s…`);
+      chat.reconnectTimer = setTimeout(() => {
+        chat.reconnectTimer = null;
+        if (chat.groupId === groupId && chat.threadId === threadId) connectChatWs();
+      }, delay);
+    };
+    ws.onerror = () => setChatStatus('connection error');
+    ws.onmessage = (ev) => {
+      let payload;
+      try { payload = JSON.parse(ev.data); } catch (_) { return; }
+      if (payload.kind === 'ready') return;
+      if (payload.kind === 'inbound') {
+        appendChatMsg('in', payload.text, null);
+        return;
+      }
+      if (payload.kind === 'outbound') {
+        const c = payload.content || {};
+        const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
+        appendChatMsg('out', text, payload.files || []);
+        return;
+      }
+    };
+  }
+
+  async function sendChat(text) {
+    if (!chat.groupId || !chat.threadId) return;
+    try {
+      await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+    } catch (err) {
+      console.error('send failed', err);
+    }
+  }
+
+  $('chat-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const input = $('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    sendChat(text).catch(console.error);
+  });
+
+  $('chat-input').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      $('chat-form').requestSubmit();
+    }
+  });
 })();
