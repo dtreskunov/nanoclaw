@@ -10,6 +10,7 @@ import { URL } from 'url';
 
 import { GROUPS_DIR } from '../../config.js';
 import { getAgentGroup } from '../../db/agent-groups.js';
+import { getDb } from '../../db/connection.js';
 import { log } from '../../log.js';
 import { listAccessibleAgentGroups } from '../../modules/permissions/access.js';
 import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
@@ -94,11 +95,20 @@ function handleMe(ctx: Ctx, userId: string): void {
 }
 
 function handleGroups(ctx: Ctx, userId: string): void {
-  const groups = listAccessibleAgentGroups(userId).map((g) => ({
+  const accessible = listAccessibleAgentGroups(userId);
+  // Cheap per-group last-activity lookup so the dropdown can sort by recency.
+  type Row = { agent_group_id: string; last_active: string | null };
+  const rows = getDb()
+    .prepare('SELECT agent_group_id, MAX(last_active) AS last_active FROM sessions GROUP BY agent_group_id')
+    .all() as Row[];
+  const lastByGroup = new Map<string, string | null>();
+  for (const r of rows) lastByGroup.set(r.agent_group_id, r.last_active);
+  const groups = accessible.map((g) => ({
     id: g.id,
     name: g.name,
     folder: g.folder,
     isAdmin: hasAdminPrivilege(userId, g.id),
+    lastActivityAt: lastByGroup.get(g.id) ?? null,
   }));
   json(ctx, 200, { groups });
 }
