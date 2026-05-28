@@ -9,9 +9,8 @@
   const PANES = [
     { key: 'threads', id: 'threads-rail', mainClass: 'threads-collapsed', toggleBtn: 'btn-threads-toggle', mobileBtn: 'btn-threads' },
     { key: 'files',   id: 'files-pane',   mainClass: 'files-collapsed',   toggleBtn: 'btn-files-toggle',   mobileBtn: 'btn-files'   },
-    { key: 'preview', id: 'preview-pane', mainClass: 'preview-collapsed', toggleBtn: 'btn-preview-toggle', mobileBtn: null         },
   ];
-  const state = { groupId: null, path: '', file: null, groups: [], isAdmin: false, paneOpen: { threads: true, files: true, preview: true } };
+  const state = { groupId: null, path: '', file: null, groups: [], isAdmin: false, paneOpen: { threads: true, files: true } };
   const uploadState = { items: [], dragDepth: 0 };
   const chat = {
     groupId: null,
@@ -76,6 +75,18 @@
     if (sec < 86400 * 7) return Math.floor(sec / 86400) + 'd';
     return new Date(t).toLocaleDateString();
   }
+  function fmtAbsolute(ts) {
+    if (!ts) return '';
+    const norm = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
+    const t = Date.parse(norm);
+    if (!t) return '';
+    return new Date(t).toLocaleString();
+  }
+  function tsHTML(ts, cls) {
+    const rel = fmtRelative(ts);
+    if (!rel) return '';
+    return `<span class="${cls || 'ts'}" title="${escapeAttr(fmtAbsolute(ts))}">${escapeHtml(rel)}</span>`;
+  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -91,23 +102,31 @@
   // the file-browser file endpoint, so references like
   // [sick_day_v2.mp3](sick_day_v2.mp3) become clickable. Also auto-linkify
   // bare backtick-quoted filename-like tokens (e.g. `sick_day_v2.mp3`).
+  // Plain left-click opens the file in the preview pane; middle/cmd-click
+  // falls through to the href and opens in a new tab.
   function rewriteFileLinks(root) {
     if (!state.groupId) return;
     const gid = encodeURIComponent(state.groupId);
     const isExternal = (h) => /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith('#') || h.startsWith('//') || h.startsWith('mailto:');
-    const toFileUrl = (p) => {
-      let rel = String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
-      if (!rel) return null;
-      return `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+    const normalizeRel = (p) => String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
+    const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+    const attachPreviewClick = (a, rel) => {
+      a.addEventListener('click', (ev) => {
+        if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+        ev.preventDefault();
+        const entry = { path: rel, name: rel.slice(rel.lastIndexOf('/') + 1) };
+        navFile(entry).catch(console.error);
+      });
     };
     root.querySelectorAll('a[href]').forEach((a) => {
       const href = a.getAttribute('href') || '';
       if (!href || isExternal(href)) return;
-      const url = toFileUrl(href);
-      if (!url) return;
-      a.setAttribute('href', url);
+      const rel = normalizeRel(href);
+      if (!rel) return;
+      a.setAttribute('href', toFileUrl(rel));
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener');
+      attachPreviewClick(a, rel);
     });
     // Auto-linkify backtick-quoted filename-like tokens.
     const fileLikeRe = /^[\w.\-/ ]+\.[A-Za-z0-9]{1,8}$/;
@@ -116,13 +135,14 @@
       const txt = c.textContent || '';
       if (!fileLikeRe.test(txt)) return;
       if (txt.length > 200) return;
-      const url = toFileUrl(txt);
-      if (!url) return;
+      const rel = normalizeRel(txt);
+      if (!rel) return;
       const a = document.createElement('a');
-      a.href = url;
+      a.href = toFileUrl(rel);
       a.target = '_blank';
       a.rel = 'noopener';
       a.textContent = txt;
+      attachPreviewClick(a, rel);
       c.replaceWith(a);
     });
   }
@@ -186,7 +206,6 @@
     }
     if (parsed.isDir) {
       await loadTree(parsed.path);
-      setPreview('<div class="empty">No file selected</div>', 'Preview');
     } else {
       const parent = parentPath(parsed.path);
       await loadTree(parent);
@@ -252,7 +271,6 @@
     syncGroupSelect();
     await loadThreads(id);
     await loadTree('');
-    setPreview('<div class="empty">No file selected</div>', 'Preview');
     onSelectionChanged();
     // Auto-resume most recent thread on group switch.
     const latest = chat.threads.length > 0 ? chat.threads[0].threadId : null;
@@ -270,6 +288,9 @@
   async function loadTree(p) {
     state.path = p;
     state.file = null;
+    stopPreviewMedia();
+    $('files-pane').classList.remove('previewing');
+    $('preview').innerHTML = '';
     renderCrumb(p);
     onSelectionChanged();
     const dz = document.getElementById('dropzone-path');
@@ -292,6 +313,7 @@
       const icon = e.type === 'dir' ? '📁' : '📄';
       row.innerHTML = `<div>${icon}</div><div class="name">${escapeHtml(e.name)}</div>`
         + `<div class="size">${fmtBytes(e.size)}</div>`
+        + `<div class="meta">${tsHTML(e.mtime)}</div>`
         + `<div class="row-actions admin-only">`
         +   `<button type="button" class="act-ren" title="Rename">✎</button>`
         +   `<button type="button" class="act-del" title="Delete">🗑</button>`
@@ -309,58 +331,87 @@
   }
 
   async function navTree(p) { await loadTree(p); writeHash(); }
-  async function navFile(entry) { await selectFile(entry); writeHash(); openPreviewDrawerIfMobile(); }
+  async function navFile(entry) {
+    await selectFile(entry);
+    writeHash();
+    if (MOBILE_MQ.matches) openFilesDrawerIfMobile();
+    else if (!state.paneOpen.files) togglePane('files');
+  }
 
   async function selectFile(entry) {
     state.file = entry.path;
+    stopPreviewMedia();
     for (const el of document.querySelectorAll('.files-pane .row')) {
       el.classList.toggle('active', el.dataset.path === entry.path);
     }
+    renderCrumb(entry.path);
+    $('files-pane').classList.add('previewing');
     onSelectionChanged();
     const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
-    $('preview-title').textContent = '/' + entry.path.replace(/^\/+/, '');
-    $('preview-title').title = '/' + entry.path.replace(/^\/+/, '');
     const pv = $('preview');
+    if (entry.size == null || !entry.mtime) {
+      try {
+        const h = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
+        if (h.ok) {
+          if (entry.size == null) {
+            const cl = h.headers.get('content-length');
+            if (cl) entry.size = Number(cl);
+          }
+          if (!entry.mtime) {
+            const lm = h.headers.get('last-modified');
+            if (lm) { const t = Date.parse(lm); if (t) entry.mtime = new Date(t).toISOString(); }
+          }
+        }
+      } catch (_) {}
+    }
+    const toolbar = previewToolbar(entry, url);
     const ext = entry.name.toLowerCase().split('.').pop();
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-      pv.innerHTML = `<img alt="${escapeHtml(entry.name)}" src="${url}"/>`;
+      pv.innerHTML = `${toolbar}<img alt="${escapeHtml(entry.name)}" src="${url}"/>`;
       return;
     }
     if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) {
-      pv.innerHTML = `<audio controls preload="metadata" src="${url}"></audio><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<audio controls preload="metadata" src="${url}"></audio>`;
       return;
     }
     if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) {
-      pv.innerHTML = `<video controls preload="metadata" src="${url}" style="max-width:100%;max-height:80vh"></video><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<video controls preload="metadata" src="${url}" style="max-width:100%;max-height:80vh"></video>`;
       return;
     }
     if (ext === 'pdf') {
-      pv.innerHTML = `<iframe src="${url}" style="width:100%;height:90vh;border:0"></iframe>`;
+      pv.innerHTML = `${toolbar}<iframe src="${url}" style="width:100%;height:90vh;border:0"></iframe>`;
       return;
     }
     const r = await fetch(url, { credentials: 'same-origin' });
-    if (!r.ok) { pv.innerHTML = `<div class="empty">HTTP ${r.status}</div>`; return; }
+    if (!r.ok) { pv.innerHTML = `${toolbar}<div class="empty">HTTP ${r.status}</div>`; return; }
     const ct = r.headers.get('content-type') || '';
     if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml')) {
       const t = await r.text();
       if (ext === 'md' || ext === 'markdown') {
         const html = renderMarkdown(t);
         if (html != null) {
-          pv.innerHTML = `<div class="markdown-preview"></div><div style="margin:8px 0"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+          pv.innerHTML = `${toolbar}<div class="markdown-preview"></div>`;
           pv.querySelector('.markdown-preview').innerHTML = html;
           return;
         }
       }
-      pv.innerHTML = `<pre></pre><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<pre></pre>`;
       pv.querySelector('pre').textContent = t;
     } else {
-      pv.innerHTML = `<div class="empty">Binary file (${escapeHtml(ct)}). <a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<div class="empty">Binary file (${escapeHtml(ct)}).</div>`;
     }
   }
 
-  function setPreview(html, title) {
-    if (title) $('preview-title').textContent = title;
+  function previewToolbar(entry, url) {
+    const parts = [`<a class="text-btn" href="${url}" download="${escapeAttr(entry.name)}">Download</a>`];
+    if (entry.size != null) parts.push(`<span class="meta">${escapeHtml(fmtBytes(entry.size))}</span>`);
+    if (entry.mtime) parts.push(tsHTML(entry.mtime, 'meta'));
+    return `<div class="preview-toolbar">${parts.join('')}</div>`;
+  }
+
+  function setPreview(html) {
     $('preview').innerHTML = html;
+    $('files-pane').classList.add('previewing');
   }
 
   function renderCrumb(p) {
@@ -406,7 +457,7 @@
       row.dataset.id = t.threadId;
       row.innerHTML = `
         <div class="title">${escapeHtml(t.title)}</div>
-        <div class="meta">${fmtRelative(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}</div>
+        <div class="meta">${tsHTML(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}</div>
         <button type="button" class="del" title="Delete chat" aria-label="Delete chat">×</button>`;
       row.addEventListener('click', (ev) => {
         if (ev.target.classList.contains('del')) return;
@@ -479,7 +530,7 @@
 
   function setChatStatus(text) { $('chat-status').textContent = text || ''; }
 
-  function appendChatMsg(kind, text, files) {
+  function appendChatMsg(kind, text, files, ts) {
     const log = $('chat-log');
     // Clear the placeholder on first append.
     const placeholder = log.querySelector('.empty');
@@ -494,6 +545,12 @@
       fl.className = 'files';
       fl.textContent = files.map((f) => `📎 ${f.filename} (${fmtBytes(f.size)})`).join('  ');
       wrap.appendChild(fl);
+    }
+    const metaHTML = tsHTML(ts || new Date().toISOString(), 'meta');
+    if (metaHTML) {
+      const meta = document.createElement('div');
+      meta.innerHTML = metaHTML;
+      wrap.appendChild(meta.firstChild);
     }
     log.appendChild(wrap);
     log.scrollTop = log.scrollHeight;
@@ -523,7 +580,7 @@
         );
         if (r.ok) {
           const { messages } = await r.json();
-          for (const msg of messages || []) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null);
+          for (const msg of messages || []) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, msg.timestamp);
         }
       } catch (err) { console.error('history load failed', err); }
       connectChatWs();
@@ -578,7 +635,7 @@
       let payload; try { payload = JSON.parse(ev.data); } catch (_) { return; }
       if (payload.kind === 'ready') return;
       if (payload.kind === 'inbound') {
-        appendChatMsg('in', payload.text, payload.files || null);
+        appendChatMsg('in', payload.text, payload.files || null, payload.timestamp);
         updateActiveThreadTitleFromFirstMessage(payload.text);
         bumpActiveThread();
         return;
@@ -586,7 +643,7 @@
       if (payload.kind === 'outbound') {
         const c = payload.content || {};
         const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
-        appendChatMsg('out', text, payload.files || []);
+        appendChatMsg('out', text, payload.files || [], payload.timestamp);
         bumpActiveThread();
         return;
       }
@@ -714,20 +771,29 @@
     }
   }
 
+  function stopPreviewMedia() {
+    const pv = $('preview');
+    if (!pv) return;
+    for (const m of pv.querySelectorAll('audio, video')) {
+      try { m.pause(); m.currentTime = 0; } catch (_) {}
+    }
+  }
+
   function togglePane(key) {
     state.paneOpen[key] = !state.paneOpen[key];
+    if (key === 'files' && !state.paneOpen.files) stopPreviewMedia();
     applyPanelClasses();
     persistPanelState();
   }
 
-  function openPreviewDrawerIfMobile() {
+  function openFilesDrawerIfMobile() {
     if (!MOBILE_MQ.matches) return;
-    // On mobile, picking a file should slide in the preview drawer.
-    for (const p of PANES) $(p.id).classList.toggle('open', p.key === 'preview');
+    for (const p of PANES) $(p.id).classList.toggle('open', p.key === 'files');
     $('backdrop').classList.add('show');
   }
 
   function closeMobileDrawers() {
+    if ($('files-pane').classList.contains('open') && $('files-pane').classList.contains('previewing')) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.remove('open');
     $('backdrop').classList.remove('show');
   }
@@ -735,6 +801,7 @@
   function toggleMobileDrawer(which) {
     const target = $(PANES.find((p) => p.key === which).id);
     const willOpen = !target.classList.contains('open');
+    if ($('files-pane').classList.contains('open') && !(which === 'files' && willOpen)) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.toggle('open', p.key === which && willOpen);
     $('backdrop').classList.toggle('show', willOpen);
   }
