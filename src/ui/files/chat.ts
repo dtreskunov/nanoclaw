@@ -15,18 +15,20 @@ import Busboy from 'busboy';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { getAgentGroup } from '../../db/agent-groups.js';
+import { getDb } from '../../db/connection.js';
 import {
   createMessagingGroup,
   createMessagingGroupAgent,
   getMessagingGroupAgents,
   getMessagingGroupByPlatform,
 } from '../../db/messaging-groups.js';
-import { findSessionForAgent } from '../../db/sessions.js';
-import { openInboundDb, openOutboundDb } from '../../session-manager.js';
+import { deleteSession, findSessionForAgent } from '../../db/sessions.js';
+import { openInboundDb, openOutboundDb, sessionDir } from '../../session-manager.js';
 import { canAccessAgentGroup } from '../../modules/permissions/access.js';
 import { log } from '../../log.js';
 import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../channels/web.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
+import fs from 'fs';
 
 /** Map (userId, agentGroupId) → deterministic web platform_id. */
 function platformIdFor(userId: string, agentGroupId: string): string {
@@ -89,13 +91,19 @@ export function matchChatPath(
   | { kind: 'start'; groupId: string }
   | { kind: 'send'; groupId: string; threadId: string }
   | { kind: 'history'; groupId: string; threadId: string }
+  | { kind: 'threads'; groupId: string }
+  | { kind: 'delete'; groupId: string; threadId: string }
   | null {
   const start = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/start$/);
   if (start) return { kind: 'start', groupId: start[1] };
+  const threads = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/threads$/);
+  if (threads) return { kind: 'threads', groupId: threads[1] };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
   if (send) return { kind: 'send', groupId: send[1], threadId: send[2] };
   const hist = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/history$/);
   if (hist) return { kind: 'history', groupId: hist[1], threadId: hist[2] };
+  const del = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)$/);
+  if (del) return { kind: 'delete', groupId: del[1], threadId: del[2] };
   return null;
 }
 
@@ -301,6 +309,36 @@ export async function handleChatRequest(
     return true;
   }
 
+  if (m.kind === 'threads') {
+    if (req.method !== 'GET') {
+      writeJson(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+    try {
+      const threads = listChatThreads(userId, m.groupId);
+      writeJson(res, 200, { threads });
+    } catch (err) {
+      log.warn('web chat threads list failed', { userId, groupId: m.groupId, err });
+      writeJson(res, 200, { threads: [] });
+    }
+    return true;
+  }
+
+  if (m.kind === 'delete') {
+    if (req.method !== 'DELETE') {
+      writeJson(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+    try {
+      const removed = deleteChatThread(userId, m.groupId, m.threadId);
+      writeJson(res, removed ? 200 : 404, { ok: removed });
+    } catch (err) {
+      log.warn('web chat thread delete failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
+      writeJson(res, 500, { error: 'delete_failed' });
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -416,6 +454,132 @@ function parseOutboundContent(content: string): { text: string; files?: { filena
   } catch {
     return { text: content };
   }
+}
+
+interface ThreadSummary {
+  threadId: string;
+  title: string;
+  lastActivityAt: string;
+  messageCount: number;
+}
+
+/**
+ * List all chat threads for (user, agent group). For each session we open
+ * outbound.db to count messages + find max timestamp, and inbound.db to
+ * grab the first user message as the title. N file opens per request —
+ * fine at small scale, swap for a denormalized column when it bites.
+ */
+function listChatThreads(userId: string, groupId: string): ThreadSummary[] {
+  const platformId = platformIdFor(userId, groupId);
+  const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+  if (!mg) return [];
+
+  type Row = { id: string; thread_id: string; last_active: string | null; created_at: string };
+  const rows = getDb()
+    .prepare(
+      `SELECT id, thread_id, last_active, created_at FROM sessions
+       WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NOT NULL`,
+    )
+    .all(groupId, mg.id) as Row[];
+
+  const out: ThreadSummary[] = [];
+  for (const r of rows) {
+    let title = '';
+    let messageCount = 0;
+    let maxTs = r.last_active || r.created_at;
+
+    try {
+      const inDb = openInboundDb(groupId, r.id);
+      try {
+        const first = inDb
+          .prepare(
+            "SELECT content, timestamp FROM messages_in WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq LIMIT 1",
+          )
+          .get(r.thread_id) as { content: string; timestamp: string } | undefined;
+        if (first) {
+          const parsed = parseInboundContent(first.content);
+          if (parsed?.text) title = parsed.text;
+        }
+        const inCount = inDb
+          .prepare("SELECT COUNT(*) AS n FROM messages_in WHERE channel_type = 'web' AND thread_id = ?")
+          .get(r.thread_id) as { n: number };
+        messageCount += inCount.n;
+        const inMax = inDb
+          .prepare("SELECT MAX(timestamp) AS t FROM messages_in WHERE channel_type = 'web' AND thread_id = ?")
+          .get(r.thread_id) as { t: string | null };
+        if (inMax.t && inMax.t > maxTs) maxTs = inMax.t;
+      } finally {
+        inDb.close();
+      }
+    } catch {
+      /* db missing */
+    }
+
+    try {
+      const outDb = openOutboundDb(groupId, r.id);
+      try {
+        const outCount = outDb
+          .prepare(
+            "SELECT COUNT(*) AS n FROM messages_out WHERE channel_type = 'web' AND thread_id = ? AND kind IN ('chat','text')",
+          )
+          .get(r.thread_id) as { n: number };
+        messageCount += outCount.n;
+        const outMax = outDb
+          .prepare("SELECT MAX(timestamp) AS t FROM messages_out WHERE channel_type = 'web' AND thread_id = ?")
+          .get(r.thread_id) as { t: string | null };
+        if (outMax.t) {
+          const norm = outMax.t.includes('T') ? outMax.t : outMax.t.replace(' ', 'T') + 'Z';
+          if (Date.parse(norm) > Date.parse(maxTs.includes('T') ? maxTs : maxTs.replace(' ', 'T') + 'Z'))
+            maxTs = outMax.t;
+        }
+      } finally {
+        outDb.close();
+      }
+    } catch {
+      /* db missing */
+    }
+
+    // Strip the auto-prepended context blockquote from titles.
+    const cleanTitle = title
+      .replace(/^>\s*Context.*\n+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    out.push({
+      threadId: r.thread_id,
+      title: cleanTitle ? cleanTitle.slice(0, 60) : '(new chat)',
+      lastActivityAt: maxTs,
+      messageCount,
+    });
+  }
+
+  out.sort((a, b) => {
+    const ta = Date.parse(a.lastActivityAt.includes('T') ? a.lastActivityAt : a.lastActivityAt.replace(' ', 'T') + 'Z');
+    const tb = Date.parse(b.lastActivityAt.includes('T') ? b.lastActivityAt : b.lastActivityAt.replace(' ', 'T') + 'Z');
+    return tb - ta;
+  });
+  return out;
+}
+
+/**
+ * Delete a chat thread — drops the sessions row and removes the on-disk
+ * session directory. Returns true if a row was deleted. Does not stop a
+ * running container (the host sweeper will tear it down when its DB
+ * disappears).
+ */
+function deleteChatThread(userId: string, groupId: string, threadId: string): boolean {
+  const platformId = platformIdFor(userId, groupId);
+  const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+  if (!mg) return false;
+  const session = findSessionForAgent(groupId, mg.id, threadId);
+  if (!session) return false;
+  const dir = sessionDir(groupId, session.id);
+  deleteSession(session.id);
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (err) {
+    log.warn('failed to rm session dir', { dir, err });
+  }
+  return true;
 }
 
 // ── WebSocket upgrade ──
