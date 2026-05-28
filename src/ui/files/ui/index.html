@@ -51,7 +51,6 @@
       /*     <div class="head">                                              */
       /*       <button class="icon-btn">›</button>                           */
       /*       <span class="title">Label</span>                              */
-      /*       <button class="drawer-close" data-drawer-close>✕</button>     */
       /*     </div>                                                          */
       /*     <div class="my-body">…</div>                                    */
       /*   </aside>                                                          */
@@ -89,7 +88,7 @@
         border-bottom-color: transparent;
         border-right: 1px solid var(--border);
       }
-      .nc-pane.collapsed > .head .drawer-close { display: none; }
+      .nc-pane.collapsed > .head .icon-btn { transform: rotate(180deg); }
       .nc-pane.no-animate > .head { transition: none; }
       .nc-pane > .head .icon-btn {
         min-width: 24px; min-height: 24px; padding: 0; border: 0;
@@ -309,9 +308,6 @@
       .backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 5; }
       .backdrop.show { display: block; }
 
-      /* Drawer-only close button (mobile) */
-      .drawer-close { display: none; }
-
       /* Mobile layout */
       @media (max-width: 720px) {
         header {
@@ -346,7 +342,7 @@
         .threads-rail.open { transform: translateX(0); box-shadow: 2px 0 16px rgba(0,0,0,0.35); }
         .files-pane { right: 0; transform: translateX(100%); border-left: 1px solid var(--border); border-right: none; }
         .files-pane.open { transform: translateX(0); box-shadow: -2px 0 16px rgba(0,0,0,0.35); }
-        .preview-pane { right: 0; transform: translateX(100%); width: min(94vw, 520px) !important; }
+        .preview-pane { right: 0; transform: translateX(100%); }
         .preview-pane.open { transform: translateX(0); box-shadow: -2px 0 16px rgba(0,0,0,0.35); }
         main.files-collapsed .files-pane,
         main.preview-collapsed .preview-pane { width: min(86vw, 340px) !important; }
@@ -354,7 +350,6 @@
         main.preview-collapsed .preview-pane .preview-body { display: flex; flex-direction: column; }
         /* Hide the desktop collapse chevrons inside drawers on mobile */
         #btn-files-toggle, #btn-preview-toggle { display: none; }
-        .drawer-close { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 48px; font-size: 28px; font-weight: 500; line-height: 1; border: 0; background: transparent; cursor: pointer; color: inherit; margin-left: auto; padding: 0; }
         .threads-rail .head, .files-pane .head, .preview-pane .head {
           /* Override the desktop rotating-handle: on mobile the pane is a
              drawer, so the head is a normal in-flow top bar. */
@@ -367,7 +362,8 @@
           position: static !important;
         }
         .threads-rail .list { position: static !important; flex: 1; }
-        .threads-rail { display: flex; flex-direction: column; }
+        .threads-rail, .files-pane, .preview-pane { display: flex; flex-direction: column; }
+        .files-pane .files-body, .preview-pane .preview-body { flex: 1; min-height: 0; overflow: auto; }
         .preview-pane .head .title { font-size: 14px; }
         .threads-rail .head { display: flex; }
         .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -385,6 +381,7 @@
         .chat-main #chat-attach { min-width: 44px; min-height: 44px; font-size: 20px; padding: 0; flex-shrink: 0; }
         .chat-main #chat-send { min-width: 56px; min-height: 44px; font-weight: 600; flex-shrink: 0; }
         .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 10px; } /* 16px prevents iOS zoom on focus */
+        .files-pane .drop-hint { display: none !important; }
       }
 
       /* Show delete on touch devices (no hover) */
@@ -409,7 +406,6 @@
         <div class="head">
           <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads">›</button>
           <span class="title">Chats</span>
-          <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
         </div>
         <div class="threads-actions">
           <button type="button" id="btn-new-chat"><span class="plus">+</span> <span class="label">New chat</span></button>
@@ -432,7 +428,6 @@
         <div class="head">
           <button type="button" class="icon-btn" id="btn-files-toggle" aria-label="Collapse files">›</button>
           <span class="title">Files</span>
-          <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
         </div>
         <div class="head-actions admin-only">
           <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file">+F</button>
@@ -451,7 +446,6 @@
         <div class="head">
           <button type="button" class="icon-btn" id="btn-preview-toggle" aria-label="Collapse preview">›</button>
           <span class="title" id="preview-title">Preview</span>
-          <button type="button" class="drawer-close" data-drawer-back aria-label="Back to files">✕</button>
         </div>
         <div class="preview-body" id="preview"><div class="empty">No file selected</div></div>
       </aside>

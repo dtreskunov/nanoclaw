@@ -6,7 +6,12 @@
 //   #ag-xyz/sub/file.txt  → file (no trailing slash)
 //   ?t=<threadId> suffix  → active chat thread
 (() => {
-  const state = { groupId: null, path: '', file: null, groups: [], isAdmin: false, threadsOpen: true, filesOpen: true, previewOpen: true };
+  const PANES = [
+    { key: 'threads', id: 'threads-rail', mainClass: 'threads-collapsed', toggleBtn: 'btn-threads-toggle', mobileBtn: 'btn-threads' },
+    { key: 'files',   id: 'files-pane',   mainClass: 'files-collapsed',   toggleBtn: 'btn-files-toggle',   mobileBtn: 'btn-files'   },
+    { key: 'preview', id: 'preview-pane', mainClass: 'preview-collapsed', toggleBtn: 'btn-preview-toggle', mobileBtn: null         },
+  ];
+  const state = { groupId: null, path: '', file: null, groups: [], isAdmin: false, paneOpen: { threads: true, files: true, preview: true } };
   const uploadState = { items: [], dragDepth: 0 };
   const chat = {
     groupId: null,
@@ -682,61 +687,55 @@
   // ── panel toggle / mobile drawers ────────────────────────────────────
   function restorePanelState() {
     try {
-      const t = localStorage.getItem('nc:threadsOpen');
-      const f = localStorage.getItem('nc:filesOpen');
-      const p = localStorage.getItem('nc:previewOpen');
-      state.threadsOpen = t === null ? true : t === '1';
-      state.filesOpen = f === null ? true : f === '1';
-      state.previewOpen = p === null ? true : p === '1';
+      for (const p of PANES) {
+        const v = localStorage.getItem(`nc:pane:${p.key}`);
+        if (v !== null) state.paneOpen[p.key] = v === '1';
+      }
     } catch (_) { /* private mode */ }
     applyPanelClasses();
   }
 
   function persistPanelState() {
     try {
-      localStorage.setItem('nc:threadsOpen', state.threadsOpen ? '1' : '0');
-      localStorage.setItem('nc:filesOpen', state.filesOpen ? '1' : '0');
-      localStorage.setItem('nc:previewOpen', state.previewOpen ? '1' : '0');
+      for (const p of PANES) localStorage.setItem(`nc:pane:${p.key}`, state.paneOpen[p.key] ? '1' : '0');
     } catch (_) {}
   }
 
   function applyPanelClasses() {
     const main = $('main');
-    main.classList.toggle('threads-collapsed', !state.threadsOpen);
-    main.classList.toggle('files-collapsed', !state.filesOpen);
-    main.classList.toggle('preview-collapsed', !state.previewOpen);
-    $('threads-rail').classList.toggle('collapsed', !state.threadsOpen);
-    $('files-pane').classList.toggle('collapsed', !state.filesOpen);
-    $('preview-pane').classList.toggle('collapsed', !state.previewOpen);
+    const mobile = MOBILE_MQ.matches;
+    for (const p of PANES) {
+      const open = state.paneOpen[p.key];
+      // Desktop grid + .collapsed pane class only apply on desktop. On
+      // mobile the panes are drawers driven by .open and the desktop
+      // grid layout is replaced by a single-column flow.
+      main.classList.toggle(p.mainClass, !mobile && !open);
+      $(p.id).classList.toggle('collapsed', !mobile && !open);
+    }
   }
 
-  function toggleThreads() { state.threadsOpen = !state.threadsOpen; applyPanelClasses(); persistPanelState(); }
-  function toggleFiles() { state.filesOpen = !state.filesOpen; applyPanelClasses(); persistPanelState(); }
-  function togglePreview() { state.previewOpen = !state.previewOpen; applyPanelClasses(); persistPanelState(); }
+  function togglePane(key) {
+    state.paneOpen[key] = !state.paneOpen[key];
+    applyPanelClasses();
+    persistPanelState();
+  }
 
   function openPreviewDrawerIfMobile() {
     if (!MOBILE_MQ.matches) return;
     // On mobile, picking a file should slide in the preview drawer.
-    $('preview-pane').classList.add('open');
-    $('files-pane').classList.remove('open');
-    $('threads-rail').classList.remove('open');
+    for (const p of PANES) $(p.id).classList.toggle('open', p.key === 'preview');
     $('backdrop').classList.add('show');
   }
 
   function closeMobileDrawers() {
-    $('threads-rail').classList.remove('open');
-    $('files-pane').classList.remove('open');
-    $('preview-pane').classList.remove('open');
+    for (const p of PANES) $(p.id).classList.remove('open');
     $('backdrop').classList.remove('show');
   }
 
   function toggleMobileDrawer(which) {
-    const el = which === 'threads' ? $('threads-rail') : $('files-pane');
-    const other = which === 'threads' ? $('files-pane') : $('threads-rail');
-    other.classList.remove('open');
-    $('preview-pane').classList.remove('open');
-    const willOpen = !el.classList.contains('open');
-    el.classList.toggle('open', willOpen);
+    const target = $(PANES.find((p) => p.key === which).id);
+    const willOpen = !target.classList.contains('open');
+    for (const p of PANES) $(p.id).classList.toggle('open', p.key === which && willOpen);
     $('backdrop').classList.toggle('show', willOpen);
   }
 
@@ -978,7 +977,6 @@
       if (!state.groupId) return;
       openChat(state.groupId, null).then(() => { $('chat-input').focus(); closeMobileDrawers(); }).catch(console.error);
     });
-    $('btn-files-toggle').addEventListener('click', toggleFiles);
     const btnUpload = document.getElementById('btn-upload');
     const btnMkdir = document.getElementById('btn-mkdir');
     const uploadInput = document.getElementById('upload-input');
@@ -993,42 +991,33 @@
     const btnTouch = document.getElementById('btn-touch');
     if (btnTouch) btnTouch.addEventListener('click', () => touchPrompt());
     setupDragDrop();
-    $('btn-preview-toggle').addEventListener('click', togglePreview);
-    $('btn-threads-toggle').addEventListener('click', toggleThreads);
     // .nc-pane component: bind expand/collapse click handlers on each pane.
     // Clicks on the head toggle in both states; clicks on the collapsed
-    // body also toggle. Interactive children (button, a) are exempt.
-    function registerPane(paneId, isOpen, toggle) {
-      const pane = $(paneId);
+    // body also toggle. Interactive children (button, a) are exempt. All
+    // toggling is desktop-only — on mobile the same pane is a drawer.
+    function registerPane(p) {
+      const pane = $(p.id);
       if (!pane) return;
+      const toggle = () => togglePane(p.key);
       const headEl = pane.querySelector(':scope > .head');
       if (headEl) headEl.addEventListener('click', (ev) => {
         if (ev.target.closest('button, a')) return;
+        if (MOBILE_MQ.matches) return;
         ev.stopPropagation();
         toggle();
       });
       pane.addEventListener('click', (ev) => {
-        if (isOpen()) return;
+        if (state.paneOpen[p.key]) return;
         if (ev.target.closest('button, a')) return;
+        if (MOBILE_MQ.matches) return;
         toggle();
       });
+      if (p.toggleBtn) $(p.toggleBtn)?.addEventListener('click', toggle);
+      if (p.mobileBtn) $(p.mobileBtn)?.addEventListener('click', () => toggleMobileDrawer(p.key));
     }
-    registerPane('threads-rail', () => state.threadsOpen, toggleThreads);
-    registerPane('files-pane', () => state.filesOpen, toggleFiles);
-    registerPane('preview-pane', () => state.previewOpen, togglePreview);
-    $('btn-threads').addEventListener('click', () => toggleMobileDrawer('threads'));
-    $('btn-files').addEventListener('click', () => toggleMobileDrawer('files'));
+    for (const p of PANES) registerPane(p);
+    MOBILE_MQ.addEventListener('change', applyPanelClasses);
     $('backdrop').addEventListener('click', closeMobileDrawers);
-    document.querySelectorAll('[data-drawer-close]').forEach((el) => el.addEventListener('click', closeMobileDrawers));
-    document.querySelectorAll('[data-drawer-back]').forEach((el) => el.addEventListener('click', () => {
-      $('preview-pane').classList.remove('open');
-      if (MOBILE_MQ.matches) {
-        $('files-pane').classList.add('open');
-        $('backdrop').classList.add('show');
-      } else {
-        $('backdrop').classList.remove('show');
-      }
-    }));
 
     $('chat-form').addEventListener('submit', (ev) => {
       ev.preventDefault();
