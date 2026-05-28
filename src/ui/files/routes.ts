@@ -76,10 +76,10 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
 
     const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file)$/);
-    if (req.method === 'GET' && groupMatch) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && groupMatch) {
       const [, groupId, kind] = groupMatch;
       const relPath = url.searchParams.get('path') ?? '';
-      if (kind === 'tree') return handleTree(ctx, session.userId, groupId, relPath);
+      if (kind === 'tree' && req.method === 'GET') return handleTree(ctx, session.userId, groupId, relPath);
       if (kind === 'file') return handleFile(ctx, session.userId, groupId, relPath);
     }
 
@@ -205,6 +205,7 @@ function handleFile(ctx: Ctx, userId: string, groupId: string, relPath: string):
   const headers: http.OutgoingHttpHeaders = {
     'Content-Type': mime.type,
     'Content-Length': stat.size,
+    'Last-Modified': stat.mtime.toUTCString(),
     'X-Content-Type-Options': 'nosniff',
     'Cache-Control': 'private, max-age=0, must-revalidate',
   };
@@ -212,6 +213,10 @@ function handleFile(ctx: Ctx, userId: string, groupId: string, relPath: string):
 
   recordAccess({ userId, groupId: group.id, path: relPath, action: 'file', req: ctx.req });
   ctx.res.writeHead(200, headers);
+  if (ctx.req.method === 'HEAD') {
+    ctx.res.end();
+    return;
+  }
   fs.createReadStream(abs).pipe(ctx.res);
 }
 
