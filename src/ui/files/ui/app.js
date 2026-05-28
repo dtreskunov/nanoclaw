@@ -9,9 +9,8 @@
   const PANES = [
     { key: 'threads', id: 'threads-rail', mainClass: 'threads-collapsed', toggleBtn: 'btn-threads-toggle', mobileBtn: 'btn-threads' },
     { key: 'files',   id: 'files-pane',   mainClass: 'files-collapsed',   toggleBtn: 'btn-files-toggle',   mobileBtn: 'btn-files'   },
-    { key: 'preview', id: 'preview-pane', mainClass: 'preview-collapsed', toggleBtn: 'btn-preview-toggle', mobileBtn: null         },
   ];
-  const state = { groupId: null, path: '', file: null, groups: [], isAdmin: false, paneOpen: { threads: true, files: true, preview: true } };
+  const state = { groupId: null, path: '', file: null, groups: [], isAdmin: false, paneOpen: { threads: true, files: true } };
   const uploadState = { items: [], dragDepth: 0 };
   const chat = {
     groupId: null,
@@ -195,7 +194,6 @@
     }
     if (parsed.isDir) {
       await loadTree(parsed.path);
-      setPreview('<div class="empty">No file selected</div>', 'Preview');
     } else {
       const parent = parentPath(parsed.path);
       await loadTree(parent);
@@ -261,7 +259,6 @@
     syncGroupSelect();
     await loadThreads(id);
     await loadTree('');
-    setPreview('<div class="empty">No file selected</div>', 'Preview');
     onSelectionChanged();
     // Auto-resume most recent thread on group switch.
     const latest = chat.threads.length > 0 ? chat.threads[0].threadId : null;
@@ -279,6 +276,9 @@
   async function loadTree(p) {
     state.path = p;
     state.file = null;
+    stopPreviewMedia();
+    $('files-pane').classList.remove('previewing');
+    $('preview').innerHTML = '';
     renderCrumb(p);
     onSelectionChanged();
     const dz = document.getElementById('dropzone-path');
@@ -321,19 +321,20 @@
   async function navFile(entry) {
     await selectFile(entry);
     writeHash();
-    if (MOBILE_MQ.matches) openPreviewDrawerIfMobile();
-    else if (!state.paneOpen.preview) togglePane('preview');
+    if (MOBILE_MQ.matches) openFilesDrawerIfMobile();
+    else if (!state.paneOpen.files) togglePane('files');
   }
 
   async function selectFile(entry) {
     state.file = entry.path;
+    stopPreviewMedia();
     for (const el of document.querySelectorAll('.files-pane .row')) {
       el.classList.toggle('active', el.dataset.path === entry.path);
     }
+    renderCrumb(entry.path);
+    $('files-pane').classList.add('previewing');
     onSelectionChanged();
     const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
-    $('preview-title').textContent = '/' + entry.path.replace(/^\/+/, '');
-    $('preview-title').title = '/' + entry.path.replace(/^\/+/, '');
     const pv = $('preview');
     const ext = entry.name.toLowerCase().split('.').pop();
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
@@ -372,9 +373,9 @@
     }
   }
 
-  function setPreview(html, title) {
-    if (title) $('preview-title').textContent = title;
+  function setPreview(html) {
     $('preview').innerHTML = html;
+    $('files-pane').classList.add('previewing');
   }
 
   function renderCrumb(p) {
@@ -729,27 +730,28 @@
   }
 
   function stopPreviewMedia() {
-    for (const m of $('preview').querySelectorAll('audio, video')) {
+    const pv = $('preview');
+    if (!pv) return;
+    for (const m of pv.querySelectorAll('audio, video')) {
       try { m.pause(); m.currentTime = 0; } catch (_) {}
     }
   }
 
   function togglePane(key) {
     state.paneOpen[key] = !state.paneOpen[key];
-    if (key === 'preview' && !state.paneOpen.preview) stopPreviewMedia();
+    if (key === 'files' && !state.paneOpen.files) stopPreviewMedia();
     applyPanelClasses();
     persistPanelState();
   }
 
-  function openPreviewDrawerIfMobile() {
+  function openFilesDrawerIfMobile() {
     if (!MOBILE_MQ.matches) return;
-    // On mobile, picking a file should slide in the preview drawer.
-    for (const p of PANES) $(p.id).classList.toggle('open', p.key === 'preview');
+    for (const p of PANES) $(p.id).classList.toggle('open', p.key === 'files');
     $('backdrop').classList.add('show');
   }
 
   function closeMobileDrawers() {
-    if ($('preview-pane').classList.contains('open')) stopPreviewMedia();
+    if ($('files-pane').classList.contains('open') && $('files-pane').classList.contains('previewing')) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.remove('open');
     $('backdrop').classList.remove('show');
   }
@@ -757,7 +759,7 @@
   function toggleMobileDrawer(which) {
     const target = $(PANES.find((p) => p.key === which).id);
     const willOpen = !target.classList.contains('open');
-    if ($('preview-pane').classList.contains('open') && !(which === 'preview' && willOpen)) stopPreviewMedia();
+    if ($('files-pane').classList.contains('open') && !(which === 'files' && willOpen)) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.toggle('open', p.key === which && willOpen);
     $('backdrop').classList.toggle('show', willOpen);
   }
