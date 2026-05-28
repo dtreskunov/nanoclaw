@@ -582,7 +582,8 @@
     if (!state.groupId) return null;
     if (state.file) return { path: state.file, kind: 'file' };
     if (state.path) return { path: state.path.replace(/\/?$/, '/'), kind: 'dir' };
-    return { path: '/', kind: 'dir' };
+    // Root folder isn't useful context — skip the chip entirely.
+    return null;
   }
 
   function renderContextChip() {
