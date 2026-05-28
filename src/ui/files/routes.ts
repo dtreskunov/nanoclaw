@@ -16,12 +16,16 @@ import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
 import { authenticate, recordAccess } from '../auth.js';
 import { redeemDownloadToken } from '../download-tokens.js';
 import { classify, resolveSafe } from './classify.js';
+import { handleChatRequest, handleChatUpgrade } from './chat.js';
+
+export { handleChatUpgrade };
 
 // UI assets live under src/ (not compiled by tsc); resolve from project root,
 // which the host always runs from.
 const UI_DIR = path.resolve(process.cwd(), 'src', 'ui', 'files', 'ui');
 const MAX_INLINE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+const ASSET_VERSION = String(Date.now());
 
 /** Path prefix the file browser is mounted under on the shared HTTP server. */
 export const FILES_MOUNT_PREFIX = '/ui/files';
@@ -63,6 +67,8 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
 
     if (req.method === 'GET' && pathname === '/api/me') return handleMe(ctx, session.userId);
     if (req.method === 'GET' && pathname === '/api/groups') return handleGroups(ctx, session.userId);
+
+    if (await handleChatRequest(req, res, pathname, session.userId)) return;
 
     const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file)$/);
     if (req.method === 'GET' && groupMatch) {
@@ -355,6 +361,25 @@ function serveStatic(ctx: Ctx, relName: string): void {
         : ext === '.js'
           ? 'application/javascript; charset=utf-8'
           : 'application/octet-stream';
-  ctx.res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size });
+  if (ext === '.html') {
+    const body = fs.readFileSync(full, 'utf8').replace(/(<script\s+src="ui\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
+    const buf = Buffer.from(body, 'utf8');
+    ctx.res.writeHead(200, {
+      'Content-Type': type,
+      'Content-Length': buf.length,
+      'Cache-Control': 'no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    });
+    ctx.res.end(buf);
+    return;
+  }
+  ctx.res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Length': stat.size,
+    'Cache-Control': 'no-store, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  });
   fs.createReadStream(full).pipe(ctx.res);
 }

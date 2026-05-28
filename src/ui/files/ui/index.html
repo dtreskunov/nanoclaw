@@ -23,7 +23,7 @@
       nav .group:hover { background: rgba(127, 127, 127, 0.1); }
       nav .group.active { background: rgba(100, 150, 255, 0.15); font-weight: 600; }
       nav .group .meta { font-size: 11px; color: var(--muted); }
-      section { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+      section { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
       .breadcrumb { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: 12px; }
       .breadcrumb a { color: inherit; cursor: pointer; text-decoration: underline; }
       .panes { display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
@@ -39,6 +39,15 @@
       .preview img, .preview iframe { max-width: 100%; }
       .empty { color: var(--muted); padding: 16px; font-style: italic; }
       button { font: inherit; padding: 4px 10px; border: 1px solid var(--border); background: transparent; border-radius: 4px; cursor: pointer; }
+      .chat { border-top: 1px solid var(--border); display: grid; grid-template-rows: 1fr auto; height: 260px; min-height: 0; }
+      .chat .log { overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+      .chat .msg { padding: 6px 8px; border-radius: 6px; max-width: 75%; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+      .chat .msg.in { align-self: flex-end; background: rgba(100, 150, 255, 0.18); }
+      .chat .msg.out { align-self: flex-start; background: rgba(127, 127, 127, 0.12); }
+      .chat .msg .files { font-size: 11px; color: var(--muted); margin-top: 4px; }
+      .chat .status { padding: 0 12px; font-size: 11px; color: var(--muted); }
+      .chat form { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--border); }
+      .chat textarea { flex: 1; min-height: 32px; max-height: 120px; resize: vertical; padding: 6px 8px; font: inherit; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; }
     </style>
   </head>
   <body>
@@ -55,6 +64,14 @@
         <div class="panes">
           <div class="listing" id="listing"><div class="empty">Select a group</div></div>
           <div class="preview" id="preview"><div class="empty">Select a file</div></div>
+        </div>
+        <div class="chat" id="chat" hidden>
+          <div class="log" id="chat-log"></div>
+          <div class="status" id="chat-status"></div>
+          <form id="chat-form">
+            <textarea id="chat-input" rows="1" placeholder="Message the agent…"></textarea>
+            <button type="submit" id="chat-send">Send</button>
+          </form>
         </div>
       </section>
     </main>

@@ -66,9 +66,13 @@
       $('preview').innerHTML = '<div class="empty">No access to group ' + escapeHtml(parsed.groupId) + '</div>';
       return;
     }
+    const groupChanged = state.groupId !== parsed.groupId;
     state.groupId = parsed.groupId;
     state.file = null;
     highlightGroup();
+    if (groupChanged) {
+      openChat(parsed.groupId).catch((err) => console.error('chat open failed', err));
+    }
     if (parsed.isDir) {
       await loadTree(parsed.path);
       $('preview').innerHTML = '<div class="empty">Select a file</div>';
@@ -124,6 +128,7 @@
     await loadTree('');
     $('preview').innerHTML = '<div class="empty">Select a file</div>';
     writeHash();
+    openChat(id).catch((err) => console.error('chat open failed', err));
   }
 
   async function loadTree(p) {
@@ -243,4 +248,108 @@
   }
 
   init().catch((err) => console.error(err));
+
+  // ── chat side panel ───────────────────────────────────────────────────
+  const chat = { groupId: null, threadId: null, ws: null };
+
+  function setChatStatus(text) {
+    $('chat-status').textContent = text;
+  }
+
+  function appendChatMsg(kind, text, files) {
+    const log = $('chat-log');
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + kind;
+    wrap.textContent = text || '';
+    if (files && files.length) {
+      const fl = document.createElement('div');
+      fl.className = 'files';
+      fl.textContent = files.map((f) => `📎 ${f.filename} (${fmtBytes(f.size)})`).join('  ');
+      wrap.appendChild(fl);
+    }
+    log.appendChild(wrap);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function openChat(groupId) {
+    // Tear down any prior session for the previously-selected group.
+    if (chat.ws) {
+      try { chat.ws.close(); } catch (_) { /* swallow */ }
+      chat.ws = null;
+    }
+    chat.groupId = groupId;
+    chat.threadId = null;
+    $('chat').hidden = false;
+    $('chat-log').innerHTML = '';
+    setChatStatus('connecting…');
+
+    let started;
+    try {
+      const r = await fetch(`api/groups/${encodeURIComponent(groupId)}/chat/start`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      started = await r.json();
+    } catch (err) {
+      setChatStatus('failed to start chat: ' + err.message);
+      return;
+    }
+    chat.threadId = started.threadId;
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${location.host}/ui/files/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(chat.threadId)}/ws`;
+    const ws = new WebSocket(wsUrl);
+    chat.ws = ws;
+    ws.onopen = () => setChatStatus('connected · fresh session');
+    ws.onclose = () => {
+      if (chat.ws === ws) setChatStatus('disconnected');
+    };
+    ws.onerror = () => setChatStatus('connection error');
+    ws.onmessage = (ev) => {
+      let payload;
+      try { payload = JSON.parse(ev.data); } catch (_) { return; }
+      if (payload.kind === 'ready') return;
+      if (payload.kind === 'inbound') {
+        appendChatMsg('in', payload.text, null);
+        return;
+      }
+      if (payload.kind === 'outbound') {
+        const c = payload.content || {};
+        const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
+        appendChatMsg('out', text, payload.files || []);
+        return;
+      }
+    };
+  }
+
+  async function sendChat(text) {
+    if (!chat.groupId || !chat.threadId) return;
+    try {
+      await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+    } catch (err) {
+      console.error('send failed', err);
+    }
+  }
+
+  $('chat-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const input = $('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    sendChat(text).catch(console.error);
+  });
+
+  $('chat-input').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      $('chat-form').requestSubmit();
+    }
+  });
 })();

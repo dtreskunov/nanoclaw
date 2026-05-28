@@ -23,11 +23,7 @@ interface WebhookEntry {
 }
 
 type MountHandler = (req: http.IncomingMessage, res: http.ServerResponse) => void | Promise<void>;
-type UpgradeHandler = (
-  req: http.IncomingMessage,
-  socket: internal.Duplex,
-  head: Buffer,
-) => void | Promise<void>;
+type UpgradeHandler = (req: http.IncomingMessage, socket: internal.Duplex, head: Buffer) => void | Promise<void>;
 
 interface Mount {
   prefix: string; // e.g. '/files' (no trailing slash)
