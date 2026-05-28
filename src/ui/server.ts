@@ -15,7 +15,7 @@ import http from 'http';
 
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
-import { ensureSharedHttpServer, mountHandler } from '../webhook-server.js';
+import { ensureSharedHttpServer, mountHandler, mountUpgradeHandler } from '../webhook-server.js';
 import {
   buildClearCookie,
   buildSessionCookie,
@@ -24,7 +24,7 @@ import {
   redeemAndCreateSession,
 } from './auth.js';
 import { purgeExpired } from './db.js';
-import { handle as filesHandle, FILES_MOUNT_PREFIX } from './files/routes.js';
+import { handle as filesHandle, FILES_MOUNT_PREFIX, handleChatUpgrade } from './files/routes.js';
 
 /** Path prefix every UI app lives under. Shared cookie path. */
 export const UI_MOUNT_PREFIX = '/ui';
@@ -89,6 +89,7 @@ export function startUi(): void {
 
   // Per-app mounts. Add more here as new UI apps are introduced.
   mountHandler(FILES_MOUNT_PREFIX, withAccessLog('files', filesHandle));
+  mountUpgradeHandler(FILES_MOUNT_PREFIX, handleChatUpgrade);
 
   mounted = true;
   log.info('UI mounted', { prefix: UI_MOUNT_PREFIX, apps: [FILES_MOUNT_PREFIX], secure: cfg.secure });
