@@ -116,6 +116,55 @@ registerChannelAdapter('resend', {
     // reply received after a restart — and a new thread means a new session
     // with no history. Using references[0] makes the threadId deterministic
     // across restarts for any reply chain.
+    //
+    // Cross-restart fix #2: persist `threadId → rootMessageId` so outbound
+    // replies can set RFC 5322 In-Reply-To/References headers even after a
+    // restart wipes the in-memory threadMessages map. Without these headers
+    // the agent's reply looks like a brand-new email; the user's next reply
+    // then builds References starting from the agent's Message-ID, so our
+    // resolveThreadId picks a different references[0] and mints a NEW
+    // thread. Result: a 34-email Gmail conversation gets sharded across
+    // many sessions, one per host restart.
+    const ROOTS_FILE = 'data/resend-thread-roots.json';
+    const threadRoots: Map<string, string> = (() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const fs = require('node:fs') as typeof import('node:fs');
+        if (fs.existsSync(ROOTS_FILE)) {
+          const obj = JSON.parse(fs.readFileSync(ROOTS_FILE, 'utf8')) as Record<string, string>;
+          return new Map(Object.entries(obj));
+        }
+      } catch (err) {
+        log.warn('resend: failed to load thread-roots file', { err });
+      }
+      return new Map();
+    })();
+    let rootsDirty = false;
+    let rootsFlushTimer: NodeJS.Timeout | null = null;
+    const scheduleFlushRoots = (): void => {
+      if (rootsFlushTimer) return;
+      rootsFlushTimer = setTimeout(() => {
+        rootsFlushTimer = null;
+        if (!rootsDirty) return;
+        rootsDirty = false;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const fs = require('node:fs') as typeof import('node:fs');
+          fs.writeFileSync(ROOTS_FILE, JSON.stringify(Object.fromEntries(threadRoots), null, 2));
+        } catch (err) {
+          log.warn('resend: failed to persist thread-roots file', { err });
+        }
+      }, 500);
+      if (typeof rootsFlushTimer.unref === 'function') rootsFlushTimer.unref();
+    };
+    const recordRoot = (threadId: string, rootMessageId: string): void => {
+      if (threadRoots.get(threadId) === rootMessageId) return;
+      if (threadRoots.has(threadId)) return; // first writer wins (true root)
+      threadRoots.set(threadId, rootMessageId);
+      rootsDirty = true;
+      scheduleFlushRoots();
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tr.resolveThreadId = async function (input: any): Promise<string> {
       const { toAddress, alias, messageId, inReplyTo, references } = input;
@@ -134,7 +183,24 @@ registerChannelAdapter('resend', {
       const hash = createHash('sha256').update(rootId).digest('hex').slice(0, 16);
       const threadId = this.encodeThreadId({ alias, toAddress, rootMessageIdHash: hash });
       this.trackMessage(threadId, messageId);
+      recordRoot(threadId, rootId);
       return threadId;
+    };
+
+    // After restart `threadMessages` is empty so the upstream impl returns
+    // undefined and our outbound replies ship without In-Reply-To /
+    // References — breaking Gmail threading. Fall back to the persisted
+    // root so the conversation chain survives. We deliberately set both
+    // headers to the same root id: clients build References from the email
+    // they're replying to, so as long as our reply references the root,
+    // the user's subsequent reply will include the root in their chain.
+    const origGetReplyHeaders = tr.getReplyHeaders.bind(tr);
+    tr.getReplyHeaders = function (threadId: string): Record<string, string> | undefined {
+      const fromMemory = origGetReplyHeaders(threadId);
+      if (fromMemory) return fromMemory;
+      const root = threadRoots.get(threadId);
+      if (!root) return undefined;
+      return { 'In-Reply-To': root, References: root };
     };
 
     // ── Inbound: key messaging_group on recipient alias ──────────────
