@@ -60,6 +60,13 @@ export interface ChatSdkBridgeConfig {
    */
   supportsThreads: boolean;
   /**
+   * Whether the wrapped Chat SDK adapter can deliver multiple attachments
+   * in a single postMessage call. See `ChannelAdapter.supportsMultiFile`
+   * for the contract. Defaults to false; set true only when verified
+   * against the underlying adapter (e.g. Resend).
+   */
+  supportsMultiFile?: boolean;
+  /**
    * Optional transform applied to outbound text/markdown before it reaches the
    * adapter. Used by channels that need to sanitize for a platform-specific
    * quirk (e.g. Telegram's legacy Markdown parse mode).
@@ -196,6 +203,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
     name: adapter.name,
     channelType: adapter.name,
     supportsThreads: config.supportsThreads,
+    supportsMultiFile: config.supportsMultiFile ?? false,
 
     async setup(hostConfig: ChannelSetup) {
       setupConfig = hostConfig;

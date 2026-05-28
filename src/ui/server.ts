@@ -58,27 +58,37 @@ export function startUi(): void {
 
   ensureSharedHttpServer();
 
+  const withAccessLog =
+    (app: string, handler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>) =>
+    (req: http.IncomingMessage, res: http.ServerResponse) => {
+      const start = Date.now();
+      handler(req, res)
+        .catch((err) => {
+          log.error(`UI ${app} dispatch threw`, { err });
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Internal Server Error');
+          }
+        })
+        .finally(() => {
+          log.info('UI request', {
+            app,
+            method: req.method,
+            url: req.url,
+            status: res.statusCode,
+            ms: Date.now() - start,
+          });
+        });
+    };
+
   // Shared auth endpoints (cookie applies to all of /ui).
-  mountHandler(`${UI_MOUNT_PREFIX}/auth`, (req, res) =>
-    handleAuth(req, res, cfg.secure).catch((err) => {
-      log.error('UI auth dispatch threw', { err });
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Internal Server Error');
-      }
-    }),
+  mountHandler(
+    `${UI_MOUNT_PREFIX}/auth`,
+    withAccessLog('auth', (req, res) => handleAuth(req, res, cfg.secure)),
   );
 
   // Per-app mounts. Add more here as new UI apps are introduced.
-  mountHandler(FILES_MOUNT_PREFIX, (req, res) =>
-    filesHandle(req, res).catch((err) => {
-      log.error('File browser dispatch threw', { err });
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Internal Server Error');
-      }
-    }),
-  );
+  mountHandler(FILES_MOUNT_PREFIX, withAccessLog('files', filesHandle));
 
   mounted = true;
   log.info('UI mounted', { prefix: UI_MOUNT_PREFIX, apps: [FILES_MOUNT_PREFIX], secure: cfg.secure });
