@@ -17,7 +17,7 @@
     contextDismissed: false,
     threads: [],
   };
-  let suppressHash = false;
+  let suppressHashCount = 0;
 
   const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
   const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
@@ -102,7 +102,7 @@
     if (chat.threadId && chat.groupId === state.groupId) {
       h += '?t=' + encodeURIComponent(chat.threadId);
     }
-    if (location.hash !== h) { suppressHash = true; location.hash = h; }
+    if (location.hash !== h) { suppressHashCount++; location.hash = h; }
   }
 
   async function applyHash() {
@@ -156,7 +156,7 @@
     restorePanelState();
     wireGlobalEvents();
     window.addEventListener('hashchange', () => {
-      if (suppressHash) { suppressHash = false; return; }
+      if (suppressHashCount > 0) { suppressHashCount--; return; }
       applyHash().catch(console.error);
     });
     await applyHash();
@@ -198,16 +198,17 @@
     await loadThreads(id);
     await loadTree('');
     setPreview('<div class="empty">No file selected</div>', 'Preview');
-    writeHash();
     onSelectionChanged();
     // Auto-resume most recent thread on group switch.
     const latest = chat.threads.length > 0 ? chat.threads[0].threadId : null;
     if (latest) {
+      // openChat writes the hash with ?t=… included.
       openChat(id, latest).catch((err) => console.error('chat open failed', err));
     } else {
       clearChat();
       chat.groupId = id;
       chat.threadId = null;
+      writeHash();
     }
   }
 
@@ -421,6 +422,10 @@
   }
 
   async function openChat(groupId, resumeThreadId) {
+    // Idempotent: re-opening the same thread is a no-op. Prevents races
+    // where two hashchanges (or a hashchange + an explicit click) both try
+    // to reload the same thread and double-render history.
+    if (resumeThreadId && chat.groupId === groupId && chat.threadId === resumeThreadId) return;
     if (chat.ws) { try { chat.ws.close(); } catch (_) {} chat.ws = null; }
     if (chat.reconnectTimer) { clearTimeout(chat.reconnectTimer); chat.reconnectTimer = null; }
     chat.groupId = groupId;
