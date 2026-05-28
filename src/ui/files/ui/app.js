@@ -82,6 +82,46 @@
     try { return window.marked.parse(text || '', { breaks: true, gfm: true }); } catch (_) { return null; }
   }
 
+  // Rewrite relative-path markdown links inside a chat message to point at
+  // the file-browser file endpoint, so references like
+  // [sick_day_v2.mp3](sick_day_v2.mp3) become clickable. Also auto-linkify
+  // bare backtick-quoted filename-like tokens (e.g. `sick_day_v2.mp3`).
+  function rewriteFileLinks(root) {
+    if (!state.groupId) return;
+    const gid = encodeURIComponent(state.groupId);
+    const isExternal = (h) => /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith('#') || h.startsWith('//') || h.startsWith('mailto:');
+    const toFileUrl = (p) => {
+      let rel = String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
+      if (!rel) return null;
+      return `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+    };
+    root.querySelectorAll('a[href]').forEach((a) => {
+      const href = a.getAttribute('href') || '';
+      if (!href || isExternal(href)) return;
+      const url = toFileUrl(href);
+      if (!url) return;
+      a.setAttribute('href', url);
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener');
+    });
+    // Auto-linkify backtick-quoted filename-like tokens.
+    const fileLikeRe = /^[\w.\-/ ]+\.[A-Za-z0-9]{1,8}$/;
+    root.querySelectorAll('code').forEach((c) => {
+      if (c.closest('pre')) return;
+      const txt = c.textContent || '';
+      if (!fileLikeRe.test(txt)) return;
+      if (txt.length > 200) return;
+      const url = toFileUrl(txt);
+      if (!url) return;
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = txt;
+      c.replaceWith(a);
+    });
+  }
+
   // ── hash routing ──────────────────────────────────────────────────────
   function parseHash() {
     const raw = location.hash.replace(/^#/, '');
@@ -442,7 +482,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + kind;
     const md = renderMarkdown(text);
-    if (md != null) { wrap.classList.add('markdown'); wrap.innerHTML = md; }
+    if (md != null) { wrap.classList.add('markdown'); wrap.innerHTML = md; rewriteFileLinks(wrap); }
     else wrap.textContent = text || '';
     if (files && files.length) {
       const fl = document.createElement('div');
@@ -1048,6 +1088,30 @@
       ev.preventDefault();
       addPendingFiles(Array.from(items));
     });
+
+    setupViewportFit();
+  }
+
+  // Keep body height equal to the visualViewport so the chat composer is not
+  // hidden behind the mobile virtual keyboard. Also scroll the input into view
+  // when it gains focus.
+  function setupViewportFit() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const apply = () => {
+      document.documentElement.style.setProperty('--app-height', vv.height + 'px');
+    };
+    apply();
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    const input = $('chat-input');
+    if (input) {
+      input.addEventListener('focus', () => {
+        setTimeout(() => {
+          try { input.scrollIntoView({ block: 'end', behavior: 'smooth' }); } catch {}
+        }, 250);
+      });
+    }
   }
 
   init().catch((err) => console.error(err));
