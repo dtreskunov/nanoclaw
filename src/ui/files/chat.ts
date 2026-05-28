@@ -20,6 +20,8 @@ import {
   getMessagingGroupAgents,
   getMessagingGroupByPlatform,
 } from '../../db/messaging-groups.js';
+import { findSessionForAgent } from '../../db/sessions.js';
+import { openInboundDb, openOutboundDb } from '../../session-manager.js';
 import { canAccessAgentGroup } from '../../modules/permissions/access.js';
 import { log } from '../../log.js';
 import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../channels/web.js';
@@ -82,11 +84,17 @@ interface ChatContext {
  */
 export function matchChatPath(
   pathname: string,
-): { kind: 'start'; groupId: string } | { kind: 'send'; groupId: string; threadId: string } | null {
+):
+  | { kind: 'start'; groupId: string }
+  | { kind: 'send'; groupId: string; threadId: string }
+  | { kind: 'history'; groupId: string; threadId: string }
+  | null {
   const start = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/start$/);
   if (start) return { kind: 'start', groupId: start[1] };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
   if (send) return { kind: 'send', groupId: send[1], threadId: send[2] };
+  const hist = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/history$/);
+  if (hist) return { kind: 'history', groupId: hist[1], threadId: hist[2] };
   return null;
 }
 
@@ -173,7 +181,112 @@ export async function handleChatRequest(
     return true;
   }
 
+  if (m.kind === 'history') {
+    if (req.method !== 'GET') {
+      writeJson(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+    try {
+      const messages = readChatHistory(userId, m.groupId, m.threadId);
+      writeJson(res, 200, { messages });
+    } catch (err) {
+      log.warn('web chat history read failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
+      writeJson(res, 200, { messages: [] });
+    }
+    return true;
+  }
+
   return false;
+}
+
+interface HistoryMessage {
+  direction: 'in' | 'out';
+  timestamp: string;
+  text: string;
+  files?: { filename: string; size: number }[];
+}
+
+/**
+ * Read merged inbound + outbound history for a (user, group, thread) from
+ * the session DBs. Returns [] if no session exists yet.
+ */
+function readChatHistory(userId: string, groupId: string, threadId: string): HistoryMessage[] {
+  const platformId = platformIdFor(userId, groupId);
+  const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+  if (!mg) return [];
+  const session = findSessionForAgent(groupId, mg.id, threadId);
+  if (!session) return [];
+
+  const messages: HistoryMessage[] = [];
+  try {
+    const inDb = openInboundDb(groupId, session.id);
+    try {
+      const rows = inDb
+        .prepare("SELECT timestamp, content FROM messages_in WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq")
+        .all(threadId) as { timestamp: string; content: string }[];
+      for (const r of rows) {
+        const text = parseInboundText(r.content);
+        if (text != null) messages.push({ direction: 'in', timestamp: r.timestamp, text });
+      }
+    } finally {
+      inDb.close();
+    }
+  } catch {
+    // inbound DB may not exist
+  }
+
+  try {
+    const outDb = openOutboundDb(groupId, session.id);
+    try {
+      const rows = outDb
+        .prepare(
+          "SELECT timestamp, kind, content FROM messages_out WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq",
+        )
+        .all(threadId) as { timestamp: string; kind: string; content: string }[];
+      for (const r of rows) {
+        if (r.kind !== 'chat' && r.kind !== 'text') continue;
+        const parsed = parseOutboundContent(r.content);
+        messages.push({ direction: 'out', timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+      }
+    } finally {
+      outDb.close();
+    }
+  } catch {
+    // outbound DB may not exist
+  }
+
+  messages.sort((a, b) => (a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0));
+  return messages;
+}
+
+function parseInboundText(content: string): string | null {
+  try {
+    const o = JSON.parse(content);
+    if (typeof o === 'string') return o;
+    if (typeof o?.text === 'string') return o.text;
+  } catch {
+    /* not JSON */
+  }
+  return null;
+}
+
+function parseOutboundContent(content: string): { text: string; files?: { filename: string; size: number }[] } {
+  try {
+    const o = JSON.parse(content);
+    if (typeof o === 'string') return { text: o };
+    const text = typeof o?.text === 'string' ? o.text : typeof o?.markdown === 'string' ? o.markdown : '';
+    const files = Array.isArray(o?.files)
+      ? o.files
+          .map((f: { filename?: string; name?: string; size?: number }) => ({
+            filename: String(f?.filename ?? f?.name ?? ''),
+            size: typeof f?.size === 'number' ? f.size : 0,
+          }))
+          .filter((f: { filename: string }) => f.filename)
+      : undefined;
+    return { text, files };
+  } catch {
+    return { text: content };
+  }
 }
 
 // ── WebSocket upgrade ──

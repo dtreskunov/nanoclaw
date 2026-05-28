@@ -30,16 +30,25 @@
   }
 
   // ── hash routing ──────────────────────────────────────────────────────
+  // Hash format: #<groupId>/<path>[/]?t=<threadId>
+  // The ?t= suffix preserves the active chat thread across page reloads.
   function parseHash() {
-    const h = decodeURI(location.hash.replace(/^#/, ''));
-    if (!h) return null;
+    const raw = location.hash.replace(/^#/, '');
+    if (!raw) return null;
+    const qIdx = raw.indexOf('?');
+    const pathPart = qIdx < 0 ? raw : raw.slice(0, qIdx);
+    const queryPart = qIdx < 0 ? '' : raw.slice(qIdx + 1);
+    const params = new URLSearchParams(queryPart);
+    const threadId = params.get('t') || null;
+    const h = decodeURI(pathPart);
+    if (!h) return threadId ? { groupId: '', path: '', isDir: true, threadId } : null;
     const slash = h.indexOf('/');
-    if (slash < 0) return { groupId: h, path: '', isDir: true };
+    if (slash < 0) return { groupId: h, path: '', isDir: true, threadId };
     const groupId = h.slice(0, slash);
     const rest = h.slice(slash + 1);
     const isDir = rest === '' || rest.endsWith('/');
     const path = isDir ? rest.replace(/\/$/, '') : rest;
-    return { groupId, path, isDir };
+    return { groupId, path, isDir, threadId };
   }
 
   function writeHash() {
@@ -49,6 +58,9 @@
       h += '/' + encodeURI(state.file);
     } else if (state.path) {
       h += '/' + encodeURI(state.path) + '/';
+    }
+    if (chat.threadId && chat.groupId === state.groupId) {
+      h += '?t=' + encodeURIComponent(chat.threadId);
     }
     if (location.hash !== h) {
       suppressHash = true;
@@ -71,7 +83,7 @@
     state.file = null;
     highlightGroup();
     if (groupChanged) {
-      openChat(parsed.groupId).catch((err) => console.error('chat open failed', err));
+      openChat(parsed.groupId, parsed.threadId).catch((err) => console.error('chat open failed', err));
     }
     if (parsed.isDir) {
       await loadTree(parsed.path);
@@ -250,7 +262,7 @@
   init().catch((err) => console.error(err));
 
   // ── chat side panel ───────────────────────────────────────────────────
-  const chat = { groupId: null, threadId: null, ws: null };
+  const chat = { groupId: null, threadId: null, ws: null, reconnectTimer: null, reconnectAttempt: 0 };
 
   function setChatStatus(text) {
     $('chat-status').textContent = text;
@@ -271,18 +283,45 @@
     log.scrollTop = log.scrollHeight;
   }
 
-  async function openChat(groupId) {
+  async function openChat(groupId, resumeThreadId) {
     // Tear down any prior session for the previously-selected group.
     if (chat.ws) {
       try { chat.ws.close(); } catch (_) { /* swallow */ }
       chat.ws = null;
     }
+    if (chat.reconnectTimer) {
+      clearTimeout(chat.reconnectTimer);
+      chat.reconnectTimer = null;
+    }
     chat.groupId = groupId;
     chat.threadId = null;
+    chat.reconnectAttempt = 0;
     $('chat').hidden = false;
     $('chat-log').innerHTML = '';
-    setChatStatus('connecting…');
 
+    if (resumeThreadId) {
+      // Resume existing thread — skip /start, load history, then connect WS.
+      chat.threadId = resumeThreadId;
+      setChatStatus('loading history…');
+      try {
+        const r = await fetch(
+          `api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(resumeThreadId)}/history`,
+          { credentials: 'same-origin' },
+        );
+        if (r.ok) {
+          const { messages } = await r.json();
+          for (const msg of messages || []) {
+            appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null);
+          }
+        }
+      } catch (err) {
+        console.error('history load failed', err);
+      }
+      connectChatWs();
+      return;
+    }
+
+    setChatStatus('connecting…');
     let started;
     try {
       const r = await fetch(`api/groups/${encodeURIComponent(groupId)}/chat/start`, {
@@ -296,14 +335,34 @@
       return;
     }
     chat.threadId = started.threadId;
+    writeHash();
+    connectChatWs();
+  }
 
+  function connectChatWs() {
+    if (!chat.groupId || !chat.threadId) return;
+    const groupId = chat.groupId;
+    const threadId = chat.threadId;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${proto}//${location.host}/ui/files/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(chat.threadId)}/ws`;
+    const wsUrl = `${proto}//${location.host}/ui/files/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/ws`;
     const ws = new WebSocket(wsUrl);
     chat.ws = ws;
-    ws.onopen = () => setChatStatus('connected · fresh session');
+    ws.onopen = () => {
+      chat.reconnectAttempt = 0;
+      setChatStatus('connected');
+    };
     ws.onclose = () => {
-      if (chat.ws === ws) setChatStatus('disconnected');
+      if (chat.ws !== ws) return;
+      chat.ws = null;
+      // Only reconnect if the user hasn't switched groups.
+      if (chat.groupId !== groupId || chat.threadId !== threadId) return;
+      const attempt = ++chat.reconnectAttempt;
+      const delay = Math.min(15000, 500 * Math.pow(2, attempt - 1));
+      setChatStatus(`disconnected · reconnecting in ${Math.round(delay / 1000)}s…`);
+      chat.reconnectTimer = setTimeout(() => {
+        chat.reconnectTimer = null;
+        if (chat.groupId === groupId && chat.threadId === threadId) connectChatWs();
+      }, delay);
     };
     ws.onerror = () => setChatStatus('connection error');
     ws.onmessage = (ev) => {
