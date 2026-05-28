@@ -34,11 +34,11 @@
       main {
         flex: 1;
         display: grid;
-        grid-template-columns: 220px 1fr auto;
+        grid-template-columns: 1fr 1fr 1fr;
         min-height: 0;
       }
-      main.threads-collapsed { grid-template-columns: 40px 1fr auto; }
-      main.files-collapsed { grid-template-columns: 220px 1fr 40px; }
+      main.threads-collapsed { grid-template-columns: 40px 1fr 1fr; }
+      main.files-collapsed { grid-template-columns: 1fr 1fr 40px; }
       main.threads-collapsed.files-collapsed { grid-template-columns: 40px 1fr 40px; }
 
       /* ── .nc-pane — reusable collapsible side panel ────────── */
@@ -52,8 +52,7 @@
       /*   </aside>                                                          */
       /* JS: registerPane(id, () => isOpen, toggleFn). Toggling adds/removes */
       /* the `collapsed` class on the pane; CSS handles the rest.            */
-      :root { --handle-h: 40px; --collapsed-w: 40px; --handle-ease: cubic-bezier(0.2, 0.8, 0.2, 1); --handle-dur: 0.4s; }
-      main { transition: grid-template-columns var(--handle-dur) var(--handle-ease); }
+      :root { --handle-h: 40px; --collapsed-w: 40px; }
 
       .nc-pane { position: relative; overflow: hidden; min-height: 0; }
       .nc-pane.collapsed { cursor: pointer; }
@@ -61,36 +60,39 @@
       .nc-pane.collapsed > :not(.head) { display: none; }
 
       .nc-pane > .head {
-        position: absolute; top: 0; left: 0;
+        position: absolute; top: 0; left: 0; right: 0;
         height: var(--handle-h);
-        /* 100vh: when rotated 90° this becomes the spine's vertical length.
-           When horizontal, the pane's overflow:hidden clips the overhang. */
-        width: 100vh;
         display: flex; align-items: center; gap: 8px;
         padding: 0 10px;
         border-bottom: 1px solid var(--border);
         background: rgba(255,255,255,0.02);
         white-space: nowrap;
-        transform-origin: top left;
-        transform: translateX(0) rotate(0deg);
-        transition: transform var(--handle-dur) var(--handle-ease),
-                    border-color var(--handle-dur) ease;
         z-index: 2;
         cursor: pointer;
       }
       .nc-pane > .head:hover { background: rgba(127,127,127,0.06); }
       .nc-pane.collapsed > .head {
-        transform: translateX(var(--collapsed-w)) rotate(90deg);
+        right: auto; width: var(--collapsed-w);
+        flex-direction: column; gap: 6px;
+        justify-content: flex-start; padding: 8px 0;
         border-bottom-color: transparent;
         border-right: 1px solid var(--border);
       }
-      .nc-pane.collapsed > .head .icon-btn { transform: rotate(180deg); }
-      .nc-pane.no-animate > .head { transition: none; }
+      .nc-pane.collapsed > .head .title {
+        flex: 0 0 auto;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-align: left;
+      }
       .nc-pane > .head .icon-btn {
         min-width: 24px; min-height: 24px; padding: 0; border: 0;
         font-size: 16px; line-height: 1;
         display: inline-flex; align-items: center; justify-content: center;
       }
+      #btn-threads-toggle::before { content: '‹'; }
+      .threads-rail.collapsed #btn-threads-toggle::before { content: '›'; }
+      #btn-files-toggle::before { content: '›'; }
+      .files-pane.collapsed #btn-files-toggle::before { content: '‹'; }
       .nc-pane > .head .title {
         flex: 1; font-size: 13px; font-weight: 600;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -152,7 +154,7 @@
       .chat-main.drag-active { outline: 2px dashed var(--accent-strong); outline-offset: -4px; }
 
       /* Files pane */
-      .files-pane { border-left: 1px solid var(--border); width: 280px; }
+      .files-pane { border-left: 1px solid var(--border); }
       .files-pane .files-body {
         position: absolute; top: var(--handle-h); left: 0; right: 0; bottom: 0;
         display: flex; flex-direction: column; min-height: 0;
@@ -173,7 +175,7 @@
         padding: 3px 7px; border-radius: 4px;
         color: var(--muted); cursor: pointer; text-decoration: none;
         background: transparent; border: 0; font: inherit;
-        max-width: 14ch; overflow: hidden; text-overflow: ellipsis;
+        flex: 0 0 auto;
       }
       .files-pane .breadcrumb .crumb:hover { background: rgba(127,127,127,0.12); color: inherit; }
       .files-pane .breadcrumb .crumb.current { color: inherit; cursor: default; }
@@ -283,12 +285,14 @@
         cursor: pointer; font-size: 16px; line-height: 1;
       }
 
-      /* Preview body — occupies the files pane when a file is selected. */
+      /* Preview body — occupies the files pane below the breadcrumb when a file is selected. */
       .files-pane .preview-body {
-        position: absolute; top: var(--handle-h); left: 0; right: 0; bottom: 0;
-        overflow: auto; padding: 12px; display: none;
+        flex: 1; min-height: 0; overflow: auto;
+        padding: 12px; display: none;
       }
-      .files-pane.previewing .files-body { display: none; }
+      .files-pane.previewing .listing,
+      .files-pane.previewing .upload-strip,
+      .files-pane.previewing .drop-hint { display: none !important; }
       .files-pane.previewing .preview-body { display: block; }
       .files-pane.previewing .head-actions { display: none !important; }
       .files-pane pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, monospace; }
@@ -351,13 +355,12 @@
           width: auto !important;
           padding: 8px 10px; gap: 8px; align-items: center;
         }
-        .threads-rail .threads-actions, .files-pane .files-body, .files-pane .preview-body {
+        .threads-rail .threads-actions, .files-pane .files-body {
           position: static !important;
         }
         .threads-rail .list { position: static !important; flex: 1; }
         .threads-rail, .files-pane { display: flex; flex-direction: column; }
         .files-pane .files-body { flex: 1; min-height: 0; overflow: auto; }
-        .files-pane.previewing .preview-body { flex: 1; min-height: 0; overflow: auto; }
         .files-pane .row { padding: 10px 12px; font-size: 14px; min-height: 40px; }
         .threads-rail .head { display: flex; }
         .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -397,7 +400,7 @@
     <main id="main">
       <aside class="nc-pane threads-rail" id="threads-rail">
         <div class="head">
-          <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads">›</button>
+          <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads"></button>
           <span class="title">Chats</span>
         </div>
         <div class="threads-actions">
@@ -419,7 +422,7 @@
       </section>
       <aside class="nc-pane files-pane no-animate" id="files-pane">
         <div class="head">
-          <button type="button" class="icon-btn" id="btn-files-toggle" aria-label="Collapse files">›</button>
+          <button type="button" class="icon-btn" id="btn-files-toggle" aria-label="Collapse files"></button>
           <span class="title">Files</span>
         </div>
         <div class="head-actions admin-only">
@@ -433,8 +436,8 @@
           <div class="upload-strip" id="upload-strip" hidden></div>
           <div class="listing" id="listing"><div class="empty">No group selected</div></div>
           <div class="drop-hint admin-only" id="dropzone">Drag &amp; drop files here to upload to <code id="dropzone-path">/</code></div>
+          <div class="preview-body" id="preview"></div>
         </div>
-        <div class="preview-body" id="preview"></div>
       </aside>
     </main>
     <div class="backdrop" id="backdrop"></div>
