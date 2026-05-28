@@ -163,7 +163,17 @@ function formatChatMessages(messages: MessageInRow[]): string {
   // requested."`) instead of calling the API — see #2555 for the full trace.
   // The fix is simply to drop the wrapper; the single-message path (which
   // already worked) is now just the N=1 case of the same code.
-  return messages.map(formatSingleChat).join('\n');
+  const formatted = messages.map(formatSingleChat).join('\n');
+  const hasWeb = messages.some((m) => m.channel_type === 'web');
+  if (!hasWeb) return formatted;
+  // For the NanoClaw web/file-browser channel, tell the agent how to make
+  // file references clickable. The UI rewrites relative-path markdown links
+  // and backtick-quoted filename tokens into download links pointing at the
+  // file endpoint, so the agent should use one of those two forms instead
+  // of plain prose like "Here it is — foo.mp3".
+  const hint =
+    '<format_hint channel="web">When you mention a file that lives in the agent workspace, format it as a Markdown link using a workspace-relative path — e.g. `[sick_day_v2.mp3](output/sick_day_v2.mp3)` — or wrap the relative path in backticks: `` `output/sick_day_v2.mp3` ``. Do NOT use absolute container paths like `/workspace/...`. The user\'s UI will turn either form into a clickable download link; plain prose filenames are not clickable.</format_hint>';
+  return hint + '\n' + formatted;
 }
 
 function formatSingleChat(msg: MessageInRow): string {
