@@ -37,50 +37,85 @@
         grid-template-columns: 220px 1fr auto auto;
         min-height: 0;
       }
-      main.threads-collapsed { grid-template-columns: 36px 1fr auto auto; }
-      main.files-collapsed { grid-template-columns: 220px 1fr 36px auto; }
-      main.preview-collapsed { grid-template-columns: 220px 1fr auto 36px; }
-      main.files-collapsed.preview-collapsed { grid-template-columns: 220px 1fr 36px 36px; }
-      main.threads-collapsed.files-collapsed { grid-template-columns: 36px 1fr 36px auto; }
-      main.threads-collapsed.preview-collapsed { grid-template-columns: 36px 1fr auto 36px; }
-      main.threads-collapsed.files-collapsed.preview-collapsed { grid-template-columns: 36px 1fr 36px 36px; }
+      main.threads-collapsed { grid-template-columns: 40px 1fr auto auto; }
+      main.files-collapsed { grid-template-columns: 220px 1fr 40px auto; }
+      main.preview-collapsed { grid-template-columns: 220px 1fr auto 40px; }
+      main.files-collapsed.preview-collapsed { grid-template-columns: 220px 1fr 40px 40px; }
+      main.threads-collapsed.files-collapsed { grid-template-columns: 40px 1fr 40px auto; }
+      main.threads-collapsed.preview-collapsed { grid-template-columns: 40px 1fr auto 40px; }
+      main.threads-collapsed.files-collapsed.preview-collapsed { grid-template-columns: 40px 1fr 40px 40px; }
 
-      /* Threads rail */
-      .threads-rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; position: relative; }
-      .threads-rail .head { padding: 8px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; align-items: center; }
-      .threads-rail .head #btn-new-chat { flex: 1; font-size: 13px; font-weight: 600; }
-      .threads-rail .list { flex: 1; overflow: auto; }
-      .rail-label { display: none; }
-      /* Unified collapsed style for all three side panes */
-      main.threads-collapsed .threads-rail,
-      main.files-collapsed .files-pane,
-      main.preview-collapsed .preview-pane { cursor: pointer; }
-      main.threads-collapsed .threads-rail:hover,
-      main.files-collapsed .files-pane:hover,
-      main.preview-collapsed .preview-pane:hover { background: rgba(127, 127, 127, 0.06); }
-      /* Collapsed: hide head children except the lone chevron toggle */
-      main.threads-collapsed .threads-rail .head > *:not(#btn-threads-toggle),
-      main.files-collapsed .files-pane .head > *:not(#btn-files-toggle),
-      main.preview-collapsed .preview-pane .head > *:not(#btn-preview-toggle) { display: none; }
-      main.threads-collapsed .threads-rail .head,
-      main.files-collapsed .files-pane .head,
-      main.preview-collapsed .preview-pane .head { padding: 6px 2px; justify-content: center; flex-direction: column; gap: 0; border-bottom: 1px solid var(--border); }
-      main.threads-collapsed .threads-rail .head #btn-threads-toggle,
-      main.files-collapsed .files-pane .head #btn-files-toggle,
-      main.preview-collapsed .preview-pane .head #btn-preview-toggle { min-width: 28px; min-height: 28px; padding: 0; border: 0; display: inline-flex; align-items: center; justify-content: center; }
-      main.threads-collapsed .threads-rail .list,
-      main.files-collapsed .files-pane .files-body,
-      main.preview-collapsed .preview-pane .preview-body { display: none; }
-      main.threads-collapsed .threads-rail .rail-label,
-      main.files-collapsed .files-pane .rail-label,
-      main.preview-collapsed .preview-pane .rail-label {
-        display: block; flex: 1;
-        writing-mode: vertical-rl; transform: rotate(180deg);
-        text-align: center; padding: 12px 0;
-        color: var(--muted); font-size: 11px; letter-spacing: 1px;
-        text-transform: uppercase; user-select: none;
-        pointer-events: none;
+      /* ── .nc-pane — reusable collapsible side panel ────────── */
+      /* Markup:                                                             */
+      /*   <aside class="nc-pane [my-pane] [no-animate]">                    */
+      /*     <div class="head">                                              */
+      /*       <button class="icon-btn">›</button>                           */
+      /*       <span class="title">Label</span>                              */
+      /*       <button class="drawer-close" data-drawer-close>✕</button>     */
+      /*     </div>                                                          */
+      /*     <div class="my-body">…</div>                                    */
+      /*   </aside>                                                          */
+      /* JS: registerPane(id, () => isOpen, toggleFn). Toggling adds/removes */
+      /* the `collapsed` class on the pane; CSS handles the rest.            */
+      :root { --handle-h: 40px; --collapsed-w: 40px; --handle-ease: cubic-bezier(0.2, 0.8, 0.2, 1); --handle-dur: 0.4s; }
+      main { transition: grid-template-columns var(--handle-dur) var(--handle-ease); }
+
+      .nc-pane { position: relative; overflow: hidden; min-height: 0; }
+      .nc-pane.collapsed { cursor: pointer; }
+      .nc-pane.collapsed:hover > .head { background: rgba(127,127,127,0.08); }
+      .nc-pane.collapsed > :not(.head) { display: none; }
+
+      .nc-pane > .head {
+        position: absolute; top: 0; left: 0;
+        height: var(--handle-h);
+        /* 100vh: when rotated 90° this becomes the spine's vertical length.
+           When horizontal, the pane's overflow:hidden clips the overhang. */
+        width: 100vh;
+        display: flex; align-items: center; gap: 8px;
+        padding: 0 10px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255,255,255,0.02);
+        white-space: nowrap;
+        transform-origin: top left;
+        transform: translateX(0) rotate(0deg);
+        transition: transform var(--handle-dur) var(--handle-ease),
+                    border-color var(--handle-dur) ease;
+        z-index: 2;
+        cursor: pointer;
       }
+      .nc-pane > .head:hover { background: rgba(127,127,127,0.06); }
+      .nc-pane.collapsed > .head {
+        transform: translateX(var(--collapsed-w)) rotate(90deg);
+        border-bottom-color: transparent;
+        border-right: 1px solid var(--border);
+      }
+      .nc-pane.collapsed > .head .drawer-close { display: none; }
+      .nc-pane.no-animate > .head { transition: none; }
+      .nc-pane > .head .icon-btn {
+        min-width: 24px; min-height: 24px; padding: 0; border: 0;
+        font-size: 16px; line-height: 1;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .nc-pane > .head .title {
+        flex: 1; font-size: 13px; font-weight: 600;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+      }
+
+      /* Threads rail (pane-specific) */
+      .threads-rail { border-right: 1px solid var(--border); }
+      .threads-rail .threads-actions {
+        position: absolute; top: var(--handle-h); left: 0; right: 0;
+        padding: 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .threads-rail .threads-actions #btn-new-chat { width: 100%; font-size: 13px; font-weight: 600; }
+      .threads-rail .list {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        top: calc(var(--handle-h) + 49px);
+        overflow: auto;
+      }
+      .rail-label { display: none; }
       .threads-rail .thread { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border); position: relative; }
       .threads-rail .thread:hover { background: rgba(127,127,127,0.08); }
       .threads-rail .thread.active { background: var(--accent); }
@@ -122,12 +157,11 @@
       .chat-main.drag-active { outline: 2px dashed var(--accent-strong); outline-offset: -4px; }
 
       /* Files pane */
-      .files-pane { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; width: 280px; }
-      main.files-collapsed .files-pane { width: 36px; }
-      main.files-collapsed .files-pane .files-body { display: none; }
-      .files-pane .head { padding: 6px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
-      .files-pane .head .title { flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      main.files-collapsed .files-pane .head .title { display: none; }
+      .files-pane { border-left: 1px solid var(--border); width: 280px; }
+      .files-pane .files-body {
+        position: absolute; top: var(--handle-h); left: 0; right: 0; bottom: 0;
+        display: flex; flex-direction: column; min-height: 0;
+      }
       .files-pane .breadcrumb {
         display: flex; align-items: center; gap: 2px;
         padding: 6px 8px;
@@ -160,14 +194,12 @@
       .files-pane .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
       /* Preview pane */
-      .preview-pane { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; width: 360px; }
-      main.preview-collapsed .preview-pane { width: 36px; }
-      main.preview-collapsed .preview-pane .preview-body { display: none; }
-      .preview-pane .head { padding: 6px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
-      .preview-pane .head .title { flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
-      .preview-pane .head .title { unicode-bidi: plaintext; }
-      main.preview-collapsed .preview-pane .head .title { display: none; }
-      .preview-pane .preview-body { flex: 1; overflow: auto; padding: 12px; }
+      .preview-pane { border-left: 1px solid var(--border); width: 360px; }
+      .preview-pane > .head .title { direction: rtl; text-align: left; unicode-bidi: plaintext; }
+      .preview-pane .preview-body {
+        position: absolute; top: var(--handle-h); left: 0; right: 0; bottom: 0;
+        overflow: auto; padding: 12px;
+      }
       .preview-pane pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, monospace; }
       .preview-pane img, .preview-pane iframe { max-width: 100%; }
       .markdown-preview { max-width: 100%; line-height: 1.5; }
@@ -228,11 +260,23 @@
         /* Hide the desktop collapse chevrons inside drawers on mobile */
         #btn-files-toggle, #btn-preview-toggle { display: none; }
         .drawer-close { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 48px; font-size: 28px; font-weight: 500; line-height: 1; border: 0; background: transparent; cursor: pointer; color: inherit; margin-left: auto; padding: 0; }
-        .threads-rail .head, .files-pane .head, .preview-pane .head { padding: 8px 10px; gap: 8px; align-items: center; }
+        .threads-rail .head, .files-pane .head, .preview-pane .head {
+          /* Override the desktop rotating-handle: on mobile the pane is a
+             drawer, so the head is a normal in-flow top bar. */
+          position: static !important;
+          transform: none !important;
+          width: auto !important;
+          padding: 8px 10px; gap: 8px; align-items: center;
+        }
+        .threads-rail .threads-actions, .files-pane .files-body, .preview-pane .preview-body {
+          position: static !important;
+        }
+        .threads-rail .list { position: static !important; flex: 1; }
+        .threads-rail { display: flex; flex-direction: column; }
         .preview-pane .head .title { font-size: 14px; }
         .threads-rail .head { display: flex; }
-        .threads-rail .head #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .threads-rail .head #btn-new-chat .plus { font-size: 26px; font-weight: 400; line-height: 1; position: relative; top: -1px; }
+        .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .threads-rail .threads-actions #btn-new-chat .plus { font-size: 26px; font-weight: 400; line-height: 1; position: relative; top: -1px; }
         .threads-rail .thread { padding: 12px 14px; }
         .threads-rail .thread .title { font-size: 14px; }
         .threads-rail .thread .meta { font-size: 12px; }
@@ -266,14 +310,16 @@
       <form method="POST" action="/ui/auth/logout" style="margin:0"><button type="submit">Log out</button></form>
     </header>
     <main id="main">
-      <aside class="threads-rail" id="threads-rail">
+      <aside class="nc-pane threads-rail" id="threads-rail">
         <div class="head">
-          <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads">‹</button>
-          <button type="button" id="btn-new-chat"><span class="plus">+</span> <span class="label">New chat</span></button>
+          <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads">›</button>
+          <span class="title">Chats</span>
           <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
         </div>
+        <div class="threads-actions">
+          <button type="button" id="btn-new-chat"><span class="plus">+</span> <span class="label">New chat</span></button>
+        </div>
         <div class="list" id="threads-list"><div class="empty">No chats yet</div></div>
-        <div class="rail-label" aria-hidden="true">Chats</div>
       </aside>
       <section class="chat-main" id="chat-main">
         <div class="log" id="chat-log"><div class="empty">Pick or start a chat.</div></div>
@@ -287,7 +333,7 @@
           <button type="submit" id="chat-send">Send</button>
         </form>
       </section>
-      <aside class="files-pane" id="files-pane">
+      <aside class="nc-pane files-pane no-animate" id="files-pane">
         <div class="head">
           <button type="button" class="icon-btn" id="btn-files-toggle" aria-label="Collapse files">›</button>
           <span class="title">Files</span>
@@ -297,16 +343,14 @@
           <div class="breadcrumb" id="crumb"></div>
           <div class="listing" id="listing"><div class="empty">No group selected</div></div>
         </div>
-        <div class="rail-label" aria-hidden="true">Files</div>
       </aside>
-      <aside class="preview-pane" id="preview-pane">
+      <aside class="nc-pane preview-pane no-animate" id="preview-pane">
         <div class="head">
           <button type="button" class="icon-btn" id="btn-preview-toggle" aria-label="Collapse preview">›</button>
           <span class="title" id="preview-title">Preview</span>
           <button type="button" class="drawer-close" data-drawer-back aria-label="Back to files">✕</button>
         </div>
         <div class="preview-body" id="preview"><div class="empty">No file selected</div></div>
-        <div class="rail-label" aria-hidden="true">Preview</div>
       </aside>
     </main>
     <div class="backdrop" id="backdrop"></div>

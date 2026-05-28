@@ -641,9 +641,9 @@
     main.classList.toggle('threads-collapsed', !state.threadsOpen);
     main.classList.toggle('files-collapsed', !state.filesOpen);
     main.classList.toggle('preview-collapsed', !state.previewOpen);
-    $('btn-threads-toggle').textContent = state.threadsOpen ? '‹' : '›';
-    $('btn-files-toggle').textContent = state.filesOpen ? '›' : '‹';
-    $('btn-preview-toggle').textContent = state.previewOpen ? '›' : '‹';
+    $('threads-rail').classList.toggle('collapsed', !state.threadsOpen);
+    $('files-pane').classList.toggle('collapsed', !state.filesOpen);
+    $('preview-pane').classList.toggle('collapsed', !state.previewOpen);
   }
 
   function toggleThreads() { state.threadsOpen = !state.threadsOpen; applyPanelClasses(); persistPanelState(); }
@@ -685,16 +685,27 @@
     $('btn-files-toggle').addEventListener('click', toggleFiles);
     $('btn-preview-toggle').addEventListener('click', togglePreview);
     $('btn-threads-toggle').addEventListener('click', toggleThreads);
-    // Whole collapsed pane is clickable to expand
-    $('threads-rail').addEventListener('click', (ev) => {
-      if (!state.threadsOpen && !ev.target.closest('button, a')) toggleThreads();
-    });
-    $('files-pane').addEventListener('click', (ev) => {
-      if (!state.filesOpen && !ev.target.closest('button, a')) toggleFiles();
-    });
-    $('preview-pane').addEventListener('click', (ev) => {
-      if (!state.previewOpen && !ev.target.closest('button, a')) togglePreview();
-    });
+    // .nc-pane component: bind expand/collapse click handlers on each pane.
+    // Clicks on the head toggle in both states; clicks on the collapsed
+    // body also toggle. Interactive children (button, a) are exempt.
+    function registerPane(paneId, isOpen, toggle) {
+      const pane = $(paneId);
+      if (!pane) return;
+      const headEl = pane.querySelector(':scope > .head');
+      if (headEl) headEl.addEventListener('click', (ev) => {
+        if (ev.target.closest('button, a')) return;
+        ev.stopPropagation();
+        toggle();
+      });
+      pane.addEventListener('click', (ev) => {
+        if (isOpen()) return;
+        if (ev.target.closest('button, a')) return;
+        toggle();
+      });
+    }
+    registerPane('threads-rail', () => state.threadsOpen, toggleThreads);
+    registerPane('files-pane', () => state.filesOpen, toggleFiles);
+    registerPane('preview-pane', () => state.previewOpen, togglePreview);
     $('btn-threads').addEventListener('click', () => toggleMobileDrawer('threads'));
     $('btn-files').addEventListener('click', () => toggleMobileDrawer('files'));
     $('backdrop').addEventListener('click', closeMobileDrawers);
