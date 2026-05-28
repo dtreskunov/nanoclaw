@@ -129,6 +129,8 @@
       .chat-main .msg.in { align-self: flex-end; background: var(--accent); }
       .chat-main .msg.out { align-self: flex-start; background: rgba(127, 127, 127, 0.12); }
       .chat-main .msg .files { font-size: 11px; color: var(--muted); margin-top: 4px; }
+      .chat-main .msg .meta { font-size: 10px; color: var(--muted); margin-top: 4px; opacity: 0.7; }
+      .chat-main .msg.in .meta { text-align: right; }
       .chat-main .msg.markdown { white-space: normal; }
       .chat-main .msg.markdown > :first-child { margin-top: 0; }
       .chat-main .msg.markdown > :last-child { margin-bottom: 0; }
@@ -189,6 +191,7 @@
       .files-pane .row.active { background: var(--accent); }
       .files-pane .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .files-pane .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .files-pane .row .meta { font-size: 11px; color: var(--muted); white-space: nowrap; opacity: 0.7; }
       .files-pane .row .row-actions { display: none; gap: 2px; }
       .files-pane .row:hover .row-actions { display: inline-flex; }
       .files-pane .row .row-actions button {

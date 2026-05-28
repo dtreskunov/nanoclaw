@@ -75,6 +75,18 @@
     if (sec < 86400 * 7) return Math.floor(sec / 86400) + 'd';
     return new Date(t).toLocaleDateString();
   }
+  function fmtAbsolute(ts) {
+    if (!ts) return '';
+    const norm = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
+    const t = Date.parse(norm);
+    if (!t) return '';
+    return new Date(t).toLocaleString();
+  }
+  function tsHTML(ts, cls) {
+    const rel = fmtRelative(ts);
+    if (!rel) return '';
+    return `<span class="${cls || 'ts'}" title="${escapeAttr(fmtAbsolute(ts))}">${escapeHtml(rel)}</span>`;
+  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -301,6 +313,7 @@
       const icon = e.type === 'dir' ? '📁' : '📄';
       row.innerHTML = `<div>${icon}</div><div class="name">${escapeHtml(e.name)}</div>`
         + `<div class="size">${fmtBytes(e.size)}</div>`
+        + `<div class="meta">${tsHTML(e.mtime)}</div>`
         + `<div class="row-actions admin-only">`
         +   `<button type="button" class="act-ren" title="Rename">✎</button>`
         +   `<button type="button" class="act-del" title="Delete">🗑</button>`
@@ -421,7 +434,7 @@
       row.dataset.id = t.threadId;
       row.innerHTML = `
         <div class="title">${escapeHtml(t.title)}</div>
-        <div class="meta">${fmtRelative(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}</div>
+        <div class="meta">${tsHTML(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}</div>
         <button type="button" class="del" title="Delete chat" aria-label="Delete chat">×</button>`;
       row.addEventListener('click', (ev) => {
         if (ev.target.classList.contains('del')) return;
@@ -494,7 +507,7 @@
 
   function setChatStatus(text) { $('chat-status').textContent = text || ''; }
 
-  function appendChatMsg(kind, text, files) {
+  function appendChatMsg(kind, text, files, ts) {
     const log = $('chat-log');
     // Clear the placeholder on first append.
     const placeholder = log.querySelector('.empty');
@@ -509,6 +522,12 @@
       fl.className = 'files';
       fl.textContent = files.map((f) => `📎 ${f.filename} (${fmtBytes(f.size)})`).join('  ');
       wrap.appendChild(fl);
+    }
+    const metaHTML = tsHTML(ts || new Date().toISOString(), 'meta');
+    if (metaHTML) {
+      const meta = document.createElement('div');
+      meta.innerHTML = metaHTML;
+      wrap.appendChild(meta.firstChild);
     }
     log.appendChild(wrap);
     log.scrollTop = log.scrollHeight;
@@ -538,7 +557,7 @@
         );
         if (r.ok) {
           const { messages } = await r.json();
-          for (const msg of messages || []) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null);
+          for (const msg of messages || []) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, msg.timestamp);
         }
       } catch (err) { console.error('history load failed', err); }
       connectChatWs();
@@ -593,7 +612,7 @@
       let payload; try { payload = JSON.parse(ev.data); } catch (_) { return; }
       if (payload.kind === 'ready') return;
       if (payload.kind === 'inbound') {
-        appendChatMsg('in', payload.text, payload.files || null);
+        appendChatMsg('in', payload.text, payload.files || null, payload.timestamp);
         updateActiveThreadTitleFromFirstMessage(payload.text);
         bumpActiveThread();
         return;
@@ -601,7 +620,7 @@
       if (payload.kind === 'outbound') {
         const c = payload.content || {};
         const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
-        appendChatMsg('out', text, payload.files || []);
+        appendChatMsg('out', text, payload.files || [], payload.timestamp);
         bumpActiveThread();
         return;
       }

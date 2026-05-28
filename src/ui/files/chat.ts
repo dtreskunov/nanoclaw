@@ -659,6 +659,7 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
             messageKind: message.kind,
             content: message.content,
             files: message.files?.map((f) => ({ filename: f.filename, size: f.data.length })) ?? [],
+            timestamp: new Date().toISOString(),
           }),
         );
       } catch (err) {
@@ -667,7 +668,7 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
     },
     onInboundEcho(text, files) {
       try {
-        ws.send(JSON.stringify({ kind: 'inbound', text, files: files ?? [] }));
+        ws.send(JSON.stringify({ kind: 'inbound', text, files: files ?? [], timestamp: new Date().toISOString() }));
       } catch (err) {
         log.warn('web chat ws echo failed', { err });
       }
