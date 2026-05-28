@@ -192,6 +192,101 @@
       .files-pane .row.active { background: var(--accent); }
       .files-pane .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .files-pane .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .files-pane .row .row-actions { display: none; gap: 2px; }
+      .files-pane .row:hover .row-actions { display: inline-flex; }
+      .files-pane .row .row-actions button {
+        background: transparent; border: 0; cursor: pointer; color: var(--muted);
+        padding: 2px 4px; font-size: 13px; line-height: 1;
+      }
+      .files-pane .row .row-actions button:hover { color: inherit; }
+
+      /* admin-only UI is hidden until JS adds .is-admin on body */
+      .admin-only { display: none; }
+      body.is-admin .admin-only { display: inline-flex; }
+      body.is-admin .files-pane .drop-hint { display: block; }
+      /* Hide admin actions when the files pane is collapsed. */
+      body.is-admin .files-pane.collapsed .admin-only { display: none; }
+      /* Action overlay anchored to the right edge of the files pane,
+         sitting on top of the .head so the title can flex underneath. */
+      .files-pane .head-actions {
+        position: absolute; top: 0; right: 0;
+        height: var(--handle-h);
+        align-items: center; gap: 6px;
+        padding: 0 10px;
+        z-index: 3;
+      }
+      body.is-admin .files-pane .head-actions { display: flex; }
+      body.is-admin .files-pane.collapsed .head-actions { display: none; }
+      /* Small text button for header actions like +D / +F / UPL. */
+      .files-pane .text-btn {
+        background: transparent; border: 1px solid var(--border);
+        color: var(--muted); cursor: pointer;
+        font-size: 11px; font-weight: 600; line-height: 1;
+        padding: 3px 6px; border-radius: 3px;
+        font-family: inherit;
+      }
+      .files-pane .text-btn:hover { color: inherit; background: rgba(127,127,127,0.12); }
+
+      /* Drag-and-drop hint pinned to bottom of files-body */
+      .files-pane .files-body { position: relative; }
+      .files-pane .drop-hint {
+        border-top: 1px solid var(--border);
+        padding: 6px 10px;
+        font-size: 11px;
+        color: var(--muted);
+        text-align: center;
+        background: rgba(127,127,127,0.04);
+        transition: background 0.12s, color 0.12s;
+      }
+      .files-pane .drop-hint code {
+        background: rgba(127,127,127,0.18);
+        padding: 0 4px;
+        border-radius: 3px;
+      }
+      .files-pane .drop-hint.drag-over {
+        background: rgba(80,140,220,0.18);
+        color: var(--fg, inherit);
+      }
+
+      /* Upload progress strip */
+      .files-pane .upload-strip {
+        border-bottom: 1px solid var(--border);
+        background: rgba(127,127,127,0.05);
+        padding: 6px 8px;
+        display: flex; flex-direction: column; gap: 4px;
+        max-height: 40vh; overflow: auto;
+      }
+      .upload-strip .row {
+        display: flex; align-items: center; gap: 8px; font-size: 12px;
+        padding: 2px 0;
+      }
+      .upload-strip .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .upload-strip .row .bar {
+        width: 60px; height: 4px; background: rgba(127,127,127,0.2); border-radius: 2px; overflow: hidden;
+      }
+      .upload-strip .row .bar > i { display: block; height: 100%; background: var(--accent, #4a8); width: 0; }
+      .upload-strip .row.ok .status { color: #6c6; }
+      .upload-strip .row.error .status { color: #e66; }
+      .upload-strip .row.conflict .status { color: #e90; }
+      .upload-strip .row .actions button {
+        background: transparent; border: 1px solid var(--border); color: inherit;
+        font-size: 11px; padding: 1px 6px; border-radius: 3px; cursor: pointer;
+      }
+      .upload-strip .row .actions button:hover { background: rgba(127,127,127,0.12); }
+      .upload-strip .footer {
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 8px; padding-top: 4px; border-top: 1px solid var(--border);
+        margin-top: 4px;
+      }
+      .upload-strip .footer button {
+        background: var(--accent, #4a8); color: white; border: 0;
+        font-size: 12px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
+      }
+      .upload-strip .footer button[disabled] { opacity: 0.5; cursor: not-allowed; }
+      .upload-strip .footer .close {
+        background: transparent; color: var(--muted); border: 0;
+        cursor: pointer; font-size: 16px; line-height: 1;
+      }
 
       /* Preview pane */
       .preview-pane { border-left: 1px solid var(--border); width: 360px; }
@@ -339,9 +434,17 @@
           <span class="title">Files</span>
           <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
         </div>
+        <div class="head-actions admin-only">
+          <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file">+F</button>
+          <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder">+D</button>
+          <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files">UPL</button>
+          <input type="file" id="upload-input" multiple hidden />
+        </div>
         <div class="files-body">
           <div class="breadcrumb" id="crumb"></div>
+          <div class="upload-strip" id="upload-strip" hidden></div>
           <div class="listing" id="listing"><div class="empty">No group selected</div></div>
+          <div class="drop-hint admin-only" id="dropzone">Drag &amp; drop files here to upload to <code id="dropzone-path">/</code></div>
         </div>
       </aside>
       <aside class="nc-pane preview-pane no-animate" id="preview-pane">
