@@ -22,6 +22,7 @@ import { createResendAdapter } from '@resend/chat-sdk-adapter';
 import { Message, parseMarkdown } from 'chat';
 
 import { isSenderAllowed, provisionEmailBot, readBotFolder } from '../auto-provision.js';
+import { getDb } from '../db/connection.js';
 import { getMessagingGroupByPlatform, getMessagingGroupAgents } from '../db/messaging-groups.js';
 import { getAskQuestionRender } from '../db/sessions.js';
 import { readEnvFile } from '../env.js';
@@ -125,44 +126,29 @@ registerChannelAdapter('resend', {
     // resolveThreadId picks a different references[0] and mints a NEW
     // thread. Result: a 34-email Gmail conversation gets sharded across
     // many sessions, one per host restart.
-    const ROOTS_FILE = 'data/resend-thread-roots.json';
-    const threadRoots: Map<string, string> = (() => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const fs = require('node:fs') as typeof import('node:fs');
-        if (fs.existsSync(ROOTS_FILE)) {
-          const obj = JSON.parse(fs.readFileSync(ROOTS_FILE, 'utf8')) as Record<string, string>;
-          return new Map(Object.entries(obj));
-        }
-      } catch (err) {
-        log.warn('resend: failed to load thread-roots file', { err });
-      }
-      return new Map();
-    })();
-    let rootsDirty = false;
-    let rootsFlushTimer: NodeJS.Timeout | null = null;
-    const scheduleFlushRoots = (): void => {
-      if (rootsFlushTimer) return;
-      rootsFlushTimer = setTimeout(() => {
-        rootsFlushTimer = null;
-        if (!rootsDirty) return;
-        rootsDirty = false;
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const fs = require('node:fs') as typeof import('node:fs');
-          fs.writeFileSync(ROOTS_FILE, JSON.stringify(Object.fromEntries(threadRoots), null, 2));
-        } catch (err) {
-          log.warn('resend: failed to persist thread-roots file', { err });
-        }
-      }, 500);
-      if (typeof rootsFlushTimer.unref === 'function') rootsFlushTimer.unref();
-    };
+    const db = getDb();
+    const selectRoot = db.prepare<[string], { root_message_id: string }>(
+      'SELECT root_message_id FROM resend_thread_roots WHERE thread_id = ?',
+    );
+    const insertRoot = db.prepare<[string, string, string]>(
+      'INSERT OR IGNORE INTO resend_thread_roots (thread_id, root_message_id, created_at) VALUES (?, ?, ?)',
+    );
     const recordRoot = (threadId: string, rootMessageId: string): void => {
-      if (threadRoots.get(threadId) === rootMessageId) return;
-      if (threadRoots.has(threadId)) return; // first writer wins (true root)
-      threadRoots.set(threadId, rootMessageId);
-      rootsDirty = true;
-      scheduleFlushRoots();
+      // INSERT OR IGNORE makes this first-writer-wins, so a later message
+      // can't clobber the true root.
+      try {
+        insertRoot.run(threadId, rootMessageId, new Date().toISOString());
+      } catch (err) {
+        log.warn('resend: failed to persist thread root', { err, threadId });
+      }
+    };
+    const lookupRoot = (threadId: string): string | undefined => {
+      try {
+        return selectRoot.get(threadId)?.root_message_id;
+      } catch (err) {
+        log.warn('resend: failed to lookup thread root', { err, threadId });
+        return undefined;
+      }
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,7 +184,7 @@ registerChannelAdapter('resend', {
     tr.getReplyHeaders = function (threadId: string): Record<string, string> | undefined {
       const fromMemory = origGetReplyHeaders(threadId);
       if (fromMemory) return fromMemory;
-      const root = threadRoots.get(threadId);
+      const root = lookupRoot(threadId);
       if (!root) return undefined;
       return { 'In-Reply-To': root, References: root };
     };
