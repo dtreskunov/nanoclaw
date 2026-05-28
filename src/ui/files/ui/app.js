@@ -349,41 +349,64 @@
     onSelectionChanged();
     const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
     const pv = $('preview');
+    if (entry.size == null || !entry.mtime) {
+      try {
+        const h = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
+        if (h.ok) {
+          if (entry.size == null) {
+            const cl = h.headers.get('content-length');
+            if (cl) entry.size = Number(cl);
+          }
+          if (!entry.mtime) {
+            const lm = h.headers.get('last-modified');
+            if (lm) { const t = Date.parse(lm); if (t) entry.mtime = new Date(t).toISOString(); }
+          }
+        }
+      } catch (_) {}
+    }
+    const toolbar = previewToolbar(entry, url);
     const ext = entry.name.toLowerCase().split('.').pop();
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-      pv.innerHTML = `<img alt="${escapeHtml(entry.name)}" src="${url}"/>`;
+      pv.innerHTML = `${toolbar}<img alt="${escapeHtml(entry.name)}" src="${url}"/>`;
       return;
     }
     if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) {
-      pv.innerHTML = `<audio controls preload="metadata" src="${url}"></audio><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<audio controls preload="metadata" src="${url}"></audio>`;
       return;
     }
     if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) {
-      pv.innerHTML = `<video controls preload="metadata" src="${url}" style="max-width:100%;max-height:80vh"></video><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<video controls preload="metadata" src="${url}" style="max-width:100%;max-height:80vh"></video>`;
       return;
     }
     if (ext === 'pdf') {
-      pv.innerHTML = `<iframe src="${url}" style="width:100%;height:90vh;border:0"></iframe>`;
+      pv.innerHTML = `${toolbar}<iframe src="${url}" style="width:100%;height:90vh;border:0"></iframe>`;
       return;
     }
     const r = await fetch(url, { credentials: 'same-origin' });
-    if (!r.ok) { pv.innerHTML = `<div class="empty">HTTP ${r.status}</div>`; return; }
+    if (!r.ok) { pv.innerHTML = `${toolbar}<div class="empty">HTTP ${r.status}</div>`; return; }
     const ct = r.headers.get('content-type') || '';
     if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml')) {
       const t = await r.text();
       if (ext === 'md' || ext === 'markdown') {
         const html = renderMarkdown(t);
         if (html != null) {
-          pv.innerHTML = `<div class="markdown-preview"></div><div style="margin:8px 0"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+          pv.innerHTML = `${toolbar}<div class="markdown-preview"></div>`;
           pv.querySelector('.markdown-preview').innerHTML = html;
           return;
         }
       }
-      pv.innerHTML = `<pre></pre><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<pre></pre>`;
       pv.querySelector('pre').textContent = t;
     } else {
-      pv.innerHTML = `<div class="empty">Binary file (${escapeHtml(ct)}). <a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+      pv.innerHTML = `${toolbar}<div class="empty">Binary file (${escapeHtml(ct)}).</div>`;
     }
+  }
+
+  function previewToolbar(entry, url) {
+    const parts = [`<a class="text-btn" href="${url}" download="${escapeAttr(entry.name)}">Download</a>`];
+    if (entry.size != null) parts.push(`<span class="meta">${escapeHtml(fmtBytes(entry.size))}</span>`);
+    if (entry.mtime) parts.push(tsHTML(entry.mtime, 'meta'));
+    return `<div class="preview-toolbar">${parts.join('')}</div>`;
   }
 
   function setPreview(html) {

@@ -227,8 +227,15 @@
       }
       .files-pane .text-btn:hover { color: inherit; background: rgba(127,127,127,0.12); }
 
+      .files-pane .preview-toolbar {
+        display: flex; align-items: center; gap: 10px;
+        padding-bottom: 8px; margin-bottom: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .files-pane .preview-toolbar .meta { font-size: 11px; color: var(--muted); }
+      .files-pane .preview-toolbar a.text-btn { text-decoration: none; display: inline-block; }
+
       /* Drag-and-drop hint pinned to bottom of files-body */
-      .files-pane .files-body { position: relative; }
       .files-pane .drop-hint {
         border-top: 1px solid var(--border);
         padding: 6px 10px;
