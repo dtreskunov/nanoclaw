@@ -295,8 +295,18 @@
     onSelectionChanged();
     const dz = document.getElementById('dropzone-path');
     if (dz) dz.textContent = '/' + p;
-    const { entries } = await api(`api/groups/${encodeURIComponent(state.groupId)}/tree?path=${encodeURIComponent(p)}`);
     const list = $('listing');
+    list.innerHTML = '';
+    list.appendChild(emptyDiv('Loading…'));
+    let entries;
+    try {
+      ({ entries } = await api(`api/groups/${encodeURIComponent(state.groupId)}/tree?path=${encodeURIComponent(p)}`));
+    } catch (err) {
+      list.innerHTML = '';
+      const msg = /HTTP 404/.test(String(err && err.message)) ? 'Not found. It may have been renamed or deleted.' : String(err && err.message || err);
+      list.appendChild(emptyDiv(msg));
+      return;
+    }
     list.innerHTML = '';
     if (p) {
       const up = document.createElement('div');
@@ -349,20 +359,25 @@
     onSelectionChanged();
     const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
     const pv = $('preview');
-    if (entry.size == null || !entry.mtime) {
-      try {
-        const h = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
-        if (h.ok) {
-          if (entry.size == null) {
-            const cl = h.headers.get('content-length');
-            if (cl) entry.size = Number(cl);
-          }
-          if (!entry.mtime) {
-            const lm = h.headers.get('last-modified');
-            if (lm) { const t = Date.parse(lm); if (t) entry.mtime = new Date(t).toISOString(); }
-          }
+    let headStatus = 0;
+    try {
+      const h = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
+      headStatus = h.status;
+      if (h.ok) {
+        if (entry.size == null) {
+          const cl = h.headers.get('content-length');
+          if (cl) entry.size = Number(cl);
         }
-      } catch (_) {}
+        if (!entry.mtime) {
+          const lm = h.headers.get('last-modified');
+          if (lm) { const t = Date.parse(lm); if (t) entry.mtime = new Date(t).toISOString(); }
+        }
+      }
+    } catch (_) {}
+    if (headStatus && headStatus >= 400) {
+      const msg = headStatus === 404 ? 'File not found. It may have been renamed or deleted.' : `HTTP ${headStatus}`;
+      pv.innerHTML = `<div class="preview-toolbar"></div><div class="empty">${escapeHtml(msg)}</div>`;
+      return;
     }
     const toolbar = previewToolbar(entry, url);
     const ext = entry.name.toLowerCase().split('.').pop();
@@ -1044,6 +1059,12 @@
       if (!state.groupId) return;
       openChat(state.groupId, null).then(() => { $('chat-input').focus(); closeMobileDrawers(); }).catch(console.error);
     });
+    const logoutForm = document.getElementById('logout-form');
+    if (logoutForm) {
+      logoutForm.addEventListener('submit', (e) => {
+        if (MOBILE_MQ.matches && !window.confirm('Log out?')) e.preventDefault();
+      });
+    }
     const btnUpload = document.getElementById('btn-upload');
     const btnMkdir = document.getElementById('btn-mkdir');
     const uploadInput = document.getElementById('upload-input');
