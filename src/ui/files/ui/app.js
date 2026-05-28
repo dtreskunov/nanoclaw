@@ -714,8 +714,15 @@
     }
   }
 
+  function stopPreviewMedia() {
+    for (const m of $('preview').querySelectorAll('audio, video')) {
+      try { m.pause(); m.currentTime = 0; } catch (_) {}
+    }
+  }
+
   function togglePane(key) {
     state.paneOpen[key] = !state.paneOpen[key];
+    if (key === 'preview' && !state.paneOpen.preview) stopPreviewMedia();
     applyPanelClasses();
     persistPanelState();
   }
@@ -728,6 +735,7 @@
   }
 
   function closeMobileDrawers() {
+    if ($('preview-pane').classList.contains('open')) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.remove('open');
     $('backdrop').classList.remove('show');
   }
@@ -735,6 +743,7 @@
   function toggleMobileDrawer(which) {
     const target = $(PANES.find((p) => p.key === which).id);
     const willOpen = !target.classList.contains('open');
+    if ($('preview-pane').classList.contains('open') && !(which === 'preview' && willOpen)) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.toggle('open', p.key === which && willOpen);
     $('backdrop').classList.toggle('show', willOpen);
   }
