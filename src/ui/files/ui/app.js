@@ -1044,6 +1044,12 @@
       if (!state.groupId) return;
       openChat(state.groupId, null).then(() => { $('chat-input').focus(); closeMobileDrawers(); }).catch(console.error);
     });
+    const logoutForm = document.getElementById('logout-form');
+    if (logoutForm) {
+      logoutForm.addEventListener('submit', (e) => {
+        if (MOBILE_MQ.matches && !window.confirm('Log out?')) e.preventDefault();
+      });
+    }
     const btnUpload = document.getElementById('btn-upload');
     const btnMkdir = document.getElementById('btn-mkdir');
     const uploadInput = document.getElementById('upload-input');

@@ -333,8 +333,8 @@
         header select { flex: 1; min-width: 0; max-width: none; min-height: 44px; height: 44px; font-size: 15px; }
         header .icon-btn { min-width: 44px; min-height: 44px; font-size: 22px; padding: 4px 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
         header form { flex-shrink: 0; margin: 0; }
-        header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; font-size: 0; position: relative; }
-        header form button::after { content: '⏻'; font-size: 22px; }
+        header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; position: relative; font-size: 0; }
+        header form button svg { width: 22px; height: 22px; vertical-align: middle; }
         main {
           grid-template-columns: 1fr !important;
           grid-template-rows: 1fr;
@@ -405,7 +405,7 @@
       <div class="spacer"></div>
       <span class="user" id="me"></span>
       <button type="button" class="icon-btn mobile-only" id="btn-files" aria-label="Files">📁</button>
-      <form method="POST" action="/ui/auth/logout" style="margin:0"><button type="submit">Log out</button></form>
+      <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0"><button type="submit" aria-label="Log out" title="Log out"><svg class="mobile-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span id="logout-label" class="desktop-only">Log out</span></button></form>
     </header>
     <main id="main">
       <aside class="nc-pane threads-rail" id="threads-rail">
