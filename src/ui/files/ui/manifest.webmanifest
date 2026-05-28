@@ -1,0 +1,14 @@
+{
+  "name": "NanoClaw",
+  "short_name": "NanoClaw",
+  "start_url": "/ui/files/",
+  "scope": "/ui/files/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "ui/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "ui/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
