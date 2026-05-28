@@ -218,6 +218,14 @@
     const ct = r.headers.get('content-type') || '';
     if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml')) {
       const t = await r.text();
+      if (ext === 'md' || ext === 'markdown') {
+        const html = renderMarkdown(t);
+        if (html != null) {
+          pv.innerHTML = `<div class="markdown-preview"></div><div style="margin:8px 16px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
+          pv.querySelector('.markdown-preview').innerHTML = html;
+          return;
+        }
+      }
       pv.innerHTML = `<pre></pre><div style="margin-top:8px"><a href="${url}" download="${escapeHtml(entry.name)}">Download</a></div>`;
       pv.querySelector('pre').textContent = t;
     } else {
@@ -268,11 +276,27 @@
     $('chat-status').textContent = text;
   }
 
+  function renderMarkdown(text) {
+    if (typeof window.marked === 'undefined') return null;
+    try {
+      return window.marked.parse(text || '', { breaks: true, gfm: true });
+    } catch (_) {
+      return null;
+    }
+  }
+
   function appendChatMsg(kind, text, files) {
     const log = $('chat-log');
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + kind;
-    wrap.textContent = text || '';
+    // Render outbound (agent) as markdown; user echo stays plain text.
+    const md = kind === 'out' ? renderMarkdown(text) : null;
+    if (md != null) {
+      wrap.classList.add('markdown');
+      wrap.innerHTML = md;
+    } else {
+      wrap.textContent = text || '';
+    }
     if (files && files.length) {
       const fl = document.createElement('div');
       fl.className = 'files';
