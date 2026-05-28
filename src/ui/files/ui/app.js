@@ -15,9 +15,16 @@
   const chat = {
     groupId: null,
     threadId: null,
+    channelType: 'web',
+    messagingGroupId: null,
+    sessionMode: 'per-thread',
+    sessionId: null,
     ws: null,
     reconnectTimer: null,
     reconnectAttempt: 0,
+    pollTimer: null,
+    threadsPollTimer: null,
+    lastSeenTs: '',
     pending: [],
     contextDismissed: false,
     threads: [],
@@ -28,6 +35,22 @@
   const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
   const UPLOAD_MAX_FILES = 10;
   const MOBILE_MQ = window.matchMedia('(max-width: 720px)');
+
+  // Channel metadata for the thread rail + composer banner.
+  const CHANNEL_META = {
+    web:      { label: 'Web',      icon: '💬' },
+    resend:   { label: 'Email',    icon: '📧' },
+    discord:  { label: 'Discord',  icon: '👾' },
+    telegram: { label: 'Telegram', icon: '✈️' },
+    whatsapp: { label: 'WhatsApp', icon: '📞' },
+    imessage: { label: 'iMessage', icon: '💬' },
+    signal:   { label: 'Signal',   icon: '🔒' },
+    slack:    { label: 'Slack',    icon: '#'  },
+    matrix:   { label: 'Matrix',   icon: 'M'  },
+    gchat:    { label: 'Chat',     icon: 'G'  },
+  };
+  const POLL_INTERVAL_MS = 10000;
+  function channelMeta(ct) { return CHANNEL_META[ct] || { label: ct || 'Channel', icon: '•' }; }
 
   const $ = (id) => document.getElementById(id);
 
@@ -155,15 +178,18 @@
     const pathPart = qIdx < 0 ? raw : raw.slice(0, qIdx);
     const params = new URLSearchParams(qIdx < 0 ? '' : raw.slice(qIdx + 1));
     const threadId = params.get('t') || null;
+    const channelType = params.get('c') || null;
+    const messagingGroupId = params.get('mg') || null;
     const h = decodeURI(pathPart);
-    if (!h) return threadId ? { groupId: '', path: '', isDir: true, threadId } : null;
+    const base = { threadId, channelType, messagingGroupId };
+    if (!h) return threadId ? { groupId: '', path: '', isDir: true, ...base } : null;
     const slash = h.indexOf('/');
-    if (slash < 0) return { groupId: h, path: '', isDir: true, threadId };
+    if (slash < 0) return { groupId: h, path: '', isDir: true, ...base };
     const groupId = h.slice(0, slash);
     const rest = h.slice(slash + 1);
     const isDir = rest === '' || rest.endsWith('/');
     const path = isDir ? rest.replace(/\/$/, '') : rest;
-    return { groupId, path, isDir, threadId };
+    return { groupId, path, isDir, ...base };
   }
 
   function writeHash() {
@@ -173,6 +199,10 @@
     else if (state.path) h += '/' + encodeURI(state.path) + '/';
     if (chat.threadId && chat.groupId === state.groupId) {
       h += '?t=' + encodeURIComponent(chat.threadId);
+      if (chat.channelType && chat.channelType !== 'web') {
+        h += '&c=' + encodeURIComponent(chat.channelType);
+        if (chat.messagingGroupId) h += '&mg=' + encodeURIComponent(chat.messagingGroupId);
+      }
     }
     if (location.hash !== h) { suppressHashCount++; location.hash = h; }
   }
@@ -196,12 +226,15 @@
       await loadThreads(parsed.groupId);
     }
     if (parsed.threadId) {
-      openChat(parsed.groupId, parsed.threadId).catch((err) => console.error('chat open failed', err));
+      const ctx = parsed.channelType && parsed.channelType !== 'web' && parsed.messagingGroupId
+        ? { channelType: parsed.channelType, messagingGroupId: parsed.messagingGroupId }
+        : null;
+      openChat(parsed.groupId, parsed.threadId, ctx).catch((err) => console.error('chat open failed', err));
     } else if (groupChanged) {
       // Brand new group selection without an explicit thread — auto-resume
       // the most recent one if any, else show empty chat.
-      const latest = chat.threads.length > 0 ? chat.threads[0].threadId : null;
-      if (latest) openChat(parsed.groupId, latest).catch((err) => console.error('chat open failed', err));
+      const latest = chat.threads.length > 0 ? chat.threads[0] : null;
+      if (latest) openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error('chat open failed', err));
       else clearChat();
     }
     if (parsed.isDir) {
@@ -270,13 +303,20 @@
     clearUploadStrip();
     syncGroupSelect();
     await loadThreads(id);
+    // Periodically refresh the thread rail so newly-arrived inbound
+    // threads (e.g. fresh email) appear without a manual reload.
+    if (chat.threadsPollTimer) { clearInterval(chat.threadsPollTimer); chat.threadsPollTimer = null; }
+    chat.threadsPollTimer = setInterval(() => {
+      if (state.groupId === id) loadThreads(id).catch(() => {});
+      else { clearInterval(chat.threadsPollTimer); chat.threadsPollTimer = null; }
+    }, 20000);
     await loadTree('');
     onSelectionChanged();
     // Auto-resume most recent thread on group switch.
-    const latest = chat.threads.length > 0 ? chat.threads[0].threadId : null;
+    const latest = chat.threads.length > 0 ? chat.threads[0] : null;
     if (latest) {
       // openChat writes the hash with ?t=… included.
-      openChat(id, latest).catch((err) => console.error('chat open failed', err));
+      openChat(id, latest.threadId, threadCtx(latest)).catch((err) => console.error('chat open failed', err));
     } else {
       clearChat();
       chat.groupId = id;
@@ -462,24 +502,39 @@
     renderThreads();
   }
 
+  function threadCtx(t) {
+    if (!t) return null;
+    if (!t.channelType || t.channelType === 'web') return null;
+    return { channelType: t.channelType, messagingGroupId: t.messagingGroupId };
+  }
+
   function renderThreads() {
     const list = $('threads-list');
     list.innerHTML = '';
     if (chat.threads.length === 0) { list.appendChild(emptyDiv('No chats yet')); return; }
     for (const t of chat.threads) {
+      const ct = t.channelType || 'web';
+      const meta = channelMeta(ct);
+      const pill = ct !== 'web'
+        ? `<span class="ch-pill" title="${escapeHtml(meta.label)}${t.counterparty ? ' · ' + escapeHtml(t.counterparty) : ''}">${meta.icon}</span>`
+        : '';
       const row = document.createElement('div');
       row.className = 'thread' + (t.threadId === chat.threadId ? ' active' : '');
       row.dataset.id = t.threadId;
+      const subMeta = `${tsHTML(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}${
+        ct !== 'web' && t.counterparty ? ' · ' + escapeHtml(t.counterparty) : ''}`;
+      const delBtn = ct === 'web' ? '<button type="button" class="del" title="Delete chat" aria-label="Delete chat">×</button>' : '';
       row.innerHTML = `
-        <div class="title">${escapeHtml(t.title)}</div>
-        <div class="meta">${tsHTML(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}</div>
-        <button type="button" class="del" title="Delete chat" aria-label="Delete chat">×</button>`;
+        <div class="title">${pill}${escapeHtml(t.title)}</div>
+        <div class="meta">${subMeta}</div>
+        ${delBtn}`;
       row.addEventListener('click', (ev) => {
         if (ev.target.classList.contains('del')) return;
-        openChat(state.groupId, t.threadId).catch((err) => console.error('chat open failed', err));
+        openChat(state.groupId, t.threadId, threadCtx(t)).catch((err) => console.error('chat open failed', err));
         closeMobileDrawers();
       });
-      row.querySelector('.del').addEventListener('click', async (ev) => {
+      const del = row.querySelector('.del');
+      if (del) del.addEventListener('click', async (ev) => {
         ev.stopPropagation();
         if (!confirm(`Delete this chat?\n\n"${t.title}"`)) return;
         await deleteThread(t.threadId);
@@ -503,8 +558,8 @@
     chat.threads = chat.threads.filter((x) => x.threadId !== threadId);
     if (chat.threadId === threadId) {
       // Active thread was deleted — fall back to most recent, or empty.
-      const latest = chat.threads.length > 0 ? chat.threads[0].threadId : null;
-      if (latest) openChat(state.groupId, latest).catch(console.error);
+      const latest = chat.threads.length > 0 ? chat.threads[0] : null;
+      if (latest) openChat(state.groupId, latest.threadId, threadCtx(latest)).catch(console.error);
       else { clearChat(); chat.threadId = null; writeHash(); }
     }
     renderThreads();
@@ -539,8 +594,92 @@
   function clearChat() {
     $('chat-log').innerHTML = '<div class="empty">Pick or start a chat.</div>';
     setChatStatus('');
+    stopChatPoll();
     if (chat.ws) { try { chat.ws.close(); } catch (_) {} chat.ws = null; }
     if (chat.reconnectTimer) { clearTimeout(chat.reconnectTimer); chat.reconnectTimer = null; }
+    chat.channelType = 'web';
+    chat.messagingGroupId = null;
+    chat.lastSeenTs = '';
+    setComposerMode('web');
+  }
+
+  function setComposerMode(channelType) {
+    const form = $('chat-form');
+    const banner = $('chat-readonly');
+    const isReadOnly = channelType && channelType !== 'web';
+    if (form) form.style.display = isReadOnly ? 'none' : '';
+    if (banner) {
+      banner.hidden = !isReadOnly;
+      if (isReadOnly) {
+        const meta = channelMeta(channelType);
+        banner.textContent = `Read-only view — reply on ${meta.label} to continue this thread.`;
+      } else {
+        banner.textContent = '';
+      }
+    }
+  }
+
+  function stopChatPoll() {
+    if (chat.pollTimer) { clearInterval(chat.pollTimer); chat.pollTimer = null; }
+  }
+
+  function startChatPoll() {
+    stopChatPoll();
+    chat.pollTimer = setInterval(async () => {
+      if (!chat.threadId || chat.channelType === 'web') { stopChatPoll(); return; }
+      try { await refetchThreadHistory(/*appendNewOnly*/ true); } catch (err) { console.error('poll failed', err); }
+    }, POLL_INTERVAL_MS);
+  }
+
+  function historyUrl(groupId, threadId) {
+    let u = `api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/history`;
+    if (chat.channelType && chat.channelType !== 'web' && chat.messagingGroupId) {
+      u += `?channel=${encodeURIComponent(chat.channelType)}&mg=${encodeURIComponent(chat.messagingGroupId)}`;
+    }
+    return u;
+  }
+
+  async function refetchThreadHistory(appendNewOnly) {
+    const groupId = chat.groupId, threadId = chat.threadId;
+    const r = await fetch(historyUrl(groupId, threadId), { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const { messages } = await r.json();
+    if (!Array.isArray(messages)) return;
+    // Compare timestamps numerically. Inbound rows are ISO 8601
+    // (`...T...Z`), outbound rows come from the container as SQLite local
+    // `YYYY-MM-DD HH:MM:SS`. A raw string compare is wrong (the 'T' at
+    // pos 10 sorts after the space) and made every poll re-append every
+    // inbound row — fmtRelative normalizes, but the > check didn't.
+    const tsKey = (s) => {
+      if (!s) return 0;
+      const norm = s.includes('T') ? s : s.replace(' ', 'T') + 'Z';
+      const n = Date.parse(norm);
+      return Number.isFinite(n) ? n : 0;
+    };
+    if (!appendNewOnly) {
+      $('chat-log').innerHTML = '';
+      for (const msg of messages) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, msg.timestamp);
+      if (messages.length > 0) chat.lastSeenTs = messages[messages.length - 1].timestamp || '';
+      return;
+    }
+    const seenKey = tsKey(chat.lastSeenTs);
+    let maxTs = chat.lastSeenTs;
+    let maxKey = seenKey;
+    let bumped = false;
+    for (const msg of messages) {
+      const ts = msg.timestamp || '';
+      const k = tsKey(ts);
+      if (!seenKey || k > seenKey) {
+        appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, ts);
+        if (k > maxKey) { maxKey = k; maxTs = ts; }
+        bumped = true;
+        if (msg.direction !== 'in') maybeNotify(msg.text, msg.files || []);
+      }
+    }
+    if (bumped) {
+      chat.lastSeenTs = maxTs || chat.lastSeenTs;
+      bumpActiveThread(maxTs);
+    }
   }
 
   function setChatStatus(text) { $('chat-status').textContent = text || ''; }
@@ -571,17 +710,36 @@
     log.scrollTop = log.scrollHeight;
   }
 
-  async function openChat(groupId, resumeThreadId) {
+  async function openChat(groupId, resumeThreadId, opts) {
     // Idempotent: re-opening the same thread is a no-op. Prevents races
     // where two hashchanges (or a hashchange + an explicit click) both try
     // to reload the same thread and double-render history.
     if (resumeThreadId && chat.groupId === groupId && chat.threadId === resumeThreadId) return;
     if (chat.ws) { try { chat.ws.close(); } catch (_) {} chat.ws = null; }
     if (chat.reconnectTimer) { clearTimeout(chat.reconnectTimer); chat.reconnectTimer = null; }
+    stopChatPoll();
     chat.groupId = groupId;
     chat.threadId = null;
     chat.reconnectAttempt = 0;
+    chat.lastSeenTs = '';
     $('chat-log').innerHTML = '';
+
+    // Resolve channel context. Explicit opts win; else try the thread rail
+    // entry; else default to web.
+    let channelType = 'web', messagingGroupId = null;
+    if (opts && opts.channelType) {
+      channelType = opts.channelType;
+      messagingGroupId = opts.messagingGroupId || null;
+    } else if (resumeThreadId) {
+      const t = chat.threads.find((x) => x.threadId === resumeThreadId);
+      if (t && t.channelType && t.channelType !== 'web') {
+        channelType = t.channelType;
+        messagingGroupId = t.messagingGroupId || null;
+      }
+    }
+    chat.channelType = channelType;
+    chat.messagingGroupId = messagingGroupId;
+    setComposerMode(channelType);
 
     if (resumeThreadId) {
       chat.threadId = resumeThreadId;
@@ -589,19 +747,22 @@
       writeHash();
       setChatStatus('loading history…');
       try {
-        const r = await fetch(
-          `api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(resumeThreadId)}/history`,
-          { credentials: 'same-origin' },
-        );
+        const r = await fetch(historyUrl(groupId, resumeThreadId), { credentials: 'same-origin' });
         if (r.ok) {
           const { messages } = await r.json();
           for (const msg of messages || []) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, msg.timestamp);
+          if (Array.isArray(messages) && messages.length > 0) chat.lastSeenTs = messages[messages.length - 1].timestamp || '';
         }
       } catch (err) { console.error('history load failed', err); }
-      connectChatWs();
+      if (channelType === 'web') connectChatWs();
+      else { setChatStatus(''); startChatPoll(); }
       return;
     }
 
+    // New chat is web-only.
+    chat.channelType = 'web';
+    chat.messagingGroupId = null;
+    setComposerMode('web');
     setChatStatus('starting…');
     let started;
     try {
@@ -615,6 +776,10 @@
     // Optimistically add the new thread to the rail.
     chat.threads.unshift({
       threadId: started.threadId,
+      sessionId: started.sessionId || null,
+      channelType: 'web',
+      messagingGroupId: started.messagingGroupId || null,
+      sessionMode: started.sessionMode || 'per-thread',
       title: '(new chat)',
       lastActivityAt: new Date().toISOString(),
       messageCount: 0,

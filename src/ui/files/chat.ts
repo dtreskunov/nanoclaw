@@ -20,9 +20,10 @@ import {
   createMessagingGroup,
   createMessagingGroupAgent,
   getMessagingGroupAgents,
+  getMessagingGroupAgentByPair,
   getMessagingGroupByPlatform,
 } from '../../db/messaging-groups.js';
-import { deleteSession, findSessionForAgent } from '../../db/sessions.js';
+import { deleteSession, findSessionByAgentGroup, findSessionForAgent } from '../../db/sessions.js';
 import { openInboundDb, openOutboundDb, sessionDir } from '../../session-manager.js';
 import { canAccessAgentGroup } from '../../modules/permissions/access.js';
 import { log } from '../../log.js';
@@ -99,11 +100,11 @@ export function matchChatPath(
   const threads = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/threads$/);
   if (threads) return { kind: 'threads', groupId: threads[1] };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
-  if (send) return { kind: 'send', groupId: send[1], threadId: send[2] };
+  if (send) return { kind: 'send', groupId: decodeURIComponent(send[1]), threadId: decodeURIComponent(send[2]) };
   const hist = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/history$/);
-  if (hist) return { kind: 'history', groupId: hist[1], threadId: hist[2] };
+  if (hist) return { kind: 'history', groupId: decodeURIComponent(hist[1]), threadId: decodeURIComponent(hist[2]) };
   const del = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)$/);
-  if (del) return { kind: 'delete', groupId: del[1], threadId: del[2] };
+  if (del) return { kind: 'delete', groupId: decodeURIComponent(del[1]), threadId: decodeURIComponent(del[2]) };
   return null;
 }
 
@@ -299,8 +300,12 @@ export async function handleChatRequest(
       writeJson(res, 405, { error: 'method_not_allowed' });
       return true;
     }
+    const q = new URLSearchParams((req.url || '').split('?')[1] || '');
+    const qChannel = q.get('channel') || undefined;
+    const qMg = q.get('mg') || undefined;
+    const override = qChannel && qMg ? { channelType: qChannel, messagingGroupId: qMg } : undefined;
     try {
-      const messages = readChatHistory(userId, m.groupId, m.threadId);
+      const messages = readChatHistory(userId, m.groupId, m.threadId, override);
       writeJson(res, 200, { messages });
     } catch (err) {
       log.warn('web chat history read failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
@@ -315,7 +320,7 @@ export async function handleChatRequest(
       return true;
     }
     try {
-      const threads = listChatThreads(userId, m.groupId);
+      const threads = listAllThreadsForUser(userId, m.groupId);
       writeJson(res, 200, { threads });
     } catch (err) {
       log.warn('web chat threads list failed', { userId, groupId: m.groupId, err });
@@ -352,12 +357,19 @@ interface HistoryMessage {
 /**
  * Read merged inbound + outbound history for a (user, group, thread) from
  * the session DBs. Returns [] if no session exists yet.
+ *
+ * `override` lets the caller target a non-web messaging group; without it
+ * defaults to the per-user web messaging group (legacy behavior).
  */
-function readChatHistory(userId: string, groupId: string, threadId: string): HistoryMessage[] {
-  const platformId = platformIdFor(userId, groupId);
-  const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
-  if (!mg) return [];
-  const session = findSessionForAgent(groupId, mg.id, threadId);
+function readChatHistory(
+  userId: string,
+  groupId: string,
+  threadId: string,
+  override?: { channelType: string; messagingGroupId: string },
+): HistoryMessage[] {
+  const target = resolveTargetMessagingGroup(userId, groupId, override);
+  if (!target) return [];
+  const session = resolveSessionForMode(groupId, target.messagingGroupId, target.sessionMode, threadId);
   if (!session) return [];
 
   const messages: HistoryMessage[] = [];
@@ -365,8 +377,8 @@ function readChatHistory(userId: string, groupId: string, threadId: string): His
     const inDb = openInboundDb(groupId, session.id);
     try {
       const rows = inDb
-        .prepare("SELECT timestamp, content FROM messages_in WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq")
-        .all(threadId) as { timestamp: string; content: string }[];
+        .prepare('SELECT timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq')
+        .all(target.channelType, threadId) as { timestamp: string; content: string }[];
       for (const r of rows) {
         const parsed = parseInboundContent(r.content);
         if (parsed != null)
@@ -384,9 +396,9 @@ function readChatHistory(userId: string, groupId: string, threadId: string): His
     try {
       const rows = outDb
         .prepare(
-          "SELECT timestamp, kind, content FROM messages_out WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq",
+          'SELECT timestamp, kind, content FROM messages_out WHERE channel_type = ? AND thread_id = ? ORDER BY seq',
         )
-        .all(threadId) as { timestamp: string; kind: string; content: string }[];
+        .all(target.channelType, threadId) as { timestamp: string; kind: string; content: string }[];
       for (const r of rows) {
         if (r.kind !== 'chat' && r.kind !== 'text') continue;
         const parsed = parseOutboundContent(r.content);
@@ -399,12 +411,82 @@ function readChatHistory(userId: string, groupId: string, threadId: string): His
     // outbound DB may not exist
   }
 
-  messages.sort((a, b) => {
-    const ta = Date.parse(a.timestamp.includes('T') ? a.timestamp : a.timestamp.replace(' ', 'T') + 'Z');
-    const tb = Date.parse(b.timestamp.includes('T') ? b.timestamp : b.timestamp.replace(' ', 'T') + 'Z');
-    return ta - tb;
-  });
+  messages.sort((a, b) => Date.parse(normTs(a.timestamp)) - Date.parse(normTs(b.timestamp)));
   return messages;
+}
+
+/**
+ * Resolve the (channelType, messagingGroupId, sessionMode) the user is
+ * targeting. If `override` is provided, authorize that user is the
+ * counterparty of that messaging group (web ownership or `user_dms`
+ * entry). Returns null on auth failure or unknown mg.
+ */
+function resolveTargetMessagingGroup(
+  userId: string,
+  agentGroupId: string,
+  override: { channelType: string; messagingGroupId: string } | undefined,
+): { channelType: string; messagingGroupId: string; sessionMode: 'per-thread' | 'shared' | 'agent-shared' } | null {
+  if (!override) {
+    const platformId = platformIdFor(userId, agentGroupId);
+    const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+    if (!mg) return null;
+    return { channelType: WEB_CHANNEL_TYPE, messagingGroupId: mg.id, sessionMode: 'per-thread' };
+  }
+  if (!userOwnsMessagingGroup(userId, agentGroupId, override.channelType, override.messagingGroupId)) return null;
+  const mga = getMessagingGroupAgentByPair(override.messagingGroupId, agentGroupId);
+  if (!mga) return null;
+  const mode = (mga.session_mode || 'per-thread') as 'per-thread' | 'shared' | 'agent-shared';
+  return { channelType: override.channelType, messagingGroupId: override.messagingGroupId, sessionMode: mode };
+}
+
+/** Authorize: viewer is the counterparty of this messaging group. */
+function userOwnsMessagingGroup(userId: string, agentGroupId: string, channelType: string, mgId: string): boolean {
+  if (channelType === WEB_CHANNEL_TYPE) {
+    const platformId = platformIdFor(userId, agentGroupId);
+    const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+    return mg?.id === mgId;
+  }
+  // Accept either a user_dms row OR a userId whose channel prefix matches
+  // the mg's channel and which is wired to this agent group. The latter
+  // covers email-bot-style aliases where the cold-DM cache isn't written.
+  const dmRow = getDb()
+    .prepare('SELECT 1 FROM user_dms WHERE user_id = ? AND channel_type = ? AND messaging_group_id = ?')
+    .get(userId, channelType, mgId);
+  if (dmRow) return true;
+  const viewerHandle = viewerHandleForChannel(userId, channelType);
+  if (!viewerHandle) return false;
+  const mgaRow = getDb()
+    .prepare(
+      `SELECT 1 FROM messaging_group_agents mga
+         JOIN messaging_groups mg ON mg.id = mga.messaging_group_id
+        WHERE mga.messaging_group_id = ? AND mga.agent_group_id = ? AND mg.channel_type = ?`,
+    )
+    .get(mgId, agentGroupId, channelType);
+  return !!mgaRow;
+}
+
+function resolveSessionForMode(
+  agentGroupId: string,
+  messagingGroupId: string,
+  sessionMode: 'per-thread' | 'shared' | 'agent-shared',
+  threadId: string,
+): { id: string } | undefined {
+  // Look up the session that actually holds this thread's messages.
+  // Order matters: a per-thread session for (ag, mg, threadId) is the
+  // most specific match. Otherwise a shared session for (ag, mg) holds
+  // every thread for that mg. Finally an agent-shared session (mg NULL)
+  // is the fallback. Each step is scoped, so we never return a session
+  // that belongs to a different messaging group.
+  void sessionMode;
+  return (
+    findSessionForAgent(agentGroupId, messagingGroupId, threadId) ||
+    findSessionForAgent(agentGroupId, messagingGroupId, null) ||
+    findSessionByAgentGroup(agentGroupId)
+  );
+}
+
+function normTs(s: string): string {
+  return s.includes('T') ? s : s.replace(' ', 'T') + 'Z';
 }
 
 function parseInboundContent(content: string): { text: string; files?: { filename: string; size: number }[] } | null {
@@ -458,106 +540,403 @@ function parseOutboundContent(content: string): { text: string; files?: { filena
 
 interface ThreadSummary {
   threadId: string;
+  sessionId: string;
+  channelType: string;
+  messagingGroupId: string;
+  platformId: string;
+  sessionMode: 'per-thread' | 'shared' | 'agent-shared';
   title: string;
   lastActivityAt: string;
   messageCount: number;
+  counterparty?: string;
+}
+
+interface UserMessagingContext {
+  messagingGroupId: string;
+  channelType: string;
+  platformId: string;
+  sessionMode: 'per-thread' | 'shared' | 'agent-shared';
 }
 
 /**
- * List all chat threads for (user, agent group). For each session we open
- * outbound.db to count messages + find max timestamp, and inbound.db to
- * grab the first user message as the title. N file opens per request —
- * fine at small scale, swap for a denormalized column when it bites.
+ * For a non-web channel, derive the viewer's platform identity on that
+ * channel from their `userId`. `userId` is always `<channel>:<handle>`;
+ * the handle is what shows up in `messages_in.platform_id` for inbound
+ * DMs from that viewer. Returns null when the viewer has no identity on
+ * the given channel (different channel prefix).
  */
-function listChatThreads(userId: string, groupId: string): ThreadSummary[] {
-  const platformId = platformIdFor(userId, groupId);
-  const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
-  if (!mg) return [];
+function viewerHandleForChannel(userId: string, channelType: string): string | null {
+  if (channelType === WEB_CHANNEL_TYPE) return null;
+  const prefix = channelType + ':';
+  if (!userId.startsWith(prefix)) return null;
+  const handle = userId.slice(prefix.length);
+  return handle || null;
+}
 
+/**
+ * All messaging-group contexts the viewer could plausibly have threads
+ * in, scoped to one agent group. Always includes the implicit web mg if
+ * one exists. For every other mga wired to the agent group, includes the
+ * mg iff the viewer's userId carries the matching channel prefix — we
+ * don't require a user_dms entry, because email-bot-style adapters don't
+ * always write one, and we filter per-thread later by inbound platform_id.
+ */
+function listUserMessagingContexts(userId: string, agentGroupId: string): UserMessagingContext[] {
+  const out: UserMessagingContext[] = [];
+  const seen = new Set<string>();
+
+  // Web: implicit per-(user, agentGroup) mg.
+  const webPlatformId = platformIdFor(userId, agentGroupId);
+  const webMg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, webPlatformId);
+  if (webMg) {
+    const mga = getMessagingGroupAgentByPair(webMg.id, agentGroupId);
+    if (mga) {
+      out.push({
+        messagingGroupId: webMg.id,
+        channelType: WEB_CHANNEL_TYPE,
+        platformId: webMg.platform_id,
+        sessionMode: (mga.session_mode || 'per-thread') as UserMessagingContext['sessionMode'],
+      });
+      seen.add(webMg.id);
+    }
+  }
+
+  // Every other mga wired to this agent group. Include iff the viewer's
+  // userId prefix matches the mg's channel.
+  type Row = {
+    mg_id: string;
+    channel_type: string;
+    platform_id: string;
+    session_mode: string | null;
+  };
+  const rows = getDb()
+    .prepare(
+      `SELECT mg.id AS mg_id, mg.channel_type, mg.platform_id, mga.session_mode
+         FROM messaging_groups mg
+         JOIN messaging_group_agents mga ON mga.messaging_group_id = mg.id
+        WHERE mga.agent_group_id = ? AND mg.channel_type != ?`,
+    )
+    .all(agentGroupId, WEB_CHANNEL_TYPE) as Row[];
+  for (const r of rows) {
+    if (seen.has(r.mg_id)) continue;
+    const viewerHandle = viewerHandleForChannel(userId, r.channel_type);
+    if (!viewerHandle) continue;
+    out.push({
+      messagingGroupId: r.mg_id,
+      channelType: r.channel_type,
+      platformId: viewerHandle,
+      sessionMode: (r.session_mode || 'per-thread') as UserMessagingContext['sessionMode'],
+    });
+    seen.add(r.mg_id);
+  }
+  return out;
+}
+
+/** Channel-aware title extraction from an inbound `content` JSON blob. */
+function extractTitle(channelType: string, content: string): string {
+  if (channelType === 'resend') {
+    try {
+      const o = JSON.parse(content) as {
+        subject?: unknown;
+        metadata?: { subject?: unknown };
+        headers?: { subject?: unknown };
+      };
+      const subj = o?.subject ?? o?.metadata?.subject ?? o?.headers?.subject;
+      if (typeof subj === 'string' && subj.trim()) return subj.trim();
+    } catch {
+      /* fall through */
+    }
+  }
+  const parsed = parseInboundContent(content);
+  return parsed?.text ?? '';
+}
+
+/** Strip auto-prepended context blockquote + whitespace, cap to 60 chars. */
+function finalizeTitle(raw: string): string {
+  const cleaned = raw
+    .replace(/^>\s*Context.*\n+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned ? cleaned.slice(0, 60) : '(new chat)';
+}
+
+/**
+ * List all chat threads across every messaging group the viewer is in
+ * for this agent group. We dispatch based on the actual session rows
+ * (whether a session has a thread_id) rather than the configured
+ * session_mode, so the listing stays correct when mga.session_mode and
+ * the session table have drifted (e.g. mode was changed mid-life).
+ */
+function listAllThreadsForUser(userId: string, agentGroupId: string): ThreadSummary[] {
+  const ctxs = listUserMessagingContexts(userId, agentGroupId);
+  const out: ThreadSummary[] = [];
+
+  // Per-mg: any session with thread_id IS NOT NULL is per-thread-style;
+  // any session with thread_id IS NULL is shared-style. Either may exist.
+  const sharedCtxs: UserMessagingContext[] = [];
+  for (const ctx of ctxs) {
+    enumeratePerThread(userId, agentGroupId, ctx, out);
+    if (hasSharedSession(agentGroupId, ctx.messagingGroupId)) sharedCtxs.push(ctx);
+  }
+  for (const ctx of sharedCtxs) enumerateShared(agentGroupId, ctx, out);
+
+  // Agent-shared session (one per agent group, no mg link in sessions).
+  if (ctxs.length > 0 && hasAgentSharedSession(agentGroupId)) {
+    enumerateAgentShared(agentGroupId, ctxs, out);
+  }
+
+  out.sort((a, b) => Date.parse(normTs(b.lastActivityAt)) - Date.parse(normTs(a.lastActivityAt)));
+  return out;
+}
+
+function hasSharedSession(agentGroupId: string, mgId: string): boolean {
+  const row = getDb()
+    .prepare(
+      'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NULL LIMIT 1',
+    )
+    .get(agentGroupId, mgId);
+  return !!row;
+}
+
+function hasAgentSharedSession(agentGroupId: string): boolean {
+  const row = getDb()
+    .prepare(
+      'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND messaging_group_id IS NULL AND thread_id IS NULL LIMIT 1',
+    )
+    .get(agentGroupId);
+  return !!row;
+}
+
+/**
+ * Enumerate per-thread-style sessions for a (ag, mg). For non-web
+ * channels, only include threads where the inbound side's `platform_id`
+ * matches the viewer's handle on that channel — otherwise the rail would
+ * leak other users' threads on a shared mg (e.g. an email-bot alias).
+ */
+function enumeratePerThread(
+  userId: string,
+  agentGroupId: string,
+  ctx: UserMessagingContext,
+  out: ThreadSummary[],
+): void {
   type Row = { id: string; thread_id: string; last_active: string | null; created_at: string };
   const rows = getDb()
     .prepare(
       `SELECT id, thread_id, last_active, created_at FROM sessions
        WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NOT NULL`,
     )
-    .all(groupId, mg.id) as Row[];
-
-  const out: ThreadSummary[] = [];
+    .all(agentGroupId, ctx.messagingGroupId) as Row[];
+  const isWeb = ctx.channelType === WEB_CHANNEL_TYPE;
+  const viewerHandle = isWeb ? null : viewerHandleForChannel(userId, ctx.channelType);
+  if (!isWeb && !viewerHandle) return;
   for (const r of rows) {
-    let title = '';
-    let messageCount = 0;
-    let maxTs = r.last_active || r.created_at;
-
-    try {
-      const inDb = openInboundDb(groupId, r.id);
-      try {
-        const first = inDb
-          .prepare(
-            "SELECT content, timestamp FROM messages_in WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq LIMIT 1",
-          )
-          .get(r.thread_id) as { content: string; timestamp: string } | undefined;
-        if (first) {
-          const parsed = parseInboundContent(first.content);
-          if (parsed?.text) title = parsed.text;
-        }
-        const inCount = inDb
-          .prepare("SELECT COUNT(*) AS n FROM messages_in WHERE channel_type = 'web' AND thread_id = ?")
-          .get(r.thread_id) as { n: number };
-        messageCount += inCount.n;
-        const inMax = inDb
-          .prepare("SELECT MAX(timestamp) AS t FROM messages_in WHERE channel_type = 'web' AND thread_id = ?")
-          .get(r.thread_id) as { t: string | null };
-        if (inMax.t && inMax.t > maxTs) maxTs = inMax.t;
-      } finally {
-        inDb.close();
-      }
-    } catch {
-      /* db missing */
+    if (!isWeb && !threadBelongsToViewer(agentGroupId, r.id, ctx.channelType, r.thread_id, viewerHandle as string)) {
+      continue;
     }
-
-    try {
-      const outDb = openOutboundDb(groupId, r.id);
-      try {
-        const outCount = outDb
-          .prepare(
-            "SELECT COUNT(*) AS n FROM messages_out WHERE channel_type = 'web' AND thread_id = ? AND kind IN ('chat','text')",
-          )
-          .get(r.thread_id) as { n: number };
-        messageCount += outCount.n;
-        const outMax = outDb
-          .prepare("SELECT MAX(timestamp) AS t FROM messages_out WHERE channel_type = 'web' AND thread_id = ?")
-          .get(r.thread_id) as { t: string | null };
-        if (outMax.t) {
-          const norm = outMax.t.includes('T') ? outMax.t : outMax.t.replace(' ', 'T') + 'Z';
-          if (Date.parse(norm) > Date.parse(maxTs.includes('T') ? maxTs : maxTs.replace(' ', 'T') + 'Z'))
-            maxTs = outMax.t;
-        }
-      } finally {
-        outDb.close();
-      }
-    } catch {
-      /* db missing */
-    }
-
-    // Strip the auto-prepended context blockquote from titles.
-    const cleanTitle = title
-      .replace(/^>\s*Context.*\n+/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const stats = readThreadStats(agentGroupId, r.id, ctx.channelType, r.thread_id);
     out.push({
       threadId: r.thread_id,
-      title: cleanTitle ? cleanTitle.slice(0, 60) : '(new chat)',
-      lastActivityAt: maxTs,
-      messageCount,
+      sessionId: r.id,
+      channelType: ctx.channelType,
+      messagingGroupId: ctx.messagingGroupId,
+      platformId: ctx.platformId,
+      sessionMode: 'per-thread',
+      title: finalizeTitle(stats.title),
+      lastActivityAt: stats.maxTs || r.last_active || r.created_at,
+      messageCount: stats.count,
+      counterparty: isWeb ? undefined : ctx.platformId,
     });
   }
+}
 
-  out.sort((a, b) => {
-    const ta = Date.parse(a.lastActivityAt.includes('T') ? a.lastActivityAt : a.lastActivityAt.replace(' ', 'T') + 'Z');
-    const tb = Date.parse(b.lastActivityAt.includes('T') ? b.lastActivityAt : b.lastActivityAt.replace(' ', 'T') + 'Z');
-    return tb - ta;
-  });
-  return out;
+/**
+ * True if some inbound message in this thread was sent by the viewer.
+ * For most channels the sender lives in `content.sender` (Chat SDK
+ * convention) rather than `messages_in.platform_id`, since platform_id
+ * holds the *inbox* identity (e.g. the email-bot alias) for inbound
+ * channels. We fall back to platform_id matching as a last resort.
+ */
+function threadBelongsToViewer(
+  agentGroupId: string,
+  sessionId: string,
+  channelType: string,
+  threadId: string,
+  viewerHandle: string,
+): boolean {
+  try {
+    const inDb = openInboundDb(agentGroupId, sessionId);
+    try {
+      const rows = inDb
+        .prepare(
+          'SELECT content, platform_id FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq LIMIT 5',
+        )
+        .all(channelType, threadId) as { content: string; platform_id: string }[];
+      for (const r of rows) {
+        if (r.platform_id === viewerHandle) return true;
+        try {
+          const o = JSON.parse(r.content) as { sender?: unknown; from?: unknown };
+          const sender = typeof o?.sender === 'string' ? o.sender : typeof o?.from === 'string' ? o.from : null;
+          if (sender && sender === viewerHandle) return true;
+        } catch {
+          /* not JSON */
+        }
+      }
+      return false;
+    } finally {
+      inDb.close();
+    }
+  } catch {
+    return false;
+  }
+}
+
+function enumerateShared(agentGroupId: string, ctx: UserMessagingContext, out: ThreadSummary[]): void {
+  const session = findSessionForAgent(agentGroupId, ctx.messagingGroupId, null);
+  if (!session) return;
+  collectThreadsFromSharedSession(agentGroupId, session.id, [{ ctx, mode: 'shared' }], out);
+}
+
+function enumerateAgentShared(agentGroupId: string, ctxs: UserMessagingContext[], out: ThreadSummary[]): void {
+  const session = findSessionByAgentGroup(agentGroupId);
+  if (!session) return;
+  collectThreadsFromSharedSession(
+    agentGroupId,
+    session.id,
+    ctxs.map((c) => ({ ctx: c, mode: 'agent-shared' as const })),
+    out,
+  );
+}
+
+/**
+ * Enumerate distinct threads inside a shared/agent-shared session DB,
+ * scoping to a list of (channelType, platformId) tuples the viewer owns.
+ */
+function collectThreadsFromSharedSession(
+  agentGroupId: string,
+  sessionId: string,
+  scopes: { ctx: UserMessagingContext; mode: 'shared' | 'agent-shared' }[],
+  out: ThreadSummary[],
+): void {
+  if (scopes.length === 0) return;
+  let inDb: ReturnType<typeof openInboundDb>;
+  try {
+    inDb = openInboundDb(agentGroupId, sessionId);
+  } catch {
+    return;
+  }
+  try {
+    const placeholders = scopes.map(() => '(channel_type = ? AND platform_id = ?)').join(' OR ');
+    const params: string[] = [];
+    for (const s of scopes) params.push(s.ctx.channelType, s.ctx.platformId);
+    type GroupRow = { channel_type: string; platform_id: string; thread_id: string; max_ts: string | null; n: number };
+    const groups = inDb
+      .prepare(
+        `SELECT channel_type, platform_id, thread_id, MAX(timestamp) AS max_ts, COUNT(*) AS n
+           FROM messages_in
+          WHERE thread_id IS NOT NULL AND (${placeholders})
+          GROUP BY channel_type, platform_id, thread_id`,
+      )
+      .all(...params) as GroupRow[];
+
+    const titleStmt = inDb.prepare(
+      `SELECT content FROM messages_in
+        WHERE channel_type = ? AND platform_id = ? AND thread_id = ?
+        ORDER BY seq LIMIT 1`,
+    );
+
+    let outDb: ReturnType<typeof openOutboundDb> | undefined;
+    try {
+      try {
+        outDb = openOutboundDb(agentGroupId, sessionId);
+      } catch {
+        outDb = undefined;
+      }
+      const outStmt = outDb?.prepare(
+        `SELECT COUNT(*) AS n, MAX(timestamp) AS t FROM messages_out
+          WHERE channel_type = ? AND thread_id = ? AND kind IN ('chat','text')`,
+      );
+
+      for (const g of groups) {
+        const scope = scopes.find((s) => s.ctx.channelType === g.channel_type && s.ctx.platformId === g.platform_id);
+        if (!scope) continue;
+        const first = titleStmt.get(g.channel_type, g.platform_id, g.thread_id) as { content: string } | undefined;
+        const title = first ? extractTitle(g.channel_type, first.content) : '';
+        let count = g.n;
+        let maxTs = g.max_ts ?? '';
+        if (outStmt) {
+          const oc = outStmt.get(g.channel_type, g.thread_id) as { n: number; t: string | null };
+          count += oc.n;
+          if (oc.t && (!maxTs || Date.parse(normTs(oc.t)) > Date.parse(normTs(maxTs)))) maxTs = oc.t;
+        }
+        out.push({
+          threadId: g.thread_id,
+          sessionId,
+          channelType: g.channel_type,
+          messagingGroupId: scope.ctx.messagingGroupId,
+          platformId: g.platform_id,
+          sessionMode: scope.mode,
+          title: finalizeTitle(title),
+          lastActivityAt: maxTs || new Date(0).toISOString(),
+          messageCount: count,
+          counterparty: g.channel_type !== WEB_CHANNEL_TYPE ? g.platform_id : undefined,
+        });
+      }
+    } finally {
+      outDb?.close();
+    }
+  } finally {
+    inDb.close();
+  }
+}
+
+/**
+ * Per-thread session stats (title + count + max timestamp). Used by the
+ * per-thread mode branch where each thread lives in its own session.
+ */
+function readThreadStats(
+  agentGroupId: string,
+  sessionId: string,
+  channelType: string,
+  threadId: string,
+): { title: string; count: number; maxTs: string } {
+  let title = '';
+  let count = 0;
+  let maxTs = '';
+  try {
+    const inDb = openInboundDb(agentGroupId, sessionId);
+    try {
+      const first = inDb
+        .prepare('SELECT content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq LIMIT 1')
+        .get(channelType, threadId) as { content: string } | undefined;
+      if (first) title = extractTitle(channelType, first.content);
+      const c = inDb
+        .prepare('SELECT COUNT(*) AS n, MAX(timestamp) AS t FROM messages_in WHERE channel_type = ? AND thread_id = ?')
+        .get(channelType, threadId) as { n: number; t: string | null };
+      count += c.n;
+      if (c.t) maxTs = c.t;
+    } finally {
+      inDb.close();
+    }
+  } catch {
+    /* inbound db missing */
+  }
+  try {
+    const outDb = openOutboundDb(agentGroupId, sessionId);
+    try {
+      const c = outDb
+        .prepare(
+          "SELECT COUNT(*) AS n, MAX(timestamp) AS t FROM messages_out WHERE channel_type = ? AND thread_id = ? AND kind IN ('chat','text')",
+        )
+        .get(channelType, threadId) as { n: number; t: string | null };
+      count += c.n;
+      if (c.t && (!maxTs || Date.parse(normTs(c.t)) > Date.parse(normTs(maxTs)))) maxTs = c.t;
+    } finally {
+      outDb.close();
+    }
+  } catch {
+    /* outbound db missing */
+  }
+  return { title, count, maxTs };
 }
 
 /**
