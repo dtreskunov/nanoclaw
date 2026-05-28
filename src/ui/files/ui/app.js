@@ -270,7 +270,11 @@
   init().catch((err) => console.error(err));
 
   // ── chat side panel ───────────────────────────────────────────────────
-  const chat = { groupId: null, threadId: null, ws: null, reconnectTimer: null, reconnectAttempt: 0 };
+  const chat = { groupId: null, threadId: null, ws: null, reconnectTimer: null, reconnectAttempt: 0, pending: [] };
+  // Upload limits — mirror server (src/ui/files/chat.ts).
+  const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
+  const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
+  const UPLOAD_MAX_FILES = 10;
 
   function setChatStatus(text) {
     $('chat-status').textContent = text;
@@ -394,7 +398,7 @@
       try { payload = JSON.parse(ev.data); } catch (_) { return; }
       if (payload.kind === 'ready') return;
       if (payload.kind === 'inbound') {
-        appendChatMsg('in', payload.text, null);
+        appendChatMsg('in', payload.text, payload.files || null);
         return;
       }
       if (payload.kind === 'outbound') {
@@ -406,27 +410,89 @@
     };
   }
 
-  async function sendChat(text) {
+  async function sendChat(text, files) {
     if (!chat.groupId || !chat.threadId) return;
+    const hasFiles = Array.isArray(files) && files.length > 0;
     try {
-      await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
+      let res;
+      if (hasFiles) {
+        const fd = new FormData();
+        fd.append('text', text || '');
+        for (const f of files) fd.append('file', f, f.name);
+        res = await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: fd,
+        });
+      } else {
+        res = await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+      }
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try { const j = await res.json(); if (j && j.error) detail = j.error + (j.detail ? ` (${j.detail})` : ''); } catch (_) {}
+        setChatStatus(`send failed: ${detail}`);
+      }
     } catch (err) {
       console.error('send failed', err);
+      setChatStatus(`send failed: ${err && err.message ? err.message : 'network error'}`);
     }
+  }
+
+  function fmtBytesShort(n) {
+    if (!n && n !== 0) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function renderPending() {
+    const tray = $('chat-pending');
+    if (!tray) return;
+    if (chat.pending.length === 0) { tray.hidden = true; tray.innerHTML = ''; return; }
+    tray.hidden = false;
+    tray.innerHTML = '';
+    chat.pending.forEach((f, i) => {
+      const item = document.createElement('span');
+      item.className = 'item';
+      item.textContent = `📎 ${f.name} (${fmtBytesShort(f.size)})`;
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '×';
+      x.title = 'Remove';
+      x.addEventListener('click', () => { chat.pending.splice(i, 1); renderPending(); });
+      item.appendChild(x);
+      tray.appendChild(item);
+    });
+  }
+
+  function addPendingFiles(files) {
+    if (!files || files.length === 0) return;
+    let totalBytes = chat.pending.reduce((n, f) => n + f.size, 0);
+    for (const f of files) {
+      if (chat.pending.length >= UPLOAD_MAX_FILES) { setChatStatus(`max ${UPLOAD_MAX_FILES} files per message`); break; }
+      if (f.size > UPLOAD_MAX_FILE_SIZE) { setChatStatus(`${f.name} too large (max ${fmtBytesShort(UPLOAD_MAX_FILE_SIZE)})`); continue; }
+      if (totalBytes + f.size > UPLOAD_MAX_TOTAL_SIZE) { setChatStatus(`total upload too large (max ${fmtBytesShort(UPLOAD_MAX_TOTAL_SIZE)})`); break; }
+      chat.pending.push(f);
+      totalBytes += f.size;
+    }
+    renderPending();
   }
 
   $('chat-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const input = $('chat-input');
     const text = input.value.trim();
-    if (!text) return;
+    const files = chat.pending.slice();
+    if (!text && files.length === 0) return;
     input.value = '';
-    sendChat(text).catch(console.error);
+    chat.pending = [];
+    renderPending();
+    sendChat(text, files).catch(console.error);
   });
 
   $('chat-input').addEventListener('keydown', (ev) => {
@@ -434,5 +500,53 @@
       ev.preventDefault();
       $('chat-form').requestSubmit();
     }
+  });
+
+  // Paperclip → file picker.
+  const attachBtn = $('chat-attach');
+  const fileInput = $('chat-file');
+  if (attachBtn && fileInput) {
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      addPendingFiles(Array.from(fileInput.files || []));
+      fileInput.value = '';
+    });
+  }
+
+  // Drag-and-drop onto the chat panel.
+  const chatEl = $('chat');
+  if (chatEl) {
+    let dragDepth = 0;
+    chatEl.addEventListener('dragenter', (ev) => {
+      if (!ev.dataTransfer || ev.dataTransfer.types.indexOf('Files') < 0) return;
+      ev.preventDefault();
+      dragDepth++;
+      chatEl.classList.add('drag-active');
+    });
+    chatEl.addEventListener('dragover', (ev) => {
+      if (!ev.dataTransfer || ev.dataTransfer.types.indexOf('Files') < 0) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'copy';
+    });
+    chatEl.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) chatEl.classList.remove('drag-active');
+    });
+    chatEl.addEventListener('drop', (ev) => {
+      if (!ev.dataTransfer) return;
+      ev.preventDefault();
+      dragDepth = 0;
+      chatEl.classList.remove('drag-active');
+      const files = Array.from(ev.dataTransfer.files || []);
+      if (files.length > 0) addPendingFiles(files);
+    });
+  }
+
+  // Paste images/files from clipboard.
+  $('chat-input').addEventListener('paste', (ev) => {
+    const items = ev.clipboardData && ev.clipboardData.files;
+    if (!items || items.length === 0) return;
+    ev.preventDefault();
+    addPendingFiles(Array.from(items));
   });
 })();

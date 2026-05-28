@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import http from 'http';
 import type internal from 'stream';
 
+import Busboy from 'busboy';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { getAgentGroup } from '../../db/agent-groups.js';
@@ -116,6 +117,86 @@ async function readJsonBody(req: http.IncomingMessage, max = 64 * 1024): Promise
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
+/** Limits for multipart chat uploads. Tweak if needed; mirrors the
+ * documented design (per-file 25 MB, per-message 50 MB, max 10 files). */
+const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
+const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
+const UPLOAD_MAX_FILES = 10;
+const UPLOAD_MAX_FILENAME = 255;
+
+interface ParsedUpload {
+  text: string;
+  files: { filename: string; contentType: string; buffer: Buffer }[];
+}
+
+/**
+ * Parse a `multipart/form-data` body for the chat send endpoint.
+ * Resolves with the accumulated text + files; rejects with a tagged error
+ * for size/count violations (caller maps these to HTTP status codes).
+ */
+function readMultipartBody(req: http.IncomingMessage): Promise<ParsedUpload> {
+  return new Promise((resolve, reject) => {
+    let bb: ReturnType<typeof Busboy>;
+    try {
+      bb = Busboy({
+        headers: req.headers,
+        limits: {
+          fileSize: UPLOAD_MAX_FILE_SIZE,
+          files: UPLOAD_MAX_FILES,
+          fields: 4,
+          fieldNameSize: 64,
+          fieldSize: 64 * 1024,
+        },
+      });
+    } catch (err) {
+      reject(Object.assign(new Error('invalid_multipart'), { detail: (err as Error).message }));
+      return;
+    }
+    const out: ParsedUpload = { text: '', files: [] };
+    let totalBytes = 0;
+    let aborted = false;
+    const fail = (code: string, detail?: string) => {
+      if (aborted) return;
+      aborted = true;
+      req.unpipe(bb);
+      req.resume();
+      reject(Object.assign(new Error(code), detail ? { detail } : {}));
+    };
+
+    bb.on('field', (name, value) => {
+      if (name === 'text' && typeof value === 'string') out.text = value;
+    });
+    bb.on('file', (_name, stream, info) => {
+      const rawName = info.filename || 'upload';
+      const filename = rawName.slice(0, UPLOAD_MAX_FILENAME);
+      const contentType = info.mimeType || 'application/octet-stream';
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        totalBytes += chunk.length;
+        if (totalBytes > UPLOAD_MAX_TOTAL_SIZE) {
+          stream.resume();
+          fail('total_too_large');
+          return;
+        }
+        chunks.push(chunk);
+      });
+      stream.on('limit', () => fail('file_too_large', `file=${filename}`));
+      stream.on('end', () => {
+        if (aborted) return;
+        out.files.push({ filename, contentType, buffer: Buffer.concat(chunks) });
+      });
+    });
+    bb.on('filesLimit', () => fail('too_many_files'));
+    bb.on('error', (err) => fail('multipart_error', (err as Error).message));
+    bb.on('close', () => {
+      if (aborted) return;
+      resolve(out);
+    });
+    req.pipe(bb);
+  });
+}
+
 /** REST handlers. Returns true if the path was a chat route. */
 export async function handleChatRequest(
   req: http.IncomingMessage,
@@ -152,16 +233,39 @@ export async function handleChatRequest(
       writeJson(res, 405, { error: 'method_not_allowed' });
       return true;
     }
-    let body: unknown;
-    try {
-      body = await readJsonBody(req);
-    } catch (err) {
-      writeJson(res, 400, { error: 'invalid_body', detail: (err as Error).message });
-      return true;
+    const ctype = (req.headers['content-type'] || '').toLowerCase();
+    let text = '';
+    let attachments: { filename: string; contentType: string; data: string; size: number }[] = [];
+    if (ctype.startsWith('multipart/form-data')) {
+      try {
+        const parsed = await readMultipartBody(req);
+        text = parsed.text;
+        attachments = parsed.files.map((f) => ({
+          filename: f.filename,
+          contentType: f.contentType,
+          data: f.buffer.toString('base64'),
+          size: f.buffer.length,
+        }));
+      } catch (err) {
+        const code = (err as Error).message;
+        const status =
+          code === 'file_too_large' || code === 'total_too_large' ? 413 : code === 'too_many_files' ? 400 : 400;
+        writeJson(res, status, { error: code, detail: (err as { detail?: string }).detail });
+        return true;
+      }
+    } else {
+      let body: unknown;
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        writeJson(res, 400, { error: 'invalid_body', detail: (err as Error).message });
+        return true;
+      }
+      const t = (body as { text?: unknown })?.text;
+      if (typeof t === 'string') text = t;
     }
-    const text = (body as { text?: unknown })?.text;
-    if (typeof text !== 'string' || text.length === 0) {
-      writeJson(res, 400, { error: 'missing_text' });
+    if (!text && attachments.length === 0) {
+      writeJson(res, 400, { error: 'empty_message' });
       return true;
     }
     ensureWebMessagingGroup(userId, m.groupId);
@@ -172,6 +276,7 @@ export async function handleChatRequest(
         platformId,
         threadId: m.threadId,
         text,
+        attachments: attachments.length > 0 ? attachments : undefined,
       });
       writeJson(res, 200, { id });
     } catch (err) {
@@ -225,8 +330,9 @@ function readChatHistory(userId: string, groupId: string, threadId: string): His
         .prepare("SELECT timestamp, content FROM messages_in WHERE channel_type = 'web' AND thread_id = ? ORDER BY seq")
         .all(threadId) as { timestamp: string; content: string }[];
       for (const r of rows) {
-        const text = parseInboundText(r.content);
-        if (text != null) messages.push({ direction: 'in', timestamp: r.timestamp, text });
+        const parsed = parseInboundContent(r.content);
+        if (parsed != null)
+          messages.push({ direction: 'in', timestamp: r.timestamp, text: parsed.text, files: parsed.files });
       }
     } finally {
       inDb.close();
@@ -263,11 +369,30 @@ function readChatHistory(userId: string, groupId: string, threadId: string): His
   return messages;
 }
 
-function parseInboundText(content: string): string | null {
+function parseInboundContent(content: string): { text: string; files?: { filename: string; size: number }[] } | null {
   try {
     const o = JSON.parse(content);
-    if (typeof o === 'string') return o;
-    if (typeof o?.text === 'string') return o.text;
+    if (typeof o === 'string') return { text: o };
+    if (typeof o?.text === 'string' || Array.isArray(o?.attachments)) {
+      const text = typeof o?.text === 'string' ? o.text : '';
+      const files = Array.isArray(o?.attachments)
+        ? o.attachments
+            .map((a: { filename?: string; name?: string; data?: string; size?: number }) => {
+              // The on-disk inbox dir is the source of truth for the agent;
+              // for history display we just need filename + an approximate
+              // size (length of the base64 string ≈ 4/3 × bytes).
+              const size =
+                typeof a?.size === 'number'
+                  ? a.size
+                  : typeof a?.data === 'string'
+                    ? Math.floor((a.data.length * 3) / 4)
+                    : 0;
+              return { filename: String(a?.name ?? a?.filename ?? ''), size };
+            })
+            .filter((f: { filename: string }) => f.filename)
+        : undefined;
+      return { text, files: files && files.length > 0 ? files : undefined };
+    }
   } catch {
     /* not JSON */
   }
@@ -376,9 +501,9 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
         log.warn('web chat ws send failed', { err });
       }
     },
-    onInboundEcho(text) {
+    onInboundEcho(text, files) {
       try {
-        ws.send(JSON.stringify({ kind: 'inbound', text }));
+        ws.send(JSON.stringify({ kind: 'inbound', text, files: files ?? [] }));
       } catch (err) {
         log.warn('web chat ws echo failed', { err });
       }
