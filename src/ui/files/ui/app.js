@@ -473,14 +473,15 @@
     });
   }
 
-  // Returns the path of the currently-selected file or directory, prefixed
-  // with the container's workspace mount so the agent can read it directly.
+  // Returns the path of the currently-selected file or directory, matching
+  // what the file browser shows (relative to the group's workspace root —
+  // the agent's CWD is /workspace, so these paths resolve directly).
   // Returns null if there's nothing meaningful to attach.
   function currentContextPath() {
     if (!state.groupId) return null;
-    if (state.file) return { path: '/workspace/' + state.file, kind: 'file' };
-    if (state.path) return { path: '/workspace/' + state.path.replace(/\/?$/, '/'), kind: 'dir' };
-    return { path: '/workspace/', kind: 'dir' };
+    if (state.file) return { path: state.file, kind: 'file' };
+    if (state.path) return { path: state.path.replace(/\/?$/, '/'), kind: 'dir' };
+    return { path: '/', kind: 'dir' };
   }
 
   function renderContextChip() {
