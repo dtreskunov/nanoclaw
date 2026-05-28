@@ -637,23 +637,41 @@
     if (!r.ok) return;
     const { messages } = await r.json();
     if (!Array.isArray(messages)) return;
+    // Compare timestamps numerically. Inbound rows are ISO 8601
+    // (`...T...Z`), outbound rows come from the container as SQLite local
+    // `YYYY-MM-DD HH:MM:SS`. A raw string compare is wrong (the 'T' at
+    // pos 10 sorts after the space) and made every poll re-append every
+    // inbound row — fmtRelative normalizes, but the > check didn't.
+    const tsKey = (s) => {
+      if (!s) return 0;
+      const norm = s.includes('T') ? s : s.replace(' ', 'T') + 'Z';
+      const n = Date.parse(norm);
+      return Number.isFinite(n) ? n : 0;
+    };
     if (!appendNewOnly) {
       $('chat-log').innerHTML = '';
       for (const msg of messages) appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, msg.timestamp);
       if (messages.length > 0) chat.lastSeenTs = messages[messages.length - 1].timestamp || '';
       return;
     }
+    const seenKey = tsKey(chat.lastSeenTs);
+    let maxTs = chat.lastSeenTs;
+    let maxKey = seenKey;
     let bumped = false;
     for (const msg of messages) {
       const ts = msg.timestamp || '';
-      if (!chat.lastSeenTs || ts > chat.lastSeenTs) {
+      const k = tsKey(ts);
+      if (!seenKey || k > seenKey) {
         appendChatMsg(msg.direction === 'in' ? 'in' : 'out', msg.text, msg.files || null, ts);
-        chat.lastSeenTs = ts || chat.lastSeenTs;
+        if (k > maxKey) { maxKey = k; maxTs = ts; }
         bumped = true;
         if (msg.direction !== 'in') maybeNotify(msg.text, msg.files || []);
       }
     }
-    if (bumped) bumpActiveThread();
+    if (bumped) {
+      chat.lastSeenTs = maxTs || chat.lastSeenTs;
+      bumpActiveThread(maxTs);
+    }
   }
 
   function setChatStatus(text) { $('chat-status').textContent = text || ''; }
