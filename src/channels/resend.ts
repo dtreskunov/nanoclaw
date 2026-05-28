@@ -49,6 +49,23 @@ function parseEmailAddress(field: string): string {
   return (m ? m[1] : field).trim().toLowerCase();
 }
 
+/**
+ * Resend rejects emails with no html/text body. When the agent sends an
+ * attachments-only message (`{text:"", files:[...]}`), the chat-sdk-bridge
+ * hands us `{markdown:"", files:[...]}` and the underlying send fails with
+ * `Missing 'html' or 'text' field`. Substitute a minimal body listing the
+ * attached filenames so delivery succeeds. Returns the (possibly cloned)
+ * message; safe to call with no files or non-empty markdown.
+ */
+export function ensureBodyForAttachments<T extends { markdown?: unknown; files?: unknown }>(message: T): T {
+  const files = message?.files as Array<{ filename: string }> | undefined;
+  if (!files || files.length === 0) return message;
+  const md = typeof message?.markdown === 'string' ? message.markdown : '';
+  if (md.trim()) return message;
+  const names = files.map((f) => `- ${f.filename}`).join('\n');
+  return { ...message, markdown: `Attached:\n\n${names}` };
+}
+
 registerChannelAdapter('resend', {
   factory: () => {
     const env = readEnvFile(['RESEND_API_KEY', 'RESEND_FROM_ADDRESS', 'RESEND_FROM_NAME', 'RESEND_WEBHOOK_SECRET']);
@@ -320,16 +337,8 @@ registerChannelAdapter('resend', {
           filename: f.filename,
           content: f.data.toString('base64'),
         }));
-        // Resend rejects emails with no html/text body. When the agent
-        // sends attachments with empty text ("here are your files"
-        // implicit in the attachment list), supply a minimal placeholder
-        // so delivery doesn't fail.
-        const md = typeof message?.markdown === 'string' ? message.markdown : '';
-        if (!md.trim()) {
-          const names = files.map((f) => `- ${f.filename}`).join('\n');
-          message = { ...message, markdown: `Attached:\n\n${names}` };
-        }
       }
+      message = ensureBodyForAttachments(message);
       try {
         return await origPostMessage(threadId, message);
       } finally {
@@ -343,6 +352,7 @@ registerChannelAdapter('resend', {
       adapter,
       concurrency: 'queue',
       supportsThreads: true,
+      supportsMultiFile: true,
       transformOutboundText: hardenSoftBreaks,
     });
 
