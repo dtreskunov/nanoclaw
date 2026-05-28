@@ -124,6 +124,18 @@ export interface ChannelAdapter {
    */
   supportsThreads: boolean;
 
+  /**
+   * Whether this adapter can deliver more than one file in a single
+   * outbound message. Default (omitted / false) means the host's delivery
+   * wrapper will split an N-file message into N single-file calls,
+   * carrying the text on the first one. Set true only when the adapter
+   * (and the underlying platform) genuinely sends multiple attachments
+   * in one payload — e.g. Resend (one email with N attachments). Leave
+   * false / omitted for adapters that throw or silently drop when given
+   * `files.length > 1` (Telegram's Chat SDK adapter is a hard reject).
+   */
+  supportsMultiFile?: boolean;
+
   // Lifecycle
   setup(config: ChannelSetup): Promise<void>;
   teardown(): Promise<void>;

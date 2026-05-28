@@ -1,7 +1,7 @@
 import { findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
-import { getInboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
+import { getInboundDb, getOutboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
 import { clearContinuation, clearFailedTurn, getContinuation, getFailedTurn, migrateLegacyContinuation, setContinuation, setFailedTurn } from './db/session-state.js';
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
 import {
@@ -511,6 +511,14 @@ async function processQuery(
   let lastProviderError: { message: string; classification?: string } | null = null;
   let sentAny = false;
 
+  // Snapshot the outbound seq so the result handler can detect whether MCP
+  // tools wrote anything this turn. Without this, an agent that calls
+  // send_file / send_message and then returns a chatty final-text gets
+  // a duplicate delivery via the <message>-wrap nudge path.
+  const currentOutboundMax = (): number =>
+    (getOutboundDb().prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM messages_out').get() as { m: number }).m;
+  let outboundMaxAtTurnStart = currentOutboundMax();
+
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open avoids
   // re-spawning the SDK subprocess (~few seconds) and re-loading the .jsonl
@@ -673,10 +681,20 @@ async function processQuery(
         // at all — either way the turn is finished.
         markCompleted(initialBatchIds);
         if (event.text) {
+          // If the agent already wrote outbound rows this turn via MCP
+          // tools (send_message / send_file / send_email), treat any
+          // unwrapped final-result text as conversational scratchpad and
+          // skip the <message>-wrap nudge. Otherwise the agent's polite
+          // "sent!" confirmation gets force-wrapped and delivered as a
+          // duplicate message.
+          const mcpWroteSomething = currentOutboundMax() > outboundMaxAtTurnStart;
           const { sent, hasUnwrapped } = dispatchResultText(event.text, routing);
           if (sent > 0) sentAny = true;
-          if (hasUnwrapped && !unwrappedNudged) {
+          if (mcpWroteSomething) {
+            sentAny = true;
+          } else if (hasUnwrapped && !unwrappedNudged) {
             unwrappedNudged = true;
+            log(`WARNING: agent output had no <message to="..."> blocks — nothing was sent`);
             const destinations = getAllDestinations();
             const names = destinations.map((d) => d.name).join(', ');
             query.push(
@@ -697,6 +715,9 @@ async function processQuery(
           endedForCommand = true;
           query.end();
         }
+        // Reset the per-turn baseline so a follow-up push within the same
+        // query starts a fresh "did MCP write anything?" window.
+        outboundMaxAtTurnStart = currentOutboundMax();
       }
     }
   } finally {
@@ -791,9 +812,6 @@ function dispatchResultText(text: string, routing: RoutingContext): { sent: numb
   }
 
   const hasUnwrapped = sent === 0 && !!scratchpad;
-  if (hasUnwrapped) {
-    log(`WARNING: agent output had no <message to="..."> blocks — nothing was sent`);
-  }
   return { sent, hasUnwrapped };
 }
 
