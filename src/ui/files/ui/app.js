@@ -660,6 +660,7 @@
         const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
         appendChatMsg('out', text, payload.files || [], payload.timestamp);
         bumpActiveThread();
+        maybeNotify(text, payload.files || []);
         return;
       }
     };
@@ -811,6 +812,59 @@
     if ($('files-pane').classList.contains('open') && $('files-pane').classList.contains('previewing')) stopPreviewMedia();
     for (const p of PANES) $(p.id).classList.remove('open');
     $('backdrop').classList.remove('show');
+  }
+
+  // ── notifications (tab-open / installed-PWA) ─────────────────────────
+  const NOTIF_MUTE_KEY = 'nanoclaw:notif:muted';
+  function notifMuted() { try { return localStorage.getItem(NOTIF_MUTE_KEY) === '1'; } catch (_) { return false; } }
+  function setNotifMuted(v) { try { localStorage.setItem(NOTIF_MUTE_KEY, v ? '1' : '0'); } catch (_) {} }
+  function wireNotifButton() {
+    const btn = document.getElementById('btn-notif');
+    if (!btn) return;
+    if (!('Notification' in window)) return; // unsupported → leave hidden
+    btn.hidden = false;
+    refreshNotifButton();
+    btn.addEventListener('click', async () => {
+      if (Notification.permission === 'denied') {
+        alert('Notifications are blocked. Enable them in your browser/OS settings for this site.');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        setNotifMuted(!notifMuted());
+        refreshNotifButton();
+        return;
+      }
+      try { await Notification.requestPermission(); } catch (_) {}
+      if (Notification.permission === 'granted') setNotifMuted(false);
+      refreshNotifButton();
+    });
+  }
+  function refreshNotifButton() {
+    const btn = document.getElementById('btn-notif');
+    if (!btn) return;
+    const p = Notification.permission;
+    const muted = p === 'granted' && notifMuted();
+    btn.textContent = p === 'denied' || muted ? '🔕' : '🔔';
+    btn.title = p === 'denied'
+      ? 'Notifications blocked'
+      : p === 'granted'
+        ? (muted ? 'Notifications muted — click to enable' : 'Notifications enabled — click to mute')
+        : 'Enable notifications';
+    btn.style.opacity = p === 'granted' && !muted ? '1' : '0.6';
+  }
+  function maybeNotify(text, files) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (notifMuted()) return;
+    if (!document.hidden) return; // tab visible → user already sees the message
+    try {
+      const groupId = chat.groupId || state.groupId || '';
+      const g = state.groups.find((x) => x.id === groupId);
+      const title = g && g.name ? g.name : 'NanoClaw';
+      let body = (text || '').trim().slice(0, 200);
+      if (!body && files && files.length) body = `📎 ${files.length} file${files.length > 1 ? 's' : ''}`;
+      const n = new Notification(title, { body, icon: 'ui/icon.svg', tag: `${groupId}:${chat.threadId || ''}` });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch (_) {}
   }
 
   function toggleMobileDrawer(which) {
@@ -1065,6 +1119,7 @@
         if (MOBILE_MQ.matches && !window.confirm('Log out?')) e.preventDefault();
       });
     }
+    wireNotifButton();
     const btnUpload = document.getElementById('btn-upload');
     const btnMkdir = document.getElementById('btn-mkdir');
     const uploadInput = document.getElementById('upload-input');
