@@ -18,6 +18,7 @@ import { authenticate, recordAccess } from '../auth.js';
 import { redeemDownloadToken } from '../download-tokens.js';
 import { classify, resolveSafe } from './classify.js';
 import { handleChatRequest, handleChatUpgrade } from './chat.js';
+import { handleWriteRequest } from './write.js';
 
 export { handleChatUpgrade };
 
@@ -72,6 +73,7 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (req.method === 'GET' && pathname === '/api/groups') return handleGroups(ctx, session.userId);
 
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
+    if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
 
     const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file)$/);
     if (req.method === 'GET' && groupMatch) {

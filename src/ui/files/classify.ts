@@ -48,6 +48,32 @@ export function classify(relPath: string): Classification {
 }
 
 /**
+ * Decide whether the current user may perform a write operation (upload,
+ * mkdir, rename, delete) at `relPath`. Admin-only. Even admins cannot
+ * touch hidden paths (`.git`, `node_modules`, dotfiles) or protected
+ * names managed elsewhere (`container.json`, `bot.json`,
+ * `allowed-senders.txt`).
+ *
+ * Returns `{ ok: true }` if the write is permitted, otherwise
+ * `{ ok: false, reason }` with a machine-readable reason code.
+ */
+export function canWrite(
+  relPath: string,
+  opts: { isAdmin: boolean },
+): { ok: true } | { ok: false; reason: 'forbidden' | 'hidden' | 'protected' | 'invalid' } {
+  if (!opts.isAdmin) return { ok: false, reason: 'forbidden' };
+  if (!relPath) return { ok: false, reason: 'invalid' };
+  const segments = relPath.split('/').filter(Boolean);
+  for (const seg of segments) {
+    if (HIDDEN_NAMES.has(seg)) return { ok: false, reason: 'hidden' };
+    if (seg.startsWith('.') && seg !== '.well-known') return { ok: false, reason: 'hidden' };
+  }
+  const base = segments[segments.length - 1] ?? '';
+  if (ADMIN_ONLY_NAMES.has(base)) return { ok: false, reason: 'protected' };
+  return { ok: true };
+}
+
+/**
  * Resolve `relPath` against `groupDir`. Returns the absolute path on success,
  * or null if the path escapes the group dir or contains forbidden segments.
  *
