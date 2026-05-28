@@ -27,7 +27,7 @@ export interface WebSubscriber {
   /** Called with each outbound row delivered for this (platformId, threadId). */
   onOutbound(message: OutboundMessage): void;
   /** Called with the user's own inbound right after it's accepted. */
-  onInboundEcho(text: string): void;
+  onInboundEcho(text: string, files?: { filename: string; size: number }[]): void;
 }
 
 let setupCallbacks: ChannelSetup | null = null;
@@ -64,9 +64,24 @@ export async function submitWebInbound(args: {
   platformId: string;
   threadId: string;
   text: string;
+  attachments?: { filename: string; contentType?: string; data: string /* base64 */; size: number }[];
 }): Promise<string> {
   if (!setupCallbacks) throw new Error('web channel not initialized');
   const id = `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const contentPayload: Record<string, unknown> = {
+    text: args.text,
+    sender: args.userId,
+    senderId: args.userId,
+  };
+  if (args.attachments && args.attachments.length > 0) {
+    // Shape matches what `extractAttachmentFiles` / `deriveAttachmentName`
+    // expects: `name` (filename), `mimeType`, `data` (base64).
+    contentPayload.attachments = args.attachments.map((a) => ({
+      name: a.filename,
+      mimeType: a.contentType,
+      data: a.data,
+    }));
+  }
   const event: InboundEvent = {
     channelType: WEB_CHANNEL_TYPE,
     platformId: args.platformId,
@@ -77,20 +92,17 @@ export async function submitWebInbound(args: {
       timestamp: new Date().toISOString(),
       isMention: true,
       isGroup: false,
-      content: JSON.stringify({
-        text: args.text,
-        sender: args.userId,
-        senderId: args.userId,
-      }),
+      content: JSON.stringify(contentPayload),
     },
   };
   // Echo to local subscribers immediately so the sending tab sees its own
   // message even if the router/container path is slow.
   const echoSet = subscribers.get(subKey(args.platformId, args.threadId));
   if (echoSet) {
+    const echoFiles = args.attachments?.map((a) => ({ filename: a.filename, size: a.size }));
     for (const sub of echoSet) {
       try {
-        sub.onInboundEcho(args.text);
+        sub.onInboundEcho(args.text, echoFiles);
       } catch (err) {
         log.warn('web subscriber onInboundEcho threw', { err });
       }
