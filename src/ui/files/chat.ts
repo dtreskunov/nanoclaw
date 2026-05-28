@@ -100,11 +100,11 @@ export function matchChatPath(
   const threads = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/threads$/);
   if (threads) return { kind: 'threads', groupId: threads[1] };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
-  if (send) return { kind: 'send', groupId: send[1], threadId: send[2] };
+  if (send) return { kind: 'send', groupId: decodeURIComponent(send[1]), threadId: decodeURIComponent(send[2]) };
   const hist = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/history$/);
-  if (hist) return { kind: 'history', groupId: hist[1], threadId: hist[2] };
+  if (hist) return { kind: 'history', groupId: decodeURIComponent(hist[1]), threadId: decodeURIComponent(hist[2]) };
   const del = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)$/);
-  if (del) return { kind: 'delete', groupId: del[1], threadId: del[2] };
+  if (del) return { kind: 'delete', groupId: decodeURIComponent(del[1]), threadId: decodeURIComponent(del[2]) };
   return null;
 }
 
@@ -471,16 +471,18 @@ function resolveSessionForMode(
   sessionMode: 'per-thread' | 'shared' | 'agent-shared',
   threadId: string,
 ): { id: string } | undefined {
-  // Try the configured mode first, then fall back across modes. This
-  // keeps history working when mga.session_mode and the live `sessions`
-  // rows have drifted (e.g. mode flipped mid-life, or a non-default mode
-  // backfill never happened).
-  const tryPerThread = () => findSessionForAgent(agentGroupId, messagingGroupId, threadId);
-  const tryShared = () => findSessionForAgent(agentGroupId, messagingGroupId, null);
-  const tryAgentShared = () => findSessionByAgentGroup(agentGroupId);
-  if (sessionMode === 'agent-shared') return tryAgentShared() || tryShared() || tryPerThread();
-  if (sessionMode === 'shared') return tryShared() || tryPerThread() || tryAgentShared();
-  return tryPerThread() || tryShared() || tryAgentShared();
+  // Look up the session that actually holds this thread's messages.
+  // Order matters: a per-thread session for (ag, mg, threadId) is the
+  // most specific match. Otherwise a shared session for (ag, mg) holds
+  // every thread for that mg. Finally an agent-shared session (mg NULL)
+  // is the fallback. Each step is scoped, so we never return a session
+  // that belongs to a different messaging group.
+  void sessionMode;
+  return (
+    findSessionForAgent(agentGroupId, messagingGroupId, threadId) ||
+    findSessionForAgent(agentGroupId, messagingGroupId, null) ||
+    findSessionByAgentGroup(agentGroupId)
+  );
 }
 
 function normTs(s: string): string {
