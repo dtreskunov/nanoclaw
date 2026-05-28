@@ -6,7 +6,7 @@
 //   #ag-xyz/sub/file.txt  → file (no trailing slash)
 //   ?t=<threadId> suffix  → active chat thread
 (() => {
-  const state = { groupId: null, path: '', file: null, groups: [], filesOpen: true, previewOpen: true };
+  const state = { groupId: null, path: '', file: null, groups: [], threadsOpen: true, filesOpen: true, previewOpen: true };
   const chat = {
     groupId: null,
     threadId: null,
@@ -249,7 +249,8 @@
     }
     onSelectionChanged();
     const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
-    $('preview-title').textContent = entry.name;
+    $('preview-title').textContent = '/' + entry.path.replace(/^\/+/, '');
+    $('preview-title').title = '/' + entry.path.replace(/^\/+/, '');
     const pv = $('preview');
     const ext = entry.name.toLowerCase().split('.').pop();
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
@@ -294,16 +295,24 @@
   }
 
   function renderCrumb(p) {
-    const segs = p ? p.split('/') : [];
-    const parts = [`<a data-path="">/</a>`];
-    let acc = '';
-    for (const s of segs) {
-      acc = acc ? acc + '/' + s : s;
-      parts.push(`<a data-path="${escapeAttr(acc)}">${escapeHtml(s)}</a>`);
-    }
+    const segs = p ? p.split('/').filter(Boolean) : [];
     const c = $('crumb');
-    c.innerHTML = parts.join(' / ');
-    for (const a of c.querySelectorAll('a')) a.onclick = () => navTree(a.dataset.path);
+    const parts = [];
+    const rootCurrent = segs.length === 0 ? ' current' : '';
+    parts.push(`<button type="button" class="crumb root${rootCurrent}" data-path="" title="Root">/</button>`);
+    let acc = '';
+    segs.forEach((s, i) => {
+      acc = acc ? acc + '/' + s : s;
+      const isLast = i === segs.length - 1;
+      parts.push(`<span class="sep" aria-hidden="true">\u203a</span>`);
+      parts.push(`<button type="button" class="crumb${isLast ? ' current' : ''}" data-path="${escapeAttr(acc)}" title="${escapeAttr('/' + acc)}">${escapeHtml(s)}</button>`);
+    });
+    c.innerHTML = parts.join('');
+    for (const a of c.querySelectorAll('.crumb:not(.current)')) {
+      a.onclick = () => navTree(a.dataset.path);
+    }
+    // Keep current segment in view when path is long
+    requestAnimationFrame(() => { c.scrollLeft = c.scrollWidth; });
   }
 
   // ── threads ──────────────────────────────────────────────────────────
@@ -609,8 +618,10 @@
   // ── panel toggle / mobile drawers ────────────────────────────────────
   function restorePanelState() {
     try {
+      const t = localStorage.getItem('nc:threadsOpen');
       const f = localStorage.getItem('nc:filesOpen');
       const p = localStorage.getItem('nc:previewOpen');
+      state.threadsOpen = t === null ? true : t === '1';
       state.filesOpen = f === null ? true : f === '1';
       state.previewOpen = p === null ? true : p === '1';
     } catch (_) { /* private mode */ }
@@ -619,6 +630,7 @@
 
   function persistPanelState() {
     try {
+      localStorage.setItem('nc:threadsOpen', state.threadsOpen ? '1' : '0');
       localStorage.setItem('nc:filesOpen', state.filesOpen ? '1' : '0');
       localStorage.setItem('nc:previewOpen', state.previewOpen ? '1' : '0');
     } catch (_) {}
@@ -626,12 +638,15 @@
 
   function applyPanelClasses() {
     const main = $('main');
+    main.classList.toggle('threads-collapsed', !state.threadsOpen);
     main.classList.toggle('files-collapsed', !state.filesOpen);
     main.classList.toggle('preview-collapsed', !state.previewOpen);
+    $('btn-threads-toggle').textContent = state.threadsOpen ? '‹' : '›';
     $('btn-files-toggle').textContent = state.filesOpen ? '›' : '‹';
     $('btn-preview-toggle').textContent = state.previewOpen ? '›' : '‹';
   }
 
+  function toggleThreads() { state.threadsOpen = !state.threadsOpen; applyPanelClasses(); persistPanelState(); }
   function toggleFiles() { state.filesOpen = !state.filesOpen; applyPanelClasses(); persistPanelState(); }
   function togglePreview() { state.previewOpen = !state.previewOpen; applyPanelClasses(); persistPanelState(); }
 
@@ -669,9 +684,30 @@
     });
     $('btn-files-toggle').addEventListener('click', toggleFiles);
     $('btn-preview-toggle').addEventListener('click', togglePreview);
+    $('btn-threads-toggle').addEventListener('click', toggleThreads);
+    // Whole collapsed pane is clickable to expand
+    $('threads-rail').addEventListener('click', (ev) => {
+      if (!state.threadsOpen && !ev.target.closest('button, a')) toggleThreads();
+    });
+    $('files-pane').addEventListener('click', (ev) => {
+      if (!state.filesOpen && !ev.target.closest('button, a')) toggleFiles();
+    });
+    $('preview-pane').addEventListener('click', (ev) => {
+      if (!state.previewOpen && !ev.target.closest('button, a')) togglePreview();
+    });
     $('btn-threads').addEventListener('click', () => toggleMobileDrawer('threads'));
     $('btn-files').addEventListener('click', () => toggleMobileDrawer('files'));
     $('backdrop').addEventListener('click', closeMobileDrawers);
+    document.querySelectorAll('[data-drawer-close]').forEach((el) => el.addEventListener('click', closeMobileDrawers));
+    document.querySelectorAll('[data-drawer-back]').forEach((el) => el.addEventListener('click', () => {
+      $('preview-pane').classList.remove('open');
+      if (MOBILE_MQ.matches) {
+        $('files-pane').classList.add('open');
+        $('backdrop').classList.add('show');
+      } else {
+        $('backdrop').classList.remove('show');
+      }
+    }));
 
     $('chat-form').addEventListener('submit', (ev) => {
       ev.preventDefault();

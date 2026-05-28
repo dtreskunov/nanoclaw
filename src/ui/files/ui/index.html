@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <base href="/ui/files/" />
     <title>NanoClaw</title>
     <style>
@@ -14,8 +14,8 @@
         --accent-strong: rgba(100, 150, 255, 0.35);
       }
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; height: 100%; }
-      body { font: 14px/1.4 system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+      html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; overscroll-behavior-x: none; }
+      body { font: 14px/1.4 system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
       button { font: inherit; padding: 4px 10px; border: 1px solid var(--border); background: transparent; border-radius: 4px; cursor: pointer; color: inherit; }
       button:hover { background: rgba(127,127,127,0.1); }
       .icon-btn { padding: 4px 8px; }
@@ -28,6 +28,7 @@
       header .spacer { flex: 1; }
       header .user { font-size: 12px; color: var(--muted); }
       header .mobile-only { display: none; }
+      .desktop-only { }
 
       /* Body grid */
       main {
@@ -36,15 +37,50 @@
         grid-template-columns: 220px 1fr auto auto;
         min-height: 0;
       }
+      main.threads-collapsed { grid-template-columns: 36px 1fr auto auto; }
       main.files-collapsed { grid-template-columns: 220px 1fr 36px auto; }
       main.preview-collapsed { grid-template-columns: 220px 1fr auto 36px; }
       main.files-collapsed.preview-collapsed { grid-template-columns: 220px 1fr 36px 36px; }
+      main.threads-collapsed.files-collapsed { grid-template-columns: 36px 1fr 36px auto; }
+      main.threads-collapsed.preview-collapsed { grid-template-columns: 36px 1fr auto 36px; }
+      main.threads-collapsed.files-collapsed.preview-collapsed { grid-template-columns: 36px 1fr 36px 36px; }
 
       /* Threads rail */
-      .threads-rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
-      .threads-rail .head { padding: 8px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; }
-      .threads-rail .head button { flex: 1; font-size: 12px; }
+      .threads-rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; position: relative; }
+      .threads-rail .head { padding: 8px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; align-items: center; }
+      .threads-rail .head #btn-new-chat { flex: 1; font-size: 13px; font-weight: 600; }
       .threads-rail .list { flex: 1; overflow: auto; }
+      .rail-label { display: none; }
+      /* Unified collapsed style for all three side panes */
+      main.threads-collapsed .threads-rail,
+      main.files-collapsed .files-pane,
+      main.preview-collapsed .preview-pane { cursor: pointer; }
+      main.threads-collapsed .threads-rail:hover,
+      main.files-collapsed .files-pane:hover,
+      main.preview-collapsed .preview-pane:hover { background: rgba(127, 127, 127, 0.06); }
+      /* Collapsed: hide head children except the lone chevron toggle */
+      main.threads-collapsed .threads-rail .head > *:not(#btn-threads-toggle),
+      main.files-collapsed .files-pane .head > *:not(#btn-files-toggle),
+      main.preview-collapsed .preview-pane .head > *:not(#btn-preview-toggle) { display: none; }
+      main.threads-collapsed .threads-rail .head,
+      main.files-collapsed .files-pane .head,
+      main.preview-collapsed .preview-pane .head { padding: 6px 2px; justify-content: center; flex-direction: column; gap: 0; border-bottom: 1px solid var(--border); }
+      main.threads-collapsed .threads-rail .head #btn-threads-toggle,
+      main.files-collapsed .files-pane .head #btn-files-toggle,
+      main.preview-collapsed .preview-pane .head #btn-preview-toggle { min-width: 28px; min-height: 28px; padding: 0; border: 0; display: inline-flex; align-items: center; justify-content: center; }
+      main.threads-collapsed .threads-rail .list,
+      main.files-collapsed .files-pane .files-body,
+      main.preview-collapsed .preview-pane .preview-body { display: none; }
+      main.threads-collapsed .threads-rail .rail-label,
+      main.files-collapsed .files-pane .rail-label,
+      main.preview-collapsed .preview-pane .rail-label {
+        display: block; flex: 1;
+        writing-mode: vertical-rl; transform: rotate(180deg);
+        text-align: center; padding: 12px 0;
+        color: var(--muted); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; user-select: none;
+        pointer-events: none;
+      }
       .threads-rail .thread { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border); position: relative; }
       .threads-rail .thread:hover { background: rgba(127,127,127,0.08); }
       .threads-rail .thread.active { background: var(--accent); }
@@ -90,10 +126,31 @@
       main.files-collapsed .files-pane { width: 36px; }
       main.files-collapsed .files-pane .files-body { display: none; }
       .files-pane .head { padding: 6px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
-      .files-pane .head .title { flex: 1; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .files-pane .head .title { flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       main.files-collapsed .files-pane .head .title { display: none; }
-      .files-pane .breadcrumb { padding: 6px 10px; border-bottom: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; }
-      .files-pane .breadcrumb a { color: inherit; cursor: pointer; text-decoration: underline; }
+      .files-pane .breadcrumb {
+        display: flex; align-items: center; gap: 2px;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        white-space: nowrap;
+      }
+      .files-pane .breadcrumb::-webkit-scrollbar { display: none; }
+      .files-pane .breadcrumb .crumb {
+        display: inline-flex; align-items: center;
+        padding: 3px 7px; border-radius: 4px;
+        color: var(--muted); cursor: pointer; text-decoration: none;
+        background: transparent; border: 0; font: inherit;
+        max-width: 14ch; overflow: hidden; text-overflow: ellipsis;
+      }
+      .files-pane .breadcrumb .crumb:hover { background: rgba(127,127,127,0.12); color: inherit; }
+      .files-pane .breadcrumb .crumb.current { color: inherit; cursor: default; }
+      .files-pane .breadcrumb .crumb.current:hover { background: transparent; }
+      .files-pane .breadcrumb .crumb.root { padding: 3px 6px; font-size: 14px; line-height: 1; }
+      .files-pane .breadcrumb .sep { color: var(--muted); opacity: 0.5; padding: 0 1px; user-select: none; }
       .files-pane .files-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
       .files-pane .listing { flex: 1; overflow: auto; }
       .files-pane .row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
@@ -107,7 +164,8 @@
       main.preview-collapsed .preview-pane { width: 36px; }
       main.preview-collapsed .preview-pane .preview-body { display: none; }
       .preview-pane .head { padding: 6px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
-      .preview-pane .head .title { flex: 1; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .preview-pane .head .title { flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+      .preview-pane .head .title { unicode-bidi: plaintext; }
       main.preview-collapsed .preview-pane .head .title { display: none; }
       .preview-pane .preview-body { flex: 1; overflow: auto; padding: 12px; }
       .preview-pane pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, monospace; }
@@ -124,10 +182,25 @@
       .backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 5; }
       .backdrop.show { display: block; }
 
+      /* Drawer-only close button (mobile) */
+      .drawer-close { display: none; }
+
       /* Mobile layout */
       @media (max-width: 720px) {
+        header {
+          padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+          padding-left: max(10px, env(safe-area-inset-left));
+          padding-right: max(10px, env(safe-area-inset-right));
+          gap: 6px;
+        }
         header .mobile-only { display: inline-flex; }
-        header .brand { display: none; }
+        .desktop-only { display: none !important; }
+        header .brand, header #me, header .spacer { display: none !important; }
+        header select { flex: 1; min-width: 0; max-width: none; min-height: 44px; height: 44px; font-size: 15px; }
+        header .icon-btn { min-width: 44px; min-height: 44px; font-size: 22px; padding: 4px 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+        header form { flex-shrink: 0; margin: 0; }
+        header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; font-size: 0; position: relative; }
+        header form button::after { content: '⏻'; font-size: 22px; }
         main {
           grid-template-columns: 1fr !important;
           grid-template-rows: 1fr;
@@ -135,22 +208,50 @@
         .threads-rail, .files-pane, .preview-pane {
           position: fixed;
           top: 0; bottom: 0;
-          width: 280px !important;
+          width: min(86vw, 340px) !important;
           background: Canvas;
           z-index: 10;
           transition: transform 0.18s ease-out;
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
         }
         .threads-rail { left: 0; transform: translateX(-100%); }
-        .threads-rail.open { transform: translateX(0); box-shadow: 2px 0 8px rgba(0,0,0,0.25); }
-        .files-pane { right: 0; transform: translateX(100%); width: 320px !important; border-left: 1px solid var(--border); border-right: none; }
-        .files-pane.open { transform: translateX(0); box-shadow: -2px 0 8px rgba(0,0,0,0.25); }
-        .preview-pane { right: 0; transform: translateX(100%); width: 90vw !important; max-width: 480px; }
-        .preview-pane.open { transform: translateX(0); box-shadow: -2px 0 8px rgba(0,0,0,0.25); }
+        .threads-rail.open { transform: translateX(0); box-shadow: 2px 0 16px rgba(0,0,0,0.35); }
+        .files-pane { right: 0; transform: translateX(100%); border-left: 1px solid var(--border); border-right: none; }
+        .files-pane.open { transform: translateX(0); box-shadow: -2px 0 16px rgba(0,0,0,0.35); }
+        .preview-pane { right: 0; transform: translateX(100%); width: min(94vw, 520px) !important; }
+        .preview-pane.open { transform: translateX(0); box-shadow: -2px 0 16px rgba(0,0,0,0.35); }
         main.files-collapsed .files-pane,
-        main.preview-collapsed .preview-pane { width: auto !important; }
+        main.preview-collapsed .preview-pane { width: min(86vw, 340px) !important; }
         main.files-collapsed .files-pane .files-body,
         main.preview-collapsed .preview-pane .preview-body { display: flex; flex-direction: column; }
-        .chat-main .msg { max-width: 90%; }
+        /* Hide the desktop collapse chevrons inside drawers on mobile */
+        #btn-files-toggle, #btn-preview-toggle { display: none; }
+        .drawer-close { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 48px; font-size: 28px; font-weight: 500; line-height: 1; border: 0; background: transparent; cursor: pointer; color: inherit; margin-left: auto; padding: 0; }
+        .threads-rail .head, .files-pane .head, .preview-pane .head { padding: 8px 10px; gap: 8px; align-items: center; }
+        .preview-pane .head .title { font-size: 14px; }
+        .threads-rail .head { display: flex; }
+        .threads-rail .head #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .threads-rail .head #btn-new-chat .plus { font-size: 26px; font-weight: 400; line-height: 1; position: relative; top: -1px; }
+        .threads-rail .thread { padding: 12px 14px; }
+        .threads-rail .thread .title { font-size: 14px; }
+        .threads-rail .thread .meta { font-size: 12px; }
+        .files-pane .row { padding: 10px 12px; font-size: 14px; min-height: 40px; }
+        .chat-main .msg { max-width: 90%; font-size: 14px; }
+        .chat-main form {
+          padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+          gap: 8px;
+          align-items: flex-end;
+        }
+        .chat-main #chat-attach { min-width: 44px; min-height: 44px; font-size: 20px; padding: 0; flex-shrink: 0; }
+        .chat-main #chat-send { min-width: 56px; min-height: 44px; font-weight: 600; flex-shrink: 0; }
+        .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 10px; } /* 16px prevents iOS zoom on focus */
+      }
+
+      /* Show delete on touch devices (no hover) */
+      @media (hover: none) {
+        .threads-rail .thread .del { display: flex !important; align-items: center; justify-content: center; opacity: 0.7; top: 50%; right: 4px; transform: translateY(-50%); font-size: 26px; min-width: 40px; min-height: 40px; padding: 0; }
+        .threads-rail .thread .title { padding-right: 40px; }
       }
     </style>
   </head>
@@ -167,9 +268,12 @@
     <main id="main">
       <aside class="threads-rail" id="threads-rail">
         <div class="head">
-          <button type="button" id="btn-new-chat">+ New chat</button>
+          <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads">‹</button>
+          <button type="button" id="btn-new-chat"><span class="plus">+</span> <span class="label">New chat</span></button>
+          <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
         </div>
         <div class="list" id="threads-list"><div class="empty">No chats yet</div></div>
+        <div class="rail-label" aria-hidden="true">Chats</div>
       </aside>
       <section class="chat-main" id="chat-main">
         <div class="log" id="chat-log"><div class="empty">Pick or start a chat.</div></div>
@@ -187,18 +291,22 @@
         <div class="head">
           <button type="button" class="icon-btn" id="btn-files-toggle" aria-label="Collapse files">›</button>
           <span class="title">Files</span>
+          <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
         </div>
         <div class="files-body">
           <div class="breadcrumb" id="crumb"></div>
           <div class="listing" id="listing"><div class="empty">No group selected</div></div>
         </div>
+        <div class="rail-label" aria-hidden="true">Files</div>
       </aside>
       <aside class="preview-pane" id="preview-pane">
         <div class="head">
           <button type="button" class="icon-btn" id="btn-preview-toggle" aria-label="Collapse preview">›</button>
           <span class="title" id="preview-title">Preview</span>
+          <button type="button" class="drawer-close" data-drawer-back aria-label="Back to files">✕</button>
         </div>
         <div class="preview-body" id="preview"><div class="empty">No file selected</div></div>
+        <div class="rail-label" aria-hidden="true">Preview</div>
       </aside>
     </main>
     <div class="backdrop" id="backdrop"></div>
