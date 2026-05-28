@@ -255,7 +255,11 @@ function readChatHistory(userId: string, groupId: string, threadId: string): His
     // outbound DB may not exist
   }
 
-  messages.sort((a, b) => (a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0));
+  messages.sort((a, b) => {
+    const ta = Date.parse(a.timestamp.includes('T') ? a.timestamp : a.timestamp.replace(' ', 'T') + 'Z');
+    const tb = Date.parse(b.timestamp.includes('T') ? b.timestamp : b.timestamp.replace(' ', 'T') + 'Z');
+    return ta - tb;
+  });
   return messages;
 }
 
