@@ -9,6 +9,7 @@
  * is on the mount.
  */
 import http from 'http';
+import type internal from 'stream';
 
 import type { Chat } from 'chat';
 
@@ -22,14 +23,25 @@ interface WebhookEntry {
 }
 
 type MountHandler = (req: http.IncomingMessage, res: http.ServerResponse) => void | Promise<void>;
+type UpgradeHandler = (
+  req: http.IncomingMessage,
+  socket: internal.Duplex,
+  head: Buffer,
+) => void | Promise<void>;
 
 interface Mount {
   prefix: string; // e.g. '/files' (no trailing slash)
   handler: MountHandler;
 }
 
+interface UpgradeMount {
+  prefix: string;
+  handler: UpgradeHandler;
+}
+
 const routes = new Map<string, WebhookEntry>();
 const mounts: Mount[] = [];
+const upgradeMounts: UpgradeMount[] = [];
 let server: http.Server | null = null;
 
 /** Convert Node.js IncomingMessage to a Web API Request. */
@@ -95,6 +107,19 @@ export function mountHandler(prefix: string, handler: MountHandler): void {
   mounts.push({ prefix: normalized, handler });
   ensureSharedHttpServer();
   log.info('HTTP mount registered', { prefix: normalized });
+}
+
+/**
+ * Mount a WebSocket upgrade handler under a path prefix. Matched the same
+ * way as `mountHandler` (longest-prefix wins). The handler receives the
+ * raw IncomingMessage / socket / head and is responsible for completing
+ * the upgrade (e.g. via the `ws` library's `wss.handleUpgrade`).
+ */
+export function mountUpgradeHandler(prefix: string, handler: UpgradeHandler): void {
+  const normalized = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  upgradeMounts.push({ prefix: normalized, handler });
+  ensureSharedHttpServer();
+  log.info('HTTP upgrade mount registered', { prefix: normalized });
 }
 
 /** Public for modules that want the shared server up without registering a route. */
@@ -168,6 +193,27 @@ function ensureServer(): void {
       mounts: mounts.map((m) => m.prefix),
     });
   });
+
+  server.on('upgrade', async (req, socket, head) => {
+    const url = req.url || '/';
+    const pathname = url.split('?')[0];
+    for (const m of [...upgradeMounts].sort((a, b) => b.prefix.length - a.prefix.length)) {
+      if (pathname === m.prefix || pathname.startsWith(m.prefix + '/')) {
+        try {
+          await m.handler(req, socket, head);
+        } catch (err) {
+          log.error('Upgrade handler threw', { prefix: m.prefix, url: req.url, err });
+          try {
+            socket.destroy();
+          } catch {
+            // swallow
+          }
+        }
+        return;
+      }
+    }
+    socket.destroy();
+  });
 }
 
 /** Shut down the shared HTTP server. */
@@ -177,6 +223,7 @@ export async function stopWebhookServer(): Promise<void> {
     server = null;
     routes.clear();
     mounts.length = 0;
+    upgradeMounts.length = 0;
     log.info('Shared HTTP server stopped');
   }
 }
