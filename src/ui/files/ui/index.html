@@ -68,6 +68,10 @@
       .chat .pending { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 12px; font-size: 11px; color: var(--muted); }
       .chat .pending .item { display: inline-flex; align-items: center; gap: 4px; background: rgba(127,127,127,0.15); padding: 2px 6px; border-radius: 10px; }
       .chat .pending .item button { padding: 0 4px; border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; }
+      .chat .context { display: flex; align-items: center; gap: 4px; padding: 4px 12px; font-size: 11px; color: var(--muted); }
+      .chat .context .chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(100,150,255,0.18); padding: 2px 6px; border-radius: 10px; max-width: 100%; }
+      .chat .context .chip .path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; font-family: ui-monospace, monospace; }
+      .chat .context .chip button { padding: 0 4px; border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; }
       .chat.drag-active { outline: 2px dashed rgba(100,150,255,0.6); outline-offset: -4px; }
       #chat-attach { padding: 4px 8px; background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
     </style>
@@ -90,6 +94,7 @@
         <div class="chat" id="chat" hidden>
           <div class="log" id="chat-log"></div>
           <div class="status" id="chat-status"></div>
+          <div class="context" id="chat-context" hidden></div>
           <div class="pending" id="chat-pending" hidden></div>
           <form id="chat-form">
             <input type="file" id="chat-file" multiple hidden />

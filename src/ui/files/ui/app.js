@@ -140,6 +140,7 @@
     await loadTree('');
     $('preview').innerHTML = '<div class="empty">Select a file</div>';
     writeHash();
+    onSelectionChanged();
     openChat(id).catch((err) => console.error('chat open failed', err));
   }
 
@@ -147,6 +148,7 @@
     state.path = p;
     state.file = null;
     renderCrumb(p);
+    onSelectionChanged();
     const { entries } = await api(`api/groups/${encodeURIComponent(state.groupId)}/tree?path=${encodeURIComponent(p)}`);
     const list = $('listing');
     list.innerHTML = '';
@@ -190,6 +192,7 @@
     for (const el of document.querySelectorAll('.listing .row')) {
       el.classList.toggle('active', el.dataset.path === entry.path);
     }
+    onSelectionChanged();
     const url = `api/groups/${encodeURIComponent(state.groupId)}/file?path=${encodeURIComponent(entry.path)}`;
     const pv = $('preview');
     const ext = entry.name.toLowerCase().split('.').pop();
@@ -270,7 +273,7 @@
   init().catch((err) => console.error(err));
 
   // ── chat side panel ───────────────────────────────────────────────────
-  const chat = { groupId: null, threadId: null, ws: null, reconnectTimer: null, reconnectAttempt: 0, pending: [] };
+  const chat = { groupId: null, threadId: null, ws: null, reconnectTimer: null, reconnectAttempt: 0, pending: [], contextDismissed: false };
   // Upload limits — mirror server (src/ui/files/chat.ts).
   const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
   const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
@@ -470,6 +473,43 @@
     });
   }
 
+  // Returns the path of the currently-selected file or directory, prefixed
+  // with the container's workspace mount so the agent can read it directly.
+  // Returns null if there's nothing meaningful to attach.
+  function currentContextPath() {
+    if (!state.groupId) return null;
+    if (state.file) return { path: '/workspace/' + state.file, kind: 'file' };
+    if (state.path) return { path: '/workspace/' + state.path.replace(/\/?$/, '/'), kind: 'dir' };
+    return { path: '/workspace/', kind: 'dir' };
+  }
+
+  function renderContextChip() {
+    const el = $('chat-context');
+    if (!el) return;
+    const ctx = currentContextPath();
+    if (!ctx || chat.contextDismissed) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = '';
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    const icon = ctx.kind === 'dir' ? '📁' : '📄';
+    chip.innerHTML = `<span>${icon}</span><span class="path" title="${escapeHtml(ctx.path)}">${escapeHtml(ctx.path)}</span>`;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.title = 'Don\u2019t include this in next message';
+    x.addEventListener('click', () => { chat.contextDismissed = true; renderContextChip(); });
+    chip.appendChild(x);
+    el.appendChild(chip);
+  }
+
+  // Whenever the file-browser selection changes, un-dismiss so the new
+  // selection shows up. Called from selectGroup/loadTree/selectFile.
+  function onSelectionChanged() {
+    chat.contextDismissed = false;
+    renderContextChip();
+  }
+
   function addPendingFiles(files) {
     if (!files || files.length === 0) return;
     let totalBytes = chat.pending.reduce((n, f) => n + f.size, 0);
@@ -489,10 +529,17 @@
     const text = input.value.trim();
     const files = chat.pending.slice();
     if (!text && files.length === 0) return;
+    // Prepend the file-browser context if the chip is currently visible.
+    const ctx = !chat.contextDismissed ? currentContextPath() : null;
+    const fullText = ctx ? `> Context (file browser): \`${ctx.path}\`\n\n${text}` : text;
     input.value = '';
     chat.pending = [];
     renderPending();
-    sendChat(text, files).catch(console.error);
+    // After a send, reset the dismissed flag so the next selection shows
+    // its chip again (the previous one was consumed by the send).
+    chat.contextDismissed = false;
+    renderContextChip();
+    sendChat(fullText, files).catch(console.error);
   });
 
   $('chat-input').addEventListener('keydown', (ev) => {
