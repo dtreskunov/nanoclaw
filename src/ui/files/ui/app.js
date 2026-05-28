@@ -91,23 +91,31 @@
   // the file-browser file endpoint, so references like
   // [sick_day_v2.mp3](sick_day_v2.mp3) become clickable. Also auto-linkify
   // bare backtick-quoted filename-like tokens (e.g. `sick_day_v2.mp3`).
+  // Plain left-click opens the file in the preview pane; middle/cmd-click
+  // falls through to the href and opens in a new tab.
   function rewriteFileLinks(root) {
     if (!state.groupId) return;
     const gid = encodeURIComponent(state.groupId);
     const isExternal = (h) => /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith('#') || h.startsWith('//') || h.startsWith('mailto:');
-    const toFileUrl = (p) => {
-      let rel = String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
-      if (!rel) return null;
-      return `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+    const normalizeRel = (p) => String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
+    const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+    const attachPreviewClick = (a, rel) => {
+      a.addEventListener('click', (ev) => {
+        if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+        ev.preventDefault();
+        const entry = { path: rel, name: rel.slice(rel.lastIndexOf('/') + 1) };
+        navFile(entry).catch(console.error);
+      });
     };
     root.querySelectorAll('a[href]').forEach((a) => {
       const href = a.getAttribute('href') || '';
       if (!href || isExternal(href)) return;
-      const url = toFileUrl(href);
-      if (!url) return;
-      a.setAttribute('href', url);
+      const rel = normalizeRel(href);
+      if (!rel) return;
+      a.setAttribute('href', toFileUrl(rel));
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener');
+      attachPreviewClick(a, rel);
     });
     // Auto-linkify backtick-quoted filename-like tokens.
     const fileLikeRe = /^[\w.\-/ ]+\.[A-Za-z0-9]{1,8}$/;
@@ -116,13 +124,14 @@
       const txt = c.textContent || '';
       if (!fileLikeRe.test(txt)) return;
       if (txt.length > 200) return;
-      const url = toFileUrl(txt);
-      if (!url) return;
+      const rel = normalizeRel(txt);
+      if (!rel) return;
       const a = document.createElement('a');
-      a.href = url;
+      a.href = toFileUrl(rel);
       a.target = '_blank';
       a.rel = 'noopener';
       a.textContent = txt;
+      attachPreviewClick(a, rel);
       c.replaceWith(a);
     });
   }
@@ -309,7 +318,12 @@
   }
 
   async function navTree(p) { await loadTree(p); writeHash(); }
-  async function navFile(entry) { await selectFile(entry); writeHash(); openPreviewDrawerIfMobile(); }
+  async function navFile(entry) {
+    await selectFile(entry);
+    writeHash();
+    if (MOBILE_MQ.matches) openPreviewDrawerIfMobile();
+    else if (!state.paneOpen.preview) togglePane('preview');
+  }
 
   async function selectFile(entry) {
     state.file = entry.path;
