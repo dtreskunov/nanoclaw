@@ -57,6 +57,7 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
   try {
     // Public static routes.
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return serveStatic(ctx, 'index.html');
+    if (req.method === 'GET' && pathname === '/manifest.webmanifest') return serveStatic(ctx, 'manifest.webmanifest');
     if (req.method === 'GET' && pathname === '/vendor/marked.umd.js')
       return serveVendor(ctx, 'marked/lib/marked.umd.js', 'application/javascript; charset=utf-8');
     if (req.method === 'GET' && pathname.startsWith('/ui/')) return serveStatic(ctx, pathname.slice('/ui/'.length));
@@ -379,7 +380,11 @@ function serveStatic(ctx: Ctx, relName: string): void {
         ? 'text/css; charset=utf-8'
         : ext === '.js'
           ? 'application/javascript; charset=utf-8'
-          : 'application/octet-stream';
+          : ext === '.svg'
+            ? 'image/svg+xml'
+            : ext === '.webmanifest'
+              ? 'application/manifest+json; charset=utf-8'
+              : 'application/octet-stream';
   if (ext === '.html') {
     const body = fs.readFileSync(full, 'utf8').replace(/(<script\s+src="ui\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
     const buf = Buffer.from(body, 'utf8');
