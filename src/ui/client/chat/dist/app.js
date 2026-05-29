@@ -3805,8 +3805,10 @@ function LyricsPanel({ text }) {
     const el = activeRef.current;
     const c4 = scrollerRef.current;
     if (!el || !c4) return;
-    const top = el.offsetTop - c4.clientHeight / 2 + el.clientHeight / 2;
-    c4.scrollTo({ top, behavior: "smooth" });
+    const elRect = el.getBoundingClientRect();
+    const cRect = c4.getBoundingClientRect();
+    const delta = elRect.top - cRect.top - (c4.clientHeight - el.clientHeight) / 2;
+    c4.scrollBy({ top: delta, behavior: "smooth" });
   }, [activeIdx]);
   const seek = (sec) => {
     const media = document.querySelector(".media-player audio, .media-player video");

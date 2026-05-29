@@ -64,8 +64,12 @@ export function LyricsPanel({ text }) {
     const el = activeRef.current;
     const c = scrollerRef.current;
     if (!el || !c) return;
-    const top = el.offsetTop - c.clientHeight / 2 + el.clientHeight / 2;
-    c.scrollTo({ top, behavior: 'smooth' });
+    // Use bounding-rect delta so we don't depend on the scroller being
+    // positioned (offsetTop is otherwise relative to the wrong ancestor).
+    const elRect = el.getBoundingClientRect();
+    const cRect = c.getBoundingClientRect();
+    const delta = elRect.top - cRect.top - (c.clientHeight - el.clientHeight) / 2;
+    c.scrollBy({ top: delta, behavior: 'smooth' });
   }, [activeIdx]);
 
   const seek = (sec) => {
