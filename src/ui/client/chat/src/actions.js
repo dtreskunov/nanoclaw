@@ -457,7 +457,7 @@ async function fetchAndAttachMeta(p) {
   // Race guard: user may have navigated to a different file in the meantime.
   const cur = previewBlock.value;
   if (!cur || cur.path !== p) return;
-  previewBlock.value = { ...cur, tags: data.tags || null, mime: data.mime || cur.mime };
+  previewBlock.value = { ...cur, tags: data.tags || null, lyrics: data.lyrics || null, mime: data.mime || cur.mime };
 }
 
 export function closePreview() {

@@ -3061,7 +3061,7 @@ async function fetchAndAttachMeta(p5) {
   const data = await r4.json();
   const cur = previewBlock.value;
   if (!cur || cur.path !== p5) return;
-  previewBlock.value = { ...cur, tags: data.tags || null, mime: data.mime || cur.mime };
+  previewBlock.value = { ...cur, tags: data.tags || null, lyrics: data.lyrics || null, mime: data.mime || cur.mime };
 }
 function closePreview() {
   n2(() => {
@@ -3725,6 +3725,13 @@ function buildItems(mode, entry, onUpload) {
   return items;
 }
 
+// src/components/MediaPlayer.js
+function MediaPlayer({ kind, url, name }) {
+  if (kind !== "audio" && kind !== "video") return null;
+  const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name} />` : html`<video controls preload="metadata" src=${url} aria-label=${name} />`;
+  return html`<div class=${"media-player media-player-" + kind}>${el}</div>`;
+}
+
 // src/components/FilesPane.js
 function Crumb() {
   const ref = A2(null);
@@ -3844,21 +3851,28 @@ function Preview() {
       <span style="margin-left:auto"><${ActionsMenu} mode="preview" /></span>
     </div>
   `;
-  const metaRows = [];
-  if (p5.mime) metaRows.push(["Type", p5.mime]);
-  if (p5.size != null) metaRows.push(["Size", fmtBytes(p5.size)]);
-  if (p5.mtime) metaRows.push(["Modified", new Date(p5.mtime).toLocaleString()]);
-  if (p5.tags) for (const [k4, v5] of Object.entries(p5.tags)) metaRows.push([k4, String(v5)]);
+  const fileRows = [];
+  if (p5.mime) fileRows.push(["Type", p5.mime]);
+  if (p5.size != null) fileRows.push(["Size", fmtBytes(p5.size)]);
+  if (p5.mtime) fileRows.push(["Modified", new Date(p5.mtime).toLocaleString()]);
+  const tagRows = p5.tags ? Object.entries(p5.tags).map(([k4, v5]) => [k4, String(v5)]) : [];
   const isMedia = p5.kind === "image" || p5.kind === "audio" || p5.kind === "video" || p5.kind === "pdf";
-  const meta = isMedia && metaRows.length > 0 ? html`
-    <dl class="preview-meta">
-      ${metaRows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
+  const player = p5.kind === "audio" || p5.kind === "video" ? html`<${MediaPlayer} kind=${p5.kind} url=${p5.url} name=${p5.name} />` : null;
+  const renderMetaPanel = (rows, cls) => html`
+    <dl class=${"preview-meta " + cls}>
+      ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
     </dl>
+  `;
+  const fileMeta = isMedia && fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
+  const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
+  const lyrics = p5.lyrics ? html`
+    <div class="preview-lyrics">
+      <div class="preview-lyrics-head">Lyrics</div>
+      <pre>${p5.lyrics}</pre>
+    </div>
   ` : null;
   let body = null;
   if (p5.kind === "image") body = html`<img alt=${p5.name} src=${p5.url} />`;
-  else if (p5.kind === "audio") body = html`<audio controls preload="metadata" src=${p5.url} />`;
-  else if (p5.kind === "video") body = html`<video controls preload="metadata" src=${p5.url} style="max-width:100%;max-height:80vh" />`;
   else if (p5.kind === "pdf") body = html`<iframe src=${p5.url} style="width:100%;height:90vh;border:0" />`;
   else if (p5.kind === "markdown") {
     const md = renderMarkdown(p5.text);
@@ -3866,7 +3880,7 @@ function Preview() {
   } else if (p5.kind === "text") body = html`<pre>${p5.text}</pre>`;
   else if (p5.kind === "binary") body = html`<div class="empty">Binary file (${p5.mime}).</div>`;
   else if (p5.kind === "error") body = html`<div class="empty">${p5.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${meta}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${fileMeta}${tagMeta}${lyrics}${body}</div>`;
 }
 function FilesPane() {
   const previewing = !!previewBlock.value;
