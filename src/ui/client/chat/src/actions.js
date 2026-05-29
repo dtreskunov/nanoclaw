@@ -4,8 +4,8 @@ import { batch } from '@preact/signals';
 import {
   groupId, threads, threadId, channelType, messagingGroupId, canSend,
   chatMessages, chatStatus, chatLoading, refs, treePath, filePath, treeEntries,
-  treeError, contextDismissed, pending, previewBlock, POLL_INTERVAL_MS,
-  THREADS_POLL_MS,
+  treeError, contextDismissed, pending, previewBlock, paneOpen, drawerOpen,
+  isMobile, POLL_INTERVAL_MS, THREADS_POLL_MS,
 } from './state.js';
 import { api } from './api.js';
 import { writeHash } from './hash.js';
@@ -365,6 +365,15 @@ export async function loadTree(p) {
 export async function navTree(p) { await loadTree(p); writeHash(); }
 
 export async function navFile(entry) {
+  // Make sure the files pane is visible so the preview is actually seen.
+  if (isMobile.value) drawerOpen.files.value = true;
+  else paneOpen.files.value = true;
+  // Sync the tree to the file's directory so the breadcrumb reflects
+  // where the previewed file lives (and the listing matches once the
+  // user closes the preview). loadTree clears filePath/previewBlock, so
+  // it has to run before selectFile.
+  const parent = parentPath(entry.path);
+  if (treePath.value !== parent) await loadTree(parent);
   await selectFile(entry);
   writeHash();
 }

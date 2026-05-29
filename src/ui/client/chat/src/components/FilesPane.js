@@ -17,25 +17,31 @@ import { Pane } from './Pane.js';
 function Crumb() {
   const ref = useRef(null);
   const p = treePath.value;
+  const fp = filePath.value;
   const segs = p ? p.split('/').filter(Boolean) : [];
+  const fileName = fp ? fp.slice(fp.lastIndexOf('/') + 1) : '';
   useEffect(() => {
     if (ref.current) requestAnimationFrame(() => { ref.current.scrollLeft = ref.current.scrollWidth; });
-  }, [p]);
+  }, [p, fp]);
   let acc = '';
   return html`
     <div class="breadcrumb" id="crumb" ref=${ref}>
-      <button type="button" class=${'crumb root' + (segs.length === 0 ? ' current' : '')} data-path="" title="Root"
+      <button type="button" class=${'crumb root' + (segs.length === 0 && !fileName ? ' current' : '')} data-path="" title="Root"
               onClick=${() => navTree('')}>/</button>
       ${segs.map((s, i) => {
         acc = acc ? acc + '/' + s : s;
         const path = acc;
-        const last = i === segs.length - 1;
+        const last = i === segs.length - 1 && !fileName;
         return html`
           <span class="sep" aria-hidden="true">\u203a</span>
           <button type="button" class=${'crumb' + (last ? ' current' : '')} data-path=${path} title=${'/' + path}
                   onClick=${last ? null : () => navTree(path)}>${s}</button>
         `;
       })}
+      ${fileName ? html`
+        <span class="sep" aria-hidden="true">\u203a</span>
+        <span class="crumb file current" title=${'/' + fp}>${fileName}</span>
+      ` : null}
     </div>
   `;
 }
@@ -45,7 +51,7 @@ function Row({ e }) {
   const onClick = (ev) => {
     if (ev.target.closest('.row-actions')) return;
     if (e.type === 'dir') navTree(e.path);
-    else navFile(e).then(() => { drawerOpen.files.value = true; }).catch(console.error);
+    else navFile(e).catch(console.error);
   };
   return html`
     <div class=${'row tier-' + e.tier + (active ? ' active' : '')} data-path=${e.path} onClick=${onClick}>
