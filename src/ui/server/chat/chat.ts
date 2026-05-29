@@ -428,14 +428,18 @@ function readChatHistory(
       const rows = inDb
         .prepare('SELECT id, timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq')
         .all(target.channelType, threadId) as { id: string; timestamp: string; content: string }[];
+      // Router namespaces ids as `<rawId>:<agentGroupId>` when writing
+      // into per-agent session DBs (router.ts messageIdForAgent), but the
+      // live WS echo from submitWebInbound sends the raw `<rawId>`. If we
+      // leak the namespaced form to the client the dedup key (direction:id)
+      // mismatches and the user's own message paints twice on visibility
+      // resume. Strip the suffix here so history matches the echo.
+      const suffix = `:${groupId}`;
       for (const r of rows) {
         const parsed = parseInboundContent(r.content);
         if (parsed != null) {
-          // Inbound rows are always the user side (CSS '.msg.in' = viewer
-          // bubble on the right). Whether the message arrived natively
-          // through the channel or was relayed via the web UI (_via:'web'),
-          // it's the user's own message either way.
-          messages.push({ direction: 'in', id: r.id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+          const id = r.id.endsWith(suffix) ? r.id.slice(0, -suffix.length) : r.id;
+          messages.push({ direction: 'in', id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
         }
       }
     } finally {
