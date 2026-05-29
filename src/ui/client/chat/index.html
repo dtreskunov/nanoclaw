@@ -335,13 +335,18 @@
         border-radius: 4px;
         font-size: 12px;
         display: grid;
-        grid-template-columns: max-content 1fr;
-        column-gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        column-gap: 24px;
         row-gap: 3px;
       }
-      .files-pane .preview-meta .row { display: contents; }
+      .files-pane .preview-meta .row {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 12px;
+        min-width: 0;
+      }
       .files-pane .preview-meta dt { color: var(--muted); white-space: nowrap; }
-      .files-pane .preview-meta dd { margin: 0; overflow-wrap: anywhere; }
+      .files-pane .preview-meta dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
 
       .files-pane .preview-lyrics {
         margin: 0 0 12px 0;
