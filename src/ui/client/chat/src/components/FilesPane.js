@@ -115,12 +115,6 @@ function UploadStrip() {
 function Preview() {
   const ref = useRef(null);
   const p = previewBlock.value;
-  // Stop any audio/video when the preview changes.
-  useEffect(() => () => {
-    if (ref.current) {
-      ref.current.querySelectorAll('audio, video').forEach((m) => { try { m.pause(); m.src = ''; m.load(); } catch (_) {} });
-    }
-  }, [p]);
   if (!p) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const toolbar = html`
     <div class="preview-toolbar">

@@ -3582,18 +3582,6 @@ function UploadStrip() {
 function Preview() {
   const ref = A2(null);
   const p4 = previewBlock.value;
-  y2(() => () => {
-    if (ref.current) {
-      ref.current.querySelectorAll("audio, video").forEach((m6) => {
-        try {
-          m6.pause();
-          m6.src = "";
-          m6.load();
-        } catch (_5) {
-        }
-      });
-    }
-  }, [p4]);
   if (!p4) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const toolbar = html`
     <div class="preview-toolbar">
