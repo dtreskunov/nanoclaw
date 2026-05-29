@@ -4,9 +4,9 @@ import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import {
   treePath, treeEntries, treeError, filePath, isAdmin,
-  previewBlock, uploadItems, groupId, threadId,
+  previewBlock, uploadItems, groupId, threadId, pinnedContext,
 } from '../state.js';
-import { navTree, navFile, closePreview } from '../actions.js';
+import { navTree, navFile, closePreview, togglePinnedFile } from '../actions.js';
 import {
   mkdirPrompt, touchPrompt, uploadFiles, renameEntry, deleteEntry,
   clearUploadStrip, resolveConflict, notifyAgent,
@@ -123,8 +123,18 @@ function Preview() {
   const ref = useRef(null);
   const p = previewBlock.value;
   if (!p) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
+  const fp = filePath.value;
+  const pinned = !!fp && pinnedContext.value.includes(fp);
+  const clippyTitle = pinned
+    ? 'Detach from next message'
+    : 'Attach to next message';
   const toolbar = html`
     <div class="preview-toolbar">
+      <button class=${'text-btn clippy' + (pinned ? ' active' : '')}
+              onClick=${() => togglePinnedFile(fp)}
+              disabled=${!fp}
+              title=${clippyTitle}
+              aria-pressed=${pinned}>\uD83D\uDCCE</button>
       <a class="text-btn" href=${p.url} download=${p.name}>Download</a>
       ${p.size != null ? html`<span class="meta">${fmtBytes(p.size)}</span>` : null}
       ${p.mtime ? html`<${RelativeTime} ts=${p.mtime} className="meta ts" />` : null}

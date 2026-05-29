@@ -1013,7 +1013,6 @@ var chatMessages = y3([]);
 var chatStatus = y3("");
 var chatLoading = y3(false);
 var pending = y3([]);
-var contextDismissed = y3(false);
 var paneOpen = {
   threads: y3(true),
   files: y3(true)
@@ -1028,6 +1027,7 @@ var me = y3("");
 var notifMutedSig = y3(false);
 var previewBlock = y3(null);
 var nowTick = y3(Date.now());
+var pinnedContext = y3([]);
 var refs = {
   ws: null,
   reconnectTimer: null,
@@ -2914,7 +2914,6 @@ async function loadTree(p4) {
     treeError.value = "";
     treeEntries.value = [];
   });
-  contextDismissed.value = false;
   try {
     const { entries } = await api(`api/groups/${encodeURIComponent(groupId.value)}/tree?path=${encodeURIComponent(p4)}`);
     treeEntries.value = entries || [];
@@ -2937,7 +2936,6 @@ async function navFile(entry) {
 }
 async function selectFile(entry) {
   filePath.value = entry.path;
-  contextDismissed.value = false;
   const url = `api/groups/${encodeURIComponent(groupId.value)}/file?path=${encodeURIComponent(entry.path)}`;
   let size = entry.size, mtime = entry.mtime;
   try {
@@ -3001,14 +2999,18 @@ function closePreview() {
     filePath.value = null;
     previewBlock.value = null;
   });
-  contextDismissed.value = false;
   writeHash();
 }
-function currentContextPath() {
-  if (!groupId.value) return null;
-  if (filePath.value) return { path: filePath.value, kind: "file" };
-  if (treePath.value) return { path: treePath.value.replace(/\/?$/, "/"), kind: "dir" };
-  return null;
+function togglePinnedFile(path) {
+  if (!path) return;
+  const cur = pinnedContext.value;
+  pinnedContext.value = cur.includes(path) ? cur.filter((p4) => p4 !== path) : cur.concat(path);
+}
+function removePinnedPath(path) {
+  pinnedContext.value = pinnedContext.value.filter((p4) => p4 !== path);
+}
+function clearPinnedContext() {
+  pinnedContext.value = [];
 }
 function addPendingFiles(fileList, max, maxSize, maxTotal) {
   if (!fileList || fileList.length === 0) return;
@@ -3237,18 +3239,17 @@ function MessageLog() {
   `;
 }
 function ContextChip() {
-  const ctx = !contextDismissed.value ? currentContextPath() : null;
-  if (!ctx) return html`<div class="context" id="chat-context" hidden></div>`;
-  const icon = ctx.kind === "dir" ? "\u{1F4C1}" : "\u{1F4C4}";
+  const pins = pinnedContext.value;
+  if (pins.length === 0) return html`<div class="context" id="chat-context" hidden></div>`;
   return html`
     <div class="context" id="chat-context">
-      <span class="chip">
-        <span>${icon}</span>
-        <span class="path" title=${ctx.path}>${ctx.path}</span>
-        <button type="button" title="Don\u2019t include this in next message" onClick=${() => {
-    contextDismissed.value = true;
-  }}>\u00d7</button>
-      </span>
+      ${pins.map((p4) => html`
+        <span class="chip" key=${p4}>
+          <span>\uD83D\uDCCE</span>
+          <span class="path" title=${p4}>${p4}</span>
+          <button type="button" title="Unpin" onClick=${() => removePinnedPath(p4)}>\u00d7</button>
+        </span>
+      `)}
     </div>
   `;
 }
@@ -3275,13 +3276,12 @@ function Composer() {
     const text = (inputRef.current?.value || "").trim();
     const files = pending.value.slice();
     if (!text && files.length === 0) return;
-    const ctx = !contextDismissed.value ? currentContextPath() : null;
-    const fullText = ctx ? `> Context (file browser): \`${ctx.path}\`
-
-${text}` : text;
+    const pins = pinnedContext.value;
+    const prefix = pins.length > 0 ? "> Context (file browser):\n" + pins.map((p4) => `> - \`${p4}\``).join("\n") + "\n\n" : "";
+    const fullText = prefix + text;
     if (inputRef.current) inputRef.current.value = "";
     clearPending();
-    contextDismissed.value = false;
+    clearPinnedContext();
     sendChat(fullText, files).catch(console.error);
   };
   const onKey = (ev) => {
@@ -3629,8 +3629,16 @@ function Preview() {
   const ref = A2(null);
   const p4 = previewBlock.value;
   if (!p4) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
+  const fp = filePath.value;
+  const pinned = !!fp && pinnedContext.value.includes(fp);
+  const clippyTitle = pinned ? "Detach from next message" : "Attach to next message";
   const toolbar = html`
     <div class="preview-toolbar">
+      <button class=${"text-btn clippy" + (pinned ? " active" : "")}
+              onClick=${() => togglePinnedFile(fp)}
+              disabled=${!fp}
+              title=${clippyTitle}
+              aria-pressed=${pinned}>\uD83D\uDCCE</button>
       <a class="text-btn" href=${p4.url} download=${p4.name}>Download</a>
       ${p4.size != null ? html`<span class="meta">${fmtBytes(p4.size)}</span>` : null}
       ${p4.mtime ? html`<${RelativeTime} ts=${p4.mtime} className="meta ts" />` : null}

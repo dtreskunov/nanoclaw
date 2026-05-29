@@ -22,7 +22,6 @@ export const chatMessages = signal([]);
 export const chatStatus = signal('');
 export const chatLoading = signal(false);
 export const pending = signal([]);
-export const contextDismissed = signal(false);
 
 // Panels / drawers
 export const paneOpen = {
@@ -46,6 +45,12 @@ export const previewBlock = signal(null);  // { kind, url?, html?, text?, mime?,
 // Global "now" tick — bumped on a timer + on visibility resume so
 // <RelativeTime> components re-render and "5m" doesn't go stale.
 export const nowTick = signal(Date.now());
+
+// Explicit file-browser context pinned by the user via the clippy
+// button in the preview toolbar. Each entry is a file path (string)
+// relative to the group workspace. Sent as a markdown context block
+// prefixed to the next outbound message, then cleared.
+export const pinnedContext = signal([]);
 
 // ── non-reactive refs (mutated outside render) ──────────────────────
 export const refs = {
