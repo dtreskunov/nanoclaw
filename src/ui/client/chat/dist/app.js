@@ -3003,31 +3003,6 @@ async function selectFile(entry) {
   }
   const ext = entry.name.toLowerCase().split(".").pop();
   const meta = { name: entry.name, size, mtime, url, path: entry.path };
-  const mediaExts = /* @__PURE__ */ new Set([
-    "png",
-    "jpg",
-    "jpeg",
-    "gif",
-    "webp",
-    "tif",
-    "tiff",
-    "heic",
-    "heif",
-    "mp3",
-    "m4a",
-    "aac",
-    "wav",
-    "ogg",
-    "oga",
-    "opus",
-    "flac",
-    "weba",
-    "mp4",
-    "m4v",
-    "mov",
-    "webm",
-    "ogv"
-  ]);
   if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) previewBlock.value = { kind: "image", ...meta };
   else if (["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "weba"].includes(ext)) previewBlock.value = { kind: "audio", ...meta };
   else if (["mp4", "m4v", "mov", "webm", "ogv"].includes(ext)) previewBlock.value = { kind: "video", ...meta };
@@ -3051,7 +3026,7 @@ async function selectFile(entry) {
       previewBlock.value = { kind: "error", text: String(err && err.message || err), ...meta };
     }
   }
-  if (mediaExts.has(ext)) fetchAndAttachMeta(entry.path).catch(() => {
+  fetchAndAttachMeta(entry.path).catch(() => {
   });
 }
 async function fetchAndAttachMeta(p5) {
@@ -3062,7 +3037,14 @@ async function fetchAndAttachMeta(p5) {
   const data = await r4.json();
   const cur = previewBlock.value;
   if (!cur || cur.path !== p5) return;
-  previewBlock.value = { ...cur, tags: data.tags || null, lyrics: data.lyrics || null, mime: data.mime || cur.mime };
+  previewBlock.value = {
+    ...cur,
+    tags: data.tags || null,
+    lyrics: data.lyrics || null,
+    mime: data.mime || cur.mime,
+    size: data.size ?? cur.size,
+    mtime: data.mtime || cur.mtime
+  };
 }
 function closePreview() {
   n2(() => {

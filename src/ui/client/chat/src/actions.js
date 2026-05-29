@@ -417,11 +417,6 @@ export async function selectFile(entry) {
   } catch (_) {}
   const ext = entry.name.toLowerCase().split('.').pop();
   const meta = { name: entry.name, size, mtime, url, path: entry.path };
-  const mediaExts = new Set([
-    'png', 'jpg', 'jpeg', 'gif', 'webp', 'tif', 'tiff', 'heic', 'heif',
-    'mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba',
-    'mp4', 'm4v', 'mov', 'webm', 'ogv',
-  ]);
   if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) previewBlock.value = { kind: 'image', ...meta };
   else if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) previewBlock.value = { kind: 'audio', ...meta };
   else if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) previewBlock.value = { kind: 'video', ...meta };
@@ -442,10 +437,12 @@ export async function selectFile(entry) {
       previewBlock.value = { kind: 'error', text: String(err && err.message || err), ...meta };
     }
   }
-  // Fire embedded-metadata fetch for media files. Best-effort: if the
-  // server doesn't have music-metadata/exifr installed, `tags` will be
-  // absent and the panel just shows size/mtime.
-  if (mediaExts.has(ext)) fetchAndAttachMeta(entry.path).catch(() => {});
+  // Fire embedded-metadata fetch for every previewable kind. Cheap on
+  // the server for non-media (readMediaTags exits immediately when the
+  // ext isn't audio/video/image). Fills in authoritative size/mtime/mime
+  // from the server so the file-meta panel is populated even when the
+  // tree entry didn't carry them.
+  fetchAndAttachMeta(entry.path).catch(() => {});
 }
 
 async function fetchAndAttachMeta(p) {
@@ -457,7 +454,14 @@ async function fetchAndAttachMeta(p) {
   // Race guard: user may have navigated to a different file in the meantime.
   const cur = previewBlock.value;
   if (!cur || cur.path !== p) return;
-  previewBlock.value = { ...cur, tags: data.tags || null, lyrics: data.lyrics || null, mime: data.mime || cur.mime };
+  previewBlock.value = {
+    ...cur,
+    tags: data.tags || null,
+    lyrics: data.lyrics || null,
+    mime: data.mime || cur.mime,
+    size: data.size ?? cur.size,
+    mtime: data.mtime || cur.mtime,
+  };
 }
 
 export function closePreview() {
