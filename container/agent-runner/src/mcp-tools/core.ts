@@ -165,7 +165,7 @@ export const sendFile: McpToolDefinition = {
     const routing = resolveRouting(args.to as string | undefined);
     if ('error' in routing) return err(routing.error);
 
-    const resolved: Array<{ src: string; filename: string }> = [];
+    const resolved: Array<{ src: string; filename: string; workspacePath: string | null }> = [];
     const singleFilenameOverride =
       rawPaths.length === 1 && typeof args.filename === 'string' && args.filename.length > 0
         ? (args.filename as string)
@@ -173,7 +173,13 @@ export const sendFile: McpToolDefinition = {
     for (const p of rawPaths) {
       const abs = path.isAbsolute(p) ? p : path.resolve('/workspace/agent', p);
       if (!fs.existsSync(abs)) return err(`File not found: ${p}`);
-      resolved.push({ src: abs, filename: singleFilenameOverride ?? path.basename(abs) });
+      // Workspace-relative path so the chat UI can deep-link to the
+      // source in the FILES panel. Null when the source lives outside
+      // /workspace/agent (e.g. a generated tmp file) — the chat chip
+      // will then be inert (no nav target).
+      const rel = path.relative('/workspace/agent', abs);
+      const workspacePath = rel.startsWith('..') || path.isAbsolute(rel) ? null : rel;
+      resolved.push({ src: abs, filename: singleFilenameOverride ?? path.basename(abs), workspacePath });
     }
 
     const id = generateId();
@@ -184,6 +190,11 @@ export const sendFile: McpToolDefinition = {
     }
 
     const filenames = resolved.map((f) => f.filename);
+    // Parallel array to `files` carrying workspace-relative source paths
+    // (or null when the source lives outside /workspace/agent). Kept
+    // separate from `files` to preserve the existing string[] contract
+    // that delivery.ts/readOutboxFiles read.
+    const filePaths = resolved.map((f) => f.workspacePath);
     writeMessageOut({
       id,
       in_reply_to: getCurrentInReplyTo(),
@@ -191,7 +202,7 @@ export const sendFile: McpToolDefinition = {
       platform_id: routing.platform_id,
       channel_type: routing.channel_type,
       thread_id: routing.thread_id,
-      content: JSON.stringify({ text: (args.text as string) || '', files: filenames }),
+      content: JSON.stringify({ text: (args.text as string) || '', files: filenames, file_paths: filePaths }),
     });
 
     log(`send_file: ${id} → ${routing.resolvedName} (${filenames.join(', ')})`);
