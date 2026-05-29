@@ -150,7 +150,11 @@ export interface ChannelAdapter {
   deliver(platformId: string, threadId: string | null, message: OutboundMessage): Promise<string | undefined>;
 
   // Optional
-  setTyping?(platformId: string, threadId: string | null): Promise<void>;
+  setTyping?(platformId: string, threadId: string | null, hint?: string): Promise<void>;
+  /** Explicit "stop typing" signal. Optional — most platforms expire the
+   *  indicator on their own; the web channel uses this to avoid a client-side
+   *  timeout. */
+  clearTyping?(platformId: string, threadId: string | null): Promise<void>;
   syncConversations?(): Promise<ConversationInfo[]>;
   resolveChannelName?(platformId: string): Promise<string | null>;
 

@@ -2,7 +2,7 @@ import { findByName, getAllDestinations, type DestinationEntry } from './destina
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { getInboundDb, getOutboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
-import { clearContinuation, migrateLegacyContinuation, setContinuation } from './db/session-state.js';
+import { clearContinuation, clearProgress, clearTurnEnded, migrateLegacyContinuation, setContinuation, setProgress, setTurnEnded } from './db/session-state.js';
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
 import {
   formatMessages,
@@ -338,6 +338,9 @@ async function processQuery(
   let queryContinuation: string | undefined;
   let done = false;
   let unwrappedNudged = false;
+  // A fresh batch is being processed \u2014 wipe any turn-ended marker from
+  // the previous turn so the host typing module re-arms cleanly.
+  try { clearTurnEnded(); } catch { /* best-effort */ }
   let lastProviderError: { message: string; classification?: string } | null = null;
   let sentAny = false;
 
@@ -423,6 +426,8 @@ async function processQuery(
         const prompt = formatMessages(keep);
         log(`Pushing ${keep.length} follow-up message(s) into active query`);
         unwrappedNudged = false;
+        turnActive = true;
+        try { clearTurnEnded(); } catch { /* best-effort */ }
         query.push(prompt);
         markCompleted(keptIds);
       } catch (err) {
@@ -463,6 +468,27 @@ async function processQuery(
     })();
   }, ACTIVE_POLL_INTERVAL_MS);
 
+  // Keep the heartbeat warm for as long as a turn is actually in flight.
+  // The SDK can stall for 10–30s between events while Anthropic generates
+  // the first token of a response; without this timer the host-side typing
+  // module would mark the agent stale, drop the indicator, and never
+  // re-arm it until the next inbound. Independent of `touchHeartbeat()`
+  // on each event — that path still runs and stays the source of truth
+  // when events are flowing.
+  //
+  // `turnActive` is true between turn start (initial entry into the
+  // for-await + every follow-up push) and the terminating `result` /
+  // `error` event. When false, we deliberately let the heartbeat go
+  // stale so the host marks us idle and clears the typing indicator —
+  // matching the behavior between processQuery calls (the outer poll
+  // loop doesn't touch the heartbeat either).
+  let turnActive = true;
+  const liveHandle = setInterval(() => {
+    if (!turnActive) return;
+    try { touchHeartbeat(); } catch { /* best-effort */ }
+  }, 2000);
+  liveHandle.unref?.();
+
   try {
     for await (const event of query.events) {
       handleEvent(event, routing);
@@ -496,8 +522,11 @@ async function processQuery(
           query.end();
         }
       } else if (event.type === 'result') {
-        // A result — with or without text — means the turn is done. Mark
-        // the initial batch completed now so the host sweep doesn't see
+        // A result — with or without text — means the turn is done. Stop
+        // warming the heartbeat so the host marks the agent idle and the
+        // typing indicator clears. A follow-up push below will re-arm it.
+        turnActive = false;
+        // Mark the initial batch completed now so the host sweep doesn't see
         // stale 'processing' claims while the query stays open for
         // follow-up pushes. The agent may have responded via MCP
         // (send_message) mid-turn, or the message may not need a response
@@ -520,6 +549,8 @@ async function processQuery(
             log(`WARNING: agent output had no <message to="..."> blocks — nothing was sent`);
             const destinations = getAllDestinations();
             const names = destinations.map((d) => d.name).join(', ');
+            turnActive = true;
+            try { clearTurnEnded(); } catch { /* best-effort */ }
             query.push(
               `<system>Your response was not delivered — it was not wrapped in <message to="name">...</message> blocks. ` +
                 `All output must be wrapped: use <message to="name"> for content to send, or <internal> for scratchpad. ` +
@@ -536,6 +567,7 @@ async function processQuery(
   } finally {
     done = true;
     clearInterval(pollHandle);
+    clearInterval(liveHandle);
   }
 
   return {
@@ -555,14 +587,19 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
       break;
     case 'result':
       log(`Result: ${event.text ? event.text.slice(0, 200) : '(empty)'}`);
+      try { clearProgress(); } catch { /* best-effort */ }
+      try { setTurnEnded(); } catch { /* best-effort */ }
       break;
     case 'error':
       log(
         `Error: ${event.message} (retryable: ${event.retryable}${event.classification ? `, ${event.classification}` : ''})`,
       );
+      try { clearProgress(); } catch { /* best-effort */ }
+      try { setTurnEnded(); } catch { /* best-effort */ }
       break;
     case 'progress':
       log(`Progress: ${event.message}`);
+      try { setProgress(event.message); } catch { /* best-effort */ }
       break;
   }
 }

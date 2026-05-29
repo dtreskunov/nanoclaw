@@ -1229,6 +1229,13 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
         log.warn('web chat ws echo failed', { err });
       }
     },
+    onTyping(on, hint) {
+      try {
+        ws.send(JSON.stringify({ kind: 'typing', on, hint: hint ?? null }));
+      } catch (err) {
+        log.warn('web chat ws typing send failed', { err });
+      }
+    },
   };
   const unsubscribe = subscribeWeb(ctx.platformId, ctx.threadId, subscriber);
 

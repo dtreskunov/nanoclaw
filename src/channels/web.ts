@@ -29,6 +29,10 @@ export interface WebSubscriber {
   /** Called with the user's own inbound right after it's accepted. `id` is the
    *  messages_in.id we just wrote — clients use it as the dedup key. */
   onInboundEcho(id: string, text: string, files?: { filename: string; size: number }[]): void;
+  /** Called when the typing indicator should turn on or off. The web channel
+   *  uses explicit start/stop signals (no client-side timeout). `hint` is
+   *  an optional one-line progress string from the container. */
+  onTyping?(on: boolean, hint?: string): void;
 }
 
 let setupCallbacks: ChannelSetup | null = null;
@@ -149,6 +153,30 @@ function createAdapter(): ChannelAdapter {
         }
       }
       return undefined;
+    },
+
+    async setTyping(platformId, threadId, hint): Promise<void> {
+      const set = subscribers.get(subKey(platformId, threadId));
+      if (!set) return;
+      for (const sub of set) {
+        try {
+          sub.onTyping?.(true, hint);
+        } catch (err) {
+          log.warn('web subscriber onTyping threw', { err });
+        }
+      }
+    },
+
+    async clearTyping(platformId, threadId): Promise<void> {
+      const set = subscribers.get(subKey(platformId, threadId));
+      if (!set) return;
+      for (const sub of set) {
+        try {
+          sub.onTyping?.(false);
+        } catch (err) {
+          log.warn('web subscriber onTyping threw', { err });
+        }
+      }
     },
   };
   return adapter;
