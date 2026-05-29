@@ -7,7 +7,7 @@
  */
 import crypto from 'crypto';
 
-import { getDb } from '../db/connection.js';
+import { getDb } from '../../db/connection.js';
 import { hashToken } from './db.js';
 
 export interface DownloadTokenRow {

@@ -2,7 +2,7 @@
  * Web channel — chat-in-browser side panel of the file browser UI.
  *
  * Each browser tab opens a fresh thread on page load (UUID minted server-side
- * via `POST /ui/files/api/groups/<groupId>/chat/start`) and connects a
+ * via `POST /ui/chat/api/groups/<groupId>/chat/start`) and connects a
  * WebSocket. POST `/send` synthesizes an `InboundEvent` via
  * `submitWebInbound` → `ChannelSetup.onInboundEvent`. The router writes the
  * row into the per-thread session's `inbound.db`; the container processes

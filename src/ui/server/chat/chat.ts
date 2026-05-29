@@ -2,7 +2,7 @@
  * Chat side-panel for the file browser UI.
  *
  * Web channel auto-provisioning + REST endpoints + WebSocket fan-out for
- * outbound. Mounted under `/ui/files/api/groups/<groupId>/chat/...` by the
+ * outbound. Mounted under `/ui/chat/api/groups/<groupId>/chat/...` by the
  * file browser router (see ../routes.ts). The web channel adapter
  * (src/channels/web.ts) handles the actual inbound injection and outbound
  * pub/sub.
@@ -14,8 +14,8 @@ import type internal from 'stream';
 import Busboy from 'busboy';
 import { WebSocketServer, type WebSocket } from 'ws';
 
-import { getAgentGroup } from '../../db/agent-groups.js';
-import { getDb } from '../../db/connection.js';
+import { getAgentGroup } from '../../../db/agent-groups.js';
+import { getDb } from '../../../db/connection.js';
 import {
   createMessagingGroup,
   createMessagingGroupAgent,
@@ -23,16 +23,16 @@ import {
   getMessagingGroupAgents,
   getMessagingGroupAgentByPair,
   getMessagingGroupByPlatform,
-} from '../../db/messaging-groups.js';
-import { deleteSession, findSessionByAgentGroup, findSessionForAgent } from '../../db/sessions.js';
-import { openInboundDb, openOutboundDb, sessionDir, writeSessionMessage } from '../../session-manager.js';
-import { canAccessAgentGroup } from '../../modules/permissions/access.js';
-import { getUser } from '../../modules/permissions/db/users.js';
-import { log } from '../../log.js';
-import { getChannelAdapter } from '../../channels/channel-registry.js';
-import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../channels/web.js';
-import { setResendPendingWebOverride } from '../../channels/resend.js';
-import type { OutboundMessage } from '../../channels/adapter.js';
+} from '../../../db/messaging-groups.js';
+import { deleteSession, findSessionByAgentGroup, findSessionForAgent } from '../../../db/sessions.js';
+import { openInboundDb, openOutboundDb, sessionDir, writeSessionMessage } from '../../../session-manager.js';
+import { canAccessAgentGroup } from '../../../modules/permissions/access.js';
+import { getUser } from '../../../modules/permissions/db/users.js';
+import { log } from '../../../log.js';
+import { getChannelAdapter } from '../../../channels/channel-registry.js';
+import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../../channels/web.js';
+import { setResendPendingWebOverride } from '../../../channels/resend.js';
+import type { OutboundMessage } from '../../../channels/adapter.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
 import fs from 'fs';
 
@@ -1125,9 +1125,9 @@ function deleteChatThread(userId: string, groupId: string, threadId: string): bo
 
 const wss = new WebSocketServer({ noServer: true });
 
-/** Match `/ui/files/api/groups/<groupId>/chat/<thread>/ws` on upgrade. */
+/** Match `/ui/chat/api/groups/<groupId>/chat/<thread>/ws` on upgrade. */
 function matchChatWsPath(pathname: string): { groupId: string; threadId: string } | null {
-  const m = pathname.match(/^\/ui\/files\/api\/groups\/([^/]+)\/chat\/([^/]+)\/ws$/);
+  const m = pathname.match(/^\/ui\/chat\/api\/groups\/([^/]+)\/chat\/([^/]+)\/ws$/);
   if (!m) return null;
   return { groupId: m[1], threadId: m[2] };
 }
@@ -1144,7 +1144,7 @@ function readCookieToken(req: http.IncomingMessage): string | null {
   return null;
 }
 
-/** Upgrade handler — mount at `/ui/files` via mountUpgradeHandler. */
+/** Upgrade handler — mount at `/ui/chat` via mountUpgradeHandler. */
 export function handleChatUpgrade(req: http.IncomingMessage, socket: internal.Duplex, head: Buffer): void {
   const url = req.url || '/';
   const pathname = url.split('?')[0];

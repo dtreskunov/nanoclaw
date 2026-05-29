@@ -48,9 +48,9 @@ import './modules/index.js';
 import './cli/commands/index.js';
 import './cli/delivery-action.js';
 import { startCliServer, stopCliServer } from './cli/socket-server.js';
-import { startUi, stopUi } from './ui/server.js';
-import './ui/login-link-action.js';
-import './ui/file-link-action.js';
+import { startUi, stopUi } from './ui/server/server.js';
+import './ui/server/login-link-action.js';
+import './ui/server/file-link-action.js';
 
 import type { ChannelAdapter, ChannelSetup } from './channels/adapter.js';
 import { initChannelAdapters, teardownChannelAdapters, getChannelAdapter } from './channels/channel-registry.js';

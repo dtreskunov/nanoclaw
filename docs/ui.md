@@ -1,6 +1,6 @@
 # Web UI
 
-Optional read-only web UI mounted on the existing webhook HTTP server under `/ui`. A shared auth shell (`/ui/auth/*`) hands out a single bearer-cookie that's reused by every UI app. Today the only app is the **file browser** at `/ui/files`; more apps will live alongside it.
+Optional read-only web UI mounted on the existing webhook HTTP server under `/ui`. A shared auth shell (`/ui/auth/*`) hands out a single bearer-cookie that's reused by every UI app. Today the only app is the **chat** app at `/ui/chat`; more apps will live alongside it.
 
 ## Enable
 
@@ -39,13 +39,13 @@ ncl users issue-link --user <userId>
 
 `<userId>` is the namespaced channel identity (e.g. `tg:6037840640`, `resend:alice@example.com`).
 
-After redeem the browser lands on `/ui/files/`. Log out via the button in the header (`POST /ui/auth/logout`).
+After redeem the browser lands on `/ui/chat/`. Log out via the button in the header (`POST /ui/auth/logout`).
 
 ## Apps
 
-### File browser (`/ui/files`)
+### Chat (`/ui/chat`)
 
-Read-only browser for the per-agent-group filesystem at `groups/<folder>/`.
+In-browser chat + read-only browser for the per-agent-group filesystem at `groups/<folder>/`.
 
 **Access model.** A user sees an agent group if either:
 

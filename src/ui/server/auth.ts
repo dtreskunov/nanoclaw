@@ -8,7 +8,7 @@
  */
 import http from 'http';
 
-import { log } from '../log.js';
+import { log } from '../../log.js';
 import { createMagicLink, createSession, deleteSession, lookupSession, logAccess, redeemMagicLink } from './db.js';
 
 // Cookie scope. Kept in sync with UI_MOUNT_PREFIX in server.ts; inlined to
