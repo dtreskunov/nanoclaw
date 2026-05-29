@@ -14,6 +14,7 @@ import { fmtBytes, renderMarkdown, parentPath } from '../utils.js';
 import { Pane } from './Pane.js';
 import { RelativeTime } from './RelativeTime.js';
 import { ActionsMenu } from './ActionsMenu.js';
+import { MediaPlayer } from './MediaPlayer.js';
 
 function Crumb() {
   const ref = useRef(null);
@@ -151,6 +152,9 @@ function Preview() {
   if (p.mtime) metaRows.push(['Modified', new Date(p.mtime).toLocaleString()]);
   if (p.tags) for (const [k, v] of Object.entries(p.tags)) metaRows.push([k, String(v)]);
   const isMedia = p.kind === 'image' || p.kind === 'audio' || p.kind === 'video' || p.kind === 'pdf';
+  const player = (p.kind === 'audio' || p.kind === 'video')
+    ? html`<${MediaPlayer} kind=${p.kind} url=${p.url} name=${p.name} />`
+    : null;
   const meta = (isMedia && metaRows.length > 0) ? html`
     <dl class="preview-meta">
       ${metaRows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
@@ -158,8 +162,6 @@ function Preview() {
   ` : null;
   let body = null;
   if (p.kind === 'image') body = html`<img alt=${p.name} src=${p.url} />`;
-  else if (p.kind === 'audio') body = html`<audio controls preload="metadata" src=${p.url} />`;
-  else if (p.kind === 'video') body = html`<video controls preload="metadata" src=${p.url} style="max-width:100%;max-height:80vh" />`;
   else if (p.kind === 'pdf') body = html`<iframe src=${p.url} style="width:100%;height:90vh;border:0" />`;
   else if (p.kind === 'markdown') {
     const md = renderMarkdown(p.text);
@@ -169,7 +171,7 @@ function Preview() {
   } else if (p.kind === 'text') body = html`<pre>${p.text}</pre>`;
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${meta}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${meta}${body}</div>`;
 }
 
 export function FilesPane() {

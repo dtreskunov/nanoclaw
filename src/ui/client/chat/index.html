@@ -311,6 +311,22 @@
       .files-pane .preview-toolbar .clippy.active { color: inherit; background: var(--accent); }
       .files-pane .preview-toolbar .clippy:disabled { opacity: 0.4; cursor: default; background: transparent; }
 
+      /* Reusable media player widget — sticks to the top of the preview
+         body while the metadata / transcript / etc scrolls underneath. */
+      .media-player {
+        position: sticky; top: 0; z-index: 4;
+        margin: 0 0 12px 0;
+        padding: 8px 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 2px 8px var(--shadow-color);
+      }
+      .media-player audio,
+      .media-player video { display: block; width: 100%; }
+      .media-player-video video { max-height: 60vh; background: black; border-radius: 3px; }
+      .media-player-audio audio { height: 36px; }
+
       .files-pane .preview-meta {
         margin: 0 0 12px 0;
         padding: 8px 10px;
