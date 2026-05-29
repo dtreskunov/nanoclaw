@@ -18160,11 +18160,17 @@ function Preview() {
   const tagRows = p5.tags ? Object.entries(p5.tags).map(([k4, v5]) => [k4, String(v5)]) : [];
   const isMedia = p5.kind === "image" || p5.kind === "audio" || p5.kind === "video" || p5.kind === "pdf";
   const player = p5.kind === "audio" || p5.kind === "video" ? html`<${MediaPlayer} kind=${p5.kind} url=${p5.url} name=${p5.name} />` : null;
-  const renderMetaPanel = (rows, cls) => html`
-    <dl class=${"preview-meta " + cls}>
-      ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
-    </dl>
-  `;
+  const renderMetaPanel = (rows, cls) => {
+    const summary = rows.map(([, v5]) => v5).join(" \xB7 ");
+    return html`
+      <details class=${"preview-meta " + cls}>
+        <summary class="preview-meta-summary">${summary}</summary>
+        <dl class="preview-meta-rows">
+          ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
+        </dl>
+      </details>
+    `;
+  };
   const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
   const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
   const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;

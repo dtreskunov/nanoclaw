@@ -328,12 +328,35 @@
       .media-player-audio audio { height: 36px; }
 
       .files-pane .preview-meta {
-        margin: 0 0 12px 0;
-        padding: 8px 10px;
+        margin: 0 0 8px 0;
+        padding: 6px 8px;
         background: var(--wash-soft);
         border: 1px solid var(--border);
         border-radius: 4px;
         font-size: 12px;
+      }
+      .files-pane .preview-meta > summary {
+        display: block;
+        list-style: none;
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .files-pane .preview-meta > summary::-webkit-details-marker { display: none; }
+      .files-pane .preview-meta > summary:hover { color: var(--surface-fg); }
+      .files-pane .preview-meta:not([open]):hover { background: var(--wash); border-color: var(--accent); }
+      .files-pane .preview-meta[open] > summary {
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4px;
+        white-space: normal;
+      }
+      .files-pane .preview-meta-rows {
+        margin: 0;
         display: grid;
         /* auto-fill pairs of [label | value] tracks; each pair is one visual
            column. Each .row spans one pair and uses subgrid so labels share
@@ -342,15 +365,15 @@
         column-gap: 24px;
         row-gap: 3px;
       }
-      .files-pane .preview-meta .row {
+      .files-pane .preview-meta-rows .row {
         display: grid;
         grid-template-columns: subgrid;
         grid-column: span 2;
         column-gap: 12px;
         min-width: 0;
       }
-      .files-pane .preview-meta dt { color: var(--muted); white-space: nowrap; }
-      .files-pane .preview-meta dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+      .files-pane .preview-meta-rows dt { color: var(--muted); white-space: nowrap; }
+      .files-pane .preview-meta-rows dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
 
       .files-pane .preview-lyrics {
         margin: 0 0 12px 0;

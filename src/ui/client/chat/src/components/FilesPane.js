@@ -156,11 +156,19 @@ function Preview() {
   const player = (p.kind === 'audio' || p.kind === 'video')
     ? html`<${MediaPlayer} kind=${p.kind} url=${p.url} name=${p.name} />`
     : null;
-  const renderMetaPanel = (rows, cls) => html`
-    <dl class=${'preview-meta ' + cls}>
-      ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
-    </dl>
-  `;
+  const renderMetaPanel = (rows, cls) => {
+    // Metadata panel collapses by default; the summary shows a dense
+    // one-liner of just the values. Click to reveal the labelled rows.
+    const summary = rows.map(([, v]) => v).join(' \u00B7 ');
+    return html`
+      <details class=${'preview-meta ' + cls}>
+        <summary class="preview-meta-summary">${summary}</summary>
+        <dl class="preview-meta-rows">
+          ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
+        </dl>
+      </details>
+    `;
+  };
   const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
   const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
   const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} />` : null;
