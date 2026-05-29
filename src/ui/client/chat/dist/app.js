@@ -63,13 +63,13 @@ function P() {
   P.__r = 0;
 }
 function $(n4, l7, u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h4, y5, d5, w5, _5, g5 = t5 && t5.__k || v, m6 = l7.length;
-  for (f4 = I(u4, l7, g5, f4, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u4.__k[a4]) && (h4 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _5 = j(n4, y5, h4, i4, r4, o4, e4, f4, c4, s5), d5 = y5.__e, y5.ref && h4.ref != y5.ref && (h4.ref && V(h4.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h4.__k === y5.__k ? f4 = A(y5, f4, n4) : "function" == typeof y5.type && void 0 !== _5 ? f4 = _5 : d5 && (f4 = d5.nextSibling), y5.__u &= -7);
+  var a4, h5, y5, d5, w5, _5, g5 = t5 && t5.__k || v, m6 = l7.length;
+  for (f4 = I(u4, l7, g5, f4, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u4.__k[a4]) && (h5 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _5 = j(n4, y5, h5, i4, r4, o4, e4, f4, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f4 = A(y5, f4, n4) : "function" == typeof y5.type && void 0 !== _5 ? f4 = _5 : d5 && (f4 = d5.nextSibling), y5.__u &= -7);
   return u4.__e = w5, f4;
 }
 function I(n4, l7, u4, t5, i4) {
-  var r4, o4, e4, f4, c4, s5 = u4.length, a4 = s5, h4 = 0;
-  for (n4.__k = new Array(i4), r4 = 0; r4 < i4; r4++) null != (o4 = l7[r4]) && "boolean" != typeof o4 && "function" != typeof o4 ? (f4 = r4 + h4, (o4 = n4.__k[r4] = "string" == typeof o4 || "number" == typeof o4 || "bigint" == typeof o4 || o4.constructor == String ? m(null, o4, null, null, null) : d(o4) ? m(k, { children: o4 }, null, null, null) : void 0 === o4.constructor && o4.__b > 0 ? m(o4.type, o4.props, o4.key, o4.ref ? o4.ref : null, o4.__v) : o4).__ = n4, o4.__b = n4.__b + 1, e4 = null, -1 !== (c4 = o4.__i = L(o4, u4, f4, a4)) && (a4--, (e4 = u4[c4]) && (e4.__u |= 2)), null == e4 || null === e4.__v ? (-1 == c4 && h4--, "function" != typeof o4.type && (o4.__u |= 4)) : c4 != f4 && (c4 == f4 - 1 ? h4-- : c4 == f4 + 1 ? h4++ : (c4 > f4 ? h4-- : h4++, o4.__u |= 4))) : n4.__k[r4] = null;
+  var r4, o4, e4, f4, c4, s5 = u4.length, a4 = s5, h5 = 0;
+  for (n4.__k = new Array(i4), r4 = 0; r4 < i4; r4++) null != (o4 = l7[r4]) && "boolean" != typeof o4 && "function" != typeof o4 ? (f4 = r4 + h5, (o4 = n4.__k[r4] = "string" == typeof o4 || "number" == typeof o4 || "bigint" == typeof o4 || o4.constructor == String ? m(null, o4, null, null, null) : d(o4) ? m(k, { children: o4 }, null, null, null) : void 0 === o4.constructor && o4.__b > 0 ? m(o4.type, o4.props, o4.key, o4.ref ? o4.ref : null, o4.__v) : o4).__ = n4, o4.__b = n4.__b + 1, e4 = null, -1 !== (c4 = o4.__i = L(o4, u4, f4, a4)) && (a4--, (e4 = u4[c4]) && (e4.__u |= 2)), null == e4 || null === e4.__v ? (-1 == c4 && h5--, "function" != typeof o4.type && (o4.__u |= 4)) : c4 != f4 && (c4 == f4 - 1 ? h5-- : c4 == f4 + 1 ? h5++ : (c4 > f4 ? h5-- : h5++, o4.__u |= 4))) : n4.__k[r4] = null;
   if (a4) for (r4 = 0; r4 < s5; r4++) null != (e4 = u4[r4]) && 0 == (2 & e4.__u) && (e4.__e == t5 && (t5 = C(e4)), q(e4, e4));
   return t5;
 }
@@ -132,30 +132,30 @@ function O(n4) {
   };
 }
 function j(n4, u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h4, p4, v5, y5, g5, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u4.type;
+  var a4, h5, p5, v5, y5, g5, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u4.type;
   if (void 0 !== u4.constructor) return null;
   128 & t5.__u && (c4 = !!(32 & t5.__u), o4 = [f4 = u4.__e = t5.__e]), (a4 = l.__b) && a4(u4);
   n: if ("function" == typeof F3) try {
-    if (b4 = u4.props, C3 = "prototype" in F3 && F3.prototype.render, S3 = (a4 = F3.contextType) && i4[a4.__c], M3 = a4 ? S3 ? S3.props.value : a4.__ : i4, t5.__c ? m6 = (h4 = u4.__c = t5.__c).__ = h4.__E : (C3 ? u4.__c = h4 = new F3(b4, M3) : (u4.__c = h4 = new x(b4, M3), h4.constructor = F3, h4.render = B), S3 && S3.sub(h4), h4.props = b4, h4.state || (h4.state = {}), h4.context = M3, h4.__n = i4, p4 = h4.__d = true, h4.__h = [], h4._sb = []), C3 && null == h4.__s && (h4.__s = h4.state), C3 && null != F3.getDerivedStateFromProps && (h4.__s == h4.state && (h4.__s = w({}, h4.__s)), w(h4.__s, F3.getDerivedStateFromProps(b4, h4.__s))), v5 = h4.props, y5 = h4.state, h4.__v = u4, p4) C3 && null == F3.getDerivedStateFromProps && null != h4.componentWillMount && h4.componentWillMount(), C3 && null != h4.componentDidMount && h4.__h.push(h4.componentDidMount);
+    if (b4 = u4.props, C3 = "prototype" in F3 && F3.prototype.render, S3 = (a4 = F3.contextType) && i4[a4.__c], M3 = a4 ? S3 ? S3.props.value : a4.__ : i4, t5.__c ? m6 = (h5 = u4.__c = t5.__c).__ = h5.__E : (C3 ? u4.__c = h5 = new F3(b4, M3) : (u4.__c = h5 = new x(b4, M3), h5.constructor = F3, h5.render = B), S3 && S3.sub(h5), h5.props = b4, h5.state || (h5.state = {}), h5.context = M3, h5.__n = i4, p5 = h5.__d = true, h5.__h = [], h5._sb = []), C3 && null == h5.__s && (h5.__s = h5.state), C3 && null != F3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = w({}, h5.__s)), w(h5.__s, F3.getDerivedStateFromProps(b4, h5.__s))), v5 = h5.props, y5 = h5.state, h5.__v = u4, p5) C3 && null == F3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), C3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
     else {
-      if (C3 && null == F3.getDerivedStateFromProps && b4 !== v5 && null != h4.componentWillReceiveProps && h4.componentWillReceiveProps(b4, M3), !h4.__e && (null != h4.shouldComponentUpdate && false === h4.shouldComponentUpdate(b4, h4.__s, M3) || u4.__v == t5.__v)) {
-        for (u4.__v != t5.__v && (h4.props = b4, h4.state = h4.__s, h4.__d = false), u4.__e = t5.__e, u4.__k = t5.__k, u4.__k.some(function(n5) {
+      if (C3 && null == F3.getDerivedStateFromProps && b4 !== v5 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(b4, M3), !h5.__e && (null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(b4, h5.__s, M3) || u4.__v == t5.__v)) {
+        for (u4.__v != t5.__v && (h5.props = b4, h5.state = h5.__s, h5.__d = false), u4.__e = t5.__e, u4.__k = t5.__k, u4.__k.some(function(n5) {
           n5 && (n5.__ = u4);
-        }), P3 = 0; P3 < h4._sb.length; P3++) h4.__h.push(h4._sb[P3]);
-        h4._sb = [], h4.__h.length && e4.push(h4);
+        }), P3 = 0; P3 < h5._sb.length; P3++) h5.__h.push(h5._sb[P3]);
+        h5._sb = [], h5.__h.length && e4.push(h5);
         break n;
       }
-      null != h4.componentWillUpdate && h4.componentWillUpdate(b4, h4.__s, M3), C3 && null != h4.componentDidUpdate && h4.__h.push(function() {
-        h4.componentDidUpdate(v5, y5, g5);
+      null != h5.componentWillUpdate && h5.componentWillUpdate(b4, h5.__s, M3), C3 && null != h5.componentDidUpdate && h5.__h.push(function() {
+        h5.componentDidUpdate(v5, y5, g5);
       });
     }
-    if (h4.context = M3, h4.props = b4, h4.__P = n4, h4.__e = false, I3 = l.__r, A5 = 0, C3) {
-      for (h4.state = h4.__s, h4.__d = false, I3 && I3(u4), a4 = h4.render(h4.props, h4.state, h4.context), H2 = 0; H2 < h4._sb.length; H2++) h4.__h.push(h4._sb[H2]);
-      h4._sb = [];
+    if (h5.context = M3, h5.props = b4, h5.__P = n4, h5.__e = false, I3 = l.__r, A5 = 0, C3) {
+      for (h5.state = h5.__s, h5.__d = false, I3 && I3(u4), a4 = h5.render(h5.props, h5.state, h5.context), H2 = 0; H2 < h5._sb.length; H2++) h5.__h.push(h5._sb[H2]);
+      h5._sb = [];
     } else do {
-      h4.__d = false, I3 && I3(u4), a4 = h4.render(h4.props, h4.state, h4.context), h4.state = h4.__s;
-    } while (h4.__d && ++A5 < 25);
-    h4.state = h4.__s, null != h4.getChildContext && (i4 = w(w({}, i4), h4.getChildContext())), C3 && !p4 && null != h4.getSnapshotBeforeUpdate && (g5 = h4.getSnapshotBeforeUpdate(v5, y5)), f4 = $(n4, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u4, t5, i4, r4, o4, e4, f4, c4, s5), h4.base = u4.__e, u4.__u &= -161, h4.__h.length && e4.push(h4), m6 && (h4.__E = h4.__ = null);
+      h5.__d = false, I3 && I3(u4), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
+    } while (h5.__d && ++A5 < 25);
+    h5.state = h5.__s, null != h5.getChildContext && (i4 = w(w({}, i4), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g5 = h5.getSnapshotBeforeUpdate(v5, y5)), f4 = $(n4, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u4, t5, i4, r4, o4, e4, f4, c4, s5), h5.base = u4.__e, u4.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
   } catch (n5) {
     if (u4.__v = null, c4 || null != o4) if (n5.then) {
       for (u4.__u |= c4 ? 160 : 128; f4 && 8 == f4.nodeType && f4.nextSibling; ) f4 = f4.nextSibling;
@@ -180,7 +180,7 @@ function z(n4, u4, t5) {
   });
 }
 function N(u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h4, v5, y5, w5, g5, m6, b4 = i4.props, k4 = t5.props, x5 = t5.type;
+  var a4, h5, v5, y5, w5, g5, m6, b4 = i4.props, k4 = t5.props, x5 = t5.type;
   if ("svg" == x5 ? o4 = "http://www.w3.org/2000/svg" : "math" == x5 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
     for (a4 = 0; a4 < e4.length; a4++) if ((w5 = e4[a4]) && "setAttribute" in w5 == !!x5 && (x5 ? w5.localName == x5 : 3 == w5.nodeType)) {
       u4 = w5, e4[a4] = null;
@@ -200,8 +200,8 @@ function N(u4, t5, i4, r4, o4, e4, f4, c4, s5) {
       if ("value" == a4 && "defaultValue" in k4 || "checked" == a4 && "defaultChecked" in k4) continue;
       F(u4, a4, null, w5, o4);
     }
-    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h4 = w5 : "value" == a4 ? g5 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u4, a4, w5, b4[a4], o4);
-    if (h4) c4 || v5 && (h4.__html === v5.__html || h4.__html === u4.innerHTML) || (u4.innerHTML = h4.__html), t5.__k = [];
+    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g5 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u4, a4, w5, b4[a4], o4);
+    if (h5) c4 || v5 && (h5.__html === v5.__html || h5.__html === u4.innerHTML) || (u4.innerHTML = h5.__html), t5.__k = [];
     else if (v5 && (u4.innerHTML = ""), $(u4, d(y5) ? y5 : [y5], t5, i4, r4, "foreignObject" == x5 ? "http://www.w3.org/1999/xhtml" : o4, e4, f4, e4 ? e4[0] : i4.__k && C(i4, 0), c4, s5), null != e4) for (a4 = e4.length; a4--; ) _(e4[a4]);
     c4 || (a4 = "value", "progress" == x5 && null == g5 ? u4.removeAttribute("value") : void 0 !== g5 && (g5 !== u4[a4] || "progress" == x5 && !g5 || "option" == x5 && g5 !== b4[a4]) && F(u4, a4, g5, b4[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u4[a4] && F(u4, a4, m6, b4[a4], o4));
   }
@@ -273,6 +273,43 @@ function d2(n4, t5) {
   c2.__h && c2.__h(r2, n4, o2 || t5), o2 = 0;
   var u4 = r2.__H || (r2.__H = { __: [], __h: [] });
   return n4 >= u4.__.length && u4.__.push({}), u4.__[n4];
+}
+function h2(n4) {
+  return o2 = 1, p2(D2, n4);
+}
+function p2(n4, u4, i4) {
+  var o4 = d2(t2++, 2);
+  if (o4.t = n4, !o4.__c && (o4.__ = [i4 ? i4(u4) : D2(void 0, u4), function(n5) {
+    var t5 = o4.__N ? o4.__N[0] : o4.__[0], r4 = o4.t(t5, n5);
+    t5 !== r4 && (o4.__N = [r4, o4.__[1]], o4.__c.setState({}));
+  }], o4.__c = r2, !r2.u)) {
+    var f4 = function(n5, t5, r4) {
+      if (!o4.__c.__H) return true;
+      var u5 = o4.__c.__H.__.filter(function(n6) {
+        return !!n6.__c;
+      });
+      if (u5.every(function(n6) {
+        return !n6.__N;
+      })) return !c4 || c4.call(this, n5, t5, r4);
+      var i5 = o4.__c.props !== n5;
+      return u5.forEach(function(n6) {
+        if (n6.__N) {
+          var t6 = n6.__[0];
+          n6.__ = n6.__N, n6.__N = void 0, t6 !== n6.__[0] && (i5 = true);
+        }
+      }), c4 && c4.call(this, n5, t5, r4) || i5;
+    };
+    r2.u = true;
+    var c4 = r2.shouldComponentUpdate, e4 = r2.componentWillUpdate;
+    r2.componentWillUpdate = function(n5, t5, r4) {
+      if (this.__e) {
+        var u5 = c4;
+        c4 = void 0, f4(n5, t5, r4), c4 = u5;
+      }
+      e4 && e4.call(this, n5, t5, r4);
+    }, r2.shouldComponentUpdate = f4;
+  }
+  return o4.__N || o4.__;
 }
 function y2(n4, u4) {
   var i4 = d2(t2++, 3);
@@ -353,6 +390,9 @@ function C2(n4, t5) {
     return t6 !== n4[r4];
   });
 }
+function D2(n4, t5) {
+  return "function" == typeof t5 ? t5(n4) : t5;
+}
 
 // node_modules/@preact/signals-core/dist/signals-core.module.js
 var i3 = Symbol.for("preact-signals");
@@ -367,9 +407,9 @@ function t3() {
         i5 = i5.o;
       }
     }();
-    while (void 0 !== h2) {
-      var n4 = h2;
-      h2 = void 0;
+    while (void 0 !== h3) {
+      var n4 = h3;
+      h3 = void 0;
       v3++;
       while (void 0 !== n4) {
         var r4 = n4.u;
@@ -412,7 +452,7 @@ function o3(i4) {
   }
 }
 var f3;
-var h2 = void 0;
+var h3 = void 0;
 var s3 = 0;
 var v3 = 0;
 var u3 = 0;
@@ -577,7 +617,7 @@ function b(i4) {
   }
   i4.s = n4;
 }
-function p2(i4, t5) {
+function p3(i4, t5) {
   l3.call(this, void 0);
   this.x = i4;
   this.s = void 0;
@@ -587,8 +627,8 @@ function p2(i4, t5) {
   this.Z = null == t5 ? void 0 : t5.unwatched;
   this.name = null == t5 ? void 0 : t5.name;
 }
-p2.prototype = new l3();
-p2.prototype.h = function() {
+p3.prototype = new l3();
+p3.prototype.h = function() {
   this.f &= -3;
   if (1 & this.f) return false;
   if (32 == (36 & this.f)) return true;
@@ -620,14 +660,14 @@ p2.prototype.h = function() {
   this.f &= -2;
   return true;
 };
-p2.prototype.S = function(i4) {
+p3.prototype.S = function(i4) {
   if (void 0 === this.t) {
     this.f |= 36;
     for (var t5 = this.s; void 0 !== t5; t5 = t5.n) t5.S.S(t5);
   }
   l3.prototype.S.call(this, i4);
 };
-p2.prototype.U = function(i4) {
+p3.prototype.U = function(i4) {
   if (void 0 !== this.t) {
     l3.prototype.U.call(this, i4);
     if (void 0 === this.t) {
@@ -636,13 +676,13 @@ p2.prototype.U = function(i4) {
     }
   }
 };
-p2.prototype.N = function() {
+p3.prototype.N = function() {
   if (!(2 & this.f)) {
     this.f |= 6;
     for (var i4 = this.t; void 0 !== i4; i4 = i4.x) i4.t.N();
   }
 };
-Object.defineProperty(p2.prototype, "value", { get: function() {
+Object.defineProperty(p3.prototype, "value", { get: function() {
   if (1 & this.f) throw new Error("Cycle detected");
   var i4 = a3(this);
   this.h();
@@ -651,7 +691,7 @@ Object.defineProperty(p2.prototype, "value", { get: function() {
   return this.v;
 } });
 function g2(i4, t5) {
-  return new p2(i4, t5);
+  return new p3(i4, t5);
 }
 function S2(i4) {
   var n4 = i4.m;
@@ -721,8 +761,8 @@ E.prototype.S = function() {
 E.prototype.N = function() {
   if (!(2 & this.f)) {
     this.f |= 2;
-    this.u = h2;
-    h2 = this;
+    this.u = h3;
+    h3 = this;
   }
 };
 E.prototype.d = function() {
@@ -747,9 +787,9 @@ function j3(i4, t5) {
 
 // node_modules/@preact/signals/dist/signals.module.js
 var s4;
-var h3;
+var h4;
 var l4;
-var p3 = [];
+var p4 = [];
 j3(function() {
   s4 = this.N;
 })();
@@ -825,18 +865,18 @@ _3("__r", function(i4, n4) {
       return n5;
     }();
   }
-  h3 = t5;
+  h4 = t5;
   m4(r4);
   i4(n4);
 });
 _3("__e", function(i4, n4, r4, t5) {
   m4();
-  h3 = void 0;
+  h4 = void 0;
   i4(n4, r4, t5);
 });
 _3("diffed", function(i4, n4) {
   m4();
-  h3 = void 0;
+  h4 = void 0;
   var r4;
   if ("string" == typeof n4.type && (r4 = n4.__e)) {
     var t5 = n4.__np, f4 = n4.props;
@@ -937,20 +977,20 @@ var k3 = function(i4) {
 function x3() {
   n2(function() {
     var i4;
-    while (i4 = p3.shift()) s4.call(i4);
+    while (i4 = p4.shift()) s4.call(i4);
   });
 }
 function A3() {
-  if (1 === p3.push(this)) (l.requestAnimationFrame || k3)(x3);
+  if (1 === p4.push(this)) (l.requestAnimationFrame || k3)(x3);
 }
 
 // node_modules/htm/dist/htm.module.js
 var n3 = function(t5, s5, r4, e4) {
   var u4;
   s5[0] = 0;
-  for (var h4 = 1; h4 < s5.length; h4++) {
-    var p4 = s5[h4++], a4 = s5[h4] ? (s5[0] |= p4 ? 1 : 2, r4[s5[h4++]]) : s5[++h4];
-    3 === p4 ? e4[0] = a4 : 4 === p4 ? e4[1] = Object.assign(e4[1] || {}, a4) : 5 === p4 ? (e4[1] = e4[1] || {})[s5[++h4]] = a4 : 6 === p4 ? e4[1][s5[++h4]] += a4 + "" : p4 ? (u4 = t5.apply(a4, n3(t5, a4, r4, ["", null])), e4.push(u4), a4[0] ? s5[0] |= 2 : (s5[h4 - 2] = 0, s5[h4] = u4)) : e4.push(a4);
+  for (var h5 = 1; h5 < s5.length; h5++) {
+    var p5 = s5[h5++], a4 = s5[h5] ? (s5[0] |= p5 ? 1 : 2, r4[s5[h5++]]) : s5[++h5];
+    3 === p5 ? e4[0] = a4 : 4 === p5 ? e4[1] = Object.assign(e4[1] || {}, a4) : 5 === p5 ? (e4[1] = e4[1] || {})[s5[++h5]] = a4 : 6 === p5 ? e4[1][s5[++h5]] += a4 + "" : p5 ? (u4 = t5.apply(a4, n3(t5, a4, r4, ["", null])), e4.push(u4), a4[0] ? s5[0] |= 2 : (s5[h5 - 2] = 0, s5[h5] = u4)) : e4.push(a4);
   }
   return e4;
 };
@@ -958,13 +998,13 @@ var t4 = /* @__PURE__ */ new Map();
 function htm_module_default(s5) {
   var r4 = t4.get(this);
   return r4 || (r4 = /* @__PURE__ */ new Map(), t4.set(this, r4)), (r4 = n3(this, r4.get(s5) || (r4.set(s5, r4 = function(n4) {
-    for (var t5, s6, r5 = 1, e4 = "", u4 = "", h4 = [0], p4 = function(n5) {
-      1 === r5 && (n5 || (e4 = e4.replace(/^\s*\n\s*|\s*\n\s*$/g, ""))) ? h4.push(0, n5, e4) : 3 === r5 && (n5 || e4) ? (h4.push(3, n5, e4), r5 = 2) : 2 === r5 && "..." === e4 && n5 ? h4.push(4, n5, 0) : 2 === r5 && e4 && !n5 ? h4.push(5, 0, true, e4) : r5 >= 5 && ((e4 || !n5 && 5 === r5) && (h4.push(r5, 0, e4, s6), r5 = 6), n5 && (h4.push(r5, n5, 0, s6), r5 = 6)), e4 = "";
+    for (var t5, s6, r5 = 1, e4 = "", u4 = "", h5 = [0], p5 = function(n5) {
+      1 === r5 && (n5 || (e4 = e4.replace(/^\s*\n\s*|\s*\n\s*$/g, ""))) ? h5.push(0, n5, e4) : 3 === r5 && (n5 || e4) ? (h5.push(3, n5, e4), r5 = 2) : 2 === r5 && "..." === e4 && n5 ? h5.push(4, n5, 0) : 2 === r5 && e4 && !n5 ? h5.push(5, 0, true, e4) : r5 >= 5 && ((e4 || !n5 && 5 === r5) && (h5.push(r5, 0, e4, s6), r5 = 6), n5 && (h5.push(r5, n5, 0, s6), r5 = 6)), e4 = "";
     }, a4 = 0; a4 < n4.length; a4++) {
-      a4 && (1 === r5 && p4(), p4(a4));
-      for (var l7 = 0; l7 < n4[a4].length; l7++) t5 = n4[a4][l7], 1 === r5 ? "<" === t5 ? (p4(), h4 = [h4], r5 = 3) : e4 += t5 : 4 === r5 ? "--" === e4 && ">" === t5 ? (r5 = 1, e4 = "") : e4 = t5 + e4[0] : u4 ? t5 === u4 ? u4 = "" : e4 += t5 : '"' === t5 || "'" === t5 ? u4 = t5 : ">" === t5 ? (p4(), r5 = 1) : r5 && ("=" === t5 ? (r5 = 5, s6 = e4, e4 = "") : "/" === t5 && (r5 < 5 || ">" === n4[a4][l7 + 1]) ? (p4(), 3 === r5 && (h4 = h4[0]), r5 = h4, (h4 = h4[0]).push(2, 0, r5), r5 = 0) : " " === t5 || "	" === t5 || "\n" === t5 || "\r" === t5 ? (p4(), r5 = 2) : e4 += t5), 3 === r5 && "!--" === e4 && (r5 = 4, h4 = h4[0]);
+      a4 && (1 === r5 && p5(), p5(a4));
+      for (var l7 = 0; l7 < n4[a4].length; l7++) t5 = n4[a4][l7], 1 === r5 ? "<" === t5 ? (p5(), h5 = [h5], r5 = 3) : e4 += t5 : 4 === r5 ? "--" === e4 && ">" === t5 ? (r5 = 1, e4 = "") : e4 = t5 + e4[0] : u4 ? t5 === u4 ? u4 = "" : e4 += t5 : '"' === t5 || "'" === t5 ? u4 = t5 : ">" === t5 ? (p5(), r5 = 1) : r5 && ("=" === t5 ? (r5 = 5, s6 = e4, e4 = "") : "/" === t5 && (r5 < 5 || ">" === n4[a4][l7 + 1]) ? (p5(), 3 === r5 && (h5 = h5[0]), r5 = h5, (h5 = h5[0]).push(2, 0, r5), r5 = 0) : " " === t5 || "	" === t5 || "\n" === t5 || "\r" === t5 ? (p5(), r5 = 2) : e4 += t5), 3 === r5 && "!--" === e4 && (r5 = 4, h5 = h5[0]);
     }
-    return p4(), h4;
+    return p5(), h5;
   }(s5)), r4), arguments, [])).length > 1 ? r4 : r4[0];
 }
 
@@ -1156,7 +1196,7 @@ var J = { _backpedal: _4, anyPunctuation: We, autolink: Xe, blockSkip: He, br: u
 var tt = { ...J, link: d4(/^!?\[(label)\]\((.*?)\)/).replace("label", v4).getRegex(), reflink: d4(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label", v4).getRegex() };
 var Q = { ...J, emStrongRDelimAst: Qe, emStrongLDelim: Ge, delLDelim: Fe, delRDelim: Ke, url: d4(/^((?:protocol):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/).replace("protocol", ie).replace("email", /[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![-_])/).getRegex(), _backpedal: /(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/, del: /^(~~?)(?=[^\s~])((?:\\[\s\S]|[^\\])*?(?:\\[\s\S]|[^\s~\\]))\1(?=[^~]|$)/, text: d4(/^([`~]+|[^`~])(?:(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|protocol:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)))/).replace("protocol", ie).getRegex() };
 var nt = { ...Q, br: d4(ue).replace("{2,}", "*").getRegex(), text: d4(Q.text).replace("\\b_", "\\b_| {2,}\\n").replace(/\{2,\}/g, "*").getRegex() };
-var D2 = { normal: W, gfm: Ee, pedantic: Ie };
+var D3 = { normal: W, gfm: Ee, pedantic: Ie };
 var A4 = { normal: J, gfm: Q, breaks: nt, pedantic: tt };
 var rt = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 var ge = (l7) => rt[l7];
@@ -1294,26 +1334,26 @@ var w4 = class {
         else break;
         n4 = n4.slice(a4);
         let c4 = u4.join(`
-`), p4 = c4.replace(this.rules.other.blockquoteSetextReplace, `
+`), p5 = c4.replace(this.rules.other.blockquoteSetextReplace, `
     $1`).replace(this.rules.other.blockquoteSetextReplace2, "");
         s5 = s5 ? `${s5}
 ${c4}` : c4, r4 = r4 ? `${r4}
-${p4}` : p4;
+${p5}` : p5;
         let k4 = this.lexer.state.top;
-        if (this.lexer.state.top = true, this.lexer.blockTokens(p4, i4, true), this.lexer.state.top = k4, n4.length === 0) break;
-        let h4 = i4.at(-1);
-        if (h4?.type === "code") break;
-        if (h4?.type === "blockquote") {
-          let R = h4, f4 = R.raw + `
+        if (this.lexer.state.top = true, this.lexer.blockTokens(p5, i4, true), this.lexer.state.top = k4, n4.length === 0) break;
+        let h5 = i4.at(-1);
+        if (h5?.type === "code") break;
+        if (h5?.type === "blockquote") {
+          let R = h5, f4 = R.raw + `
 ` + n4.join(`
 `), S3 = this.blockquote(f4);
           i4[i4.length - 1] = S3, s5 = s5.substring(0, s5.length - R.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.text.length) + S3.text;
           break;
-        } else if (h4?.type === "list") {
-          let R = h4, f4 = R.raw + `
+        } else if (h5?.type === "list") {
+          let R = h5, f4 = R.raw + `
 ` + n4.join(`
 `), S3 = this.list(f4);
-          i4[i4.length - 1] = S3, s5 = s5.substring(0, s5.length - h4.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.raw.length) + S3.raw, n4 = f4.substring(i4.at(-1).raw.length).split(`
+          i4[i4.length - 1] = S3, s5 = s5.substring(0, s5.length - h5.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.raw.length) + S3.raw, n4 = f4.substring(i4.at(-1).raw.length).split(`
 `);
           continue;
         }
@@ -1328,31 +1368,31 @@ ${p4}` : p4;
       n4 = s5 ? `\\d{1,9}\\${n4.slice(-1)}` : `\\${n4}`, this.options.pedantic && (n4 = s5 ? n4 : "[*+-]");
       let i4 = this.rules.other.listItemRegex(n4), o4 = false;
       for (; e4; ) {
-        let a4 = false, c4 = "", p4 = "";
+        let a4 = false, c4 = "", p5 = "";
         if (!(t5 = i4.exec(e4)) || this.rules.block.hr.test(e4)) break;
         c4 = t5[0], e4 = e4.substring(c4.length);
         let k4 = me2(t5[2].split(`
-`, 1)[0], t5[1].length), h4 = e4.split(`
+`, 1)[0], t5[1].length), h5 = e4.split(`
 `, 1)[0], R = !k4.trim(), f4 = 0;
-        if (this.options.pedantic ? (f4 = 2, p4 = k4.trimStart()) : R ? f4 = t5[1].length + 1 : (f4 = k4.search(this.rules.other.nonSpaceChar), f4 = f4 > 4 ? 1 : f4, p4 = k4.slice(f4), f4 += t5[1].length), R && this.rules.other.blankLine.test(h4) && (c4 += h4 + `
-`, e4 = e4.substring(h4.length + 1), a4 = true), !a4) {
+        if (this.options.pedantic ? (f4 = 2, p5 = k4.trimStart()) : R ? f4 = t5[1].length + 1 : (f4 = k4.search(this.rules.other.nonSpaceChar), f4 = f4 > 4 ? 1 : f4, p5 = k4.slice(f4), f4 += t5[1].length), R && this.rules.other.blankLine.test(h5) && (c4 += h5 + `
+`, e4 = e4.substring(h5.length + 1), a4 = true), !a4) {
           let S3 = this.rules.other.nextBulletRegex(f4), te = this.rules.other.hrRegex(f4), ne = this.rules.other.fencesBeginRegex(f4), re = this.rules.other.headingBeginRegex(f4), be = this.rules.other.htmlBeginRegex(f4), Re = this.rules.other.blockquoteBeginRegex(f4);
           for (; e4; ) {
             let G = e4.split(`
 `, 1)[0], C3;
-            if (h4 = G, this.options.pedantic ? (h4 = h4.replace(this.rules.other.listReplaceNesting, "  "), C3 = h4) : C3 = h4.replace(this.rules.other.tabCharGlobal, "    "), ne.test(h4) || re.test(h4) || be.test(h4) || Re.test(h4) || S3.test(h4) || te.test(h4)) break;
-            if (C3.search(this.rules.other.nonSpaceChar) >= f4 || !h4.trim()) p4 += `
+            if (h5 = G, this.options.pedantic ? (h5 = h5.replace(this.rules.other.listReplaceNesting, "  "), C3 = h5) : C3 = h5.replace(this.rules.other.tabCharGlobal, "    "), ne.test(h5) || re.test(h5) || be.test(h5) || Re.test(h5) || S3.test(h5) || te.test(h5)) break;
+            if (C3.search(this.rules.other.nonSpaceChar) >= f4 || !h5.trim()) p5 += `
 ` + C3.slice(f4);
             else {
               if (R || k4.replace(this.rules.other.tabCharGlobal, "    ").search(this.rules.other.nonSpaceChar) >= 4 || ne.test(k4) || re.test(k4) || te.test(k4)) break;
-              p4 += `
-` + h4;
+              p5 += `
+` + h5;
             }
-            R = !h4.trim(), c4 += G + `
+            R = !h5.trim(), c4 += G + `
 `, e4 = e4.substring(G.length + 1), k4 = C3.slice(f4);
           }
         }
-        r4.loose || (o4 ? r4.loose = true : this.rules.other.doubleBlankLine.test(c4) && (o4 = true)), r4.items.push({ type: "list_item", raw: c4, task: !!this.options.gfm && this.rules.other.listIsTask.test(p4), loose: false, text: p4, tokens: [] }), r4.raw += c4;
+        r4.loose || (o4 ? r4.loose = true : this.rules.other.doubleBlankLine.test(c4) && (o4 = true)), r4.items.push({ type: "list_item", raw: c4, task: !!this.options.gfm && this.rules.other.listIsTask.test(p5), loose: false, text: p5, tokens: [] }), r4.raw += c4;
       }
       let u4 = r4.items.at(-1);
       if (u4) u4.raw = u4.raw.trimEnd(), u4.text = u4.text.trimEnd();
@@ -1367,14 +1407,14 @@ ${p4}` : p4;
             this.lexer.inlineQueue[k4].src = this.lexer.inlineQueue[k4].src.replace(this.rules.other.listReplaceTask, "");
             break;
           }
-          let p4 = this.rules.other.listTaskCheckbox.exec(a4.raw);
-          if (p4) {
-            let k4 = { type: "checkbox", raw: p4[0] + " ", checked: p4[0] !== "[ ]" };
+          let p5 = this.rules.other.listTaskCheckbox.exec(a4.raw);
+          if (p5) {
+            let k4 = { type: "checkbox", raw: p5[0] + " ", checked: p5[0] !== "[ ]" };
             a4.checked = k4.checked, r4.loose ? a4.tokens[0] && ["paragraph", "text"].includes(a4.tokens[0].type) && "tokens" in a4.tokens[0] && a4.tokens[0].tokens ? (a4.tokens[0].raw = k4.raw + a4.tokens[0].raw, a4.tokens[0].text = k4.raw + a4.tokens[0].text, a4.tokens[0].tokens.unshift(k4)) : a4.tokens.unshift({ type: "paragraph", raw: k4.raw, text: k4.raw, tokens: [k4] }) : a4.tokens.unshift(k4);
           }
         } else a4.task && (a4.task = false);
         if (!r4.loose) {
-          let p4 = a4.tokens.filter((h4) => h4.type === "space"), k4 = p4.length > 0 && p4.some((h4) => this.rules.other.anyLine.test(h4.raw));
+          let p5 = a4.tokens.filter((h5) => h5.type === "space"), k4 = p5.length > 0 && p5.some((h5) => this.rules.other.anyLine.test(h5.raw));
           r4.loose = k4;
         }
       }
@@ -1480,8 +1520,8 @@ ${p4}` : p4;
     let s5 = this.rules.inline.emStrongLDelim.exec(e4);
     if (!s5 || !s5[1] && !s5[2] && !s5[3] && !s5[4] || s5[4] && n4.match(this.rules.other.unicodeAlphaNumeric)) return;
     if (!(s5[1] || s5[3] || "") || !n4 || this.rules.inline.punctuation.exec(n4)) {
-      let i4 = [...s5[0]].length - 1, o4, u4, a4 = i4, c4 = 0, p4 = s5[0][0] === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd;
-      for (p4.lastIndex = 0, t5 = t5.slice(-1 * e4.length + i4); (s5 = p4.exec(t5)) !== null; ) {
+      let i4 = [...s5[0]].length - 1, o4, u4, a4 = i4, c4 = 0, p5 = s5[0][0] === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd;
+      for (p5.lastIndex = 0, t5 = t5.slice(-1 * e4.length + i4); (s5 = p5.exec(t5)) !== null; ) {
         if (o4 = s5[1] || s5[2] || s5[3] || s5[4] || s5[5] || s5[6], !o4) continue;
         if (u4 = [...o4].length, s5[3] || s5[4]) {
           a4 += u4;
@@ -1492,13 +1532,13 @@ ${p4}` : p4;
         }
         if (a4 -= u4, a4 > 0) continue;
         u4 = Math.min(u4, u4 + a4 + c4);
-        let k4 = [...s5[0]][0].length, h4 = e4.slice(0, i4 + s5.index + k4 + u4);
+        let k4 = [...s5[0]][0].length, h5 = e4.slice(0, i4 + s5.index + k4 + u4);
         if (Math.min(i4, u4) % 2) {
-          let f4 = h4.slice(1, -1);
-          return { type: "em", raw: h4, text: f4, tokens: this.lexer.inlineTokens(f4) };
+          let f4 = h5.slice(1, -1);
+          return { type: "em", raw: h5, text: f4, tokens: this.lexer.inlineTokens(f4) };
         }
-        let R = h4.slice(2, -2);
-        return { type: "strong", raw: h4, text: R, tokens: this.lexer.inlineTokens(R) };
+        let R = h5.slice(2, -2);
+        return { type: "strong", raw: h5, text: R, tokens: this.lexer.inlineTokens(R) };
       }
     }
   }
@@ -1526,8 +1566,8 @@ ${p4}` : p4;
         }
         if (a4 -= u4, a4 > 0) continue;
         u4 = Math.min(u4, u4 + a4);
-        let p4 = [...s5[0]][0].length, k4 = e4.slice(0, i4 + s5.index + p4 + u4), h4 = k4.slice(i4, -i4);
-        return { type: "del", raw: k4, text: h4, tokens: this.lexer.inlineTokens(h4) };
+        let p5 = [...s5[0]][0].length, k4 = e4.slice(0, i4 + s5.index + p5 + u4), h5 = k4.slice(i4, -i4);
+        return { type: "del", raw: k4, text: h5, tokens: this.lexer.inlineTokens(h5) };
       }
     }
   }
@@ -1569,11 +1609,11 @@ var x4 = class l5 {
   tokenizer;
   constructor(e4) {
     this.tokens = [], this.tokens.links = /* @__PURE__ */ Object.create(null), this.options = e4 || T3, this.options.tokenizer = this.options.tokenizer || new w4(), this.tokenizer = this.options.tokenizer, this.tokenizer.options = this.options, this.tokenizer.lexer = this, this.inlineQueue = [], this.state = { inLink: false, inRawBlock: false, top: true };
-    let t5 = { other: m5, block: D2.normal, inline: A4.normal };
-    this.options.pedantic ? (t5.block = D2.pedantic, t5.inline = A4.pedantic) : this.options.gfm && (t5.block = D2.gfm, this.options.breaks ? t5.inline = A4.breaks : t5.inline = A4.gfm), this.tokenizer.rules = t5;
+    let t5 = { other: m5, block: D3.normal, inline: A4.normal };
+    this.options.pedantic ? (t5.block = D3.pedantic, t5.inline = A4.pedantic) : this.options.gfm && (t5.block = D3.gfm, this.options.breaks ? t5.inline = A4.breaks : t5.inline = A4.gfm), this.tokenizer.rules = t5;
   }
   static get rules() {
-    return { block: D2, inline: A4 };
+    return { block: D3, inline: A4 };
   }
   static lex(e4, t5) {
     return new l5(t5).lex(e4);
@@ -1712,7 +1752,7 @@ var x4 = class l5 {
       }
       i4 || (o4 = ""), i4 = false;
       let a4;
-      if (this.options.extensions?.inline?.some((p4) => (a4 = p4.call({ lexer: this }, e4, t5)) ? (e4 = e4.substring(a4.raw.length), t5.push(a4), true) : false)) continue;
+      if (this.options.extensions?.inline?.some((p5) => (a4 = p5.call({ lexer: this }, e4, t5)) ? (e4 = e4.substring(a4.raw.length), t5.push(a4), true) : false)) continue;
       if (a4 = this.tokenizer.escape(e4)) {
         e4 = e4.substring(a4.raw.length), t5.push(a4);
         continue;
@@ -1727,8 +1767,8 @@ var x4 = class l5 {
       }
       if (a4 = this.tokenizer.reflink(e4, this.tokens.links)) {
         e4 = e4.substring(a4.raw.length);
-        let p4 = t5.at(-1);
-        a4.type === "text" && p4?.type === "text" ? (p4.raw += a4.raw, p4.text += a4.text) : t5.push(a4);
+        let p5 = t5.at(-1);
+        a4.type === "text" && p5?.type === "text" ? (p5.raw += a4.raw, p5.text += a4.text) : t5.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.emStrong(e4, n4, o4)) {
@@ -1757,15 +1797,15 @@ var x4 = class l5 {
       }
       let c4 = e4;
       if (this.options.extensions?.startInline) {
-        let p4 = 1 / 0, k4 = e4.slice(1), h4;
+        let p5 = 1 / 0, k4 = e4.slice(1), h5;
         this.options.extensions.startInline.forEach((R) => {
-          h4 = R.call({ lexer: this }, k4), typeof h4 == "number" && h4 >= 0 && (p4 = Math.min(p4, h4));
-        }), p4 < 1 / 0 && p4 >= 0 && (c4 = e4.substring(0, p4 + 1));
+          h5 = R.call({ lexer: this }, k4), typeof h5 == "number" && h5 >= 0 && (p5 = Math.min(p5, h5));
+        }), p5 < 1 / 0 && p5 >= 0 && (c4 = e4.substring(0, p5 + 1));
       }
       if (a4 = this.tokenizer.inlineText(c4)) {
         e4 = e4.substring(a4.raw.length), a4.raw.slice(-1) !== "_" && (o4 = a4.raw.slice(-1)), i4 = true;
-        let p4 = t5.at(-1);
-        p4?.type === "text" ? (p4.raw += a4.raw, p4.text += a4.text) : t5.push(a4);
+        let p5 = t5.at(-1);
+        p5?.type === "text" ? (p5.raw += a4.raw, p5.text += a4.text) : t5.push(a4);
         continue;
       }
       if (e4) {
@@ -2174,8 +2214,8 @@ var q2 = class {
           if (["options", "parser"].includes(i4)) continue;
           let o4 = i4, u4 = n4.renderer[o4], a4 = r4[o4];
           r4[o4] = (...c4) => {
-            let p4 = u4.apply(r4, c4);
-            return p4 === false && (p4 = a4.apply(r4, c4)), p4 || "";
+            let p5 = u4.apply(r4, c4);
+            return p5 === false && (p5 = a4.apply(r4, c4)), p5 || "";
           };
         }
         s5.renderer = r4;
@@ -2187,8 +2227,8 @@ var q2 = class {
           if (["options", "rules", "lexer"].includes(i4)) continue;
           let o4 = i4, u4 = n4.tokenizer[o4], a4 = r4[o4];
           r4[o4] = (...c4) => {
-            let p4 = u4.apply(r4, c4);
-            return p4 === false && (p4 = a4.apply(r4, c4)), p4;
+            let p5 = u4.apply(r4, c4);
+            return p5 === false && (p5 = a4.apply(r4, c4)), p5;
           };
         }
         s5.tokenizer = r4;
@@ -2204,15 +2244,15 @@ var q2 = class {
               let k4 = await u4.call(r4, c4);
               return a4.call(r4, k4);
             })();
-            let p4 = u4.call(r4, c4);
-            return a4.call(r4, p4);
+            let p5 = u4.call(r4, c4);
+            return a4.call(r4, p5);
           } : r4[o4] = (...c4) => {
             if (this.defaults.async) return (async () => {
               let k4 = await u4.apply(r4, c4);
               return k4 === false && (k4 = await a4.apply(r4, c4)), k4;
             })();
-            let p4 = u4.apply(r4, c4);
-            return p4 === false && (p4 = a4.apply(r4, c4)), p4;
+            let p5 = u4.apply(r4, c4);
+            return p5 === false && (p5 = a4.apply(r4, c4)), p5;
           };
         }
         s5.hooks = r4;
@@ -2243,17 +2283,17 @@ var q2 = class {
       if (typeof n4 > "u" || n4 === null) return o4(new Error("marked(): input parameter is undefined or null"));
       if (typeof n4 != "string") return o4(new Error("marked(): input parameter is of type " + Object.prototype.toString.call(n4) + ", string expected"));
       if (i4.hooks && (i4.hooks.options = i4, i4.hooks.block = e4), i4.async) return (async () => {
-        let u4 = i4.hooks ? await i4.hooks.preprocess(n4) : n4, c4 = await (i4.hooks ? await i4.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(u4, i4), p4 = i4.hooks ? await i4.hooks.processAllTokens(c4) : c4;
-        i4.walkTokens && await Promise.all(this.walkTokens(p4, i4.walkTokens));
-        let h4 = await (i4.hooks ? await i4.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(p4, i4);
-        return i4.hooks ? await i4.hooks.postprocess(h4) : h4;
+        let u4 = i4.hooks ? await i4.hooks.preprocess(n4) : n4, c4 = await (i4.hooks ? await i4.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(u4, i4), p5 = i4.hooks ? await i4.hooks.processAllTokens(c4) : c4;
+        i4.walkTokens && await Promise.all(this.walkTokens(p5, i4.walkTokens));
+        let h5 = await (i4.hooks ? await i4.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(p5, i4);
+        return i4.hooks ? await i4.hooks.postprocess(h5) : h5;
       })().catch(o4);
       try {
         i4.hooks && (n4 = i4.hooks.preprocess(n4));
         let a4 = (i4.hooks ? i4.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(n4, i4);
         i4.hooks && (a4 = i4.hooks.processAllTokens(a4)), i4.walkTokens && this.walkTokens(a4, i4.walkTokens);
-        let p4 = (i4.hooks ? i4.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(a4, i4);
-        return i4.hooks && (p4 = i4.hooks.postprocess(p4)), p4;
+        let p5 = (i4.hooks ? i4.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(a4, i4);
+        return i4.hooks && (p5 = i4.hooks.postprocess(p5)), p5;
       } catch (u4) {
         return o4(u4);
       }
@@ -2343,9 +2383,9 @@ function tsKey(s5) {
   const n4 = Date.parse(norm);
   return Number.isFinite(n4) ? n4 : 0;
 }
-function parentPath(p4) {
-  const i4 = p4.lastIndexOf("/");
-  return i4 < 0 ? "" : p4.slice(0, i4);
+function parentPath(p5) {
+  const i4 = p5.lastIndexOf("/");
+  return i4 < 0 ? "" : p5.slice(0, i4);
 }
 function renderMarkdown(text) {
   try {
@@ -2357,8 +2397,8 @@ function renderMarkdown(text) {
 function rewriteFileLinks(root, groupId2, onNavFile) {
   if (!groupId2 || !root) return;
   const gid = encodeURIComponent(groupId2);
-  const isExternal = (h4) => /^[a-z][a-z0-9+.-]*:/i.test(h4) || h4.startsWith("#") || h4.startsWith("//") || h4.startsWith("mailto:");
-  const normalizeRel = (p4) => String(p4 || "").replace(/^\.?\/+/, "").replace(/^workspace\/+/, "");
+  const isExternal = (h5) => /^[a-z][a-z0-9+.-]*:/i.test(h5) || h5.startsWith("#") || h5.startsWith("//") || h5.startsWith("mailto:");
+  const normalizeRel = (p5) => String(p5 || "").replace(/^\.?\/+/, "").replace(/^workspace\/+/, "");
   const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
   const attachPreviewClick = (a4, rel) => {
     a4.addEventListener("click", (ev) => {
@@ -2405,37 +2445,37 @@ function parseHash() {
   const tid = params.get("t") || null;
   const ct = params.get("c") || null;
   const mg = params.get("mg") || null;
-  const h4 = decodeURI(pathPart);
+  const h5 = decodeURI(pathPart);
   const base = { threadId: tid, channelType: ct, messagingGroupId: mg };
-  if (!h4) return tid ? { groupId: "", path: "", isDir: true, ...base } : null;
-  const slash = h4.indexOf("/");
-  if (slash < 0) return { groupId: h4, path: "", isDir: true, ...base };
-  const gid = h4.slice(0, slash);
-  const rest = h4.slice(slash + 1);
+  if (!h5) return tid ? { groupId: "", path: "", isDir: true, ...base } : null;
+  const slash = h5.indexOf("/");
+  if (slash < 0) return { groupId: h5, path: "", isDir: true, ...base };
+  const gid = h5.slice(0, slash);
+  const rest = h5.slice(slash + 1);
   const isDir = rest === "" || rest.endsWith("/");
   const path = isDir ? rest.replace(/\/$/, "") : rest;
   return { groupId: gid, path, isDir, ...base };
 }
 function buildHash() {
   if (!groupId.value) return "";
-  let h4 = "#" + encodeURI(groupId.value);
-  if (filePath.value) h4 += "/" + encodeURI(filePath.value);
-  else if (treePath.value) h4 += "/" + encodeURI(treePath.value) + "/";
+  let h5 = "#" + encodeURI(groupId.value);
+  if (filePath.value) h5 += "/" + encodeURI(filePath.value);
+  else if (treePath.value) h5 += "/" + encodeURI(treePath.value) + "/";
   if (threadId.value) {
-    h4 += "?t=" + encodeURIComponent(threadId.value);
+    h5 += "?t=" + encodeURIComponent(threadId.value);
     if (channelType.value && channelType.value !== "web") {
-      h4 += "&c=" + encodeURIComponent(channelType.value);
-      if (messagingGroupId.value) h4 += "&mg=" + encodeURIComponent(messagingGroupId.value);
+      h5 += "&c=" + encodeURIComponent(channelType.value);
+      if (messagingGroupId.value) h5 += "&mg=" + encodeURIComponent(messagingGroupId.value);
     }
   }
-  return h4;
+  return h5;
 }
 function writeHash() {
-  const h4 = buildHash();
-  if (!h4) return;
-  if (location.hash !== h4) {
+  const h5 = buildHash();
+  if (!h5) return;
+  if (location.hash !== h5) {
     refs.suppressHashCount++;
-    location.hash = h4;
+    location.hash = h5;
   }
 }
 function applyAdminFlag() {
@@ -2908,24 +2948,24 @@ async function selectGroup(gid) {
     writeHash();
   }
 }
-async function loadTree(p4) {
+async function loadTree(p5) {
   n2(() => {
-    treePath.value = p4;
+    treePath.value = p5;
     filePath.value = null;
     previewBlock.value = null;
     treeError.value = "";
     treeEntries.value = [];
   });
   try {
-    const { entries } = await api(`api/groups/${encodeURIComponent(groupId.value)}/tree?path=${encodeURIComponent(p4)}`);
+    const { entries } = await api(`api/groups/${encodeURIComponent(groupId.value)}/tree?path=${encodeURIComponent(p5)}`);
     treeEntries.value = entries || [];
   } catch (err) {
     const msg = /HTTP 404/.test(String(err && err.message)) ? "Not found. It may have been renamed or deleted." : String(err && err.message || err);
     treeError.value = msg;
   }
 }
-async function navTree(p4) {
-  await loadTree(p4);
+async function navTree(p5) {
+  await loadTree(p5);
   writeHash();
 }
 async function navFile(entry) {
@@ -2941,18 +2981,18 @@ async function selectFile(entry) {
   const url = `api/groups/${encodeURIComponent(groupId.value)}/file?path=${encodeURIComponent(entry.path)}`;
   let size = entry.size, mtime = entry.mtime;
   try {
-    const h4 = await fetch(url, { method: "HEAD", credentials: "same-origin" });
-    if (h4.status >= 400) {
-      const msg = h4.status === 404 ? "File not found. It may have been renamed or deleted." : `HTTP ${h4.status}`;
+    const h5 = await fetch(url, { method: "HEAD", credentials: "same-origin" });
+    if (h5.status >= 400) {
+      const msg = h5.status === 404 ? "File not found. It may have been renamed or deleted." : `HTTP ${h5.status}`;
       previewBlock.value = { kind: "error", text: msg, name: entry.name, url };
       return;
     }
     if (size == null) {
-      const cl = h4.headers.get("content-length");
+      const cl = h5.headers.get("content-length");
       if (cl) size = Number(cl);
     }
     if (!mtime) {
-      const lm = h4.headers.get("last-modified");
+      const lm = h5.headers.get("last-modified");
       if (lm) {
         const t5 = Date.parse(lm);
         if (t5) mtime = new Date(t5).toISOString();
@@ -3013,14 +3053,14 @@ async function selectFile(entry) {
   if (mediaExts.has(ext)) fetchAndAttachMeta(entry.path).catch(() => {
   });
 }
-async function fetchAndAttachMeta(p4) {
+async function fetchAndAttachMeta(p5) {
   const gid = groupId.value;
-  const u4 = `api/groups/${encodeURIComponent(gid)}/meta?path=${encodeURIComponent(p4)}`;
+  const u4 = `api/groups/${encodeURIComponent(gid)}/meta?path=${encodeURIComponent(p5)}`;
   const r4 = await fetch(u4, { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
   const data = await r4.json();
   const cur = previewBlock.value;
-  if (!cur || cur.path !== p4) return;
+  if (!cur || cur.path !== p5) return;
   previewBlock.value = { ...cur, tags: data.tags || null, mime: data.mime || cur.mime };
 }
 function closePreview() {
@@ -3033,10 +3073,10 @@ function closePreview() {
 function togglePinnedFile(path) {
   if (!path) return;
   const cur = pinnedContext.value;
-  pinnedContext.value = cur.includes(path) ? cur.filter((p4) => p4 !== path) : cur.concat(path);
+  pinnedContext.value = cur.includes(path) ? cur.filter((p5) => p5 !== path) : cur.concat(path);
 }
 function removePinnedPath(path) {
-  pinnedContext.value = pinnedContext.value.filter((p4) => p4 !== path);
+  pinnedContext.value = pinnedContext.value.filter((p5) => p5 !== path);
 }
 function clearPinnedContext() {
   pinnedContext.value = [];
@@ -3272,11 +3312,11 @@ function ContextChip() {
   if (pins.length === 0) return html`<div class="context" id="chat-context" hidden></div>`;
   return html`
     <div class="context" id="chat-context">
-      ${pins.map((p4) => html`
-        <span class="chip" key=${p4}>
+      ${pins.map((p5) => html`
+        <span class="chip" key=${p5}>
           <span>\uD83D\uDCCE</span>
-          <span class="path" title=${p4}>${p4}</span>
-          <button type="button" title="Unpin" onClick=${() => removePinnedPath(p4)}>\u00d7</button>
+          <span class="path" title=${p5}>${p5}</span>
+          <button type="button" title="Unpin" onClick=${() => removePinnedPath(p5)}>\u00d7</button>
         </span>
       `)}
     </div>
@@ -3306,7 +3346,7 @@ function Composer() {
     const files = pending.value.slice();
     if (!text && files.length === 0) return;
     const pins = pinnedContext.value;
-    const prefix = pins.length > 0 ? "> Context (file browser):\n" + pins.map((p4) => `> - \`${p4}\``).join("\n") + "\n\n" : "";
+    const prefix = pins.length > 0 ? "> Context (file browser):\n" + pins.map((p5) => `> - \`${p5}\``).join("\n") + "\n\n" : "";
     const fullText = prefix + text;
     if (inputRef.current) inputRef.current.value = "";
     clearPending();
@@ -3469,6 +3509,40 @@ async function deleteEntry(entry) {
   }
   await loadTree(treePath.value);
 }
+async function deletePaths(paths) {
+  if (!isAdmin.value || paths.length === 0) return;
+  if (!confirm(`Delete ${paths.length} item${paths.length === 1 ? "" : "s"}?`)) return;
+  const errors = [];
+  for (const p5 of paths) {
+    const r4 = await postJson(`api/groups/${groupId.value}/delete`, { path: p5 });
+    if (!r4.ok) errors.push(`${p5}: ${r4.data.error || r4.status}`);
+  }
+  if (errors.length) alert("Some deletes failed:\n" + errors.join("\n"));
+  await loadTree(treePath.value);
+}
+function downloadPaths(paths, entries) {
+  if (!groupId.value || paths.length === 0) return;
+  if (paths.length === 1) {
+    const single = paths[0];
+    const entry = entries?.find((e4) => e4.path === single);
+    if (entry && entry.type !== "dir") {
+      const url = `api/groups/${groupId.value}/file?path=${encodeURIComponent(single)}`;
+      triggerDownload(url, entry.name);
+      return;
+    }
+  }
+  const qs = paths.map((p5) => `path=${encodeURIComponent(p5)}`).join("&");
+  triggerDownload(`api/groups/${groupId.value}/zip?${qs}`);
+}
+function triggerDownload(url, filename) {
+  const a4 = document.createElement("a");
+  a4.href = url;
+  if (filename) a4.download = filename;
+  a4.rel = "noopener";
+  document.body.appendChild(a4);
+  a4.click();
+  a4.remove();
+}
 function updateItem(idx, patch) {
   const next = uploadItems.value.slice();
   next[idx] = { ...next[idx], ...patch };
@@ -3538,7 +3612,7 @@ async function uploadFiles(fileList) {
 }
 async function notifyAgent(paths) {
   if (!threadId.value || !groupId.value || paths.length === 0) return;
-  const list = paths.slice(0, 20).map((p4) => "`" + p4 + "`").join(", ");
+  const list = paths.slice(0, 20).map((p5) => "`" + p5 + "`").join(", ");
   const more = paths.length > 20 ? ` (and ${paths.length - 20} more)` : "";
   const text = `Files updated via web UI: ${list}${more}`;
   const r4 = await postJson(`api/groups/${groupId.value}/chat/${threadId.value}/send`, { text });
@@ -3549,18 +3623,120 @@ async function notifyAgent(paths) {
   clearUploadStrip();
 }
 
+// src/components/ActionsMenu.js
+function entriesByPath(paths) {
+  const set = new Set(paths);
+  return treeEntries.value.filter((e4) => set.has(e4.path));
+}
+function ActionsMenu({ mode, entry, onUpload }) {
+  const [open, setOpen] = h2(false);
+  const wrapRef = A2(null);
+  y2(() => {
+    if (!open) return void 0;
+    const onDoc = (ev) => {
+      if (wrapRef.current && !wrapRef.current.contains(ev.target)) setOpen(false);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const items = buildItems(mode, entry, onUpload);
+  if (items.length === 0) return null;
+  return html`
+    <div class=${"action-menu" + (open ? " open" : "")} ref=${wrapRef}>
+      <button type="button" class="text-btn action-trigger" aria-haspopup="menu" aria-expanded=${open}
+              title="Actions" onClick=${(ev) => {
+    ev.stopPropagation();
+    setOpen((o4) => !o4);
+  }}>\u22EF</button>
+      ${open ? html`
+        <div class="action-panel" role="menu">
+          ${items.map((it, i4) => it === "---" ? html`<div class="action-sep" key=${"s" + i4}></div>` : html`
+                <button type="button" class=${"action-item" + (it.danger ? " danger" : "")}
+                        role="menuitem" key=${it.label} disabled=${it.disabled}
+                        onClick=${(ev) => {
+    ev.stopPropagation();
+    setOpen(false);
+    it.onClick();
+  }}>
+                  <span class="ico">${it.ico}</span>
+                  <span class="lbl">${it.label}</span>
+                </button>
+              `)}
+        </div>
+      ` : null}
+    </div>
+  `;
+}
+function buildItems(mode, entry, onUpload) {
+  const admin = isAdmin.value;
+  if (mode === "row" && entry) {
+    const items2 = [];
+    items2.push({ ico: "\u2B07", label: "Download", onClick: () => downloadPaths([entry.path], [entry]) });
+    if (admin) {
+      items2.push("---");
+      items2.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(entry) });
+      items2.push({ ico: "\u{1F5D1}", label: "Delete", danger: true, onClick: () => deleteEntry(entry) });
+    }
+    return items2;
+  }
+  if (mode === "preview") {
+    const p5 = previewBlock.value;
+    const fp = filePath.value;
+    if (!p5) return [];
+    const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name, type: "file" } : null);
+    const items2 = [];
+    items2.push({ ico: "\u2B07", label: "Download", onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
+    if (admin && entryForPath) {
+      items2.push("---");
+      items2.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(entryForPath) });
+      items2.push({ ico: "\u{1F5D1}", label: "Delete", danger: true, onClick: () => deleteEntry(entryForPath) });
+    }
+    items2.push("---");
+    items2.push({ ico: "\xD7", label: "Close preview", onClick: closePreview });
+    return items2;
+  }
+  const sel = pinnedContext.value;
+  const selEntries = entriesByPath(sel);
+  const items = [];
+  if (admin) {
+    items.push({ ico: "\uFF0B", label: "New file", onClick: touchPrompt });
+    items.push({ ico: "\u{1F4C1}", label: "New folder", onClick: mkdirPrompt });
+    if (onUpload) items.push({ ico: "\u2B06", label: "Upload files\u2026", onClick: onUpload });
+  }
+  if (sel.length > 0) {
+    if (items.length) items.push("---");
+    items.push({ ico: "\u2B07", label: sel.length > 1 ? `Download ${sel.length} (zip)` : "Download", onClick: () => downloadPaths(sel, selEntries) });
+    if (admin) {
+      if (sel.length === 1 && selEntries.length === 1) {
+        items.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(selEntries[0]) });
+      }
+      items.push({ ico: "\u{1F5D1}", label: sel.length > 1 ? `Delete ${sel.length}` : "Delete", danger: true, onClick: () => deletePaths(sel) });
+    }
+    items.push("---");
+    items.push({ ico: "\u2715", label: "Clear selection", onClick: clearPinnedContext });
+  }
+  return items;
+}
+
 // src/components/FilesPane.js
 function Crumb() {
   const ref = A2(null);
-  const p4 = treePath.value;
+  const p5 = treePath.value;
   const fp = filePath.value;
-  const segs = p4 ? p4.split("/").filter(Boolean) : [];
+  const segs = p5 ? p5.split("/").filter(Boolean) : [];
   const fileName = fp ? fp.slice(fp.lastIndexOf("/") + 1) : "";
   y2(() => {
     if (ref.current) requestAnimationFrame(() => {
       ref.current.scrollLeft = ref.current.scrollWidth;
     });
-  }, [p4, fp]);
+  }, [p5, fp]);
   let acc = "";
   return html`
     <div class="breadcrumb" id="crumb" ref=${ref}>
@@ -3585,38 +3761,33 @@ function Crumb() {
 }
 function Row({ e: e4 }) {
   const active = e4.path === filePath.value;
+  const selected = pinnedContext.value.includes(e4.path);
   const onClick = (ev) => {
-    if (ev.target.closest(".row-actions")) return;
+    if (ev.target.closest(".row-sel") || ev.target.closest(".action-menu")) return;
     if (e4.type === "dir") navTree(e4.path);
     else navFile(e4).catch(console.error);
   };
   return html`
-    <div class=${"row tier-" + e4.tier + (active ? " active" : "")} data-path=${e4.path} onClick=${onClick}>
+    <div class=${"row tier-" + e4.tier + (active ? " active" : "") + (selected ? " selected" : "")} data-path=${e4.path} onClick=${onClick}>
+      <label class="row-sel" onClick=${(ev) => ev.stopPropagation()} title=${selected ? "Detach from next message" : "Attach to next message"}>
+        <input type="checkbox" checked=${selected} onChange=${() => togglePinnedFile(e4.path)} />
+      </label>
       <div>${e4.type === "dir" ? "\u{1F4C1}" : "\u{1F4C4}"}</div>
       <div class="name">${e4.name}</div>
       <div class="size">${fmtBytes(e4.size)}</div>
       <div class="meta"><${RelativeTime} ts=${e4.mtime} /></div>
-      <div class="row-actions admin-only">
-        <button type="button" class="act-ren" title="Rename" onClick=${(ev) => {
-    ev.stopPropagation();
-    renameEntry(e4);
-  }}>\u270e</button>
-        <button type="button" class="act-del" title="Delete" onClick=${(ev) => {
-    ev.stopPropagation();
-    deleteEntry(e4);
-  }}>\uD83D\uDDD1</button>
-      </div>
+      <div class="row-actions"><${ActionsMenu} mode="row" entry=${e4} /></div>
     </div>
   `;
 }
 function Listing() {
-  const p4 = treePath.value;
+  const p5 = treePath.value;
   const err = treeError.value;
   const entries = treeEntries.value;
   if (err) return html`<div class="listing" id="listing"><div class="empty">${err}</div></div>`;
   return html`
     <div class="listing" id="listing">
-      ${p4 ? html`<div class="row" onClick=${() => navTree(parentPath(p4))}><div class="name">..</div></div>` : null}
+      ${p5 ? html`<div class="row" onClick=${() => navTree(parentPath(p5))}><div class="name">..</div></div>` : null}
       ${entries.length === 0 ? html`<div class="empty">Empty directory</div>` : entries.map((e4) => html`<${Row} key=${e4.path} e=${e4} />`)}
     </div>
   `;
@@ -3656,8 +3827,8 @@ function UploadStrip() {
 }
 function Preview() {
   const ref = A2(null);
-  const p4 = previewBlock.value;
-  if (!p4) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
+  const p5 = previewBlock.value;
+  if (!p5) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const fp = filePath.value;
   const pinned = !!fp && pinnedContext.value.includes(fp);
   const clippyTitle = pinned ? "Detach from next message" : "Attach to next message";
@@ -3668,34 +3839,33 @@ function Preview() {
               disabled=${!fp}
               title=${clippyTitle}
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
-      <a class="text-btn" href=${p4.url} download=${p4.name}>Download</a>
-      ${p4.size != null ? html`<span class="meta">${fmtBytes(p4.size)}</span>` : null}
-      ${p4.mtime ? html`<${RelativeTime} ts=${p4.mtime} className="meta ts" />` : null}
-      <button class="text-btn" onClick=${closePreview} style="margin-left:auto" title="Close preview">\u00d7</button>
+      ${p5.size != null ? html`<span class="meta">${fmtBytes(p5.size)}</span>` : null}
+      ${p5.mtime ? html`<${RelativeTime} ts=${p5.mtime} className="meta ts" />` : null}
+      <span style="margin-left:auto"><${ActionsMenu} mode="preview" /></span>
     </div>
   `;
   const metaRows = [];
-  if (p4.mime) metaRows.push(["Type", p4.mime]);
-  if (p4.size != null) metaRows.push(["Size", fmtBytes(p4.size)]);
-  if (p4.mtime) metaRows.push(["Modified", new Date(p4.mtime).toLocaleString()]);
-  if (p4.tags) for (const [k4, v5] of Object.entries(p4.tags)) metaRows.push([k4, String(v5)]);
-  const isMedia = p4.kind === "image" || p4.kind === "audio" || p4.kind === "video" || p4.kind === "pdf";
+  if (p5.mime) metaRows.push(["Type", p5.mime]);
+  if (p5.size != null) metaRows.push(["Size", fmtBytes(p5.size)]);
+  if (p5.mtime) metaRows.push(["Modified", new Date(p5.mtime).toLocaleString()]);
+  if (p5.tags) for (const [k4, v5] of Object.entries(p5.tags)) metaRows.push([k4, String(v5)]);
+  const isMedia = p5.kind === "image" || p5.kind === "audio" || p5.kind === "video" || p5.kind === "pdf";
   const meta = isMedia && metaRows.length > 0 ? html`
     <dl class="preview-meta">
       ${metaRows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
     </dl>
   ` : null;
   let body = null;
-  if (p4.kind === "image") body = html`<img alt=${p4.name} src=${p4.url} />`;
-  else if (p4.kind === "audio") body = html`<audio controls preload="metadata" src=${p4.url} />`;
-  else if (p4.kind === "video") body = html`<video controls preload="metadata" src=${p4.url} style="max-width:100%;max-height:80vh" />`;
-  else if (p4.kind === "pdf") body = html`<iframe src=${p4.url} style="width:100%;height:90vh;border:0" />`;
-  else if (p4.kind === "markdown") {
-    const md = renderMarkdown(p4.text);
-    body = md != null ? html`<div class="markdown-preview" dangerouslySetInnerHTML=${{ __html: md }} />` : html`<pre>${p4.text}</pre>`;
-  } else if (p4.kind === "text") body = html`<pre>${p4.text}</pre>`;
-  else if (p4.kind === "binary") body = html`<div class="empty">Binary file (${p4.mime}).</div>`;
-  else if (p4.kind === "error") body = html`<div class="empty">${p4.text}</div>`;
+  if (p5.kind === "image") body = html`<img alt=${p5.name} src=${p5.url} />`;
+  else if (p5.kind === "audio") body = html`<audio controls preload="metadata" src=${p5.url} />`;
+  else if (p5.kind === "video") body = html`<video controls preload="metadata" src=${p5.url} style="max-width:100%;max-height:80vh" />`;
+  else if (p5.kind === "pdf") body = html`<iframe src=${p5.url} style="width:100%;height:90vh;border:0" />`;
+  else if (p5.kind === "markdown") {
+    const md = renderMarkdown(p5.text);
+    body = md != null ? html`<div class="markdown-preview" dangerouslySetInnerHTML=${{ __html: md }} />` : html`<pre>${p5.text}</pre>`;
+  } else if (p5.kind === "text") body = html`<pre>${p5.text}</pre>`;
+  else if (p5.kind === "binary") body = html`<div class="empty">Binary file (${p5.mime}).</div>`;
+  else if (p5.kind === "error") body = html`<div class="empty">${p5.text}</div>`;
   return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${meta}${body}</div>`;
 }
 function FilesPane() {
@@ -3748,18 +3918,13 @@ function FilesPane() {
   }, []);
   const uploadInputRef = A2(null);
   const headActions = html`
-    <div class="head-actions admin-only">
-      <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file"
-              onClick=${touchPrompt}>+F</button>
-      <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder"
-              onClick=${mkdirPrompt}>+D</button>
-      <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files"
-              onClick=${() => uploadInputRef.current?.click()}>UPL</button>
+    <div class="head-actions">
       <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
              onChange=${(ev) => {
     if (ev.target.files?.length) uploadFiles(ev.target.files);
     ev.target.value = "";
   }} />
+      <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
     </div>
   `;
   return html`

@@ -201,16 +201,17 @@
       .files-pane .row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
       .files-pane .row:hover { background: rgba(127, 127, 127, 0.1); }
       .files-pane .row.active { background: var(--accent); }
+      .files-pane .row.selected { background: rgba(127, 127, 255, 0.08); }
+      .files-pane .row.selected.active { background: var(--accent); }
       .files-pane .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .files-pane .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
       .files-pane .row .meta { font-size: 11px; color: var(--muted); white-space: nowrap; opacity: 0.7; }
-      .files-pane .row .row-actions { display: none; gap: 2px; }
-      .files-pane .row:hover .row-actions { display: inline-flex; }
-      .files-pane .row .row-actions button {
-        background: transparent; border: 0; cursor: pointer; color: var(--muted);
-        padding: 2px 4px; font-size: 13px; line-height: 1;
-      }
-      .files-pane .row .row-actions button:hover { color: inherit; }
+      .files-pane .row .row-sel { display: inline-flex; align-items: center; cursor: pointer; }
+      .files-pane .row .row-sel input { margin: 0; cursor: pointer; }
+      .files-pane .row .row-actions { display: inline-flex; }
+      .files-pane .row .row-actions .action-trigger { color: var(--muted); }
+      .files-pane .row:hover .row-actions .action-trigger,
+      .files-pane .row .action-menu.open .action-trigger { color: inherit; }
 
       /* admin-only UI is hidden until JS adds .is-admin on body */
       .admin-only { display: none; }
@@ -223,13 +224,12 @@
       .files-pane .head-actions {
         position: absolute; top: 0; right: 0;
         height: var(--handle-h);
-        align-items: center; gap: 6px;
+        display: flex; align-items: center; gap: 6px;
         padding: 0 10px;
         z-index: 3;
       }
-      body.is-admin .files-pane .head-actions { display: flex; }
-      body.is-admin .files-pane.collapsed .head-actions { display: none; }
-      /* Small text button for header actions like +D / +F / UPL. */
+      .files-pane.collapsed .head-actions { display: none; }
+      /* Small text button for header actions like UPL. */
       .files-pane .text-btn {
         background: transparent; border: 1px solid var(--border);
         color: var(--muted); cursor: pointer;
@@ -238,6 +238,34 @@
         font-family: inherit;
       }
       .files-pane .text-btn:hover { color: inherit; background: rgba(127,127,127,0.12); }
+
+      /* Unified actions menu (⋯) used in row, header, and preview. */
+      .action-menu { position: relative; display: inline-block; }
+      .action-menu .action-trigger {
+        font-size: 14px; line-height: 1; padding: 2px 6px;
+        border: 1px solid transparent;
+      }
+      .action-menu.open .action-trigger { border-color: var(--border); background: rgba(127,127,127,0.12); }
+      .action-panel {
+        position: absolute; top: 100%; right: 0; margin-top: 4px;
+        min-width: 180px; z-index: 50;
+        background: Canvas; color: CanvasText;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+        padding: 4px 0;
+      }
+      .action-item {
+        display: flex; align-items: center; gap: 8px; width: 100%;
+        background: transparent; border: 0; cursor: pointer;
+        padding: 6px 12px; font-size: 12px; line-height: 1.4;
+        color: inherit; text-align: left; font-family: inherit;
+      }
+      .action-item:hover:not(:disabled) { background: rgba(127, 127, 127, 0.12); }
+      .action-item:disabled { opacity: 0.4; cursor: default; }
+      .action-item .ico { width: 16px; text-align: center; opacity: 0.8; }
+      .action-item.danger { color: #c0392b; }
+      .action-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
       .files-pane .preview-toolbar {
         display: flex; align-items: center; gap: 10px;
