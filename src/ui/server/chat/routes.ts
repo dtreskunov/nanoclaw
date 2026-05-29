@@ -75,13 +75,15 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
 
-    const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file|meta)$/);
+    const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file|meta|zip)$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && groupMatch) {
       const [, groupId, kind] = groupMatch;
       const relPath = url.searchParams.get('path') ?? '';
       if (kind === 'tree' && req.method === 'GET') return handleTree(ctx, session.userId, groupId, relPath);
       if (kind === 'file') return handleFile(ctx, session.userId, groupId, relPath);
       if (kind === 'meta' && req.method === 'GET') return await handleMeta(ctx, session.userId, groupId, relPath);
+      if (kind === 'zip' && req.method === 'GET')
+        return handleZip(ctx, session.userId, groupId, url.searchParams.getAll('path'));
     }
 
     return json(ctx, 404, { error: 'not_found' });
@@ -335,6 +337,91 @@ function formatDuration(seconds: number): string {
   const sec = s % 60;
   const pad = (n: number) => String(n).padStart(2, '0');
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
+function handleZip(ctx: Ctx, userId: string, groupId: string, paths: string[]): void {
+  const group = resolveGroupAccess(userId, groupId);
+  if (!group) return json(ctx, 403, { error: 'forbidden' });
+  if (paths.length === 0) return json(ctx, 400, { error: 'no_paths' });
+  if (paths.length > 500) return json(ctx, 400, { error: 'too_many_paths' });
+
+  const isAdmin = hasAdminPrivilege(userId, group.id);
+  const groupDir = path.resolve(GROUPS_DIR, group.folder);
+
+  // Resolve + classify every requested path up front so we either
+  // refuse the whole request or stream a complete archive.
+  const resolved: { rel: string; abs: string; isDir: boolean }[] = [];
+  for (const rel of paths) {
+    if (!rel) return json(ctx, 400, { error: 'invalid_path' });
+    const cls = classify(rel);
+    if (cls.kind === 'hidden') return json(ctx, 404, { error: 'not_found', path: rel });
+    if (cls.tier === 'admin' && !isAdmin) return json(ctx, 403, { error: 'forbidden', path: rel });
+    const abs = resolveSafe(groupDir, rel);
+    if (!abs) return json(ctx, 400, { error: 'invalid_path', path: rel });
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(abs);
+    } catch {
+      return json(ctx, 404, { error: 'not_found', path: rel });
+    }
+    resolved.push({ rel, abs, isDir: stat.isDirectory() });
+  }
+
+  // Build a friendly archive name: single dir → that dir's basename;
+  // single file → that file's basename (without ext); multi → group folder.
+  let baseName: string;
+  if (resolved.length === 1) baseName = path.basename(resolved[0].rel) || group.folder;
+  else baseName = `${group.folder}-files`;
+  const zipName = `${baseName}.zip`;
+
+  recordAccess({ userId, groupId: group.id, path: paths.join(','), action: 'zip', req: ctx.req });
+
+  ctx.res.writeHead(200, {
+    'Content-Type': 'application/zip',
+    'Content-Disposition': `attachment; filename="${encodeURIComponent(zipName)}"`,
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
+
+  // Dynamic import to keep startup lean and so an absent archiver
+  // dependency degrades gracefully (returns 500 rather than crashing
+  // module load — though we install it as a regular dep so this should
+  // never fire in practice).
+  void (async () => {
+    let archiverMod;
+    try {
+      archiverMod = (await import('archiver')).default;
+    } catch (err) {
+      log.error('archiver dynamic import failed', { err });
+      try {
+        ctx.res.end();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    const archive = archiverMod('zip', { zlib: { level: 6 } });
+    archive.on('warning', (err: NodeJS.ErrnoException) => {
+      // ENOENT in here is "we lost a race with rm" — log but don't fail.
+      if (err.code === 'ENOENT') log.warn('zip archive missing entry', { err });
+      else log.error('zip archive warning', { err });
+    });
+    archive.on('error', (err: Error) => {
+      log.error('zip archive error', { err });
+      try {
+        ctx.res.destroy(err);
+      } catch {
+        /* ignore */
+      }
+    });
+    archive.pipe(ctx.res);
+    for (const { rel, abs, isDir } of resolved) {
+      const inZipBase = path.basename(rel);
+      if (isDir) archive.directory(abs, inZipBase);
+      else archive.file(abs, { name: inZipBase });
+    }
+    await archive.finalize();
+  })();
 }
 
 function handleTokenDownload(ctx: Ctx): void {
