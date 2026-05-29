@@ -595,9 +595,10 @@ async function sendViaChannelAdapter(args: {
     throw Object.assign(new Error('http_500'), { detail: (err as Error).message || 'channel_send_failed' });
   }
 
-  // Log the user's send as an inbound row so the agent can see what the
-  // user did on its next natural wake. trigger=0 means it won't auto-wake
-  // the container.
+  // Log the user's send as an inbound row so the agent acts on it. The
+  // host's sweep gates on trigger=1 to wake an idle container; without
+  // it, a web-relayed reply that arrives after the container has gone
+  // idle just sits in the DB until the next natural wake.
   const id = `web-relay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const contentPayload: Record<string, unknown> = {
     text: args.text,
@@ -618,7 +619,7 @@ async function sendViaChannelAdapter(args: {
     channelType: args.channelType,
     threadId: args.threadId,
     content: JSON.stringify(contentPayload),
-    trigger: 0,
+    trigger: 1,
   });
   return id;
 }
