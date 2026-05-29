@@ -3729,15 +3729,24 @@ function buildItems(mode, entry, onUpload) {
 // src/components/MediaPlayer.js
 function MediaPlayer({ kind, url, name }) {
   if (kind !== "audio" && kind !== "video") return null;
-  const onTime = (e4) => {
-    mediaCurrentTime.value = e4.currentTarget.currentTime || 0;
-  };
-  const onReset = () => {
-    mediaCurrentTime.value = 0;
-  };
-  const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name}
-              onTimeUpdate=${onTime} onLoadedMetadata=${onReset} onSeeked=${onTime} />` : html`<video controls preload="metadata" src=${url} aria-label=${name}
-              onTimeUpdate=${onTime} onLoadedMetadata=${onReset} onSeeked=${onTime} />`;
+  const ref = A2(null);
+  y2(() => {
+    const el2 = ref.current;
+    if (!el2) return void 0;
+    const push = () => {
+      mediaCurrentTime.value = el2.currentTime || 0;
+    };
+    el2.addEventListener("timeupdate", push);
+    el2.addEventListener("seeked", push);
+    el2.addEventListener("loadedmetadata", push);
+    push();
+    return () => {
+      el2.removeEventListener("timeupdate", push);
+      el2.removeEventListener("seeked", push);
+      el2.removeEventListener("loadedmetadata", push);
+    };
+  }, [url]);
+  const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />` : html`<video controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />`;
   return html`<div class=${"media-player media-player-" + kind}>${el}</div>`;
 }
 
@@ -3808,7 +3817,6 @@ function LyricsPanel({ text }) {
   };
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>
-      <div class="preview-lyrics-head">Lyrics</div>
       ${parsed.synced ? html`<ol class="lyrics-synced">
             ${parsed.lines.map((l7, i4) => html`
               <li key=${i4}

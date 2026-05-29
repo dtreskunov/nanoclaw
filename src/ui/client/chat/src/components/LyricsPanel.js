@@ -75,7 +75,6 @@ export function LyricsPanel({ text }) {
 
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>
-      <div class="preview-lyrics-head">Lyrics</div>
       ${parsed.synced
         ? html`<ol class="lyrics-synced">
             ${parsed.lines.map((l, i) => html`
