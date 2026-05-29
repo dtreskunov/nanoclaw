@@ -360,7 +360,32 @@
         font-size: 12px;
         max-height: 40vh;
         overflow: auto;
+        position: relative;
       }
+      .files-pane .preview-lyrics .lyrics-toggle {
+        position: sticky;
+        top: 0;
+        float: right;
+        margin: 6px 6px 0 0;
+        padding: 2px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 10px;
+        box-shadow: 0 1px 4px var(--shadow-color);
+        z-index: 2;
+      }
+      .files-pane .preview-lyrics .lyrics-toggle button {
+        background: transparent;
+        border: 0;
+        color: var(--muted);
+        padding: 2px 8px;
+        cursor: pointer;
+        border-radius: 2px;
+        font: inherit;
+        line-height: 1;
+      }
+      .files-pane .preview-lyrics .lyrics-toggle button:hover { background: var(--wash); }
       .files-pane .preview-lyrics pre {
         margin: 0;
         padding: 10px;

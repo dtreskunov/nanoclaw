@@ -3776,8 +3776,10 @@ function findActiveIdx(lines, t5) {
 }
 function LyricsPanel({ text }) {
   const parsed = T2(() => parseLyrics(text || ""), [text]);
+  const [showSynced, setShowSynced] = h2(true);
+  const synced = parsed.synced && showSynced;
   const t5 = mediaCurrentTime.value;
-  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, t5) : -1;
+  const activeIdx = synced ? findActiveIdx(parsed.lines, t5) : -1;
   const scrollerRef = A2(null);
   const activeRef = A2(null);
   const lastIdxRef = A2(-2);
@@ -3803,7 +3805,12 @@ function LyricsPanel({ text }) {
   };
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>
-      ${parsed.synced ? html`<ol class="lyrics-synced">
+      ${parsed.synced ? html`
+        <div class="lyrics-toggle" title=${synced ? "Show plain text" : "Show synced highlighting"}>
+          <button type="button" onClick=${() => setShowSynced((v5) => !v5)}>${synced ? "synced" : "plain"}</button>
+        </div>
+      ` : null}
+      ${synced ? html`<ol class="lyrics-synced">
             ${parsed.lines.map((l7, i4) => html`
               <li key=${i4}
                   ref=${i4 === activeIdx ? activeRef : null}

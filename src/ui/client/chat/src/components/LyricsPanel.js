@@ -5,7 +5,7 @@
 // Supported timestamp form: [mm:ss], [mm:ss.x], [mm:ss.xx], [mm:ss.xxx].
 // A line may carry multiple timestamps — common in LRC files for
 // repeated choruses. Click a synced line to seek the media element.
-import { useMemo, useRef, useEffect } from 'preact/hooks';
+import { useMemo, useRef, useEffect, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { mediaCurrentTime } from '../state.js';
 
@@ -53,8 +53,10 @@ function findActiveIdx(lines, t) {
 
 export function LyricsPanel({ text }) {
   const parsed = useMemo(() => parseLyrics(text || ''), [text]);
+  const [showSynced, setShowSynced] = useState(true);
+  const synced = parsed.synced && showSynced;
   const t = mediaCurrentTime.value;
-  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, t) : -1;
+  const activeIdx = synced ? findActiveIdx(parsed.lines, t) : -1;
   const scrollerRef = useRef(null);
   const activeRef = useRef(null);
   const lastIdxRef = useRef(-2);
@@ -83,7 +85,12 @@ export function LyricsPanel({ text }) {
 
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>
-      ${parsed.synced
+      ${parsed.synced ? html`
+        <div class="lyrics-toggle" title=${synced ? 'Show plain text' : 'Show synced highlighting'}>
+          <button type="button" onClick=${() => setShowSynced((v) => !v)}>${synced ? 'synced' : 'plain'}</button>
+        </div>
+      ` : null}
+      ${synced
         ? html`<ol class="lyrics-synced">
             ${parsed.lines.map((l, i) => html`
               <li key=${i}
