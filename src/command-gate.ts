@@ -10,8 +10,8 @@
  * - Normal messages: pass through unchanged
  */
 import { getDb, hasTable } from './db/connection.js';
-import { issueMagicLink } from './ui/auth.js';
-import { isUiEnabled, uiBaseUrl } from './ui/server.js';
+import { issueMagicLink } from './ui/server/auth.js';
+import { isUiEnabled, uiBaseUrl } from './ui/server/server.js';
 
 export type GateResult =
   | { action: 'pass' }

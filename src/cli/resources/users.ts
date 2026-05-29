@@ -1,6 +1,6 @@
 import { registerResource } from '../crud.js';
-import { issueMagicLink } from '../../ui/auth.js';
-import { uiBaseUrl } from '../../ui/server.js';
+import { issueMagicLink } from '../../ui/server/auth.js';
+import { uiBaseUrl } from '../../ui/server/server.js';
 import { getUser } from '../../modules/permissions/db/users.js';
 
 registerResource({

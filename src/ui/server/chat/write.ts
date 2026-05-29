@@ -11,11 +11,11 @@ import http from 'http';
 import path from 'path';
 import { URL } from 'url';
 
-import { GROUPS_DIR } from '../../config.js';
-import { getAgentGroup } from '../../db/agent-groups.js';
-import { log } from '../../log.js';
-import { listAccessibleAgentGroups } from '../../modules/permissions/access.js';
-import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
+import { GROUPS_DIR } from '../../../config.js';
+import { getAgentGroup } from '../../../db/agent-groups.js';
+import { log } from '../../../log.js';
+import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
+import { hasAdminPrivilege } from '../../../modules/permissions/db/user-roles.js';
 import { recordAccess } from '../auth.js';
 import { canWrite, resolveSafe } from './classify.js';
 

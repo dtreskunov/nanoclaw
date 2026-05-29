@@ -1,5 +1,5 @@
 /**
- * HTTP route handlers for the file browser (mounted at /ui/files by the
+ * HTTP route handlers for the chat web app (mounted at /ui/chat by the
  * UI shell in ../server.ts). The shell owns shared auth at /ui/auth/* and
  * mints the cookie this dispatcher reads.
  */
@@ -8,12 +8,12 @@ import http from 'http';
 import path from 'path';
 import { URL } from 'url';
 
-import { GROUPS_DIR } from '../../config.js';
-import { getAgentGroup } from '../../db/agent-groups.js';
-import { getDb } from '../../db/connection.js';
-import { log } from '../../log.js';
-import { listAccessibleAgentGroups } from '../../modules/permissions/access.js';
-import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
+import { GROUPS_DIR } from '../../../config.js';
+import { getAgentGroup } from '../../../db/agent-groups.js';
+import { getDb } from '../../../db/connection.js';
+import { log } from '../../../log.js';
+import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
+import { hasAdminPrivilege } from '../../../modules/permissions/db/user-roles.js';
 import { authenticate, recordAccess } from '../auth.js';
 import { redeemDownloadToken } from '../download-tokens.js';
 import { classify, resolveSafe } from './classify.js';
@@ -24,13 +24,13 @@ export { handleChatUpgrade };
 
 // UI assets live under src/ (not compiled by tsc); resolve from project root,
 // which the host always runs from.
-const UI_DIR = path.resolve(process.cwd(), 'src', 'ui', 'files', 'ui');
+const UI_DIR = path.resolve(process.cwd(), 'src', 'ui', 'client', 'chat');
 const MAX_INLINE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 const ASSET_VERSION = String(Date.now());
 
-/** Path prefix the file browser is mounted under on the shared HTTP server. */
-export const FILES_MOUNT_PREFIX = '/ui/files';
+/** Path prefix the chat web app is mounted under on the shared HTTP server. */
+export const CHAT_MOUNT_PREFIX = '/ui/chat';
 
 interface Ctx {
   req: http.IncomingMessage;
@@ -44,14 +44,14 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
 
   // Strip the mount prefix so internal route matching stays local.
   let pathname = url.pathname;
-  if (pathname === FILES_MOUNT_PREFIX) {
-    // /ui/files (no trailing slash) → redirect to /ui/files/ so relative URLs resolve.
-    res.writeHead(308, { Location: FILES_MOUNT_PREFIX + '/' });
+  if (pathname === CHAT_MOUNT_PREFIX) {
+    // /ui/chat (no trailing slash) → redirect to /ui/chat/ so relative URLs resolve.
+    res.writeHead(308, { Location: CHAT_MOUNT_PREFIX + '/' });
     res.end();
     return;
   }
-  if (pathname.startsWith(FILES_MOUNT_PREFIX + '/')) {
-    pathname = pathname.slice(FILES_MOUNT_PREFIX.length) || '/';
+  if (pathname.startsWith(CHAT_MOUNT_PREFIX + '/')) {
+    pathname = pathname.slice(CHAT_MOUNT_PREFIX.length) || '/';
   }
 
   try {
@@ -60,7 +60,8 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (req.method === 'GET' && pathname === '/manifest.webmanifest') return serveStatic(ctx, 'manifest.webmanifest');
     if (req.method === 'GET' && pathname === '/vendor/marked.umd.js')
       return serveVendor(ctx, 'marked/lib/marked.umd.js', 'application/javascript; charset=utf-8');
-    if (req.method === 'GET' && pathname.startsWith('/ui/')) return serveStatic(ctx, pathname.slice('/ui/'.length));
+    if (req.method === 'GET' && pathname.startsWith('/dist/')) return serveStatic(ctx, pathname.slice(1));
+    if (req.method === 'GET' && pathname === '/icon.svg') return serveStatic(ctx, 'icon.svg');
 
     // Public token-based download (no cookie required). Always sent as
     // attachment; never sets a session.
@@ -360,11 +361,16 @@ function text(ctx: Ctx, status: number, body: string): void {
 }
 
 function serveStatic(ctx: Ctx, relName: string): void {
-  // Lexical guard: no traversal, no absolute, no nested dirs (UI is flat).
-  if (relName.includes('..') || relName.includes('/') || path.isAbsolute(relName)) {
+  // Lexical guard: no traversal, no absolute paths. Allow exactly one level
+  // of subdirectory (e.g. `dist/app.js`) but reject anything deeper.
+  if (relName.includes('..') || path.isAbsolute(relName)) {
     return text(ctx, 400, 'Bad request');
   }
-  const full = path.join(UI_DIR, relName);
+  const segments = relName.split('/');
+  if (segments.length > 2 || segments.some((s) => s === '')) {
+    return text(ctx, 400, 'Bad request');
+  }
+  const full = path.join(UI_DIR, ...segments);
   let stat: fs.Stats;
   try {
     stat = fs.statSync(full);
@@ -386,7 +392,7 @@ function serveStatic(ctx: Ctx, relName: string): void {
               ? 'application/manifest+json; charset=utf-8'
               : 'application/octet-stream';
   if (ext === '.html') {
-    const body = fs.readFileSync(full, 'utf8').replace(/(<script\s+src="ui\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
+    const body = fs.readFileSync(full, 'utf8').replace(/(<script[^>]+src="dist\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
     const buf = Buffer.from(body, 'utf8');
     ctx.res.writeHead(200, {
       'Content-Type': type,

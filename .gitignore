@@ -5,6 +5,8 @@ node_modules/
 .pnpm-store/
 # Build output
 dist/
+# Exception: the chat UI bundle is checked in (rebuilt by .githooks/pre-commit).
+!src/ui/client/chat/dist/
 
 # Local data & auth
 store/

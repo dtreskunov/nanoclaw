@@ -813,7 +813,7 @@
     const groupId = chat.groupId;
     const threadId = chat.threadId;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${proto}//${location.host}/ui/files/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/ws`;
+    const wsUrl = `${proto}//${location.host}/ui/chat/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/ws`;
     const ws = new WebSocket(wsUrl);
     chat.ws = ws;
     ws.onopen = () => { chat.reconnectAttempt = 0; setChatStatus('connected'); };

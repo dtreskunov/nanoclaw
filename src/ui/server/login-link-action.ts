@@ -7,9 +7,9 @@
  * their direct DM channel — never via the originating thread, which may
  * be a group chat where the link would be exposed to everyone.
  */
-import { registerDeliveryAction, getDeliveryAdapter } from '../delivery.js';
-import { log } from '../log.js';
-import { ensureUserDm } from '../modules/permissions/user-dm.js';
+import { registerDeliveryAction, getDeliveryAdapter } from '../../delivery.js';
+import { log } from '../../log.js';
+import { ensureUserDm } from '../../modules/permissions/user-dm.js';
 import { issueMagicLink } from './auth.js';
 import { isUiEnabled, uiBaseUrl } from './server.js';
 

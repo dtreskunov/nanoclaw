@@ -1,0 +1,14 @@
+{
+  "name": "@nanoclaw/ui-chat",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Browser chat UI for NanoClaw. Bundled with esbuild; output checked in at dist/app.js.",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --target=es2022 --sourcemap --outfile=dist/app.js",
+    "watch": "esbuild src/index.js --bundle --format=esm --target=es2022 --sourcemap --outfile=dist/app.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

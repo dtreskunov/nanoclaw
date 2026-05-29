@@ -1,8 +1,8 @@
 /**
  * UI shell. Hosts shared authentication for everything mounted under
  * {@link UI_MOUNT_PREFIX} (`/ui`) on the shared HTTP server (see
- * ../webhook-server.ts). Individual UI apps (currently just the file
- * browser at `/ui/files`) reuse the cookie minted here — no per-app login.
+ * ../../webhook-server.ts). Individual UI apps (currently just the chat
+ * browser at `/ui/chat`) reuse the cookie minted here — no per-app login.
  *
  * Env:
  *   UI_ENABLED   — 'true' to mount the UI (shared auth + every registered app)
@@ -13,9 +13,9 @@
  */
 import http from 'http';
 
-import { readEnvFile } from '../env.js';
-import { log } from '../log.js';
-import { ensureSharedHttpServer, mountHandler, mountUpgradeHandler } from '../webhook-server.js';
+import { readEnvFile } from '../../env.js';
+import { log } from '../../log.js';
+import { ensureSharedHttpServer, mountHandler, mountUpgradeHandler } from '../../webhook-server.js';
 import {
   buildClearCookie,
   buildSessionCookie,
@@ -24,12 +24,12 @@ import {
   redeemAndCreateSession,
 } from './auth.js';
 import { purgeExpired } from './db.js';
-import { handle as filesHandle, FILES_MOUNT_PREFIX, handleChatUpgrade } from './files/routes.js';
+import { handle as chatHandle, CHAT_MOUNT_PREFIX, handleChatUpgrade } from './chat/routes.js';
 
 /** Path prefix every UI app lives under. Shared cookie path. */
 export const UI_MOUNT_PREFIX = '/ui';
 /** Where a successful magic-link redeem redirects when no `next` is given. */
-const DEFAULT_LANDING = `${UI_MOUNT_PREFIX}/files/`;
+const DEFAULT_LANDING = `${UI_MOUNT_PREFIX}/chat/`;
 
 const PURGE_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -88,11 +88,11 @@ export function startUi(): void {
   );
 
   // Per-app mounts. Add more here as new UI apps are introduced.
-  mountHandler(FILES_MOUNT_PREFIX, withAccessLog('files', filesHandle));
-  mountUpgradeHandler(FILES_MOUNT_PREFIX, handleChatUpgrade);
+  mountHandler(CHAT_MOUNT_PREFIX, withAccessLog('chat', chatHandle));
+  mountUpgradeHandler(CHAT_MOUNT_PREFIX, handleChatUpgrade);
 
   mounted = true;
-  log.info('UI mounted', { prefix: UI_MOUNT_PREFIX, apps: [FILES_MOUNT_PREFIX], secure: cfg.secure });
+  log.info('UI mounted', { prefix: UI_MOUNT_PREFIX, apps: [CHAT_MOUNT_PREFIX], secure: cfg.secure });
 
   purgeTimer = setInterval(() => {
     try {

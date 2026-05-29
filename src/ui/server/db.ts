@@ -8,7 +8,7 @@
  */
 import crypto from 'crypto';
 
-import { getDb } from '../db/connection.js';
+import { getDb } from '../../db/connection.js';
 
 export interface UiSession {
   token_hash: string;

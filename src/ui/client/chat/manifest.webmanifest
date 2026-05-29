@@ -1,8 +1,8 @@
 {
   "name": "NanoClaw",
   "short_name": "NanoClaw",
-  "start_url": "/ui/files/",
-  "scope": "/ui/files/",
+  "start_url": "/ui/chat/",
+  "scope": "/ui/chat/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#0d1117",

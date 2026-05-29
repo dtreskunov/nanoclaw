@@ -11,15 +11,15 @@
 import fs from 'fs';
 import path from 'path';
 
-import { GROUPS_DIR } from '../config.js';
-import { getAgentGroup } from '../db/agent-groups.js';
-import { registerDeliveryAction, getDeliveryAdapter } from '../delivery.js';
-import { log } from '../log.js';
-import { canAccessAgentGroup } from '../modules/permissions/access.js';
-import { hasAdminPrivilege } from '../modules/permissions/db/user-roles.js';
-import { ensureUserDm } from '../modules/permissions/user-dm.js';
+import { GROUPS_DIR } from '../../config.js';
+import { getAgentGroup } from '../../db/agent-groups.js';
+import { registerDeliveryAction, getDeliveryAdapter } from '../../delivery.js';
+import { log } from '../../log.js';
+import { canAccessAgentGroup } from '../../modules/permissions/access.js';
+import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
+import { ensureUserDm } from '../../modules/permissions/user-dm.js';
 import { createDownloadToken } from './download-tokens.js';
-import { classify, resolveSafe } from './files/classify.js';
+import { classify, resolveSafe } from './chat/classify.js';
 import { isUiEnabled, uiBaseUrl } from './server.js';
 
 const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 min
