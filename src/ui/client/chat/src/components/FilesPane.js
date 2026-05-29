@@ -160,7 +160,7 @@ function Preview() {
       ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
     </dl>
   `;
-  const fileMeta = (isMedia && fileRows.length > 0) ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
+  const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
   const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
   const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} />` : null;
   let body = null;
