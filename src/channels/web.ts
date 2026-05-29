@@ -26,8 +26,9 @@ export const WEB_CHANNEL_TYPE = 'web';
 export interface WebSubscriber {
   /** Called with each outbound row delivered for this (platformId, threadId). */
   onOutbound(message: OutboundMessage): void;
-  /** Called with the user's own inbound right after it's accepted. */
-  onInboundEcho(text: string, files?: { filename: string; size: number }[]): void;
+  /** Called with the user's own inbound right after it's accepted. `id` is the
+   *  messages_in.id we just wrote — clients use it as the dedup key. */
+  onInboundEcho(id: string, text: string, files?: { filename: string; size: number }[]): void;
 }
 
 let setupCallbacks: ChannelSetup | null = null;
@@ -102,7 +103,7 @@ export async function submitWebInbound(args: {
     const echoFiles = args.attachments?.map((a) => ({ filename: a.filename, size: a.size }));
     for (const sub of echoSet) {
       try {
-        sub.onInboundEcho(args.text, echoFiles);
+        sub.onInboundEcho(id, args.text, echoFiles);
       } catch (err) {
         log.warn('web subscriber onInboundEcho threw', { err });
       }

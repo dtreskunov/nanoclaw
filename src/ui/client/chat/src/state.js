@@ -59,7 +59,11 @@ export const refs = {
   reconnectAttempt: 0,
   pollTimer: null,
   threadsPollTimer: null,
-  lastSeenTs: '',
+  // Set of `${direction}:${id}` for every row currently in chatMessages.
+  // Used to dedup WS pushes against history refetches. Cleared on
+  // openChat / clearChat. Initial-load and full-replace rebuild it
+  // from scratch; append-only refetch and appendMsg add to it.
+  seenIds: new Set(),
   suppressHashCount: 0,
   uploadDragDepth: 0,
 };

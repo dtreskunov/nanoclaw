@@ -1034,7 +1034,11 @@ var refs = {
   reconnectAttempt: 0,
   pollTimer: null,
   threadsPollTimer: null,
-  lastSeenTs: "",
+  // Set of `${direction}:${id}` for every row currently in chatMessages.
+  // Used to dedup WS pushes against history refetches. Cleared on
+  // openChat / clearChat. Initial-load and full-replace rebuild it
+  // from scratch; append-only refetch and appendMsg add to it.
+  seenIds: /* @__PURE__ */ new Set(),
   suppressHashCount: 0,
   uploadDragDepth: 0
 };
@@ -2603,7 +2607,7 @@ function clearChat() {
     clearTimeout(refs.reconnectTimer);
     refs.reconnectTimer = null;
   }
-  refs.lastSeenTs = "";
+  refs.seenIds.clear();
 }
 function stopChatPoll() {
   if (refs.pollTimer) {
@@ -2632,12 +2636,15 @@ function historyUrl(gid, tid) {
   }
   return u4;
 }
-function appendMsg(direction, text, files, ts) {
+function appendMsg(direction, text, files, ts, id) {
+  const key = id ? `${direction}:${id}` : null;
+  if (key && refs.seenIds.has(key)) return;
+  if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
 }
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
-  const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin" });
+  const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
   const { messages } = await r4.json();
   if (!Array.isArray(messages)) return;
@@ -2648,28 +2655,23 @@ async function refetchThreadHistory(appendNewOnly) {
       files: m6.files || null,
       ts: m6.timestamp
     }));
-    if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
+    refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
     return;
   }
-  const seenKey = tsKey(refs.lastSeenTs);
-  let maxTs = refs.lastSeenTs, maxKey = seenKey, bumped = false;
+  let maxTs = "";
   const additions = [];
   for (const m6 of messages) {
+    const direction = m6.direction === "in" ? "in" : "out";
+    const key = m6.id ? `${direction}:${m6.id}` : null;
+    if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    const k4 = tsKey(ts);
-    if (!seenKey || k4 > seenKey) {
-      additions.push({ direction: m6.direction === "in" ? "in" : "out", text: m6.text, files: m6.files || null, ts });
-      if (k4 > maxKey) {
-        maxKey = k4;
-        maxTs = ts;
-      }
-      bumped = true;
-      if (m6.direction !== "in") maybeNotify(m6.text, m6.files || []);
-    }
+    additions.push({ direction, text: m6.text, files: m6.files || null, ts });
+    if (key) refs.seenIds.add(key);
+    if (ts > maxTs) maxTs = ts;
+    if (direction !== "in") maybeNotify(m6.text, m6.files || []);
   }
-  if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
-  if (bumped) {
-    refs.lastSeenTs = maxTs || refs.lastSeenTs;
+  if (additions.length) {
+    chatMessages.value = chatMessages.value.concat(additions);
     bumpActiveThread(maxTs);
   }
 }
@@ -2688,7 +2690,6 @@ async function openChat(gid, resumeTid, opts) {
   }
   stopChatPoll();
   refs.reconnectAttempt = 0;
-  refs.lastSeenTs = "";
   let ct = "web", mg = null, cs = true;
   if (opts && opts.channelType) {
     ct = opts.channelType;
@@ -2717,7 +2718,7 @@ async function openChat(gid, resumeTid, opts) {
   if (resumeTid) {
     writeHash();
     try {
-      const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin" });
+      const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin", cache: "no-store" });
       if (r4.ok) {
         const { messages } = await r4.json();
         n2(() => {
@@ -2729,7 +2730,9 @@ async function openChat(gid, resumeTid, opts) {
           }));
           chatLoading.value = false;
         });
-        if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
+        if (Array.isArray(messages)) {
+          refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
+        }
       } else {
         chatLoading.value = false;
       }
@@ -2812,7 +2815,7 @@ function connectChatWs() {
     }
     if (payload.kind === "ready") return;
     if (payload.kind === "inbound") {
-      appendMsg("in", payload.text, payload.files || null, payload.timestamp);
+      appendMsg("in", payload.text, payload.files || null, payload.timestamp, payload.id);
       updateActiveThreadTitleFromFirstMessage(payload.text);
       bumpActiveThread();
       return;
@@ -2820,7 +2823,7 @@ function connectChatWs() {
     if (payload.kind === "outbound") {
       const c4 = payload.content || {};
       const text = typeof c4 === "string" ? c4 : c4.text || c4.markdown || "";
-      appendMsg("out", text, payload.files || [], payload.timestamp);
+      appendMsg("out", text, payload.files || [], payload.timestamp, payload.id);
       bumpActiveThread();
       maybeNotify(text, payload.files || []);
       return;
@@ -2835,7 +2838,6 @@ async function sendChat(text, files) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const fileMetas = hasFiles ? files.map((f4) => ({ filename: f4.name, size: f4.size })) : null;
     appendMsg("in", text || "", fileMetas, now);
-    refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
   if (!isWeb && messagingGroupId.value) {
