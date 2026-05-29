@@ -8,6 +8,9 @@
     "build": "esbuild src/index.js --bundle --format=esm --target=es2022 --sourcemap --outfile=dist/app.js",
     "watch": "esbuild src/index.js --bundle --format=esm --target=es2022 --sourcemap --outfile=dist/app.js --watch"
   },
+  "dependencies": {
+    "marked": "18.0.4"
+  },
   "devDependencies": {
     "esbuild": "0.24.2"
   }

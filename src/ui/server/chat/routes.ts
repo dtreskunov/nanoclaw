@@ -58,8 +58,6 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     // Public static routes.
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return serveStatic(ctx, 'index.html');
     if (req.method === 'GET' && pathname === '/manifest.webmanifest') return serveStatic(ctx, 'manifest.webmanifest');
-    if (req.method === 'GET' && pathname === '/vendor/marked.umd.js')
-      return serveVendor(ctx, 'marked/lib/marked.umd.js', 'application/javascript; charset=utf-8');
     if (req.method === 'GET' && pathname.startsWith('/dist/')) return serveStatic(ctx, pathname.slice(1));
     if (req.method === 'GET' && pathname === '/icon.svg') return serveStatic(ctx, 'icon.svg');
 
@@ -410,25 +408,6 @@ function serveStatic(ctx: Ctx, relName: string): void {
     'Cache-Control': 'no-store, must-revalidate',
     Pragma: 'no-cache',
     Expires: '0',
-  });
-  fs.createReadStream(full).pipe(ctx.res);
-}
-
-/** Serve a file from node_modules (vendored client lib). */
-function serveVendor(ctx: Ctx, relName: string, contentType: string): void {
-  if (relName.includes('..')) return text(ctx, 400, 'Bad request');
-  const full = path.join(process.cwd(), 'node_modules', relName);
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(full);
-  } catch {
-    return text(ctx, 404, 'Not found');
-  }
-  if (!stat.isFile()) return text(ctx, 404, 'Not found');
-  ctx.res.writeHead(200, {
-    'Content-Type': contentType,
-    'Content-Length': stat.size,
-    'Cache-Control': 'public, max-age=86400',
   });
   fs.createReadStream(full).pipe(ctx.res);
 }

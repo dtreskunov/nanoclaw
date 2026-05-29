@@ -1,4 +1,5 @@
 // Format helpers, DOM utilities, markdown rendering, file-link rewriter.
+import { marked } from 'marked';
 import { state } from './state.js';
 
 export const $ = (id) => document.getElementById(id);
@@ -61,8 +62,7 @@ export function emptyDiv(text) {
 }
 
 export function renderMarkdown(text) {
-  if (typeof window.marked === 'undefined') return null;
-  try { return window.marked.parse(text || '', { breaks: true, gfm: true }); } catch (_) { return null; }
+  try { return marked.parse(text || '', { breaks: true, gfm: true }); } catch (_) { return null; }
 }
 
 // Rewrite relative-path markdown links inside a chat message to point at
