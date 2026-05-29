@@ -32,27 +32,27 @@
 
         /* Neutral overlays — mid-gray so they read identically in light
            and dark. Used for hover, dividers, code blocks, fills. */
-        --wash-subtle: var(--wash-subtle);
-        --wash-soft:   var(--wash-soft);
-        --wash:        var(--wash);
-        --wash-strong: var(--wash-strong);
+        --wash-subtle: rgba(127, 127, 127, 0.05);
+        --wash-soft:   rgba(127, 127, 127, 0.08);
+        --wash:        rgba(127, 127, 127, 0.12);
+        --wash-strong: rgba(127, 127, 127, 0.18);
 
         /* One-offs. */
-        --head-tint:    var(--head-tint);
-        --selection:    var(--selection);
-        --drag-target:  var(--drag-target);
+        --head-tint:    rgba(255, 255, 255, 0.02);
+        --selection:    rgba(127, 127, 255, 0.08);
+        --drag-target:  rgba(80, 140, 220, 0.18);
 
         /* Overlays and shadows. */
         --scrim:                rgba(0, 0, 0, 0.40);
-        --shadow-color:         var(--shadow-color);
-        --shadow-color-strong:  var(--shadow-color-strong);
+        --shadow-color:         rgba(0, 0, 0, 0.28);
+        --shadow-color-strong:  rgba(0, 0, 0, 0.35);
 
         /* Status colors. */
-        --danger:     var(--danger);
-        --error:      var(--error);
-        --error-soft: var(--error-soft);
-        --warning:    var(--warning);
-        --success:    var(--success);
+        --danger:     #c0392b;
+        --error:      #e44;
+        --error-soft: #e66;
+        --warning:    #e90;
+        --success:    #6c6;
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; overscroll-behavior-x: none; }
