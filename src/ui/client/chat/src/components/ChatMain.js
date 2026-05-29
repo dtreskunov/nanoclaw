@@ -29,7 +29,15 @@ function Message({ m }) {
         ? html`<div ref=${ref} dangerouslySetInnerHTML=${{ __html: md }} />`
         : (m.text || '')}
       ${m.files && m.files.length
-        ? html`<div class="files">${m.files.map((f) => `\uD83D\uDCCE ${f.filename} (${fmtBytes(f.size)})`).join('  ')}</div>`
+        ? html`<div class="files">${m.files.map((f) => f.path
+            ? html`<button
+                type="button"
+                class="file-chip"
+                title=${'/' + f.path}
+                onClick=${() => navFile({ path: f.path, name: f.filename, size: f.size }).catch(console.error)}
+              >\uD83D\uDCCE ${f.filename} (${fmtBytes(f.size)})</button>`
+            : html`<span class="file-chip inert" title="Source not in workspace">\uD83D\uDCCE ${f.filename} (${fmtBytes(f.size)})</span>`
+          )}</div>`
         : null}
       ${m.ts ? html`<div class="meta"><${RelativeTime} ts=${m.ts} /></div>` : null}
     </div>
