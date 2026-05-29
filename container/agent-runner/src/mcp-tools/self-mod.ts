@@ -34,18 +34,22 @@ function err(text: string) {
 
 const APT_RE = /^[a-z0-9][a-z0-9._+-]*$/;
 const NPM_RE = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
+// Allow optional PEP 440 version specifier (e.g. "yt-dlp", "yt-dlp==2024.12.13",
+// "requests>=2.31,<3"). No shell metacharacters, no URLs, no extras with brackets.
+const PIP_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:[<>=!~]=?[A-Za-z0-9._*+!-]+(?:,[<>=!~]=?[A-Za-z0-9._*+!-]+)*)?$/;
 const MAX_PACKAGES = 20;
 
 export const installPackages: McpToolDefinition = {
   tool: {
     name: 'install_packages',
     description:
-      'Install apt and/or npm packages into YOUR per-agent container image. Requires admin approval; fire-and-forget. On approval, the image is rebuilt and the container is restarted automatically.',
+      'Install apt, npm, and/or pip packages into YOUR per-agent container image. Prefer `pip` for Python CLIs (yt-dlp, etc.) since the apt versions are usually stale. Requires admin approval; fire-and-forget. On approval, the image is rebuilt and the container is restarted automatically.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         apt: { type: 'array', items: { type: 'string' }, description: 'apt packages to install (names only, no version specs or flags)' },
         npm: { type: 'array', items: { type: 'string' }, description: 'npm packages to install globally (names only, no version specs)' },
+        pip: { type: 'array', items: { type: 'string' }, description: 'pip packages to install into the shared venv. Names or PEP 440 version specs allowed (e.g. "yt-dlp" or "yt-dlp==2024.12.13"). Prefer this over apt for Python tools.' },
         reason: { type: 'string', description: 'Why these packages are needed' },
       },
     },
@@ -53,13 +57,16 @@ export const installPackages: McpToolDefinition = {
   async handler(args) {
     const apt = (args.apt as string[]) || [];
     const npm = (args.npm as string[]) || [];
-    if (apt.length === 0 && npm.length === 0) return err('At least one apt or npm package is required');
-    if (apt.length + npm.length > MAX_PACKAGES) return err(`Maximum ${MAX_PACKAGES} packages per request`);
+    const pip = (args.pip as string[]) || [];
+    if (apt.length === 0 && npm.length === 0 && pip.length === 0) return err('At least one apt, npm, or pip package is required');
+    if (apt.length + npm.length + pip.length > MAX_PACKAGES) return err(`Maximum ${MAX_PACKAGES} packages per request`);
 
     const invalidApt = apt.find((p) => !APT_RE.test(p));
     if (invalidApt) return err(`Invalid apt package name: "${invalidApt}". Only lowercase letters, digits, and ._+- allowed.`);
     const invalidNpm = npm.find((p) => !NPM_RE.test(p));
     if (invalidNpm) return err(`Invalid npm package name: "${invalidNpm}". No version specs or shell characters.`);
+    const invalidPip = pip.find((p) => !PIP_RE.test(p));
+    if (invalidPip) return err(`Invalid pip package spec: "${invalidPip}". Name plus optional PEP 440 version (e.g. "yt-dlp" or "yt-dlp==2024.12.13").`);
 
     const requestId = generateId();
     writeMessageOut({
@@ -69,11 +76,12 @@ export const installPackages: McpToolDefinition = {
         action: 'install_packages',
         apt,
         npm,
+        pip,
         reason: (args.reason as string) || '',
       }),
     });
 
-    log(`install_packages: ${requestId} → apt=[${apt.join(',')}] npm=[${npm.join(',')}]`);
+    log(`install_packages: ${requestId} → apt=[${apt.join(',')}] npm=[${npm.join(',')}] pip=[${pip.join(',')}]`);
     return ok(`Package install request submitted. You will be notified when admin approves or rejects.`);
   },
 };
