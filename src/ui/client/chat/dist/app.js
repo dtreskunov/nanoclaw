@@ -1018,10 +1018,11 @@ var paneOpen = {
   threads: y3(true),
   files: y3(true)
 };
-var drawerOpen = {
+var drawerOpen2 = {
   threads: y3(false),
   files: y3(false)
 };
+var isMobile = y3(false);
 var uploadItems = y3([]);
 var me = y3("");
 var notifMutedSig = y3(false);
@@ -3036,8 +3037,8 @@ function Header() {
     <header>
       <button type="button" class="icon-btn mobile-only" aria-label="Threads"
               onClick=${() => {
-    drawerOpen.threads.value = !drawerOpen.threads.value;
-    drawerOpen.files.value = false;
+    drawerOpen2.threads.value = !drawerOpen2.threads.value;
+    drawerOpen2.files.value = false;
   }}>\u2630</button>
       <span class="brand">NanoClaw</span>
       <select id="group-select" aria-label="Agent group" value=${groupId.value || ""} onChange=${onChange}>
@@ -3049,8 +3050,8 @@ function Header() {
               onClick=${toggleMute}>${muted ? "\u{1F515}" : "\u{1F514}"}</button>
       <button type="button" class="icon-btn mobile-only" aria-label="Files"
               onClick=${() => {
-    drawerOpen.files.value = !drawerOpen.files.value;
-    drawerOpen.threads.value = false;
+    drawerOpen2.files.value = !drawerOpen2.files.value;
+    drawerOpen2.threads.value = false;
   }}>\uD83D\uDCC1</button>
       <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
         <button type="submit" aria-label="Log out" title="Log out">
@@ -3067,10 +3068,44 @@ function Header() {
   `;
 }
 
-// src/components/ThreadsRail.js
-function ChevronToggle({ open, onClick, ariaLabel }) {
-  return html`<button type="button" class="icon-btn desktop-only" aria-label=${ariaLabel} onClick=${onClick}>${open ? "\u2039" : "\u203A"}</button>`;
+// src/components/Pane.js
+function Pane({ paneKey, name, label, extraClass, headActions, children }) {
+  const mobile = isMobile.value;
+  const collapsed = !mobile && !paneOpen[paneKey].value;
+  const drawer = drawerOpen2[paneKey].value;
+  const cls = "nc-pane " + name + (collapsed ? " collapsed" : "") + (drawer ? " open" : "") + (extraClass ? " " + extraClass : "");
+  const toggle = () => {
+    paneOpen[paneKey].value = !paneOpen[paneKey].value;
+  };
+  const onPaneClick = (ev) => {
+    if (!collapsed) return;
+    if (ev.target.closest("button, a")) return;
+    paneOpen[paneKey].value = true;
+  };
+  const onHeadClick = (ev) => {
+    if (mobile) return;
+    if (ev.target.closest("button, a")) return;
+    ev.stopPropagation();
+    toggle();
+  };
+  return html`
+    <aside class=${cls} id=${name} onClick=${onPaneClick}>
+      <div class="head" onClick=${onHeadClick}>
+        <button type="button" class="icon-btn desktop-only" id=${"btn-" + paneKey + "-toggle"}
+                aria-label=${collapsed ? "Expand " + label : "Collapse " + label}
+                onClick=${(e4) => {
+    e4.stopPropagation();
+    toggle();
+  }}></button>
+        <span class="title">${label}</span>
+      </div>
+      ${headActions || null}
+      ${children}
+    </aside>
+  `;
 }
+
+// src/components/ThreadsRail.js
 function threadCtxOf2(t5) {
   if (!t5 || !t5.channelType || t5.channelType === "web") return null;
   return { channelType: t5.channelType, messagingGroupId: t5.messagingGroupId, canSend: !!t5.canSend };
@@ -3084,7 +3119,7 @@ function ThreadRow({ t: t5 }) {
   const onOpen = (ev) => {
     if (ev.target.classList.contains("del")) return;
     openChat(groupId.value, t5.threadId, threadCtxOf2(t5)).catch(console.error);
-    drawerOpen.threads.value = false;
+    drawerOpen2.threads.value = false;
   };
   const onDel = async (ev) => {
     ev.stopPropagation();
@@ -3105,41 +3140,18 @@ function ThreadRow({ t: t5 }) {
   `;
 }
 function ThreadsRail() {
-  const collapsed = !paneOpen.threads.value;
-  const drawer = drawerOpen.threads.value;
-  const cls = "nc-pane threads-rail" + (collapsed ? " collapsed" : "") + (drawer ? " open" : "");
   const list = threads.value;
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null).then(() => {
       const el = document.getElementById("chat-input");
       if (el) el.focus();
-      drawerOpen.threads.value = false;
-      drawerOpen.files.value = false;
+      drawerOpen2.threads.value = false;
+      drawerOpen2.files.value = false;
     }).catch(console.error);
   };
-  const onPaneClick = (ev) => {
-    if (!collapsed) return;
-    if (ev.target.closest("button, a")) return;
-    if (MOBILE_MQ.matches) return;
-    paneOpen.threads.value = true;
-  };
-  const onHeadClick = (ev) => {
-    if (ev.target.closest("button, a")) return;
-    if (MOBILE_MQ.matches) return;
-    ev.stopPropagation();
-    paneOpen.threads.value = !paneOpen.threads.value;
-  };
   return html`
-    <aside class=${cls} id="threads-rail" onClick=${onPaneClick}>
-      <div class="head" onClick=${onHeadClick}>
-        <${ChevronToggle} open=${!collapsed} ariaLabel=${collapsed ? "Expand threads" : "Collapse threads"}
-                          onClick=${(e4) => {
-    e4.stopPropagation();
-    paneOpen.threads.value = !collapsed;
-  }} />
-        <span class="title">Chats</span>
-      </div>
+    <${Pane} paneKey="threads" name="threads-rail" label="Chats">
       <div class="threads-actions">
         <button type="button" id="btn-new-chat" onClick=${onNewChat}>
           <span class="plus">+</span> <span class="label">New chat</span>
@@ -3148,7 +3160,7 @@ function ThreadsRail() {
       <div class="list" id="threads-list">
         ${list.length === 0 ? html`<div class="empty">No chats yet</div>` : list.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
       </div>
-    </aside>
+    <//>
   `;
 }
 
@@ -3605,10 +3617,7 @@ function Preview() {
   return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${body}</div>`;
 }
 function FilesPane() {
-  const collapsed = !paneOpen.files.value;
-  const drawer = drawerOpen.files.value;
   const previewing = !!previewBlock.value;
-  const cls = "nc-pane files-pane no-animate" + (collapsed ? " collapsed" : "") + (drawer ? " open" : "") + (previewing ? " previewing" : "");
   const bodyRef = A2(null);
   y2(() => {
     const body = bodyRef.current;
@@ -3655,42 +3664,26 @@ function FilesPane() {
       body.removeEventListener("drop", onDrop);
     };
   }, []);
-  const onPaneClick = (ev) => {
-    if (!collapsed) return;
-    if (ev.target.closest("button, a")) return;
-    if (MOBILE_MQ.matches) return;
-    paneOpen.files.value = true;
-  };
-  const onHeadClick = (ev) => {
-    if (ev.target.closest("button, a")) return;
-    if (MOBILE_MQ.matches) return;
-    ev.stopPropagation();
-    paneOpen.files.value = !paneOpen.files.value;
-  };
   const uploadInputRef = A2(null);
-  return html`
-    <aside class=${cls} id="files-pane" onClick=${onPaneClick}>
-      <div class="head" onClick=${onHeadClick}>
-        <button type="button" class="icon-btn" id="btn-files-toggle" aria-label=${collapsed ? "Expand files" : "Collapse files"}
-                onClick=${(e4) => {
-    e4.stopPropagation();
-    paneOpen.files.value = !collapsed;
-  }}></button>
-        <span class="title">Files</span>
-      </div>
-      <div class="head-actions admin-only">
-        <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file"
-                onClick=${touchPrompt}>+F</button>
-        <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder"
-                onClick=${mkdirPrompt}>+D</button>
-        <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files"
-                onClick=${() => uploadInputRef.current?.click()}>UPL</button>
-        <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
-               onChange=${(ev) => {
+  const headActions = html`
+    <div class="head-actions admin-only">
+      <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file"
+              onClick=${touchPrompt}>+F</button>
+      <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder"
+              onClick=${mkdirPrompt}>+D</button>
+      <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files"
+              onClick=${() => uploadInputRef.current?.click()}>UPL</button>
+      <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
+             onChange=${(ev) => {
     if (ev.target.files?.length) uploadFiles(ev.target.files);
     ev.target.value = "";
   }} />
-      </div>
+    </div>
+  `;
+  return html`
+    <${Pane} paneKey="files" name="files-pane" label="Files"
+             extraClass=${previewing ? "previewing" : ""}
+             headActions=${headActions}>
       <div class="files-body" ref=${bodyRef}>
         <${Crumb} />
         <${UploadStrip} />
@@ -3700,7 +3693,7 @@ function FilesPane() {
         </div>
         <${Preview} />
       </div>
-    </aside>
+    <//>
   `;
 }
 
@@ -3725,12 +3718,14 @@ function persistPanelState() {
   }
 }
 function applyPanelClasses() {
-  if (MOBILE_MQ.matches) {
+  const mobile = MOBILE_MQ.matches;
+  isMobile.value = mobile;
+  if (mobile) {
     document.body.classList.add("mobile");
   } else {
     document.body.classList.remove("mobile");
-    drawerOpen.threads.value = false;
-    drawerOpen.files.value = false;
+    drawerOpen2.threads.value = false;
+    drawerOpen2.files.value = false;
   }
 }
 
@@ -3771,10 +3766,10 @@ function App() {
     persistPanelState();
   }, [threadsOpen, filesOpen]);
   const mainCls = (threadsOpen ? "" : " threads-collapsed") + (filesOpen ? "" : " files-collapsed");
-  const backdropShown = drawerOpen.threads.value || drawerOpen.files.value;
+  const backdropShown = drawerOpen2.threads.value || drawerOpen2.files.value;
   const onBackdrop = () => {
-    drawerOpen.threads.value = false;
-    drawerOpen.files.value = false;
+    drawerOpen2.threads.value = false;
+    drawerOpen2.files.value = false;
   };
   return html`
     <${Header} />

@@ -1,7 +1,7 @@
 // Pane state persistence + body/main class side-effects. The actual UI
 // rendering of panes lives in their components; this module handles
 // localStorage + the body/main classes used by global CSS.
-import { paneOpen, drawerOpen, MOBILE_MQ } from './state.js';
+import { paneOpen, drawerOpen, isMobile, MOBILE_MQ } from './state.js';
 
 const KEYS = { threads: 'nc:pane:threads', files: 'nc:pane:files' };
 
@@ -27,7 +27,9 @@ export function persistPanelState() {
 // page paint doesn't animate the panes sliding in. On mobile, also ensure
 // the drawers are closed by default.
 export function applyPanelClasses() {
-  if (MOBILE_MQ.matches) {
+  const mobile = MOBILE_MQ.matches;
+  isMobile.value = mobile;
+  if (mobile) {
     document.body.classList.add('mobile');
   } else {
     document.body.classList.remove('mobile');
