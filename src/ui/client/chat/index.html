@@ -328,18 +328,30 @@
       .media-player-audio audio { height: 36px; }
 
       .files-pane .preview-meta {
-        margin: 0 0 12px 0;
-        padding: 8px 10px;
+        margin: 0 0 8px 0;
+        padding: 6px 8px;
         background: var(--wash-soft);
         border: 1px solid var(--border);
         border-radius: 4px;
         font-size: 12px;
       }
-      /* Desktop: always-expanded; summary is hidden, native marker too.
-         Mobile (below) re-shows the summary as a dense one-liner and
-         the panel starts collapsed via the `open` attribute. */
       .files-pane .preview-meta > summary {
-        display: none;
+        display: block;
+        list-style: none;
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .files-pane .preview-meta > summary::-webkit-details-marker { display: none; }
+      .files-pane .preview-meta[open] > summary {
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4px;
+        white-space: normal;
       }
       .files-pane .preview-meta-rows {
         margin: 0;
@@ -360,32 +372,6 @@
       }
       .files-pane .preview-meta-rows dt { color: var(--muted); white-space: nowrap; }
       .files-pane .preview-meta-rows dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
-      @media (max-width: 720px) {
-        .files-pane .preview-meta { padding: 6px 8px; margin-bottom: 8px; }
-        .files-pane .preview-meta > summary {
-          display: block;
-          list-style: none;
-          cursor: pointer;
-          color: var(--muted);
-          font-size: 11px;
-          line-height: 1.4;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .files-pane .preview-meta > summary::-webkit-details-marker { display: none; }
-        .files-pane .preview-meta[open] > summary {
-          margin-bottom: 6px;
-          border-bottom: 1px solid var(--border);
-          padding-bottom: 4px;
-          white-space: normal;
-        }
-        .files-pane .preview-meta-rows {
-          column-gap: 12px;
-          row-gap: 2px;
-          grid-template-columns: [label] max-content [value] 1fr;
-        }
-      }
 
       .files-pane .preview-lyrics {
         margin: 0 0 12px 0;

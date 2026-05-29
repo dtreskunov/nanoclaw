@@ -5,7 +5,6 @@ import { html } from '../html.js';
 import {
   treePath, treeEntries, treeError, filePath, isAdmin,
   previewBlock, uploadItems, groupId, threadId, pinnedContext,
-  isMobile,
 } from '../state.js';
 import { navTree, navFile, closePreview, togglePinnedFile } from '../actions.js';
 import {
@@ -158,12 +157,11 @@ function Preview() {
     ? html`<${MediaPlayer} kind=${p.kind} url=${p.url} name=${p.name} />`
     : null;
   const renderMetaPanel = (rows, cls) => {
-    // On mobile the metadata panel collapses by default to keep the
-    // preview chrome compact; the summary shows a dense one-liner of
-    // just the values. Desktop hides the summary and shows the rows.
+    // Metadata panel collapses by default; the summary shows a dense
+    // one-liner of just the values. Click to reveal the labelled rows.
     const summary = rows.map(([, v]) => v).join(' \u00B7 ');
     return html`
-      <details class=${'preview-meta ' + cls} open=${!isMobile.value}>
+      <details class=${'preview-meta ' + cls}>
         <summary class="preview-meta-summary">${summary}</summary>
         <dl class="preview-meta-rows">
           ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}

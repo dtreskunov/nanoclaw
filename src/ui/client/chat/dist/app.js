@@ -18163,7 +18163,7 @@ function Preview() {
   const renderMetaPanel = (rows, cls) => {
     const summary = rows.map(([, v5]) => v5).join(" \xB7 ");
     return html`
-      <details class=${"preview-meta " + cls} open=${!isMobile.value}>
+      <details class=${"preview-meta " + cls}>
         <summary class="preview-meta-summary">${summary}</summary>
         <dl class="preview-meta-rows">
           ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
