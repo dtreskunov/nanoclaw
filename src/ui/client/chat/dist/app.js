@@ -3734,10 +3734,17 @@ function MediaPlayer({ kind, url, name }) {
 
 // src/components/LyricsPanel.js
 var TS_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+var OFFSET_RE = /^\s*\[offset:\s*([+-]?\d+)\s*\]\s*$/i;
 function parseLyrics(text) {
   const lines = [];
   let sawTimestamp = false;
+  let offset = 0;
   for (const raw of text.split(/\r?\n/)) {
+    const om = OFFSET_RE.exec(raw);
+    if (om) {
+      offset = Number(om[1]) / 1e3;
+      continue;
+    }
     const times = [];
     let m6;
     TS_RE.lastIndex = 0;
@@ -3755,9 +3762,9 @@ function parseLyrics(text) {
     sawTimestamp = true;
     for (const t5 of times) lines.push({ t: t5, text: content });
   }
-  if (!sawTimestamp) return { synced: false, lines };
+  if (!sawTimestamp) return { synced: false, lines, offset: 0 };
   const synced = lines.filter((l7) => l7.t != null).sort((a4, b4) => a4.t - b4.t);
-  return { synced: true, lines: synced };
+  return { synced: true, lines: synced, offset };
 }
 function findActiveIdx(lines, t5) {
   let lo = 0;
@@ -3779,7 +3786,8 @@ function LyricsPanel({ text }) {
   const [showSynced, setShowSynced] = h2(true);
   const synced = parsed.synced && showSynced;
   const t5 = mediaCurrentTime.value;
-  const activeIdx = synced ? findActiveIdx(parsed.lines, t5) : -1;
+  const effective = t5 - parsed.offset;
+  const activeIdx = synced ? findActiveIdx(parsed.lines, effective) : -1;
   const scrollerRef = A2(null);
   const activeRef = A2(null);
   const lastIdxRef = A2(-2);
@@ -3797,8 +3805,9 @@ function LyricsPanel({ text }) {
   const seek = (sec) => {
     const media = document.querySelector(".media-player audio, .media-player video");
     if (!media) return;
-    media.currentTime = sec;
-    mediaCurrentTime.value = sec;
+    const target = Math.max(0, sec + parsed.offset);
+    media.currentTime = target;
+    mediaCurrentTime.value = target;
     const p5 = media.play();
     if (p5 && typeof p5.catch === "function") p5.catch(() => {
     });

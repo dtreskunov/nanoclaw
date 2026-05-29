@@ -10,11 +10,17 @@ import { html } from '../html.js';
 import { mediaCurrentTime } from '../state.js';
 
 const TS_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+// LRC `[offset:NNN]` header tag. Milliseconds, sign optional; positive
+// shifts lyrics later, negative shifts earlier.
+const OFFSET_RE = /^\s*\[offset:\s*([+-]?\d+)\s*\]\s*$/i;
 
 function parseLyrics(text) {
   const lines = [];
   let sawTimestamp = false;
+  let offset = 0; // seconds
   for (const raw of text.split(/\r?\n/)) {
+    const om = OFFSET_RE.exec(raw);
+    if (om) { offset = Number(om[1]) / 1000; continue; }
     const times = [];
     let m;
     TS_RE.lastIndex = 0;
@@ -32,11 +38,11 @@ function parseLyrics(text) {
     sawTimestamp = true;
     for (const t of times) lines.push({ t, text: content });
   }
-  if (!sawTimestamp) return { synced: false, lines };
+  if (!sawTimestamp) return { synced: false, lines, offset: 0 };
   // Drop untimed lines in synced mode (usually LRC header tags like
   // [ar:...], [ti:...] that already stripped to empty) and sort by time.
   const synced = lines.filter((l) => l.t != null).sort((a, b) => a.t - b.t);
-  return { synced: true, lines: synced };
+  return { synced: true, lines: synced, offset };
 }
 
 function findActiveIdx(lines, t) {
@@ -56,7 +62,11 @@ export function LyricsPanel({ text }) {
   const [showSynced, setShowSynced] = useState(true);
   const synced = parsed.synced && showSynced;
   const t = mediaCurrentTime.value;
-  const activeIdx = synced ? findActiveIdx(parsed.lines, t) : -1;
+  // LRC `[offset]` is milliseconds added to displayed time: positive =
+  // lyrics appear later, negative = earlier. Equivalent to comparing
+  // playback time minus offset against the raw line timestamps.
+  const effective = t - parsed.offset;
+  const activeIdx = synced ? findActiveIdx(parsed.lines, effective) : -1;
   const scrollerRef = useRef(null);
   const activeRef = useRef(null);
   const lastIdxRef = useRef(-2);
@@ -77,8 +87,9 @@ export function LyricsPanel({ text }) {
   const seek = (sec) => {
     const media = document.querySelector('.media-player audio, .media-player video');
     if (!media) return;
-    media.currentTime = sec;
-    mediaCurrentTime.value = sec;
+    const target = Math.max(0, sec + parsed.offset);
+    media.currentTime = target;
+    mediaCurrentTime.value = target;
     const p = media.play();
     if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay blocked — ignore */ });
   };
