@@ -33,6 +33,7 @@ export const drawerOpen = {
   threads: signal(false),
   files: signal(false),
 };
+export const isMobile = signal(false);
 
 // Uploads
 export const uploadItems = signal([]);

@@ -1,14 +1,12 @@
-// Threads rail: head + new-chat button + scrollable list.
+// Threads rail: head + new-chat button + scrollable list. Pane shell
+// (collapse / drawer / chevron toggle) lives in <Pane>.
 import { html } from '../html.js';
 import {
-  threads, threadId, groupId, paneOpen, drawerOpen, MOBILE_MQ, channelMeta,
+  threads, threadId, groupId, drawerOpen, channelMeta,
 } from '../state.js';
-import { openChat, clearChat, deleteThread } from '../actions.js';
+import { openChat, deleteThread } from '../actions.js';
 import { tsKey, fmtRelative, fmtAbsolute } from '../utils.js';
-
-function ChevronToggle({ open, onClick, ariaLabel }) {
-  return html`<button type="button" class="icon-btn desktop-only" aria-label=${ariaLabel} onClick=${onClick}>${open ? '\u2039' : '\u203A'}</button>`;
-}
+import { Pane } from './Pane.js';
 
 function threadCtxOf(t) {
   if (!t || !t.channelType || t.channelType === 'web') return null;
@@ -44,9 +42,6 @@ function ThreadRow({ t }) {
 }
 
 export function ThreadsRail() {
-  const collapsed = !paneOpen.threads.value;
-  const drawer = drawerOpen.threads.value;
-  const cls = 'nc-pane threads-rail' + (collapsed ? ' collapsed' : '') + (drawer ? ' open' : '');
   const list = threads.value;
   const onNewChat = () => {
     if (!groupId.value) return;
@@ -57,25 +52,8 @@ export function ThreadsRail() {
       drawerOpen.files.value = false;
     }).catch(console.error);
   };
-  const onPaneClick = (ev) => {
-    if (!collapsed) return;
-    if (ev.target.closest('button, a')) return;
-    if (MOBILE_MQ.matches) return;
-    paneOpen.threads.value = true;
-  };
-  const onHeadClick = (ev) => {
-    if (ev.target.closest('button, a')) return;
-    if (MOBILE_MQ.matches) return;
-    ev.stopPropagation();
-    paneOpen.threads.value = !paneOpen.threads.value;
-  };
   return html`
-    <aside class=${cls} id="threads-rail" onClick=${onPaneClick}>
-      <div class="head" onClick=${onHeadClick}>
-        <${ChevronToggle} open=${!collapsed} ariaLabel=${collapsed ? 'Expand threads' : 'Collapse threads'}
-                          onClick=${(e) => { e.stopPropagation(); paneOpen.threads.value = !collapsed; }} />
-        <span class="title">Chats</span>
-      </div>
+    <${Pane} paneKey="threads" name="threads-rail" label="Chats">
       <div class="threads-actions">
         <button type="button" id="btn-new-chat" onClick=${onNewChat}>
           <span class="plus">+</span> <span class="label">New chat</span>
@@ -86,6 +64,6 @@ export function ThreadsRail() {
           ? html`<div class="empty">No chats yet</div>`
           : list.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
       </div>
-    </aside>
+    <//>
   `;
 }

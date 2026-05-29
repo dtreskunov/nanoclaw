@@ -3,8 +3,8 @@
 import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import {
-  treePath, treeEntries, treeError, filePath, isAdmin, paneOpen,
-  drawerOpen, previewBlock, MOBILE_MQ, uploadItems, groupId, threadId,
+  treePath, treeEntries, treeError, filePath, isAdmin,
+  previewBlock, uploadItems, groupId, threadId,
 } from '../state.js';
 import { navTree, navFile, closePreview } from '../actions.js';
 import {
@@ -12,6 +12,7 @@ import {
   clearUploadStrip, resolveConflict, notifyAgent,
 } from '../uploads.js';
 import { fmtBytes, fmtRelative, fmtAbsolute, renderMarkdown, parentPath } from '../utils.js';
+import { Pane } from './Pane.js';
 
 function Crumb() {
   const ref = useRef(null);
@@ -146,13 +147,7 @@ function Preview() {
 }
 
 export function FilesPane() {
-  const collapsed = !paneOpen.files.value;
-  const drawer = drawerOpen.files.value;
   const previewing = !!previewBlock.value;
-  const cls = 'nc-pane files-pane no-animate'
-    + (collapsed ? ' collapsed' : '')
-    + (drawer ? ' open' : '')
-    + (previewing ? ' previewing' : '');
 
   // Drop zone for uploads — bind handlers in an effect.
   const bodyRef = useRef(null);
@@ -186,36 +181,23 @@ export function FilesPane() {
     };
   }, []);
 
-  const onPaneClick = (ev) => {
-    if (!collapsed) return;
-    if (ev.target.closest('button, a')) return;
-    if (MOBILE_MQ.matches) return;
-    paneOpen.files.value = true;
-  };
-  const onHeadClick = (ev) => {
-    if (ev.target.closest('button, a')) return;
-    if (MOBILE_MQ.matches) return;
-    ev.stopPropagation();
-    paneOpen.files.value = !paneOpen.files.value;
-  };
   const uploadInputRef = useRef(null);
+  const headActions = html`
+    <div class="head-actions admin-only">
+      <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file"
+              onClick=${touchPrompt}>+F</button>
+      <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder"
+              onClick=${mkdirPrompt}>+D</button>
+      <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files"
+              onClick=${() => uploadInputRef.current?.click()}>UPL</button>
+      <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
+             onChange=${(ev) => { if (ev.target.files?.length) uploadFiles(ev.target.files); ev.target.value = ''; }} />
+    </div>
+  `;
   return html`
-    <aside class=${cls} id="files-pane" onClick=${onPaneClick}>
-      <div class="head" onClick=${onHeadClick}>
-        <button type="button" class="icon-btn" id="btn-files-toggle" aria-label=${collapsed ? 'Expand files' : 'Collapse files'}
-                onClick=${(e) => { e.stopPropagation(); paneOpen.files.value = !collapsed; }}></button>
-        <span class="title">Files</span>
-      </div>
-      <div class="head-actions admin-only">
-        <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file"
-                onClick=${touchPrompt}>+F</button>
-        <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder"
-                onClick=${mkdirPrompt}>+D</button>
-        <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files"
-                onClick=${() => uploadInputRef.current?.click()}>UPL</button>
-        <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
-               onChange=${(ev) => { if (ev.target.files?.length) uploadFiles(ev.target.files); ev.target.value = ''; }} />
-      </div>
+    <${Pane} paneKey="files" name="files-pane" label="Files"
+             extraClass=${previewing ? 'previewing' : ''}
+             headActions=${headActions}>
       <div class="files-body" ref=${bodyRef}>
         <${Crumb} />
         <${UploadStrip} />
@@ -225,6 +207,6 @@ export function FilesPane() {
         </div>
         <${Preview} />
       </div>
-    </aside>
+    <//>
   `;
 }
