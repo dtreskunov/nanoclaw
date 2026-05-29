@@ -409,63 +409,7 @@
     </style>
   </head>
   <body>
-    <header>
-      <button type="button" class="icon-btn mobile-only" id="btn-threads" aria-label="Threads">☰</button>
-      <span class="brand">NanoClaw</span>
-      <select id="group-select" aria-label="Agent group"></select>
-      <div class="spacer"></div>
-      <span class="user" id="me"></span>
-      <button type="button" class="icon-btn" id="btn-notif" aria-label="Notifications" title="Notifications" hidden>🔔</button>
-      <button type="button" class="icon-btn mobile-only" id="btn-files" aria-label="Files">📁</button>
-      <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0"><button type="submit" aria-label="Log out" title="Log out"><svg class="mobile-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span id="logout-label" class="desktop-only">Log out</span></button></form>
-    </header>
-    <main id="main">
-      <aside class="nc-pane threads-rail" id="threads-rail">
-        <div class="head">
-          <button type="button" class="icon-btn desktop-only" id="btn-threads-toggle" aria-label="Collapse threads"></button>
-          <span class="title">Chats</span>
-        </div>
-        <div class="threads-actions">
-          <button type="button" id="btn-new-chat"><span class="plus">+</span> <span class="label">New chat</span></button>
-        </div>
-        <div class="list" id="threads-list"><div class="empty">No chats yet</div></div>
-      </aside>
-      <section class="chat-main" id="chat-main">
-        <div class="log" id="chat-log"><div class="empty">Pick or start a chat.</div></div>
-        <div class="status" id="chat-status"></div>
-        <div class="context" id="chat-context" hidden></div>
-        <div class="pending" id="chat-pending" hidden></div>
-        <div class="readonly-banner" id="chat-readonly" hidden></div>
-        <div class="chat-subnotice" id="chat-subnotice" hidden></div>
-        <form id="chat-form">
-          <input type="file" id="chat-file" multiple hidden />
-          <button type="button" id="chat-attach" title="Attach files" aria-label="Attach files">📎</button>
-          <textarea id="chat-input" rows="1" placeholder="Message the agent…"></textarea>
-          <button type="submit" id="chat-send">Send</button>
-        </form>
-      </section>
-      <aside class="nc-pane files-pane no-animate" id="files-pane">
-        <div class="head">
-          <button type="button" class="icon-btn" id="btn-files-toggle" aria-label="Collapse files"></button>
-          <span class="title">Files</span>
-        </div>
-        <div class="head-actions admin-only">
-          <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file">+F</button>
-          <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder">+D</button>
-          <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files">UPL</button>
-          <input type="file" id="upload-input" multiple hidden />
-        </div>
-        <div class="files-body">
-          <div class="breadcrumb" id="crumb"></div>
-          <div class="upload-strip" id="upload-strip" hidden></div>
-          <div class="listing" id="listing"><div class="empty">No group selected</div></div>
-          <div class="drop-hint admin-only" id="dropzone">Drag &amp; drop files here to upload to <code id="dropzone-path">/</code></div>
-          <div class="preview-body" id="preview"></div>
-        </div>
-      </aside>
-    </main>
-    <div class="backdrop" id="backdrop"></div>
-
+    <div id="app"></div>
     <script type="module" src="dist/app.js"></script>
   </body>
 </html>

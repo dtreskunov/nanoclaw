@@ -1,8 +1,6 @@
-// Format helpers, DOM utilities, markdown rendering, file-link rewriter.
+// Format helpers + markdown rendering. Returns plain strings/HTML —
+// components handle escaping via htm's prop interpolation when possible.
 import { marked } from 'marked';
-import { state } from './state.js';
-
-export const $ = (id) => document.getElementById(id);
 
 export function fmtBytes(n) {
   if (n == null) return '';
@@ -40,40 +38,26 @@ export function fmtAbsolute(ts) {
   return new Date(t).toLocaleString();
 }
 
-export function tsHTML(ts, cls) {
-  const rel = fmtRelative(ts);
-  if (!rel) return '';
-  return `<span class="${cls || 'ts'}" title="${escapeAttr(fmtAbsolute(ts))}">${escapeHtml(rel)}</span>`;
+export function tsKey(s) {
+  if (!s) return 0;
+  const norm = s.includes('T') ? s : s.replace(' ', 'T') + 'Z';
+  const n = Date.parse(norm);
+  return Number.isFinite(n) ? n : 0;
 }
-
-export function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-export function escapeAttr(s) { return escapeHtml(s); }
 
 export function parentPath(p) { const i = p.lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); }
-
-export function emptyDiv(text) {
-  const d = document.createElement('div');
-  d.className = 'empty';
-  d.textContent = text;
-  return d;
-}
 
 export function renderMarkdown(text) {
   try { return marked.parse(text || '', { breaks: true, gfm: true }); } catch (_) { return null; }
 }
 
-// Rewrite relative-path markdown links inside a chat message to point at
-// the file-browser file endpoint, so references like
-// [sick_day_v2.mp3](sick_day_v2.mp3) become clickable. Also auto-linkify
-// bare backtick-quoted filename-like tokens (e.g. `sick_day_v2.mp3`).
-// Plain left-click invokes `onNavFile(entry)`; middle/cmd-click falls
-// through to the href and opens in a new tab.
-export function rewriteFileLinks(root, onNavFile) {
-  if (!state.groupId) return;
-  const gid = encodeURIComponent(state.groupId);
+// Rewrite relative-path markdown links inside a chat message bubble (post-
+// render) so [foo.mp3](foo.mp3) and backtick-quoted `foo.mp3` open the file
+// in the preview pane. Plain left-click invokes onNavFile(entry); middle/
+// cmd-click falls through to the href and opens in a new tab.
+export function rewriteFileLinks(root, groupId, onNavFile) {
+  if (!groupId || !root) return;
+  const gid = encodeURIComponent(groupId);
   const isExternal = (h) => /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith('#') || h.startsWith('//') || h.startsWith('mailto:');
   const normalizeRel = (p) => String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
   const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
@@ -81,8 +65,7 @@ export function rewriteFileLinks(root, onNavFile) {
     a.addEventListener('click', (ev) => {
       if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
       ev.preventDefault();
-      const entry = { path: rel, name: rel.slice(rel.lastIndexOf('/') + 1) };
-      onNavFile(entry).catch(console.error);
+      onNavFile({ path: rel, name: rel.slice(rel.lastIndexOf('/') + 1) });
     });
   };
   root.querySelectorAll('a[href]').forEach((a) => {
@@ -95,7 +78,6 @@ export function rewriteFileLinks(root, onNavFile) {
     a.setAttribute('rel', 'noopener');
     attachPreviewClick(a, rel);
   });
-  // Auto-linkify backtick-quoted filename-like tokens.
   const fileLikeRe = /^[\w.\-/ ]+\.[A-Za-z0-9]{1,8}$/;
   root.querySelectorAll('code').forEach((c) => {
     if (c.closest('pre')) return;

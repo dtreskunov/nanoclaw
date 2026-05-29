@@ -1,5 +1,5 @@
-// HTTP helpers.
-
+// HTTP helpers. Treats 401 as a global "not logged in" — replaces the body
+// with a static message and rejects.
 export async function api(url, opts) {
   const r = await fetch(url, Object.assign({ credentials: 'same-origin' }, opts || {}));
   if (r.status === 401) {
@@ -12,13 +12,13 @@ export async function api(url, opts) {
 }
 
 export async function postJson(path, body) {
-  const res = await fetch(path, {
+  const r = await fetch(path, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(body || {}),
   });
-  const ct = res.headers.get('content-type') || '';
-  const data = ct.includes('application/json') ? await res.json().catch(() => ({})) : {};
-  return { ok: res.ok, status: res.status, data };
+  let data = {};
+  try { data = await r.json(); } catch (_) {}
+  return { ok: r.ok, status: r.status, data };
 }
