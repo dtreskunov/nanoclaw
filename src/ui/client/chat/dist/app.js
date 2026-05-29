@@ -1034,6 +1034,13 @@ var refs = {
   reconnectAttempt: 0,
   pollTimer: null,
   threadsPollTimer: null,
+  // Set of `${direction}:${id}` for every row currently in chatMessages.
+  // Used to dedup WS pushes against history refetches. Cleared on
+  // openChat / clearChat. Initial-load and full-replace rebuild it
+  // from scratch; append-only refetch and appendMsg add to it.
+  seenIds: /* @__PURE__ */ new Set(),
+  // Newest server timestamp we've painted, used only to drive
+  // bumpActiveThread side effects (not for dedup).
   lastSeenTs: "",
   suppressHashCount: 0,
   uploadDragDepth: 0
@@ -2604,6 +2611,7 @@ function clearChat() {
     refs.reconnectTimer = null;
   }
   refs.lastSeenTs = "";
+  refs.seenIds.clear();
 }
 function stopChatPoll() {
   if (refs.pollTimer) {
@@ -2632,18 +2640,12 @@ function historyUrl(gid, tid) {
   }
   return u4;
 }
-function appendMsg(direction, text, files, ts) {
+function appendMsg(direction, text, files, ts, id) {
+  const key = id ? `${direction}:${id}` : null;
+  if (key && refs.seenIds.has(key)) return;
+  if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
-  if (ts && tsKey(ts) > tsKey(refs.lastSeenTs)) refs.lastSeenTs = ts;
-}
-function alreadyPainted(direction, ts, text) {
-  const list = chatMessages.value;
-  for (let i4 = list.length - 1; i4 >= 0; i4--) {
-    const m6 = list[i4];
-    if (m6.ts && tsKey(m6.ts) < tsKey(ts) - 5e3) break;
-    if (m6.direction === direction && m6.ts === ts && (m6.text || "") === (text || "")) return true;
-  }
-  return false;
+  if (ts && (!refs.lastSeenTs || ts > refs.lastSeenTs)) refs.lastSeenTs = ts;
 }
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
@@ -2658,33 +2660,24 @@ async function refetchThreadHistory(appendNewOnly) {
       files: m6.files || null,
       ts: m6.timestamp
     }));
+    refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
     if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
     return;
   }
-  const seenKey = tsKey(refs.lastSeenTs);
-  let maxTs = refs.lastSeenTs, maxKey = seenKey, bumped = false;
+  let maxTs = refs.lastSeenTs, bumped = false;
   const additions = [];
   for (const m6 of messages) {
+    const direction = m6.direction === "in" ? "in" : "out";
+    const key = m6.id ? `${direction}:${m6.id}` : null;
+    if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    const k4 = tsKey(ts);
-    if (!seenKey || k4 > seenKey) {
-      const direction = m6.direction === "in" ? "in" : "out";
-      if (alreadyPainted(direction, ts, m6.text)) {
-        if (k4 > maxKey) {
-          maxKey = k4;
-          maxTs = ts;
-          bumped = true;
-        }
-        continue;
-      }
-      additions.push({ direction, text: m6.text, files: m6.files || null, ts });
-      if (k4 > maxKey) {
-        maxKey = k4;
-        maxTs = ts;
-      }
-      bumped = true;
-      if (direction !== "in") maybeNotify(m6.text, m6.files || []);
+    additions.push({ direction, text: m6.text, files: m6.files || null, ts });
+    if (key) refs.seenIds.add(key);
+    if (!maxTs || ts > maxTs) {
+      maxTs = ts;
     }
+    bumped = true;
+    if (direction !== "in") maybeNotify(m6.text, m6.files || []);
   }
   if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
   if (bumped) {
@@ -2748,7 +2741,10 @@ async function openChat(gid, resumeTid, opts) {
           }));
           chatLoading.value = false;
         });
-        if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
+        if (Array.isArray(messages)) {
+          refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
+          if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
+        }
       } else {
         chatLoading.value = false;
       }
@@ -2831,7 +2827,7 @@ function connectChatWs() {
     }
     if (payload.kind === "ready") return;
     if (payload.kind === "inbound") {
-      appendMsg("in", payload.text, payload.files || null, payload.timestamp);
+      appendMsg("in", payload.text, payload.files || null, payload.timestamp, payload.id);
       updateActiveThreadTitleFromFirstMessage(payload.text);
       bumpActiveThread();
       return;
@@ -2839,7 +2835,7 @@ function connectChatWs() {
     if (payload.kind === "outbound") {
       const c4 = payload.content || {};
       const text = typeof c4 === "string" ? c4 : c4.text || c4.markdown || "";
-      appendMsg("out", text, payload.files || [], payload.timestamp);
+      appendMsg("out", text, payload.files || [], payload.timestamp, payload.id);
       bumpActiveThread();
       maybeNotify(text, payload.files || []);
       return;
@@ -2854,7 +2850,6 @@ async function sendChat(text, files) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const fileMetas = hasFiles ? files.map((f4) => ({ filename: f4.name, size: f4.size })) : null;
     appendMsg("in", text || "", fileMetas, now);
-    refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
   if (!isWeb && messagingGroupId.value) {

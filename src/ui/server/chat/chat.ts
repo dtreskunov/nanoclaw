@@ -387,6 +387,9 @@ export async function handleChatRequest(
 
 interface HistoryMessage {
   direction: 'in' | 'out';
+  // messages_in.id / messages_out.id — stable per-row id the client uses
+  // as the dedup key against live WS pushes.
+  id: string;
   timestamp: string;
   text: string;
   files?: { filename: string; size: number }[];
@@ -415,8 +418,8 @@ function readChatHistory(
     const inDb = openInboundDb(groupId, session.id);
     try {
       const rows = inDb
-        .prepare('SELECT timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq')
-        .all(target.channelType, threadId) as { timestamp: string; content: string }[];
+        .prepare('SELECT id, timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq')
+        .all(target.channelType, threadId) as { id: string; timestamp: string; content: string }[];
       for (const r of rows) {
         const parsed = parseInboundContent(r.content);
         if (parsed != null) {
@@ -424,7 +427,7 @@ function readChatHistory(
           // bubble on the right). Whether the message arrived natively
           // through the channel or was relayed via the web UI (_via:'web'),
           // it's the user's own message either way.
-          messages.push({ direction: 'in', timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+          messages.push({ direction: 'in', id: r.id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
         }
       }
     } finally {
@@ -439,13 +442,13 @@ function readChatHistory(
     try {
       const rows = outDb
         .prepare(
-          'SELECT timestamp, kind, content FROM messages_out WHERE channel_type = ? AND thread_id = ? ORDER BY seq',
+          'SELECT id, timestamp, kind, content FROM messages_out WHERE channel_type = ? AND thread_id = ? ORDER BY seq',
         )
-        .all(target.channelType, threadId) as { timestamp: string; kind: string; content: string }[];
+        .all(target.channelType, threadId) as { id: string; timestamp: string; kind: string; content: string }[];
       for (const r of rows) {
         if (r.kind !== 'chat' && r.kind !== 'text') continue;
         const parsed = parseOutboundContent(r.content);
-        messages.push({ direction: 'out', timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+        messages.push({ direction: 'out', id: r.id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
       }
     } finally {
       outDb.close();
@@ -1196,6 +1199,7 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
         ws.send(
           JSON.stringify({
             kind: 'outbound',
+            id: message.id,
             messageKind: message.kind,
             content: message.content,
             files: message.files?.map((f) => ({ filename: f.filename, size: f.data.length })) ?? [],
@@ -1206,9 +1210,9 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
         log.warn('web chat ws send failed', { err });
       }
     },
-    onInboundEcho(text, files) {
+    onInboundEcho(id, text, files) {
       try {
-        ws.send(JSON.stringify({ kind: 'inbound', text, files: files ?? [], timestamp: new Date().toISOString() }));
+        ws.send(JSON.stringify({ kind: 'inbound', id, text, files: files ?? [], timestamp: new Date().toISOString() }));
       } catch (err) {
         log.warn('web chat ws echo failed', { err });
       }

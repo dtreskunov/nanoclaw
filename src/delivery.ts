@@ -57,6 +57,7 @@ export interface ChannelDeliveryAdapter {
     kind: string,
     content: string,
     files?: OutboundFile[],
+    id?: string,
   ): Promise<string | undefined>;
   setTyping?(channelType: string, platformId: string, threadId: string | null): Promise<void>;
 }
@@ -360,6 +361,7 @@ async function deliverMessage(
     msg.kind,
     msg.content,
     files,
+    msg.id,
   );
   log.info('Message delivered', {
     id: msg.id,

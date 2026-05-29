@@ -10,7 +10,7 @@ import {
 import { api } from './api.js';
 import { writeHash } from './hash.js';
 import { maybeNotify } from './notify.js';
-import { tsKey, parentPath } from './utils.js';
+import { parentPath } from './utils.js';
 
 // ── threads ─────────────────────────────────────────────────────────
 export async function loadThreads(gid) {
@@ -89,6 +89,7 @@ export function clearChat() {
   if (refs.ws) { try { refs.ws.close(); } catch (_) {} refs.ws = null; }
   if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
   refs.lastSeenTs = '';
+  refs.seenIds.clear();
 }
 
 export function stopChatPoll() {
@@ -111,26 +112,17 @@ function historyUrl(gid, tid) {
   return u;
 }
 
-function appendMsg(direction, text, files, ts) {
+function appendMsg(direction, text, files, ts, id) {
+  // Dedup against history refetch by stable per-row id. Live WS pushes
+  // carry `id` (messages_in.id / messages_out.id); optimistic local
+  // bubbles for non-web sends pass a synthetic `local:<ts>` sentinel,
+  // which won't collide with any server id and so won't block the real
+  // row on refetch (content-match in refetchThreadHistory handles that).
+  const key = id ? `${direction}:${id}` : null;
+  if (key && refs.seenIds.has(key)) return;
+  if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
-  // Keep refs.lastSeenTs in sync with what's already painted so a
-  // subsequent refetch (visibility resume, poll, reconnect catchup)
-  // doesn't re-add the same row through the tsKey gate below.
-  if (ts && tsKey(ts) > tsKey(refs.lastSeenTs)) refs.lastSeenTs = ts;
-}
-
-// Content-equal to an existing painted row? Used as a defensive
-// backstop in refetchThreadHistory in case ts comparison can't
-// distinguish (two rows in the same second) or the WS painted a
-// row before lastSeenTs caught up.
-function alreadyPainted(direction, ts, text) {
-  const list = chatMessages.value;
-  for (let i = list.length - 1; i >= 0; i--) {
-    const m = list[i];
-    if (m.ts && tsKey(m.ts) < tsKey(ts) - 5000) break; // 5s back-window is plenty
-    if (m.direction === direction && m.ts === ts && (m.text || '') === (text || '')) return true;
-  }
-  return false;
+  if (ts && (!refs.lastSeenTs || ts > refs.lastSeenTs)) refs.lastSeenTs = ts;
 }
 
 async function refetchThreadHistory(appendNewOnly) {
@@ -146,26 +138,22 @@ async function refetchThreadHistory(appendNewOnly) {
       files: m.files || null,
       ts: m.timestamp,
     }));
+    refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${m.direction === 'in' ? 'in' : 'out'}:${m.id}`));
     if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
     return;
   }
-  const seenKey = tsKey(refs.lastSeenTs);
-  let maxTs = refs.lastSeenTs, maxKey = seenKey, bumped = false;
+  let maxTs = refs.lastSeenTs, bumped = false;
   const additions = [];
   for (const m of messages) {
+    const direction = m.direction === 'in' ? 'in' : 'out';
+    const key = m.id ? `${direction}:${m.id}` : null;
+    if (key && refs.seenIds.has(key)) continue;
     const ts = m.timestamp || '';
-    const k = tsKey(ts);
-    if (!seenKey || k > seenKey) {
-      const direction = m.direction === 'in' ? 'in' : 'out';
-      if (alreadyPainted(direction, ts, m.text)) {
-        if (k > maxKey) { maxKey = k; maxTs = ts; bumped = true; }
-        continue;
-      }
-      additions.push({ direction, text: m.text, files: m.files || null, ts });
-      if (k > maxKey) { maxKey = k; maxTs = ts; }
-      bumped = true;
-      if (direction !== 'in') maybeNotify(m.text, m.files || []);
-    }
+    additions.push({ direction, text: m.text, files: m.files || null, ts });
+    if (key) refs.seenIds.add(key);
+    if (!maxTs || ts > maxTs) { maxTs = ts; }
+    bumped = true;
+    if (direction !== 'in') maybeNotify(m.text, m.files || []);
   }
   if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
   if (bumped) { refs.lastSeenTs = maxTs || refs.lastSeenTs; bumpActiveThread(maxTs); }
@@ -218,7 +206,10 @@ export async function openChat(gid, resumeTid, opts) {
           }));
           chatLoading.value = false;
         });
-        if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
+        if (Array.isArray(messages)) {
+          refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${m.direction === 'in' ? 'in' : 'out'}:${m.id}`));
+          if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
+        }
       } else {
         chatLoading.value = false;
       }
@@ -287,7 +278,7 @@ function connectChatWs() {
     let payload; try { payload = JSON.parse(ev.data); } catch (_) { return; }
     if (payload.kind === 'ready') return;
     if (payload.kind === 'inbound') {
-      appendMsg('in', payload.text, payload.files || null, payload.timestamp);
+      appendMsg('in', payload.text, payload.files || null, payload.timestamp, payload.id);
       updateActiveThreadTitleFromFirstMessage(payload.text);
       bumpActiveThread();
       return;
@@ -295,7 +286,7 @@ function connectChatWs() {
     if (payload.kind === 'outbound') {
       const c = payload.content || {};
       const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
-      appendMsg('out', text, payload.files || [], payload.timestamp);
+      appendMsg('out', text, payload.files || [], payload.timestamp, payload.id);
       bumpActiveThread();
       maybeNotify(text, payload.files || []);
       return;
@@ -308,13 +299,15 @@ export async function sendChat(text, files) {
   const isWeb = !channelType.value || channelType.value === 'web';
   const hasFiles = Array.isArray(files) && files.length > 0;
   // Cross-channel sends have no live tail — paint the user's bubble
-  // immediately. The 10s poll re-fetches the same row; tsKey gates it.
+  // immediately, then reconcile via a full refetch after success.
   if (!isWeb) {
     const now = new Date().toISOString();
     const fileMetas = hasFiles ? files.map((f) => ({ filename: f.name, size: f.size })) : null;
     // 'in' = viewer's own bubble (see chat-main CSS); 'out' is the agent.
+    // No id — the server-truth row arrives via the post-send full refetch
+    // (refetchThreadHistory(false)) which wipes optimistic bubbles and
+    // rebuilds seenIds from scratch.
     appendMsg('in', text || '', fileMetas, now);
-    refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
   if (!isWeb && messagingGroupId.value) {
