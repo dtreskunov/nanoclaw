@@ -142,23 +142,30 @@ function Preview() {
       <span style="margin-left:auto"><${ActionsMenu} mode="preview" /></span>
     </div>
   `;
-  // Always-shown metadata strip above the body. Starts with size/mtime/mime
-  // (cheap, from selectFile) and gains embedded media tags once the async
-  // /meta fetch resolves. Hidden when there's nothing useful (e.g. text
-  // files where size/mtime are already in the toolbar).
-  const metaRows = [];
-  if (p.mime) metaRows.push(['Type', p.mime]);
-  if (p.size != null) metaRows.push(['Size', fmtBytes(p.size)]);
-  if (p.mtime) metaRows.push(['Modified', new Date(p.mtime).toLocaleString()]);
-  if (p.tags) for (const [k, v] of Object.entries(p.tags)) metaRows.push([k, String(v)]);
+  // Metadata panels above the body. File panel (size/type/modified) is
+  // always shown for media kinds; tags panel only when embedded tags are
+  // present; lyrics get their own scrollable panel below tags.
+  const fileRows = [];
+  if (p.mime) fileRows.push(['Type', p.mime]);
+  if (p.size != null) fileRows.push(['Size', fmtBytes(p.size)]);
+  if (p.mtime) fileRows.push(['Modified', new Date(p.mtime).toLocaleString()]);
+  const tagRows = p.tags ? Object.entries(p.tags).map(([k, v]) => [k, String(v)]) : [];
   const isMedia = p.kind === 'image' || p.kind === 'audio' || p.kind === 'video' || p.kind === 'pdf';
   const player = (p.kind === 'audio' || p.kind === 'video')
     ? html`<${MediaPlayer} kind=${p.kind} url=${p.url} name=${p.name} />`
     : null;
-  const meta = (isMedia && metaRows.length > 0) ? html`
-    <dl class="preview-meta">
-      ${metaRows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
+  const renderMetaPanel = (rows, cls) => html`
+    <dl class=${'preview-meta ' + cls}>
+      ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
     </dl>
+  `;
+  const fileMeta = (isMedia && fileRows.length > 0) ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
+  const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
+  const lyrics = p.lyrics ? html`
+    <div class="preview-lyrics">
+      <div class="preview-lyrics-head">Lyrics</div>
+      <pre>${p.lyrics}</pre>
+    </div>
   ` : null;
   let body = null;
   if (p.kind === 'image') body = html`<img alt=${p.name} src=${p.url} />`;
@@ -171,7 +178,7 @@ function Preview() {
   } else if (p.kind === 'text') body = html`<pre>${p.text}</pre>`;
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${meta}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${fileMeta}${tagMeta}${lyrics}${body}</div>`;
 }
 
 export function FilesPane() {
