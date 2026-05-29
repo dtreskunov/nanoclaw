@@ -12,6 +12,11 @@ export const filePath = signal(null);   // selected file (full path) or null
 export const treeEntries = signal([]);
 export const treeError = signal('');
 
+// Current playback position of the preview media player (seconds). 0 when
+// nothing is playing or on src change. Used by LyricsPanel to highlight
+// the active LRC line.
+export const mediaCurrentTime = signal(0);
+
 // Chat thread
 export const threads = signal([]);
 export const threadId = signal(null);

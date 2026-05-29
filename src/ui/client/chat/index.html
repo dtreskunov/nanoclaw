@@ -380,6 +380,29 @@
         font-size: 12px;
         line-height: 1.5;
       }
+      .files-pane .preview-lyrics ol.lyrics-synced {
+        list-style: none;
+        margin: 0;
+        padding: 10px;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .files-pane .preview-lyrics ol.lyrics-synced li {
+        padding: 2px 8px;
+        border-radius: 3px;
+        color: var(--muted);
+        cursor: pointer;
+        transition: color 120ms ease, background 120ms ease;
+      }
+      .files-pane .preview-lyrics ol.lyrics-synced li:hover {
+        background: var(--wash);
+        color: var(--surface-fg);
+      }
+      .files-pane .preview-lyrics ol.lyrics-synced li.active {
+        color: var(--surface-fg);
+        background: var(--accent);
+        font-weight: 500;
+      }
 
       /* Drag-and-drop hint pinned to bottom of files-body */
       .files-pane .drop-hint {

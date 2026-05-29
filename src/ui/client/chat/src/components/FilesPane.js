@@ -15,6 +15,7 @@ import { Pane } from './Pane.js';
 import { RelativeTime } from './RelativeTime.js';
 import { ActionsMenu } from './ActionsMenu.js';
 import { MediaPlayer } from './MediaPlayer.js';
+import { LyricsPanel } from './LyricsPanel.js';
 
 function Crumb() {
   const ref = useRef(null);
@@ -161,12 +162,7 @@ function Preview() {
   `;
   const fileMeta = (isMedia && fileRows.length > 0) ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
   const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
-  const lyrics = p.lyrics ? html`
-    <div class="preview-lyrics">
-      <div class="preview-lyrics-head">Lyrics</div>
-      <pre>${p.lyrics}</pre>
-    </div>
-  ` : null;
+  const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} />` : null;
   let body = null;
   if (p.kind === 'image') body = html`<img alt=${p.name} src=${p.url} />`;
   else if (p.kind === 'pdf') body = html`<iframe src=${p.url} style="width:100%;height:90vh;border:0" />`;

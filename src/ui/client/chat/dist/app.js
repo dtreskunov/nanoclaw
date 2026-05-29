@@ -1044,6 +1044,7 @@ var treePath = y3("");
 var filePath = y3(null);
 var treeEntries = y3([]);
 var treeError = y3("");
+var mediaCurrentTime = y3(0);
 var threads = y3([]);
 var threadId = y3(null);
 var channelType = y3("web");
@@ -3728,8 +3729,102 @@ function buildItems(mode, entry, onUpload) {
 // src/components/MediaPlayer.js
 function MediaPlayer({ kind, url, name }) {
   if (kind !== "audio" && kind !== "video") return null;
-  const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name} />` : html`<video controls preload="metadata" src=${url} aria-label=${name} />`;
+  const onTime = (e4) => {
+    mediaCurrentTime.value = e4.currentTarget.currentTime || 0;
+  };
+  const onReset = () => {
+    mediaCurrentTime.value = 0;
+  };
+  const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name}
+              onTimeUpdate=${onTime} onLoadedMetadata=${onReset} onSeeked=${onTime} />` : html`<video controls preload="metadata" src=${url} aria-label=${name}
+              onTimeUpdate=${onTime} onLoadedMetadata=${onReset} onSeeked=${onTime} />`;
   return html`<div class=${"media-player media-player-" + kind}>${el}</div>`;
+}
+
+// src/components/LyricsPanel.js
+var TS_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+function parseLyrics(text) {
+  const lines = [];
+  let sawTimestamp = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const times = [];
+    let m6;
+    TS_RE.lastIndex = 0;
+    while ((m6 = TS_RE.exec(raw)) !== null) {
+      const mm = +m6[1];
+      const ss = +m6[2];
+      const frac = m6[3] ? +`0.${m6[3]}` : 0;
+      times.push(mm * 60 + ss + frac);
+    }
+    const content = raw.replace(TS_RE, "").trim();
+    if (times.length === 0) {
+      lines.push({ t: null, text: raw });
+      continue;
+    }
+    sawTimestamp = true;
+    for (const t5 of times) lines.push({ t: t5, text: content });
+  }
+  if (!sawTimestamp) return { synced: false, lines };
+  const synced = lines.filter((l7) => l7.t != null).sort((a4, b4) => a4.t - b4.t);
+  return { synced: true, lines: synced };
+}
+function findActiveIdx(lines, t5) {
+  let lo = 0;
+  let hi = lines.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = lo + hi >> 1;
+    if (lines[mid].t <= t5) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return ans;
+}
+function LyricsPanel({ text }) {
+  const parsed = T2(() => parseLyrics(text || ""), [text]);
+  const t5 = mediaCurrentTime.value;
+  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, t5) : -1;
+  const scrollerRef = A2(null);
+  const activeRef = A2(null);
+  const lastIdxRef = A2(-2);
+  y2(() => {
+    if (lastIdxRef.current === activeIdx) return;
+    lastIdxRef.current = activeIdx;
+    const el = activeRef.current;
+    const c4 = scrollerRef.current;
+    if (!el || !c4) return;
+    const top = el.offsetTop - c4.clientHeight / 2 + el.clientHeight / 2;
+    c4.scrollTo({ top, behavior: "smooth" });
+  }, [activeIdx]);
+  const seek = (sec) => {
+    const media = document.querySelector(".media-player audio, .media-player video");
+    if (media) {
+      media.currentTime = sec;
+      mediaCurrentTime.value = sec;
+    }
+  };
+  return html`
+    <div class="preview-lyrics" ref=${scrollerRef}>
+      <div class="preview-lyrics-head">Lyrics</div>
+      ${parsed.synced ? html`<ol class="lyrics-synced">
+            ${parsed.lines.map((l7, i4) => html`
+              <li key=${i4}
+                  ref=${i4 === activeIdx ? activeRef : null}
+                  class=${i4 === activeIdx ? "active" : ""}
+                  onClick=${() => seek(l7.t)}
+                  title=${`Jump to ${formatTime(l7.t)}`}>${l7.text || "\xA0"}</li>
+            `)}
+          </ol>` : html`<pre>${text}</pre>`}
+    </div>
+  `;
+}
+function formatTime(s5) {
+  const m6 = Math.floor(s5 / 60);
+  const sec = Math.floor(s5 % 60);
+  return `${m6}:${String(sec).padStart(2, "0")}`;
 }
 
 // src/components/FilesPane.js
@@ -3865,12 +3960,7 @@ function Preview() {
   `;
   const fileMeta = isMedia && fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
   const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
-  const lyrics = p5.lyrics ? html`
-    <div class="preview-lyrics">
-      <div class="preview-lyrics-head">Lyrics</div>
-      <pre>${p5.lyrics}</pre>
-    </div>
-  ` : null;
+  const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;
   let body = null;
   if (p5.kind === "image") body = html`<img alt=${p5.name} src=${p5.url} />`;
   else if (p5.kind === "pdf") body = html`<iframe src=${p5.url} style="width:100%;height:90vh;border:0" />`;
