@@ -347,6 +347,8 @@
         white-space: nowrap;
       }
       .files-pane .preview-meta > summary::-webkit-details-marker { display: none; }
+      .files-pane .preview-meta > summary:hover { color: var(--surface-fg); }
+      .files-pane .preview-meta:not([open]):hover { background: var(--wash); border-color: var(--accent); }
       .files-pane .preview-meta[open] > summary {
         margin-bottom: 6px;
         border-bottom: 1px solid var(--border);
