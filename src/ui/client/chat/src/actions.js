@@ -4,8 +4,8 @@ import { batch } from '@preact/signals';
 import {
   groupId, threads, threadId, channelType, messagingGroupId, canSend,
   chatMessages, chatStatus, chatLoading, refs, treePath, filePath, treeEntries,
-  treeError, contextDismissed, pending, previewBlock, paneOpen, drawerOpen,
-  isMobile, nowTick, POLL_INTERVAL_MS, THREADS_POLL_MS,
+  treeError, pending, previewBlock, paneOpen, drawerOpen,
+  isMobile, nowTick, pinnedContext, POLL_INTERVAL_MS, THREADS_POLL_MS,
 } from './state.js';
 import { api } from './api.js';
 import { writeHash } from './hash.js';
@@ -362,7 +362,6 @@ export async function loadTree(p) {
     treeError.value = '';
     treeEntries.value = [];
   });
-  contextDismissed.value = false;
   try {
     const { entries } = await api(`api/groups/${encodeURIComponent(groupId.value)}/tree?path=${encodeURIComponent(p)}`);
     treeEntries.value = entries || [];
@@ -390,7 +389,6 @@ export async function navFile(entry) {
 
 export async function selectFile(entry) {
   filePath.value = entry.path;
-  contextDismissed.value = false;
   const url = `api/groups/${encodeURIComponent(groupId.value)}/file?path=${encodeURIComponent(entry.path)}`;
   let size = entry.size, mtime = entry.mtime;
   try {
@@ -430,17 +428,19 @@ export async function selectFile(entry) {
 
 export function closePreview() {
   batch(() => { filePath.value = null; previewBlock.value = null; });
-  contextDismissed.value = false;
   writeHash();
 }
 
-// Context chip helper (used by both Files and Chat components).
-export function currentContextPath() {
-  if (!groupId.value) return null;
-  if (filePath.value) return { path: filePath.value, kind: 'file' };
-  if (treePath.value) return { path: treePath.value.replace(/\/?$/, '/'), kind: 'dir' };
-  return null;
+// ── pinned file-browser context ────────────────────────────────────
+export function togglePinnedFile(path) {
+  if (!path) return;
+  const cur = pinnedContext.value;
+  pinnedContext.value = cur.includes(path) ? cur.filter((p) => p !== path) : cur.concat(path);
 }
+export function removePinnedPath(path) {
+  pinnedContext.value = pinnedContext.value.filter((p) => p !== path);
+}
+export function clearPinnedContext() { pinnedContext.value = []; }
 
 // ── pending uploads in composer ─────────────────────────────────────
 export function addPendingFiles(fileList, max, maxSize, maxTotal) {

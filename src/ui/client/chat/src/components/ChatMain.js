@@ -4,11 +4,14 @@ import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import {
   chatMessages, chatStatus, chatLoading, threadId, channelType, canSend, pending,
-  contextDismissed, threads, groupId, channelMeta,
+  threads, groupId, channelMeta, pinnedContext,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state.js';
 import { renderMarkdown, rewriteFileLinks, fmtBytes, fmtBytesShort } from '../utils.js';
-import { sendChat, addPendingFiles, removePending, clearPending, currentContextPath, navFile } from '../actions.js';
+import {
+  sendChat, addPendingFiles, removePending, clearPending,
+  navFile, removePinnedPath, clearPinnedContext,
+} from '../actions.js';
 import { RelativeTime } from './RelativeTime.js';
 
 function Message({ m }) {
@@ -54,16 +57,17 @@ function MessageLog() {
 }
 
 function ContextChip() {
-  const ctx = !contextDismissed.value ? currentContextPath() : null;
-  if (!ctx) return html`<div class="context" id="chat-context" hidden></div>`;
-  const icon = ctx.kind === 'dir' ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+  const pins = pinnedContext.value;
+  if (pins.length === 0) return html`<div class="context" id="chat-context" hidden></div>`;
   return html`
     <div class="context" id="chat-context">
-      <span class="chip">
-        <span>${icon}</span>
-        <span class="path" title=${ctx.path}>${ctx.path}</span>
-        <button type="button" title="Don\u2019t include this in next message" onClick=${() => { contextDismissed.value = true; }}>\u00d7</button>
-      </span>
+      ${pins.map((p) => html`
+        <span class="chip" key=${p}>
+          <span>\uD83D\uDCCE</span>
+          <span class="path" title=${p}>${p}</span>
+          <button type="button" title="Unpin" onClick=${() => removePinnedPath(p)}>\u00d7</button>
+        </span>
+      `)}
     </div>
   `;
 }
@@ -92,11 +96,14 @@ function Composer() {
     const text = (inputRef.current?.value || '').trim();
     const files = pending.value.slice();
     if (!text && files.length === 0) return;
-    const ctx = !contextDismissed.value ? currentContextPath() : null;
-    const fullText = ctx ? `> Context (file browser): \`${ctx.path}\`\n\n${text}` : text;
+    const pins = pinnedContext.value;
+    const prefix = pins.length > 0
+      ? '> Context (file browser):\n' + pins.map((p) => `> - \`${p}\``).join('\n') + '\n\n'
+      : '';
+    const fullText = prefix + text;
     if (inputRef.current) inputRef.current.value = '';
     clearPending();
-    contextDismissed.value = false;
+    clearPinnedContext();
     sendChat(fullText, files).catch(console.error);
   };
   const onKey = (ev) => {
