@@ -28,6 +28,7 @@ export function createDeliveryBridge(opts: DeliveryBridgeOptions) {
       kind: string,
       content: string,
       files?: OutboundFile[],
+      id?: string,
     ): Promise<string | undefined> {
       const adapter = getChannelAdapter(channelType);
       if (!adapter) {
@@ -40,16 +41,17 @@ export function createDeliveryBridge(opts: DeliveryBridgeOptions) {
         for (let i = 0; i < files.length; i++) {
           const isFirst = i === 0;
           const sub = isFirst ? parsed : ({ ...parsed, text: '', markdown: '' } as Record<string, unknown>);
-          const id = await adapter.deliver(platformId, threadId, {
+          const id2 = await adapter.deliver(platformId, threadId, {
             kind,
             content: sub,
             files: [files[i]],
+            id,
           });
-          if (isFirst) firstId = id;
+          if (isFirst) firstId = id2;
         }
         return firstId;
       }
-      return adapter.deliver(platformId, threadId, { kind, content: JSON.parse(content), files });
+      return adapter.deliver(platformId, threadId, { kind, content: JSON.parse(content), files, id });
     },
     async setTyping(channelType: string, platformId: string, threadId: string | null): Promise<void> {
       const adapter = getChannelAdapter(channelType);

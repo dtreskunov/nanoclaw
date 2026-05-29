@@ -10,7 +10,7 @@ import {
 import { api } from './api.js';
 import { writeHash } from './hash.js';
 import { maybeNotify } from './notify.js';
-import { tsKey, parentPath } from './utils.js';
+import { parentPath } from './utils.js';
 
 // ── threads ─────────────────────────────────────────────────────────
 export async function loadThreads(gid) {
@@ -88,7 +88,7 @@ export function clearChat() {
   stopChatPoll();
   if (refs.ws) { try { refs.ws.close(); } catch (_) {} refs.ws = null; }
   if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
-  refs.lastSeenTs = '';
+  refs.seenIds.clear();
 }
 
 export function stopChatPoll() {
@@ -111,13 +111,20 @@ function historyUrl(gid, tid) {
   return u;
 }
 
-function appendMsg(direction, text, files, ts) {
+function appendMsg(direction, text, files, ts, id) {
+  // Dedup against history refetch by stable per-row id. Live WS pushes
+  // carry `id` (messages_in.id / messages_out.id); optimistic local
+  // bubbles for non-web sends pass no id and rely on the post-send full
+  // refetch (refetchThreadHistory(false)) to reconcile.
+  const key = id ? `${direction}:${id}` : null;
+  if (key && refs.seenIds.has(key)) return;
+  if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
 }
 
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
-  const r = await fetch(historyUrl(gid, tid), { credentials: 'same-origin' });
+  const r = await fetch(historyUrl(gid, tid), { credentials: 'same-origin', cache: 'no-store' });
   if (!r.ok) return;
   const { messages } = await r.json();
   if (!Array.isArray(messages)) return;
@@ -128,24 +135,25 @@ async function refetchThreadHistory(appendNewOnly) {
       files: m.files || null,
       ts: m.timestamp,
     }));
-    if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
+    refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${m.direction === 'in' ? 'in' : 'out'}:${m.id}`));
     return;
   }
-  const seenKey = tsKey(refs.lastSeenTs);
-  let maxTs = refs.lastSeenTs, maxKey = seenKey, bumped = false;
+  let maxTs = '';
   const additions = [];
   for (const m of messages) {
+    const direction = m.direction === 'in' ? 'in' : 'out';
+    const key = m.id ? `${direction}:${m.id}` : null;
+    if (key && refs.seenIds.has(key)) continue;
     const ts = m.timestamp || '';
-    const k = tsKey(ts);
-    if (!seenKey || k > seenKey) {
-      additions.push({ direction: m.direction === 'in' ? 'in' : 'out', text: m.text, files: m.files || null, ts });
-      if (k > maxKey) { maxKey = k; maxTs = ts; }
-      bumped = true;
-      if (m.direction !== 'in') maybeNotify(m.text, m.files || []);
-    }
+    additions.push({ direction, text: m.text, files: m.files || null, ts });
+    if (key) refs.seenIds.add(key);
+    if (ts > maxTs) maxTs = ts;
+    if (direction !== 'in') maybeNotify(m.text, m.files || []);
   }
-  if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
-  if (bumped) { refs.lastSeenTs = maxTs || refs.lastSeenTs; bumpActiveThread(maxTs); }
+  if (additions.length) {
+    chatMessages.value = chatMessages.value.concat(additions);
+    bumpActiveThread(maxTs);
+  }
 }
 
 export async function openChat(gid, resumeTid, opts) {
@@ -155,7 +163,6 @@ export async function openChat(gid, resumeTid, opts) {
   if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
   stopChatPoll();
   refs.reconnectAttempt = 0;
-  refs.lastSeenTs = '';
 
   let ct = 'web', mg = null, cs = true;
   if (opts && opts.channelType) {
@@ -183,7 +190,7 @@ export async function openChat(gid, resumeTid, opts) {
     // doesn't paint "No messages yet" between threadId set and history.
     writeHash();
     try {
-      const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin' });
+      const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin', cache: 'no-store' });
       if (r.ok) {
         const { messages } = await r.json();
         batch(() => {
@@ -195,7 +202,9 @@ export async function openChat(gid, resumeTid, opts) {
           }));
           chatLoading.value = false;
         });
-        if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
+        if (Array.isArray(messages)) {
+          refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${m.direction === 'in' ? 'in' : 'out'}:${m.id}`));
+        }
       } else {
         chatLoading.value = false;
       }
@@ -264,7 +273,7 @@ function connectChatWs() {
     let payload; try { payload = JSON.parse(ev.data); } catch (_) { return; }
     if (payload.kind === 'ready') return;
     if (payload.kind === 'inbound') {
-      appendMsg('in', payload.text, payload.files || null, payload.timestamp);
+      appendMsg('in', payload.text, payload.files || null, payload.timestamp, payload.id);
       updateActiveThreadTitleFromFirstMessage(payload.text);
       bumpActiveThread();
       return;
@@ -272,7 +281,7 @@ function connectChatWs() {
     if (payload.kind === 'outbound') {
       const c = payload.content || {};
       const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
-      appendMsg('out', text, payload.files || [], payload.timestamp);
+      appendMsg('out', text, payload.files || [], payload.timestamp, payload.id);
       bumpActiveThread();
       maybeNotify(text, payload.files || []);
       return;
@@ -285,13 +294,15 @@ export async function sendChat(text, files) {
   const isWeb = !channelType.value || channelType.value === 'web';
   const hasFiles = Array.isArray(files) && files.length > 0;
   // Cross-channel sends have no live tail — paint the user's bubble
-  // immediately. The 10s poll re-fetches the same row; tsKey gates it.
+  // immediately, then reconcile via a full refetch after success.
   if (!isWeb) {
     const now = new Date().toISOString();
     const fileMetas = hasFiles ? files.map((f) => ({ filename: f.name, size: f.size })) : null;
     // 'in' = viewer's own bubble (see chat-main CSS); 'out' is the agent.
+    // No id — the server-truth row arrives via the post-send full refetch
+    // (refetchThreadHistory(false)) which wipes optimistic bubbles and
+    // rebuilds seenIds from scratch.
     appendMsg('in', text || '', fileMetas, now);
-    refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
   if (!isWeb && messagingGroupId.value) {
@@ -469,10 +480,11 @@ export function clearPending() { pending.value = []; }
 // Keep relative-time labels fresh and recover messages missed while the
 // tab/phone was asleep. Two triggers:
 //   - 30s interval bumps nowTick so <RelativeTime> re-renders.
-//   - visibilitychange \u2192 visible: bump nowTick immediately, fetch any
-//     messages since refs.lastSeenTs, and force the WS to reconnect if
-//     it's not currently open (mobile OSes routinely silently kill
-//     sockets on resume without firing onclose).
+//   - visibilitychange → visible: bump nowTick immediately, refetch
+//     any new messages (dedup'd by row id against refs.seenIds), and
+//     force the WS to reconnect if it's not currently open (mobile
+//     OSes routinely silently kill sockets on resume without firing
+//     onclose).
 const NOW_TICK_MS = 30000;
 export function installLivenessHandlers() {
   setInterval(() => { if (!document.hidden) nowTick.value = Date.now(); }, NOW_TICK_MS);

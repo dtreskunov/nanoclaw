@@ -98,6 +98,11 @@ export interface OutboundMessage {
   kind: string;
   content: unknown; // parsed JSON from messages_out
   files?: OutboundFile[]; // file attachments from the session outbox
+  // Stable row id from messages_out. Threaded through so adapters that
+  // re-broadcast (web WS) can hand the client a key for dedup against
+  // history refetches. Optional because synthetic deliveries (e.g. the
+  // chat-api's "send via channel adapter" path) don't have one.
+  id?: string;
 }
 
 /** Discovered conversation info (from syncConversations). */
