@@ -250,6 +250,22 @@
       .files-pane .preview-toolbar .clippy.active { color: var(--fg, inherit); background: var(--accent); }
       .files-pane .preview-toolbar .clippy:disabled { opacity: 0.4; cursor: default; background: transparent; }
 
+      .files-pane .preview-meta {
+        margin: 0 0 12px 0;
+        padding: 8px 10px;
+        background: rgba(127,127,127,0.06);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 12px;
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 12px;
+        row-gap: 3px;
+      }
+      .files-pane .preview-meta .row { display: contents; }
+      .files-pane .preview-meta dt { color: var(--muted); white-space: nowrap; }
+      .files-pane .preview-meta dd { margin: 0; overflow-wrap: anywhere; }
+
       /* Drag-and-drop hint pinned to bottom of files-body */
       .files-pane .drop-hint {
         border-top: 1px solid var(--border);
