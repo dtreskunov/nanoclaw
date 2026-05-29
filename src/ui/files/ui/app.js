@@ -505,7 +505,7 @@
   function threadCtx(t) {
     if (!t) return null;
     if (!t.channelType || t.channelType === 'web') return null;
-    return { channelType: t.channelType, messagingGroupId: t.messagingGroupId };
+    return { channelType: t.channelType, messagingGroupId: t.messagingGroupId, canSend: !!t.canSend };
   }
 
   function renderThreads() {
@@ -599,22 +599,37 @@
     if (chat.reconnectTimer) { clearTimeout(chat.reconnectTimer); chat.reconnectTimer = null; }
     chat.channelType = 'web';
     chat.messagingGroupId = null;
+    chat.canSend = true;
     chat.lastSeenTs = '';
-    setComposerMode('web');
+    setComposerMode('web', true);
   }
 
-  function setComposerMode(channelType) {
+  function setComposerMode(channelType, canSend) {
     const form = $('chat-form');
     const banner = $('chat-readonly');
-    const isReadOnly = channelType && channelType !== 'web';
-    if (form) form.style.display = isReadOnly ? 'none' : '';
+    const subnotice = $('chat-subnotice');
+    const isWeb = !channelType || channelType === 'web';
+    const showComposer = isWeb || canSend;
+    if (form) form.style.display = showComposer ? '' : 'none';
     if (banner) {
-      banner.hidden = !isReadOnly;
-      if (isReadOnly) {
+      banner.hidden = showComposer;
+      if (!showComposer) {
         const meta = channelMeta(channelType);
         banner.textContent = `Read-only view — reply on ${meta.label} to continue this thread.`;
       } else {
         banner.textContent = '';
+      }
+    }
+    if (subnotice) {
+      if (showComposer && !isWeb) {
+        const meta = channelMeta(channelType);
+        const t = chat.threads.find((x) => x.threadId === chat.threadId);
+        const cp = t && t.counterparty ? ` · ${t.counterparty}` : '';
+        subnotice.hidden = false;
+        subnotice.textContent = `${meta.icon} Sending via ${meta.label}${cp}`;
+      } else {
+        subnotice.hidden = true;
+        subnotice.textContent = '';
       }
     }
   }
@@ -726,20 +741,23 @@
 
     // Resolve channel context. Explicit opts win; else try the thread rail
     // entry; else default to web.
-    let channelType = 'web', messagingGroupId = null;
+    let channelType = 'web', messagingGroupId = null, canSend = true;
     if (opts && opts.channelType) {
       channelType = opts.channelType;
       messagingGroupId = opts.messagingGroupId || null;
+      canSend = !!opts.canSend;
     } else if (resumeThreadId) {
       const t = chat.threads.find((x) => x.threadId === resumeThreadId);
       if (t && t.channelType && t.channelType !== 'web') {
         channelType = t.channelType;
         messagingGroupId = t.messagingGroupId || null;
+        canSend = !!t.canSend;
       }
     }
     chat.channelType = channelType;
     chat.messagingGroupId = messagingGroupId;
-    setComposerMode(channelType);
+    chat.canSend = channelType === 'web' ? true : canSend;
+    setComposerMode(channelType, chat.canSend);
 
     if (resumeThreadId) {
       chat.threadId = resumeThreadId;
@@ -762,7 +780,8 @@
     // New chat is web-only.
     chat.channelType = 'web';
     chat.messagingGroupId = null;
-    setComposerMode('web');
+    chat.canSend = true;
+    setComposerMode('web', true);
     setChatStatus('starting…');
     let started;
     try {
@@ -833,18 +852,31 @@
 
   async function sendChat(text, files) {
     if (!chat.groupId || !chat.threadId) return;
+    const isWeb = !chat.channelType || chat.channelType === 'web';
     const hasFiles = Array.isArray(files) && files.length > 0;
+    // Cross-channel sends have no live tail — paint the user's own bubble
+    // immediately so the UI feels responsive. The 10s poll will re-fetch
+    // the same row from the inbound DB (logged with _via:'web') and the
+    // tsKey gate in refetchThreadHistory skips already-seen timestamps.
+    if (!isWeb) {
+      const now = new Date().toISOString();
+      const fileMetas = hasFiles ? files.map((f) => ({ filename: f.name, size: f.size })) : null;
+      appendChatMsg('out', text || '', fileMetas, now);
+      chat.lastSeenTs = now;
+    }
+    let url = `api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`;
+    if (!isWeb && chat.messagingGroupId) {
+      url += `?channel=${encodeURIComponent(chat.channelType)}&mg=${encodeURIComponent(chat.messagingGroupId)}`;
+    }
     try {
       let res;
       if (hasFiles) {
         const fd = new FormData();
         fd.append('text', text || '');
         for (const f of files) fd.append('file', f, f.name);
-        res = await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
-          method: 'POST', credentials: 'same-origin', body: fd,
-        });
+        res = await fetch(url, { method: 'POST', credentials: 'same-origin', body: fd });
       } else {
-        res = await fetch(`api/groups/${encodeURIComponent(chat.groupId)}/chat/${encodeURIComponent(chat.threadId)}/send`, {
+        res = await fetch(url, {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
