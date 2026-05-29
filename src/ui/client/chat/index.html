@@ -156,8 +156,9 @@
       .chat-main .msg.markdown blockquote { border-left: 3px solid rgba(127,127,127,0.4); margin: 4px 0; padding: 0 8px; color: var(--muted); font-size: 12px; }
 
       .chat-main .status { padding: 0 16px; font-size: 11px; color: var(--muted); min-height: 14px; }
-      .chat-main .context { display: flex; align-items: center; gap: 4px; padding: 4px 16px; font-size: 11px; color: var(--muted); }
+      .chat-main .context { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 16px; font-size: 11px; color: var(--muted); }
       .chat-main .context .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent); padding: 2px 6px; border-radius: 10px; max-width: 100%; }
+      .chat-main .context .chip.auto { background: transparent; border: 1px dashed var(--border); color: var(--muted); }
       .chat-main .context .chip .path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; font-family: ui-monospace, monospace; }
       .chat-main .context .chip button { padding: 0 4px; border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; }
       .chat-main .pending { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 16px; font-size: 11px; color: var(--muted); }
@@ -246,6 +247,9 @@
       }
       .files-pane .preview-toolbar .meta { font-size: 11px; color: var(--muted); }
       .files-pane .preview-toolbar a.text-btn { text-decoration: none; display: inline-block; }
+      .files-pane .preview-toolbar .clippy { font-size: 13px; padding: 2px 6px; }
+      .files-pane .preview-toolbar .clippy.active { color: var(--fg, inherit); background: var(--accent); }
+      .files-pane .preview-toolbar .clippy:disabled { opacity: 0.4; cursor: default; background: transparent; }
 
       /* Drag-and-drop hint pinned to bottom of files-body */
       .files-pane .drop-hint {

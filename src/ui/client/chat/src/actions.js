@@ -5,7 +5,7 @@ import {
   groupId, threads, threadId, channelType, messagingGroupId, canSend,
   chatMessages, chatStatus, chatLoading, refs, treePath, filePath, treeEntries,
   treeError, contextDismissed, pending, previewBlock, paneOpen, drawerOpen,
-  isMobile, nowTick, POLL_INTERVAL_MS, THREADS_POLL_MS,
+  isMobile, nowTick, pinnedContext, POLL_INTERVAL_MS, THREADS_POLL_MS,
 } from './state.js';
 import { api } from './api.js';
 import { writeHash } from './hash.js';
@@ -441,6 +441,17 @@ export function currentContextPath() {
   if (treePath.value) return { path: treePath.value.replace(/\/?$/, '/'), kind: 'dir' };
   return null;
 }
+
+// ── pinned file-browser context ────────────────────────────────────
+export function togglePinnedFile(path) {
+  if (!path) return;
+  const cur = pinnedContext.value;
+  pinnedContext.value = cur.includes(path) ? cur.filter((p) => p !== path) : cur.concat(path);
+}
+export function removePinnedPath(path) {
+  pinnedContext.value = pinnedContext.value.filter((p) => p !== path);
+}
+export function clearPinnedContext() { pinnedContext.value = []; }
 
 // ── pending uploads in composer ─────────────────────────────────────
 export function addPendingFiles(fileList, max, maxSize, maxTotal) {

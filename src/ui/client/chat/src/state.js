@@ -47,6 +47,12 @@ export const previewBlock = signal(null);  // { kind, url?, html?, text?, mime?,
 // <RelativeTime> components re-render and "5m" doesn't go stale.
 export const nowTick = signal(Date.now());
 
+// Explicit file-browser context pinned by the user via the clippy
+// button in the preview toolbar. Each entry is a file path (string)
+// relative to the group workspace. Sent as a markdown context block
+// prefixed to the next outbound message, then cleared.
+export const pinnedContext = signal([]);
+
 // ── non-reactive refs (mutated outside render) ──────────────────────
 export const refs = {
   ws: null,
