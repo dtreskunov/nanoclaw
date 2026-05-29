@@ -51,10 +51,20 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         git \
         tini \
         unzip \
+        python3 \
+        python3-venv \
+        python3-pip \
     && if [ "$INSTALL_CJK_FONTS" = "true" ]; then \
         apt-get install -y --no-install-recommends fonts-noto-cjk; \
        fi \
     && rm -rf /var/lib/apt/lists/*
+
+# Shared Python venv so per-group `pip install` at image-rebuild time goes
+# into an isolated, world-readable location (no PEP 668 --break-system-packages).
+# Put its bin on PATH so installed console scripts (yt-dlp, etc.) resolve.
+RUN python3 -m venv /opt/agent-venv && \
+    /opt/agent-venv/bin/pip install --no-cache-dir --upgrade pip
+ENV PATH="/opt/agent-venv/bin:$PATH"
 
 # Chromium path for agent-browser / Playwright consumers
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
