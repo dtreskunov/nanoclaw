@@ -23,6 +23,7 @@
     reconnectTimer: null,
     reconnectAttempt: 0,
     pollTimer: null,
+    threadsPollTimer: null,
     lastSeenTs: '',
     pending: [],
     contextDismissed: false,
@@ -302,6 +303,13 @@
     clearUploadStrip();
     syncGroupSelect();
     await loadThreads(id);
+    // Periodically refresh the thread rail so newly-arrived inbound
+    // threads (e.g. fresh email) appear without a manual reload.
+    if (chat.threadsPollTimer) { clearInterval(chat.threadsPollTimer); chat.threadsPollTimer = null; }
+    chat.threadsPollTimer = setInterval(() => {
+      if (state.groupId === id) loadThreads(id).catch(() => {});
+      else { clearInterval(chat.threadsPollTimer); chat.threadsPollTimer = null; }
+    }, 20000);
     await loadTree('');
     onSelectionChanged();
     // Auto-resume most recent thread on group switch.
