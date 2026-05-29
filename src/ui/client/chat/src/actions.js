@@ -3,7 +3,7 @@
 import { batch } from '@preact/signals';
 import {
   groupId, threads, threadId, channelType, messagingGroupId, canSend,
-  chatMessages, chatStatus, chatLoading, refs, treePath, filePath, treeEntries,
+  chatMessages, chatStatus, chatLoading, isTyping, typingHint, refs, treePath, filePath, treeEntries,
   treeError, pending, previewBlock, paneOpen, drawerOpen,
   isMobile, nowTick, pinnedContext, POLL_INTERVAL_MS, THREADS_POLL_MS,
 } from './state.js';
@@ -259,6 +259,8 @@ function connectChatWs() {
   ws.onclose = () => {
     if (refs.ws !== ws) return;
     refs.ws = null;
+    isTyping.value = false;
+    typingHint.value = '';
     if (groupId.value !== gid || threadId.value !== tid) return;
     const attempt = ++refs.reconnectAttempt;
     const delay = Math.min(15000, 500 * Math.pow(2, attempt - 1));
@@ -272,6 +274,7 @@ function connectChatWs() {
   ws.onmessage = (ev) => {
     let payload; try { payload = JSON.parse(ev.data); } catch (_) { return; }
     if (payload.kind === 'ready') return;
+    if (payload.kind === 'typing') { isTyping.value = !!payload.on; typingHint.value = payload.hint || ''; return; }
     if (payload.kind === 'inbound') {
       appendMsg('in', payload.text, payload.files || null, payload.timestamp, payload.id);
       updateActiveThreadTitleFromFirstMessage(payload.text);

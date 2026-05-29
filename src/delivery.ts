@@ -23,7 +23,7 @@ import {
 import { log } from './log.js';
 import { normalizeOptions } from './channels/ask-question.js';
 import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './session-manager.js';
-import { pauseTypingRefreshAfterDelivery, setTypingAdapter } from './modules/typing/index.js';
+import { checkTurnEndedAndStop, setTypingAdapter } from './modules/typing/index.js';
 import type { OutboundFile } from './channels/adapter.js';
 import type { Session } from './types.js';
 
@@ -59,7 +59,8 @@ export interface ChannelDeliveryAdapter {
     files?: OutboundFile[],
     id?: string,
   ): Promise<string | undefined>;
-  setTyping?(channelType: string, platformId: string, threadId: string | null): Promise<void>;
+  setTyping?(channelType: string, platformId: string, threadId: string | null, hint?: string): Promise<void>;
+  clearTyping?(channelType: string, platformId: string, threadId: string | null): Promise<void>;
 }
 
 let deliveryAdapter: ChannelDeliveryAdapter | null = null;
@@ -126,6 +127,11 @@ async function pollActive(): Promise<void> {
     const sessions = getRunningSessions();
     for (const session of sessions) {
       await deliverSessionMessages(session);
+      // Drop the typing indicator as soon as the container marks the
+      // turn ended (set on the SDK's result/error event). This runs
+      // every active tick so the dots clear within ~1s of the agent
+      // finishing — the in-module 4s refresh tick is the fallback.
+      checkTurnEndedAndStop(session.id);
     }
   } catch (err) {
     log.error('Active delivery poll error', { err });
@@ -194,15 +200,10 @@ async function drainSession(session: Session): Promise<void> {
         markDelivered(inDb, msg.id, platformMsgId ?? null);
         deliveryAttempts.delete(msg.id);
 
-        // Pause the typing indicator after a real user-facing message
-        // lands on the user's screen, so the client has time to visually
-        // clear the indicator before the next heartbeat tick brings it
-        // back. Skip the pause for internal traffic (system actions,
-        // agent-to-agent routing) — the user doesn't see those and
-        // shouldn't get a gap in their typing indicator for them.
-        if (msg.kind !== 'system' && msg.channel_type !== 'agent') {
-          pauseTypingRefreshAfterDelivery(session.id);
-        }
+        // No post-delivery typing pause: turn_ended_at is now the
+        // authoritative "nothing more is coming" signal, checked
+        // on every active delivery tick. Intermediate deliveries
+        // leave the indicator alone; the final result clears it.
       } catch (err) {
         const attempts = (deliveryAttempts.get(msg.id) ?? 0) + 1;
         deliveryAttempts.set(msg.id, attempts);

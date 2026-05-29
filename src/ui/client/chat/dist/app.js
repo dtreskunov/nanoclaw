@@ -15158,6 +15158,8 @@ var canSend = y3(true);
 var chatMessages = y3([]);
 var chatStatus = y3("");
 var chatLoading = y3(false);
+var isTyping = y3(false);
+var typingHint = y3("");
 var pending = y3([]);
 var paneOpen = {
   threads: y3(true),
@@ -16940,6 +16942,8 @@ function connectChatWs() {
   ws.onclose = () => {
     if (refs.ws !== ws) return;
     refs.ws = null;
+    isTyping.value = false;
+    typingHint.value = "";
     if (groupId.value !== gid || threadId.value !== tid) return;
     const attempt = ++refs.reconnectAttempt;
     const delay = Math.min(15e3, 500 * Math.pow(2, attempt - 1));
@@ -16960,6 +16964,11 @@ function connectChatWs() {
       return;
     }
     if (payload.kind === "ready") return;
+    if (payload.kind === "typing") {
+      isTyping.value = !!payload.on;
+      typingHint.value = payload.hint || "";
+      return;
+    }
     if (payload.kind === "inbound") {
       appendMsg("in", payload.text, payload.files || null, payload.timestamp, payload.id);
       updateActiveThreadTitleFromFirstMessage(payload.text);
@@ -17389,9 +17398,14 @@ function MessageLog() {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   });
   const list = chatMessages.value;
+  const typing = isTyping.value && threadId.value && !chatLoading.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
       ${chatLoading.value ? null : !threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : list.map((m6, i4) => html`<${Message} key=${i4} m=${m6} />`)}
+      ${typing ? html`<div class="typing" aria-live="polite">
+            <span></span><span></span><span></span>
+            ${typingHint.value ? html`<span class="hint">${typingHint.value}</span>` : null}
+          </div>` : null}
     </div>
   `;
 }
