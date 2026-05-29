@@ -3968,7 +3968,7 @@ function Preview() {
       ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
     </dl>
   `;
-  const fileMeta = isMedia && fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
+  const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
   const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
   const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;
   let body = null;
