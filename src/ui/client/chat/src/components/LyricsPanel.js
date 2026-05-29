@@ -87,7 +87,11 @@ export function LyricsPanel({ text }) {
   const seek = (sec) => {
     const media = document.querySelector('.media-player audio, .media-player video');
     if (!media) return;
-    const target = Math.max(0, sec + parsed.offset);
+    // Overshoot by a small epsilon: the browser quantizes `currentTime`
+    // on seek (often slightly downward) and a subsequent `seeked` event
+    // overwrites mediaCurrentTime — without the cushion, findActiveIdx
+    // then picks the previous line.
+    const target = Math.max(0, sec + parsed.offset + 0.03);
     media.currentTime = target;
     mediaCurrentTime.value = target;
     const p = media.play();

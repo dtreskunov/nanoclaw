@@ -17910,7 +17910,7 @@ function LyricsPanel({ text }) {
   const seek = (sec) => {
     const media = document.querySelector(".media-player audio, .media-player video");
     if (!media) return;
-    const target = Math.max(0, sec + parsed.offset);
+    const target = Math.max(0, sec + parsed.offset + 0.03);
     media.currentTime = target;
     mediaCurrentTime.value = target;
     const p5 = media.play();
