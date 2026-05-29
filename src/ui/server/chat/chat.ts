@@ -400,7 +400,7 @@ interface HistoryMessage {
   id: string;
   timestamp: string;
   text: string;
-  files?: { filename: string; size: number }[];
+  files?: { filename: string; size: number; path?: string }[];
 }
 
 /**
@@ -679,17 +679,34 @@ function parseInboundContent(
   return null;
 }
 
-function parseOutboundContent(content: string): { text: string; files?: { filename: string; size: number }[] } {
+function parseOutboundContent(content: string): {
+  text: string;
+  files?: { filename: string; size: number; path?: string }[];
+} {
   try {
     const o = JSON.parse(content);
     if (typeof o === 'string') return { text: o };
     const text = typeof o?.text === 'string' ? o.text : typeof o?.markdown === 'string' ? o.markdown : '';
+    // file_paths is a parallel array to files written by send_file with
+    // workspace-relative source paths (or null when the source isn't in
+    // /workspace/agent). Lets the chat UI link the chip to the FILES
+    // panel without changing the established `files: string[]` contract
+    // that delivery / readOutboxFiles depend on.
+    const filePaths: (string | null | undefined)[] = Array.isArray(o?.file_paths) ? o.file_paths : [];
     const files = Array.isArray(o?.files)
       ? o.files
-          .map((f: { filename?: string; name?: string; size?: number }) => ({
-            filename: String(f?.filename ?? f?.name ?? ''),
-            size: typeof f?.size === 'number' ? f.size : 0,
-          }))
+          .map((f: { filename?: string; name?: string; size?: number } | string, i: number) => {
+            if (typeof f === 'string') {
+              const p = filePaths[i];
+              return { filename: f, size: 0, path: typeof p === 'string' ? p : undefined };
+            }
+            const p = filePaths[i];
+            return {
+              filename: String(f?.filename ?? f?.name ?? ''),
+              size: typeof f?.size === 'number' ? f.size : 0,
+              path: typeof p === 'string' ? p : undefined,
+            };
+          })
           .filter((f: { filename: string }) => f.filename)
       : undefined;
     return { text, files };
@@ -1208,13 +1225,24 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
   const subscriber: WebSubscriber = {
     onOutbound(message) {
       try {
+        // send_file writes a `file_paths` array parallel to `files` with
+        // workspace-relative source paths so the chat UI can link the
+        // attachment chip into the FILES panel. Fish it out of the
+        // parsed content (delivery.ts has already JSON.parsed it).
+        const c = (typeof message.content === 'object' && message.content) as { file_paths?: unknown } | undefined;
+        const filePaths: unknown[] = Array.isArray(c?.file_paths) ? c!.file_paths! : [];
         ws.send(
           JSON.stringify({
             kind: 'outbound',
             id: message.id,
             messageKind: message.kind,
             content: message.content,
-            files: message.files?.map((f) => ({ filename: f.filename, size: f.data.length })) ?? [],
+            files:
+              message.files?.map((f, i) => ({
+                filename: f.filename,
+                size: f.data.length,
+                path: typeof filePaths[i] === 'string' ? (filePaths[i] as string) : undefined,
+              })) ?? [],
             timestamp: new Date().toISOString(),
           }),
         );
