@@ -3734,17 +3734,10 @@ function MediaPlayer({ kind, url, name }) {
 
 // src/components/LyricsPanel.js
 var TS_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
-var OFFSET_RE = /^\s*\[offset:\s*([+-]?\d+)\s*\]\s*$/i;
 function parseLyrics(text) {
   const lines = [];
   let sawTimestamp = false;
-  let lrcOffset = 0;
   for (const raw of text.split(/\r?\n/)) {
-    const om = OFFSET_RE.exec(raw);
-    if (om) {
-      lrcOffset = Number(om[1]) / 1e3;
-      continue;
-    }
     const times = [];
     let m6;
     TS_RE.lastIndex = 0;
@@ -3762,9 +3755,9 @@ function parseLyrics(text) {
     sawTimestamp = true;
     for (const t5 of times) lines.push({ t: t5, text: content });
   }
-  if (!sawTimestamp) return { synced: false, lines, lrcOffset: 0 };
+  if (!sawTimestamp) return { synced: false, lines };
   const synced = lines.filter((l7) => l7.t != null).sort((a4, b4) => a4.t - b4.t);
-  return { synced: true, lines: synced, lrcOffset };
+  return { synced: true, lines: synced };
 }
 function findActiveIdx(lines, t5) {
   let lo = 0;
@@ -3781,32 +3774,10 @@ function findActiveIdx(lines, t5) {
   }
   return ans;
 }
-var OFFSET_KEY_PREFIX = "nanoclaw.lyricsOffset.";
-function loadUserOffset(path) {
-  if (!path) return 0;
-  try {
-    return Number(localStorage.getItem(OFFSET_KEY_PREFIX + path)) || 0;
-  } catch {
-    return 0;
-  }
-}
-function saveUserOffset(path, sec) {
-  if (!path) return;
-  try {
-    if (sec === 0) localStorage.removeItem(OFFSET_KEY_PREFIX + path);
-    else localStorage.setItem(OFFSET_KEY_PREFIX + path, String(sec));
-  } catch {
-  }
-}
-function LyricsPanel({ text, path }) {
+function LyricsPanel({ text }) {
   const parsed = T2(() => parseLyrics(text || ""), [text]);
-  const [userOffset, setUserOffset] = h2(() => loadUserOffset(path));
-  y2(() => {
-    setUserOffset(loadUserOffset(path));
-  }, [path]);
-  const currentTime = mediaCurrentTime.value;
-  const effective = currentTime - parsed.lrcOffset + userOffset;
-  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, effective) : -1;
+  const t5 = mediaCurrentTime.value;
+  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, t5) : -1;
   const scrollerRef = A2(null);
   const activeRef = A2(null);
   const lastIdxRef = A2(-2);
@@ -3821,40 +3792,15 @@ function LyricsPanel({ text, path }) {
     const delta = elRect.top - cRect.top - (c4.clientHeight - el.clientHeight) / 2;
     c4.scrollBy({ top: delta, behavior: "smooth" });
   }, [activeIdx]);
-  const seek = (lineT) => {
-    const audioT = lineT + parsed.lrcOffset - userOffset;
+  const seek = (sec) => {
     const media = document.querySelector(".media-player audio, .media-player video");
     if (media) {
-      media.currentTime = Math.max(0, audioT);
-      mediaCurrentTime.value = media.currentTime;
+      media.currentTime = sec;
+      mediaCurrentTime.value = sec;
     }
-  };
-  const nudge = (delta) => {
-    const next = Math.round((userOffset + delta) * 10) / 10;
-    setUserOffset(next);
-    saveUserOffset(path, next);
-  };
-  const syncHere = () => {
-    if (activeIdx < 0) return;
-    const lineT = parsed.lines[activeIdx].t;
-    const next = Math.round((lineT - (currentTime - parsed.lrcOffset)) * 10) / 10;
-    setUserOffset(next);
-    saveUserOffset(path, next);
-  };
-  const reset = () => {
-    setUserOffset(0);
-    saveUserOffset(path, 0);
   };
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>
-      ${parsed.synced ? html`
-        <div class="lyrics-offset" title="Lyrics sync offset (saved per file). Negative = lyrics earlier, positive = lyrics later.">
-          <button type="button" onClick=${() => nudge(-0.5)} title="Lyrics 0.5s earlier">\u2212</button>
-          <button type="button" class="lyrics-offset-val" onClick=${reset} title="Reset to 0">${formatOffset(userOffset)}</button>
-          <button type="button" onClick=${() => nudge(0.5)} title="Lyrics 0.5s later">+</button>
-          <button type="button" class="lyrics-offset-sync" onClick=${syncHere} title="Sync the highlighted line to the current playback time">sync</button>
-        </div>
-      ` : null}
       ${parsed.synced ? html`<ol class="lyrics-synced">
             ${parsed.lines.map((l7, i4) => html`
               <li key=${i4}
@@ -3871,10 +3817,6 @@ function formatTime(s5) {
   const m6 = Math.floor(s5 / 60);
   const sec = Math.floor(s5 % 60);
   return `${m6}:${String(sec).padStart(2, "0")}`;
-}
-function formatOffset(s5) {
-  if (s5 === 0) return "0.0s";
-  return `${s5 > 0 ? "+" : ""}${s5.toFixed(1)}s`;
 }
 
 // src/components/FilesPane.js
@@ -4010,7 +3952,7 @@ function Preview() {
   `;
   const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
   const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
-  const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} path=${p5.path} />` : null;
+  const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;
   let body = null;
   if (p5.kind === "image") body = html`<img alt=${p5.name} src=${p5.url} />`;
   else if (p5.kind === "pdf") body = html`<iframe src=${p5.url} style="width:100%;height:90vh;border:0" />`;
