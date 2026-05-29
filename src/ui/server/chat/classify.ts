@@ -35,15 +35,18 @@ export function classify(relPath: string): Classification {
   const segments = relPath.split('/').filter(Boolean);
   for (const seg of segments) {
     if (HIDDEN_NAMES.has(seg)) return { kind: 'hidden' };
-    // Hide dotfiles by default (members) — but allow CLAUDE.local.md and other
-    // explicit names through. Anything starting with "." that isn't in our
-    // allow-listed-visible set is hidden.
-    if (seg.startsWith('.') && seg !== '.well-known') return { kind: 'hidden' };
   }
   const base = segments[segments.length - 1] ?? '';
   if (ADMIN_ONLY_NAMES.has(base)) return { kind: 'visible', tier: 'admin', readonly: true };
   // CLAUDE.local.md visible to members but RO (write surface is deferred).
   if (base === 'CLAUDE.local.md') return { kind: 'visible', tier: 'member', readonly: true };
+  // Dotfiles and dot-directories: visible to admins only. Always RO via the
+  // UI — these tend to be runtime plumbing or carry secrets, and an in-place
+  // edit through the file API is rarely what you want. Use the agent / shell
+  // to modify them deliberately.
+  if (segments.some((s) => s.startsWith('.') && s !== '.well-known')) {
+    return { kind: 'visible', tier: 'admin', readonly: true };
+  }
   return { kind: 'visible', tier: 'member', readonly: true };
 }
 
@@ -66,7 +69,8 @@ export function canWrite(
   const segments = relPath.split('/').filter(Boolean);
   for (const seg of segments) {
     if (HIDDEN_NAMES.has(seg)) return { ok: false, reason: 'hidden' };
-    if (seg.startsWith('.') && seg !== '.well-known') return { ok: false, reason: 'hidden' };
+    // Dotfiles are visible to admins (read) but never writable via the UI.
+    if (seg.startsWith('.') && seg !== '.well-known') return { ok: false, reason: 'protected' };
   }
   const base = segments[segments.length - 1] ?? '';
   if (ADMIN_ONLY_NAMES.has(base)) return { ok: false, reason: 'protected' };
