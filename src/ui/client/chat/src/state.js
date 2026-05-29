@@ -20,6 +20,7 @@ export const messagingGroupId = signal(null);
 export const canSend = signal(true);
 export const chatMessages = signal([]);
 export const chatStatus = signal('');
+export const chatLoading = signal(false);
 export const pending = signal([]);
 export const contextDismissed = signal(false);
 
