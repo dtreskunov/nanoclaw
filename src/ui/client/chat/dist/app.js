@@ -2961,40 +2961,67 @@ async function selectFile(entry) {
   } catch (_5) {
   }
   const ext = entry.name.toLowerCase().split(".").pop();
-  const meta = { name: entry.name, size, mtime, url };
-  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
-    previewBlock.value = { kind: "image", ...meta };
-    return;
-  }
-  if (["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "weba"].includes(ext)) {
-    previewBlock.value = { kind: "audio", ...meta };
-    return;
-  }
-  if (["mp4", "m4v", "mov", "webm", "ogv"].includes(ext)) {
-    previewBlock.value = { kind: "video", ...meta };
-    return;
-  }
-  if (ext === "pdf") {
-    previewBlock.value = { kind: "pdf", ...meta };
-    return;
-  }
-  try {
-    const r4 = await fetch(url, { credentials: "same-origin" });
-    if (!r4.ok) {
-      previewBlock.value = { kind: "error", text: `HTTP ${r4.status}`, ...meta };
-      return;
+  const meta = { name: entry.name, size, mtime, url, path: entry.path };
+  const mediaExts = /* @__PURE__ */ new Set([
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "webp",
+    "tif",
+    "tiff",
+    "heic",
+    "heif",
+    "mp3",
+    "m4a",
+    "aac",
+    "wav",
+    "ogg",
+    "oga",
+    "opus",
+    "flac",
+    "weba",
+    "mp4",
+    "m4v",
+    "mov",
+    "webm",
+    "ogv"
+  ]);
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) previewBlock.value = { kind: "image", ...meta };
+  else if (["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "weba"].includes(ext)) previewBlock.value = { kind: "audio", ...meta };
+  else if (["mp4", "m4v", "mov", "webm", "ogv"].includes(ext)) previewBlock.value = { kind: "video", ...meta };
+  else if (ext === "pdf") previewBlock.value = { kind: "pdf", ...meta };
+  else {
+    try {
+      const r4 = await fetch(url, { credentials: "same-origin" });
+      if (!r4.ok) {
+        previewBlock.value = { kind: "error", text: `HTTP ${r4.status}`, ...meta };
+        return;
+      }
+      const ctType = r4.headers.get("content-type") || "";
+      if (ctType.startsWith("text/") || ctType.includes("json") || ctType.includes("xml")) {
+        const txt = await r4.text();
+        const isMd = ext === "md" || ext === "markdown";
+        previewBlock.value = { kind: isMd ? "markdown" : "text", text: txt, ...meta };
+      } else {
+        previewBlock.value = { kind: "binary", mime: ctType, ...meta };
+      }
+    } catch (err) {
+      previewBlock.value = { kind: "error", text: String(err && err.message || err), ...meta };
     }
-    const ctType = r4.headers.get("content-type") || "";
-    if (ctType.startsWith("text/") || ctType.includes("json") || ctType.includes("xml")) {
-      const txt = await r4.text();
-      const isMd = ext === "md" || ext === "markdown";
-      previewBlock.value = { kind: isMd ? "markdown" : "text", text: txt, ...meta };
-    } else {
-      previewBlock.value = { kind: "binary", mime: ctType, ...meta };
-    }
-  } catch (err) {
-    previewBlock.value = { kind: "error", text: String(err && err.message || err), ...meta };
   }
+  if (mediaExts.has(ext)) fetchAndAttachMeta(entry.path).catch(() => {
+  });
+}
+async function fetchAndAttachMeta(p4) {
+  const gid = groupId.value;
+  const u4 = `api/groups/${encodeURIComponent(gid)}/meta?path=${encodeURIComponent(p4)}`;
+  const r4 = await fetch(u4, { credentials: "same-origin", cache: "no-store" });
+  if (!r4.ok) return;
+  const data = await r4.json();
+  const cur = previewBlock.value;
+  if (!cur || cur.path !== p4) return;
+  previewBlock.value = { ...cur, tags: data.tags || null, mime: data.mime || cur.mime };
 }
 function closePreview() {
   n2(() => {
@@ -3647,6 +3674,17 @@ function Preview() {
       <button class="text-btn" onClick=${closePreview} style="margin-left:auto" title="Close preview">\u00d7</button>
     </div>
   `;
+  const metaRows = [];
+  if (p4.mime) metaRows.push(["Type", p4.mime]);
+  if (p4.size != null) metaRows.push(["Size", fmtBytes(p4.size)]);
+  if (p4.mtime) metaRows.push(["Modified", new Date(p4.mtime).toLocaleString()]);
+  if (p4.tags) for (const [k4, v5] of Object.entries(p4.tags)) metaRows.push([k4, String(v5)]);
+  const isMedia = p4.kind === "image" || p4.kind === "audio" || p4.kind === "video" || p4.kind === "pdf";
+  const meta = isMedia && metaRows.length > 0 ? html`
+    <dl class="preview-meta">
+      ${metaRows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
+    </dl>
+  ` : null;
   let body = null;
   if (p4.kind === "image") body = html`<img alt=${p4.name} src=${p4.url} />`;
   else if (p4.kind === "audio") body = html`<audio controls preload="metadata" src=${p4.url} />`;
@@ -3658,7 +3696,7 @@ function Preview() {
   } else if (p4.kind === "text") body = html`<pre>${p4.text}</pre>`;
   else if (p4.kind === "binary") body = html`<div class="empty">Binary file (${p4.mime}).</div>`;
   else if (p4.kind === "error") body = html`<div class="empty">${p4.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${meta}${body}</div>`;
 }
 function FilesPane() {
   const previewing = !!previewBlock.value;
