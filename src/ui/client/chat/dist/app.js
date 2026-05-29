@@ -1011,6 +1011,7 @@ var messagingGroupId = y3(null);
 var canSend = y3(true);
 var chatMessages = y3([]);
 var chatStatus = y3("");
+var chatLoading = y3(false);
 var pending = y3([]);
 var contextDismissed = y3(false);
 var paneOpen = {
@@ -2582,6 +2583,7 @@ function clearChat() {
   n2(() => {
     chatMessages.value = [];
     chatStatus.value = "";
+    chatLoading.value = false;
     threadId.value = null;
     channelType.value = "web";
     messagingGroupId.value = null;
@@ -2704,25 +2706,34 @@ async function openChat(gid, resumeTid, opts) {
     channelType.value = ct;
     messagingGroupId.value = mg;
     canSend.value = ct === "web" ? true : cs;
+    if (resumeTid) {
+      threadId.value = resumeTid;
+      chatLoading.value = true;
+      chatStatus.value = "loading history\u2026";
+    }
   });
   if (resumeTid) {
-    threadId.value = resumeTid;
     writeHash();
-    chatStatus.value = "loading history\u2026";
     try {
       const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin" });
       if (r4.ok) {
         const { messages } = await r4.json();
-        chatMessages.value = (messages || []).map((m6) => ({
-          direction: m6.direction === "in" ? "in" : "out",
-          text: m6.text,
-          files: m6.files || null,
-          ts: m6.timestamp
-        }));
+        n2(() => {
+          chatMessages.value = (messages || []).map((m6) => ({
+            direction: m6.direction === "in" ? "in" : "out",
+            text: m6.text,
+            files: m6.files || null,
+            ts: m6.timestamp
+          }));
+          chatLoading.value = false;
+        });
         if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
+      } else {
+        chatLoading.value = false;
       }
     } catch (err) {
       console.error("history load failed", err);
+      chatLoading.value = false;
     }
     if (ct === "web") connectChatWs();
     else {
@@ -3167,7 +3178,7 @@ function MessageLog() {
   const list = chatMessages.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
-      ${!threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : list.map((m6, i4) => html`<${Message} key=${i4} m=${m6} />`)}
+      ${chatLoading.value ? null : !threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : list.map((m6, i4) => html`<${Message} key=${i4} m=${m6} />`)}
     </div>
   `;
 }
@@ -3824,6 +3835,8 @@ async function init() {
     return;
   }
   applyAdminFlag();
+  const parsed = parseHash();
+  if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error("initial route failed", err));
   D(html`<${App} />`, document.getElementById("app"));
 }

@@ -7,7 +7,8 @@ import { me, groups } from './state.js';
 import { App } from './components/App.js';
 import { initNotif } from './notify.js';
 import { restorePanelState, applyPanelClasses } from './panels.js';
-import { applyHash, applyAdminFlag } from './hash.js';
+import { applyHash, applyAdminFlag, parseHash } from './hash.js';
+import { chatLoading } from './state.js';
 import { router } from './router.js';
 
 function sortGroups(list) {
@@ -63,6 +64,11 @@ async function init() {
   // triggered by selectGroup will still complete later, but the layout
   // itself is settled.
   applyAdminFlag();
+  // If the URL points at a thread or a group with prior threads, suppress
+  // the "Pick or start / No messages yet" empty states until history
+  // arrives. applyHash will toggle chatLoading off when it does.
+  const parsed = parseHash();
+  if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error('initial route failed', err));
   render(html`<${App} />`, document.getElementById('app'));
 }
