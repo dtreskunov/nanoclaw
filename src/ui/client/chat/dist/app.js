@@ -3964,7 +3964,7 @@ function Preview() {
   } else if (p5.kind === "text") body = html`<pre>${p5.text}</pre>`;
   else if (p5.kind === "binary") body = html`<div class="empty">Binary file (${p5.mime}).</div>`;
   else if (p5.kind === "error") body = html`<div class="empty">${p5.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${fileMeta}${tagMeta}${lyrics}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${fileMeta}${tagMeta}${body}</div>`;
 }
 function FilesPane() {
   const previewing = !!previewBlock.value;

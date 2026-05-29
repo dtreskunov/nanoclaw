@@ -174,7 +174,7 @@ function Preview() {
   } else if (p.kind === 'text') body = html`<pre>${p.text}</pre>`;
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${fileMeta}${tagMeta}${lyrics}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${fileMeta}${tagMeta}${body}</div>`;
 }
 
 export function FilesPane() {
