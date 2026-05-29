@@ -3936,7 +3936,7 @@ function FilesPane() {
         <${UploadStrip} />
         <${Listing} />
         <div class="drop-hint admin-only" id="dropzone">
-          Drag &amp; drop files here to upload to <code id="dropzone-path">/${treePath.value}</code>
+          Drag & drop files here to upload to <code id="dropzone-path">/${treePath.value}</code>
         </div>
         <${Preview} />
       </div>
