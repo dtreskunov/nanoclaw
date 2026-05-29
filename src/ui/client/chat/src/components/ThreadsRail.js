@@ -5,8 +5,9 @@ import {
   threads, threadId, groupId, drawerOpen, channelMeta,
 } from '../state.js';
 import { openChat, deleteThread } from '../actions.js';
-import { tsKey, fmtRelative, fmtAbsolute } from '../utils.js';
+import { tsKey } from '../utils.js';
 import { Pane } from './Pane.js';
+import { RelativeTime } from './RelativeTime.js';
 
 function threadCtxOf(t) {
   if (!t || !t.channelType || t.channelType === 'web') return null;
@@ -18,7 +19,7 @@ function ThreadRow({ t }) {
   const meta = channelMeta(ct);
   const active = t.threadId === threadId.value;
   const pillTitle = `${meta.label}${t.counterparty ? ' · ' + t.counterparty : ''}`;
-  const subMeta = `${fmtRelative(t.lastActivityAt)}${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}${ct !== 'web' && t.counterparty ? ' · ' + t.counterparty : ''}`;
+  const subTrailer = `${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}${ct !== 'web' && t.counterparty ? ' · ' + t.counterparty : ''}`;
   const onOpen = (ev) => {
     if (ev.target.classList.contains('del')) return;
     openChat(groupId.value, t.threadId, threadCtxOf(t)).catch(console.error);
@@ -35,7 +36,7 @@ function ThreadRow({ t }) {
         ${ct !== 'web' ? html`<span class="ch-pill" title=${pillTitle}>${meta.icon}</span>` : null}
         ${t.title}
       </div>
-      <div class="meta" title=${fmtAbsolute(t.lastActivityAt)}>${subMeta}</div>
+      <div class="meta"><${RelativeTime} ts=${t.lastActivityAt} />${subTrailer}</div>
       ${ct === 'web' ? html`<button type="button" class="del" title="Delete chat" aria-label="Delete chat" onClick=${onDel}>\u00d7</button>` : null}
     </div>
   `;

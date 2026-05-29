@@ -11,8 +11,9 @@ import {
   mkdirPrompt, touchPrompt, uploadFiles, renameEntry, deleteEntry,
   clearUploadStrip, resolveConflict, notifyAgent,
 } from '../uploads.js';
-import { fmtBytes, fmtRelative, fmtAbsolute, renderMarkdown, parentPath } from '../utils.js';
+import { fmtBytes, renderMarkdown, parentPath } from '../utils.js';
 import { Pane } from './Pane.js';
+import { RelativeTime } from './RelativeTime.js';
 
 function Crumb() {
   const ref = useRef(null);
@@ -58,7 +59,7 @@ function Row({ e }) {
       <div>${e.type === 'dir' ? '\uD83D\uDCC1' : '\uD83D\uDCC4'}</div>
       <div class="name">${e.name}</div>
       <div class="size">${fmtBytes(e.size)}</div>
-      <div class="meta" title=${fmtAbsolute(e.mtime)}>${fmtRelative(e.mtime)}</div>
+      <div class="meta"><${RelativeTime} ts=${e.mtime} /></div>
       <div class="row-actions admin-only">
         <button type="button" class="act-ren" title="Rename" onClick=${(ev) => { ev.stopPropagation(); renameEntry(e); }}>\u270e</button>
         <button type="button" class="act-del" title="Delete" onClick=${(ev) => { ev.stopPropagation(); deleteEntry(e); }}>\uD83D\uDDD1</button>
@@ -126,7 +127,7 @@ function Preview() {
     <div class="preview-toolbar">
       <a class="text-btn" href=${p.url} download=${p.name}>Download</a>
       ${p.size != null ? html`<span class="meta">${fmtBytes(p.size)}</span>` : null}
-      ${p.mtime ? html`<span class="meta ts" title=${fmtAbsolute(p.mtime)}>${fmtRelative(p.mtime)}</span>` : null}
+      ${p.mtime ? html`<${RelativeTime} ts=${p.mtime} className="meta ts" />` : null}
       <button class="text-btn" onClick=${closePreview} style="margin-left:auto" title="Close preview">\u00d7</button>
     </div>
   `;

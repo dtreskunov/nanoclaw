@@ -1027,6 +1027,7 @@ var uploadItems = y3([]);
 var me = y3("");
 var notifMutedSig = y3(false);
 var previewBlock = y3(null);
+var nowTick = y3(Date.now());
 var refs = {
   ws: null,
   reconnectTimer: null,
@@ -2780,8 +2781,12 @@ function connectChatWs() {
   const ws = new WebSocket(wsUrl);
   refs.ws = ws;
   ws.onopen = () => {
+    const wasReconnect = refs.reconnectAttempt > 0;
     refs.reconnectAttempt = 0;
     chatStatus.value = "connected";
+    if (wasReconnect) {
+      refetchThreadHistory(true).catch((err) => console.error("reconnect catchup failed", err));
+    }
   };
   ws.onclose = () => {
     if (refs.ws !== ws) return;
@@ -3035,6 +3040,27 @@ function removePending(i4) {
 function clearPending() {
   pending.value = [];
 }
+var NOW_TICK_MS = 3e4;
+function installLivenessHandlers() {
+  setInterval(() => {
+    if (!document.hidden) nowTick.value = Date.now();
+  }, NOW_TICK_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    nowTick.value = Date.now();
+    if (!threadId.value) return;
+    refetchThreadHistory(true).catch((err) => console.error("resume catchup failed", err));
+    const ws = refs.ws;
+    const open = ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
+    if (channelType.value === "web" && !open) {
+      if (refs.reconnectTimer) {
+        clearTimeout(refs.reconnectTimer);
+        refs.reconnectTimer = null;
+      }
+      connectChatWs();
+    }
+  });
+}
 
 // src/components/Header.js
 function Header() {
@@ -3114,6 +3140,13 @@ function Pane({ paneKey, name, label, extraClass, headActions, children }) {
   `;
 }
 
+// src/components/RelativeTime.js
+function RelativeTime({ ts, className }) {
+  nowTick.value;
+  if (!ts) return null;
+  return html`<span class=${className || "ts"} title=${fmtAbsolute(ts)}>${fmtRelative(ts)}</span>`;
+}
+
 // src/components/ThreadsRail.js
 function threadCtxOf2(t5) {
   if (!t5 || !t5.channelType || t5.channelType === "web") return null;
@@ -3124,7 +3157,7 @@ function ThreadRow({ t: t5 }) {
   const meta = channelMeta(ct);
   const active = t5.threadId === threadId.value;
   const pillTitle = `${meta.label}${t5.counterparty ? " \xB7 " + t5.counterparty : ""}`;
-  const subMeta = `${fmtRelative(t5.lastActivityAt)}${t5.messageCount ? " \xB7 " + t5.messageCount + " msg" : ""}${ct !== "web" && t5.counterparty ? " \xB7 " + t5.counterparty : ""}`;
+  const subTrailer = `${t5.messageCount ? " \xB7 " + t5.messageCount + " msg" : ""}${ct !== "web" && t5.counterparty ? " \xB7 " + t5.counterparty : ""}`;
   const onOpen = (ev) => {
     if (ev.target.classList.contains("del")) return;
     openChat(groupId.value, t5.threadId, threadCtxOf2(t5)).catch(console.error);
@@ -3143,7 +3176,7 @@ function ThreadRow({ t: t5 }) {
         ${ct !== "web" ? html`<span class="ch-pill" title=${pillTitle}>${meta.icon}</span>` : null}
         ${t5.title}
       </div>
-      <div class="meta" title=${fmtAbsolute(t5.lastActivityAt)}>${subMeta}</div>
+      <div class="meta"><${RelativeTime} ts=${t5.lastActivityAt} />${subTrailer}</div>
       ${ct === "web" ? html`<button type="button" class="del" title="Delete chat" aria-label="Delete chat" onClick=${onDel}>\u00d7</button>` : null}
     </div>
   `;
@@ -3187,7 +3220,7 @@ function Message({ m: m6 }) {
     <div class=${cls}>
       ${md != null ? html`<div ref=${ref} dangerouslySetInnerHTML=${{ __html: md }} />` : m6.text || ""}
       ${m6.files && m6.files.length ? html`<div class="files">${m6.files.map((f4) => `\u{1F4CE} ${f4.filename} (${fmtBytes(f4.size)})`).join("  ")}</div>` : null}
-      ${m6.ts ? html`<div class="meta" title=${fmtAbsolute(m6.ts)}><span class="ts" title=${fmtAbsolute(m6.ts)}>${fmtRelative(m6.ts)}</span></div>` : null}
+      ${m6.ts ? html`<div class="meta"><${RelativeTime} ts=${m6.ts} /></div>` : null}
     </div>
   `;
 }
@@ -3533,7 +3566,7 @@ function Row({ e: e4 }) {
       <div>${e4.type === "dir" ? "\u{1F4C1}" : "\u{1F4C4}"}</div>
       <div class="name">${e4.name}</div>
       <div class="size">${fmtBytes(e4.size)}</div>
-      <div class="meta" title=${fmtAbsolute(e4.mtime)}>${fmtRelative(e4.mtime)}</div>
+      <div class="meta"><${RelativeTime} ts=${e4.mtime} /></div>
       <div class="row-actions admin-only">
         <button type="button" class="act-ren" title="Rename" onClick=${(ev) => {
     ev.stopPropagation();
@@ -3600,7 +3633,7 @@ function Preview() {
     <div class="preview-toolbar">
       <a class="text-btn" href=${p4.url} download=${p4.name}>Download</a>
       ${p4.size != null ? html`<span class="meta">${fmtBytes(p4.size)}</span>` : null}
-      ${p4.mtime ? html`<span class="meta ts" title=${fmtAbsolute(p4.mtime)}>${fmtRelative(p4.mtime)}</span>` : null}
+      ${p4.mtime ? html`<${RelativeTime} ts=${p4.mtime} className="meta ts" />` : null}
       <button class="text-btn" onClick=${closePreview} style="margin-left:auto" title="Close preview">\u00d7</button>
     </div>
   `;
@@ -3815,6 +3848,7 @@ function setupViewportFit() {
 async function init() {
   initNotif();
   setupViewportFit();
+  installLivenessHandlers();
   restorePanelState();
   applyPanelClasses();
   try {

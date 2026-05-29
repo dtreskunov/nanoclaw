@@ -43,6 +43,10 @@ export const me = signal('');
 export const notifMutedSig = signal(false);
 export const previewBlock = signal(null);  // { kind, url?, html?, text?, mime?, ext?, name?, size?, mtime? } | null
 
+// Global "now" tick — bumped on a timer + on visibility resume so
+// <RelativeTime> components re-render and "5m" doesn't go stale.
+export const nowTick = signal(Date.now());
+
 // ── non-reactive refs (mutated outside render) ──────────────────────
 export const refs = {
   ws: null,

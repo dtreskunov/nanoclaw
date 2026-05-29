@@ -10,6 +10,7 @@ import { restorePanelState, applyPanelClasses } from './panels.js';
 import { applyHash, applyAdminFlag, parseHash } from './hash.js';
 import { chatLoading } from './state.js';
 import { router } from './router.js';
+import { installLivenessHandlers } from './actions.js';
 
 function sortGroups(list) {
   return list.slice().sort((a, b) => {
@@ -40,6 +41,7 @@ function setupViewportFit() {
 async function init() {
   initNotif();
   setupViewportFit();
+  installLivenessHandlers();
   // Restore pane state + mobile class BEFORE first paint so the layout
   // doesn't flash open-then-collapsed.
   restorePanelState();
