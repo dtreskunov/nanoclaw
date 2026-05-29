@@ -16,6 +16,7 @@ import { migration016 } from './016-ui.js';
 import { migration017 } from './017-ui-download-tokens.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
+import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
 import { moduleResendThreadRoots } from './module-resend-thread-roots.js';
 
 export interface Migration {
@@ -41,6 +42,7 @@ const migrations: Migration[] = [
   migration016,
   migration017,
   moduleResendThreadRoots,
+  moduleContainerConfigsPip,
 ];
 
 export function runMigrations(db: Database.Database): void {
