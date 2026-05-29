@@ -279,7 +279,8 @@ export async function sendChat(text, files) {
   if (!isWeb) {
     const now = new Date().toISOString();
     const fileMetas = hasFiles ? files.map((f) => ({ filename: f.name, size: f.size })) : null;
-    appendMsg('out', text || '', fileMetas, now);
+    // 'in' = viewer's own bubble (see chat-main CSS); 'out' is the agent.
+    appendMsg('in', text || '', fileMetas, now);
     refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;

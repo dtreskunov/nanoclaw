@@ -420,11 +420,11 @@ function readChatHistory(
       for (const r of rows) {
         const parsed = parseInboundContent(r.content);
         if (parsed != null) {
-          // _via:'web' marks a message that was relayed *from* the viewer
-          // through the web UI. From the viewer's perspective it belongs
-          // in their own bubble, not the bot's.
-          const direction: 'in' | 'out' = parsed.viaWeb ? 'out' : 'in';
-          messages.push({ direction, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+          // Inbound rows are always the user side (CSS '.msg.in' = viewer
+          // bubble on the right). Whether the message arrived natively
+          // through the channel or was relayed via the web UI (_via:'web'),
+          // it's the user's own message either way.
+          messages.push({ direction: 'in', timestamp: r.timestamp, text: parsed.text, files: parsed.files });
         }
       }
     } finally {

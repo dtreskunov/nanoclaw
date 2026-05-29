@@ -2829,7 +2829,7 @@ async function sendChat(text, files) {
   if (!isWeb) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const fileMetas = hasFiles ? files.map((f4) => ({ filename: f4.name, size: f4.size })) : null;
-    appendMsg("out", text || "", fileMetas, now);
+    appendMsg("in", text || "", fileMetas, now);
     refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
