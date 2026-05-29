@@ -2644,7 +2644,7 @@ function appendMsg(direction, text, files, ts, id) {
 }
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
-  const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin" });
+  const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
   const { messages } = await r4.json();
   if (!Array.isArray(messages)) return;
@@ -2718,7 +2718,7 @@ async function openChat(gid, resumeTid, opts) {
   if (resumeTid) {
     writeHash();
     try {
-      const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin" });
+      const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin", cache: "no-store" });
       if (r4.ok) {
         const { messages } = await r4.json();
         n2(() => {

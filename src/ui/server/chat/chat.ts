@@ -114,7 +114,15 @@ export function matchChatPath(
 }
 
 function writeJson(res: http.ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    // All chat-api responses are dynamic per-user state; the browser
+    // (especially on mobile after backgrounding) was serving stale
+    // /history responses from cache on visibility-resume catchup,
+    // so the just-arrived agent reply wasn't visible until a hard
+    // reload. no-store is the right tier for this content.
+    'Cache-Control': 'no-store',
+  });
   res.end(JSON.stringify(body));
 }
 

@@ -124,7 +124,7 @@ function appendMsg(direction, text, files, ts, id) {
 
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
-  const r = await fetch(historyUrl(gid, tid), { credentials: 'same-origin' });
+  const r = await fetch(historyUrl(gid, tid), { credentials: 'same-origin', cache: 'no-store' });
   if (!r.ok) return;
   const { messages } = await r.json();
   if (!Array.isArray(messages)) return;
@@ -190,7 +190,7 @@ export async function openChat(gid, resumeTid, opts) {
     // doesn't paint "No messages yet" between threadId set and history.
     writeHash();
     try {
-      const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin' });
+      const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin', cache: 'no-store' });
       if (r.ok) {
         const { messages } = await r.json();
         batch(() => {
