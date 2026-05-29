@@ -51,6 +51,45 @@ export async function deleteEntry(entry) {
   await loadTree(treePath.value);
 }
 
+export async function deletePaths(paths) {
+  if (!isAdmin.value || paths.length === 0) return;
+  if (!confirm(`Delete ${paths.length} item${paths.length === 1 ? '' : 's'}?`)) return;
+  const errors = [];
+  for (const p of paths) {
+    const r = await postJson(`api/groups/${groupId.value}/delete`, { path: p });
+    if (!r.ok) errors.push(`${p}: ${r.data.error || r.status}`);
+  }
+  if (errors.length) alert('Some deletes failed:\n' + errors.join('\n'));
+  await loadTree(treePath.value);
+}
+
+// Trigger a download for one or more paths. A single regular file downloads
+// directly; folders and multi-selections stream via the server's zip endpoint.
+export function downloadPaths(paths, entries) {
+  if (!groupId.value || paths.length === 0) return;
+  if (paths.length === 1) {
+    const single = paths[0];
+    const entry = entries?.find((e) => e.path === single);
+    if (entry && entry.type !== 'dir') {
+      const url = `api/groups/${groupId.value}/file?path=${encodeURIComponent(single)}`;
+      triggerDownload(url, entry.name);
+      return;
+    }
+  }
+  const qs = paths.map((p) => `path=${encodeURIComponent(p)}`).join('&');
+  triggerDownload(`api/groups/${groupId.value}/zip?${qs}`);
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  if (filename) a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 // ── upload + progress strip ─────────────────────────────────────────
 function updateItem(idx, patch) {
   const next = uploadItems.value.slice();

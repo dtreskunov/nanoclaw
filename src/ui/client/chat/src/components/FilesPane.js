@@ -8,12 +8,12 @@ import {
 } from '../state.js';
 import { navTree, navFile, closePreview, togglePinnedFile } from '../actions.js';
 import {
-  mkdirPrompt, touchPrompt, uploadFiles, renameEntry, deleteEntry,
-  clearUploadStrip, resolveConflict, notifyAgent,
+  uploadFiles, clearUploadStrip, resolveConflict, notifyAgent,
 } from '../uploads.js';
 import { fmtBytes, renderMarkdown, parentPath } from '../utils.js';
 import { Pane } from './Pane.js';
 import { RelativeTime } from './RelativeTime.js';
+import { ActionsMenu } from './ActionsMenu.js';
 
 function Crumb() {
   const ref = useRef(null);
@@ -49,21 +49,22 @@ function Crumb() {
 
 function Row({ e }) {
   const active = e.path === filePath.value;
+  const selected = pinnedContext.value.includes(e.path);
   const onClick = (ev) => {
-    if (ev.target.closest('.row-actions')) return;
+    if (ev.target.closest('.row-sel') || ev.target.closest('.action-menu')) return;
     if (e.type === 'dir') navTree(e.path);
     else navFile(e).catch(console.error);
   };
   return html`
-    <div class=${'row tier-' + e.tier + (active ? ' active' : '')} data-path=${e.path} onClick=${onClick}>
+    <div class=${'row tier-' + e.tier + (active ? ' active' : '') + (selected ? ' selected' : '')} data-path=${e.path} onClick=${onClick}>
+      <label class="row-sel" onClick=${(ev) => ev.stopPropagation()} title=${selected ? 'Detach from next message' : 'Attach to next message'}>
+        <input type="checkbox" checked=${selected} onChange=${() => togglePinnedFile(e.path)} />
+      </label>
       <div>${e.type === 'dir' ? '\uD83D\uDCC1' : '\uD83D\uDCC4'}</div>
       <div class="name">${e.name}</div>
       <div class="size">${fmtBytes(e.size)}</div>
       <div class="meta"><${RelativeTime} ts=${e.mtime} /></div>
-      <div class="row-actions admin-only">
-        <button type="button" class="act-ren" title="Rename" onClick=${(ev) => { ev.stopPropagation(); renameEntry(e); }}>\u270e</button>
-        <button type="button" class="act-del" title="Delete" onClick=${(ev) => { ev.stopPropagation(); deleteEntry(e); }}>\uD83D\uDDD1</button>
-      </div>
+      <div class="row-actions"><${ActionsMenu} mode="row" entry=${e} /></div>
     </div>
   `;
 }
@@ -135,10 +136,9 @@ function Preview() {
               disabled=${!fp}
               title=${clippyTitle}
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
-      <a class="text-btn" href=${p.url} download=${p.name}>Download</a>
       ${p.size != null ? html`<span class="meta">${fmtBytes(p.size)}</span>` : null}
       ${p.mtime ? html`<${RelativeTime} ts=${p.mtime} className="meta ts" />` : null}
-      <button class="text-btn" onClick=${closePreview} style="margin-left:auto" title="Close preview">\u00d7</button>
+      <span style="margin-left:auto"><${ActionsMenu} mode="preview" /></span>
     </div>
   `;
   // Always-shown metadata strip above the body. Starts with size/mtime/mime
@@ -209,15 +209,12 @@ export function FilesPane() {
 
   const uploadInputRef = useRef(null);
   const headActions = html`
-    <div class="head-actions admin-only">
-      <button type="button" class="text-btn" id="btn-touch" title="New empty file" aria-label="New empty file"
-              onClick=${touchPrompt}>+F</button>
-      <button type="button" class="text-btn" id="btn-mkdir" title="New folder" aria-label="New folder"
-              onClick=${mkdirPrompt}>+D</button>
-      <button type="button" class="text-btn" id="btn-upload" title="Upload files" aria-label="Upload files"
+    <div class="head-actions">
+      <button type="button" class="text-btn admin-only" id="btn-upload" title="Upload files" aria-label="Upload files"
               onClick=${() => uploadInputRef.current?.click()}>UPL</button>
       <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
              onChange=${(ev) => { if (ev.target.files?.length) uploadFiles(ev.target.files); ev.target.value = ''; }} />
+      <${ActionsMenu} mode="header" />
     </div>
   `;
   return html`
