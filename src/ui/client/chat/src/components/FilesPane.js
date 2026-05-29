@@ -45,7 +45,7 @@ function Row({ e }) {
   const onClick = (ev) => {
     if (ev.target.closest('.row-actions')) return;
     if (e.type === 'dir') navTree(e.path);
-    else navFile(e).then(() => { drawerOpen.files.value = true; }).catch(console.error);
+    else navFile(e).catch(console.error);
   };
   return html`
     <div class=${'row tier-' + e.tier + (active ? ' active' : '')} data-path=${e.path} onClick=${onClick}>
