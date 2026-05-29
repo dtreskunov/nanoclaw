@@ -206,14 +206,12 @@
       .files-pane .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .files-pane .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
       .files-pane .row .meta { font-size: 11px; color: var(--muted); white-space: nowrap; opacity: 0.7; }
-      .files-pane .row .row-sel { display: inline-flex; align-items: center; cursor: pointer; opacity: 0; }
-      .files-pane .row:hover .row-sel,
-      .files-pane .row.selected .row-sel { opacity: 1; }
+      .files-pane .row .row-sel { display: inline-flex; align-items: center; cursor: pointer; }
       .files-pane .row .row-sel input { margin: 0; cursor: pointer; }
-      .files-pane .row .row-actions { display: inline-flex; opacity: 0; }
-      .files-pane .row:hover .row-actions,
-      .files-pane .row .action-menu.open { opacity: 1; }
-      .files-pane .row .action-menu.open { opacity: 1; }
+      .files-pane .row .row-actions { display: inline-flex; }
+      .files-pane .row .row-actions .action-trigger { color: var(--muted); }
+      .files-pane .row:hover .row-actions .action-trigger,
+      .files-pane .row .action-menu.open .action-trigger { color: inherit; }
 
       /* admin-only UI is hidden until JS adds .is-admin on body */
       .admin-only { display: none; }
@@ -251,10 +249,10 @@
       .action-panel {
         position: absolute; top: 100%; right: 0; margin-top: 4px;
         min-width: 180px; z-index: 50;
-        background: var(--bg, #fff); color: var(--fg, inherit);
+        background: Canvas; color: CanvasText;
         border: 1px solid var(--border);
-        border-radius: 4px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
         padding: 4px 0;
       }
       .action-item {

@@ -210,11 +210,9 @@ export function FilesPane() {
   const uploadInputRef = useRef(null);
   const headActions = html`
     <div class="head-actions">
-      <button type="button" class="text-btn admin-only" id="btn-upload" title="Upload files" aria-label="Upload files"
-              onClick=${() => uploadInputRef.current?.click()}>UPL</button>
       <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
              onChange=${(ev) => { if (ev.target.files?.length) uploadFiles(ev.target.files); ev.target.value = ''; }} />
-      <${ActionsMenu} mode="header" />
+      <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
     </div>
   `;
   return html`

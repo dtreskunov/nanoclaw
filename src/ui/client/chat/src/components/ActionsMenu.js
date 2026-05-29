@@ -18,7 +18,7 @@ function entriesByPath(paths) {
   return treeEntries.value.filter((e) => set.has(e.path));
 }
 
-export function ActionsMenu({ mode, entry }) {
+export function ActionsMenu({ mode, entry, onUpload }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -36,7 +36,7 @@ export function ActionsMenu({ mode, entry }) {
     };
   }, [open]);
 
-  const items = buildItems(mode, entry, () => setOpen(false));
+  const items = buildItems(mode, entry, onUpload);
   if (items.length === 0) return null;
 
   return html`
@@ -61,7 +61,7 @@ export function ActionsMenu({ mode, entry }) {
   `;
 }
 
-function buildItems(mode, entry, _close) {
+function buildItems(mode, entry, onUpload) {
   const admin = isAdmin.value;
   if (mode === 'row' && entry) {
     const items = [];
@@ -98,6 +98,7 @@ function buildItems(mode, entry, _close) {
   if (admin) {
     items.push({ ico: '\uFF0B', label: 'New file', onClick: touchPrompt });
     items.push({ ico: '\uD83D\uDCC1', label: 'New folder', onClick: mkdirPrompt });
+    if (onUpload) items.push({ ico: '\u2B06', label: 'Upload files\u2026', onClick: onUpload });
   }
   if (sel.length > 0) {
     if (items.length) items.push('---');

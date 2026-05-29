@@ -3628,7 +3628,7 @@ function entriesByPath(paths) {
   const set = new Set(paths);
   return treeEntries.value.filter((e4) => set.has(e4.path));
 }
-function ActionsMenu({ mode, entry }) {
+function ActionsMenu({ mode, entry, onUpload }) {
   const [open, setOpen] = h2(false);
   const wrapRef = A2(null);
   y2(() => {
@@ -3646,7 +3646,7 @@ function ActionsMenu({ mode, entry }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
-  const items = buildItems(mode, entry, () => setOpen(false));
+  const items = buildItems(mode, entry, onUpload);
   if (items.length === 0) return null;
   return html`
     <div class=${"action-menu" + (open ? " open" : "")} ref=${wrapRef}>
@@ -3674,7 +3674,7 @@ function ActionsMenu({ mode, entry }) {
     </div>
   `;
 }
-function buildItems(mode, entry, _close) {
+function buildItems(mode, entry, onUpload) {
   const admin = isAdmin.value;
   if (mode === "row" && entry) {
     const items2 = [];
@@ -3708,6 +3708,7 @@ function buildItems(mode, entry, _close) {
   if (admin) {
     items.push({ ico: "\uFF0B", label: "New file", onClick: touchPrompt });
     items.push({ ico: "\u{1F4C1}", label: "New folder", onClick: mkdirPrompt });
+    if (onUpload) items.push({ ico: "\u2B06", label: "Upload files\u2026", onClick: onUpload });
   }
   if (sel.length > 0) {
     if (items.length) items.push("---");
@@ -3918,14 +3919,12 @@ function FilesPane() {
   const uploadInputRef = A2(null);
   const headActions = html`
     <div class="head-actions">
-      <button type="button" class="text-btn admin-only" id="btn-upload" title="Upload files" aria-label="Upload files"
-              onClick=${() => uploadInputRef.current?.click()}>UPL</button>
       <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
              onChange=${(ev) => {
     if (ev.target.files?.length) uploadFiles(ev.target.files);
     ev.target.value = "";
   }} />
-      <${ActionsMenu} mode="header" />
+      <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
     </div>
   `;
   return html`
