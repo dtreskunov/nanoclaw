@@ -2634,6 +2634,16 @@ function historyUrl(gid, tid) {
 }
 function appendMsg(direction, text, files, ts) {
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
+  if (ts && tsKey(ts) > tsKey(refs.lastSeenTs)) refs.lastSeenTs = ts;
+}
+function alreadyPainted(direction, ts, text) {
+  const list = chatMessages.value;
+  for (let i4 = list.length - 1; i4 >= 0; i4--) {
+    const m6 = list[i4];
+    if (m6.ts && tsKey(m6.ts) < tsKey(ts) - 5e3) break;
+    if (m6.direction === direction && m6.ts === ts && (m6.text || "") === (text || "")) return true;
+  }
+  return false;
 }
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
@@ -2658,13 +2668,22 @@ async function refetchThreadHistory(appendNewOnly) {
     const ts = m6.timestamp || "";
     const k4 = tsKey(ts);
     if (!seenKey || k4 > seenKey) {
-      additions.push({ direction: m6.direction === "in" ? "in" : "out", text: m6.text, files: m6.files || null, ts });
+      const direction = m6.direction === "in" ? "in" : "out";
+      if (alreadyPainted(direction, ts, m6.text)) {
+        if (k4 > maxKey) {
+          maxKey = k4;
+          maxTs = ts;
+          bumped = true;
+        }
+        continue;
+      }
+      additions.push({ direction, text: m6.text, files: m6.files || null, ts });
       if (k4 > maxKey) {
         maxKey = k4;
         maxTs = ts;
       }
       bumped = true;
-      if (m6.direction !== "in") maybeNotify(m6.text, m6.files || []);
+      if (direction !== "in") maybeNotify(m6.text, m6.files || []);
     }
   }
   if (additions.length) chatMessages.value = chatMessages.value.concat(additions);

@@ -113,6 +113,24 @@ function historyUrl(gid, tid) {
 
 function appendMsg(direction, text, files, ts) {
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
+  // Keep refs.lastSeenTs in sync with what's already painted so a
+  // subsequent refetch (visibility resume, poll, reconnect catchup)
+  // doesn't re-add the same row through the tsKey gate below.
+  if (ts && tsKey(ts) > tsKey(refs.lastSeenTs)) refs.lastSeenTs = ts;
+}
+
+// Content-equal to an existing painted row? Used as a defensive
+// backstop in refetchThreadHistory in case ts comparison can't
+// distinguish (two rows in the same second) or the WS painted a
+// row before lastSeenTs caught up.
+function alreadyPainted(direction, ts, text) {
+  const list = chatMessages.value;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    if (m.ts && tsKey(m.ts) < tsKey(ts) - 5000) break; // 5s back-window is plenty
+    if (m.direction === direction && m.ts === ts && (m.text || '') === (text || '')) return true;
+  }
+  return false;
 }
 
 async function refetchThreadHistory(appendNewOnly) {
@@ -138,10 +156,15 @@ async function refetchThreadHistory(appendNewOnly) {
     const ts = m.timestamp || '';
     const k = tsKey(ts);
     if (!seenKey || k > seenKey) {
-      additions.push({ direction: m.direction === 'in' ? 'in' : 'out', text: m.text, files: m.files || null, ts });
+      const direction = m.direction === 'in' ? 'in' : 'out';
+      if (alreadyPainted(direction, ts, m.text)) {
+        if (k > maxKey) { maxKey = k; maxTs = ts; bumped = true; }
+        continue;
+      }
+      additions.push({ direction, text: m.text, files: m.files || null, ts });
       if (k > maxKey) { maxKey = k; maxTs = ts; }
       bumped = true;
-      if (m.direction !== 'in') maybeNotify(m.text, m.files || []);
+      if (direction !== 'in') maybeNotify(m.text, m.files || []);
     }
   }
   if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
