@@ -261,12 +261,18 @@ async function handleMeta(ctx: Ctx, userId: string, groupId: string, relPath: st
     mime: mimeFor(ext).type,
     ext,
   };
-  const tags = await readMediaTags(abs, ext);
-  if (tags) out.tags = tags;
+  const media = await readMediaTags(abs, ext);
+  if (media?.tags) out.tags = media.tags;
+  if (media?.lyrics) out.lyrics = media.lyrics;
   return json(ctx, 200, out);
 }
 
-async function readMediaTags(abs: string, ext: string): Promise<Record<string, string> | null> {
+interface MediaMeta {
+  tags: Record<string, string> | null;
+  lyrics: string | null;
+}
+
+async function readMediaTags(abs: string, ext: string): Promise<MediaMeta | null> {
   try {
     if (AUDIO_META_EXTS.has(ext) || VIDEO_META_EXTS.has(ext)) {
       const mm = await import('music-metadata').catch(() => null);
@@ -289,7 +295,22 @@ async function readMediaTags(abs: string, ext: string): Promise<Record<string, s
       if (f.numberOfChannels) t.Channels = String(f.numberOfChannels);
       if (f.codec) t.Codec = f.codec;
       if (f.container && f.container !== f.codec) t.Container = f.container;
-      return Object.keys(t).length > 0 ? t : null;
+      let lyrics: string | null = null;
+      const rawLyrics = (c as { lyrics?: unknown }).lyrics;
+      if (Array.isArray(rawLyrics)) {
+        const texts: string[] = [];
+        for (const l of rawLyrics) {
+          if (typeof l === 'string') texts.push(l);
+          else if (l && typeof l === 'object' && typeof (l as { text?: unknown }).text === 'string') {
+            texts.push((l as { text: string }).text);
+          }
+        }
+        const joined = texts.join('\n\n').trim();
+        if (joined) lyrics = joined;
+      } else if (typeof rawLyrics === 'string' && rawLyrics.trim()) {
+        lyrics = rawLyrics.trim();
+      }
+      return { tags: Object.keys(t).length > 0 ? t : null, lyrics };
     }
     if (IMAGE_META_EXTS.has(ext)) {
       const exifr = await import('exifr').catch(() => null);
@@ -321,7 +342,7 @@ async function readMediaTags(abs: string, ext: string): Promise<Record<string, s
       if (e.Orientation != null) t.Orientation = String(e.Orientation);
       if (e.latitude != null && e.longitude != null)
         t.GPS = `${Number(e.latitude).toFixed(5)}, ${Number(e.longitude).toFixed(5)}`;
-      return Object.keys(t).length > 0 ? t : null;
+      return { tags: Object.keys(t).length > 0 ? t : null, lyrics: null };
     }
   } catch (err) {
     // music-metadata throws on malformed media; treat as "no tags".

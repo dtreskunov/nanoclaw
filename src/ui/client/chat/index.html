@@ -311,6 +311,22 @@
       .files-pane .preview-toolbar .clippy.active { color: inherit; background: var(--accent); }
       .files-pane .preview-toolbar .clippy:disabled { opacity: 0.4; cursor: default; background: transparent; }
 
+      /* Reusable media player widget — sticks to the top of the preview
+         body while the metadata / transcript / etc scrolls underneath. */
+      .media-player {
+        position: sticky; top: 0; z-index: 4;
+        margin: 0 0 12px 0;
+        padding: 8px 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 2px 8px var(--shadow-color);
+      }
+      .media-player audio,
+      .media-player video { display: block; width: 100%; }
+      .media-player-video video { max-height: 60vh; background: black; border-radius: 3px; }
+      .media-player-audio audio { height: 36px; }
+
       .files-pane .preview-meta {
         margin: 0 0 12px 0;
         padding: 8px 10px;
@@ -319,13 +335,51 @@
         border-radius: 4px;
         font-size: 12px;
         display: grid;
-        grid-template-columns: max-content 1fr;
-        column-gap: 12px;
+        /* auto-fill pairs of [label | value] tracks; each pair is one visual
+           column. Each .row spans one pair and uses subgrid so labels share
+           a track width across all rows in that visual column. */
+        grid-template-columns: repeat(auto-fill, [label] minmax(60px, max-content) [value] minmax(120px, 1fr));
+        column-gap: 24px;
         row-gap: 3px;
       }
-      .files-pane .preview-meta .row { display: contents; }
+      .files-pane .preview-meta .row {
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column: span 2;
+        column-gap: 12px;
+        min-width: 0;
+      }
       .files-pane .preview-meta dt { color: var(--muted); white-space: nowrap; }
-      .files-pane .preview-meta dd { margin: 0; overflow-wrap: anywhere; }
+      .files-pane .preview-meta dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+
+      .files-pane .preview-lyrics {
+        margin: 0 0 12px 0;
+        background: var(--wash-soft);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 12px;
+        max-height: 40vh;
+        overflow: auto;
+      }
+      .files-pane .preview-lyrics-head {
+        position: sticky; top: 0;
+        padding: 6px 10px;
+        background: var(--wash);
+        border-bottom: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .files-pane .preview-lyrics pre {
+        margin: 0;
+        padding: 10px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-family: inherit;
+        font-size: 12px;
+        line-height: 1.5;
+      }
 
       /* Drag-and-drop hint pinned to bottom of files-body */
       .files-pane .drop-hint {
