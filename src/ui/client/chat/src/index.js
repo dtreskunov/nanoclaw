@@ -1,10 +1,14 @@
 // Entry point: bootstrap data, mount Preact App.
 import { render } from 'preact';
+import { batch } from '@preact/signals';
 import { html } from './html.js';
 import { api } from './api.js';
 import { me, groups } from './state.js';
 import { App } from './components/App.js';
 import { initNotif } from './notify.js';
+import { restorePanelState, applyPanelClasses } from './panels.js';
+import { applyHash, applyAdminFlag } from './hash.js';
+import { router } from './router.js';
 
 function sortGroups(list) {
   return list.slice().sort((a, b) => {
@@ -35,11 +39,16 @@ function setupViewportFit() {
 async function init() {
   initNotif();
   setupViewportFit();
+  // Restore pane state + mobile class BEFORE first paint so the layout
+  // doesn't flash open-then-collapsed.
+  restorePanelState();
+  applyPanelClasses();
   try {
-    const meRes = await api('api/me');
-    me.value = meRes.userId;
-    const { groups: gs } = await api('api/groups');
-    groups.value = sortGroups(gs);
+    const [meRes, groupsRes] = await Promise.all([api('api/me'), api('api/groups')]);
+    batch(() => {
+      me.value = meRes.userId;
+      groups.value = sortGroups(groupsRes.groups);
+    });
   } catch (_) {
     // api() already replaced the body with a "not logged in" message on 401.
     return;
@@ -49,6 +58,12 @@ async function init() {
       '<div style="padding:24px;font:14px system-ui">No accessible groups.</div>';
     return;
   }
+  // Resolve the URL hash synchronously into signals (groupId/threadId/
+  // treePath) so the first render reflects the URL. Async fetches
+  // triggered by selectGroup will still complete later, but the layout
+  // itself is settled.
+  applyAdminFlag();
+  applyHash(router).catch((err) => console.error('initial route failed', err));
   render(html`<${App} />`, document.getElementById('app'));
 }
 
