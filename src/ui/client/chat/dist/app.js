@@ -2829,7 +2829,7 @@ async function sendChat(text, files) {
   if (!isWeb) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const fileMetas = hasFiles ? files.map((f4) => ({ filename: f4.name, size: f4.size })) : null;
-    appendMsg("out", text || "", fileMetas, now);
+    appendMsg("in", text || "", fileMetas, now);
     refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
@@ -2859,6 +2859,11 @@ async function sendChat(text, files) {
       } catch (_5) {
       }
       chatStatus.value = `send failed: ${detail}`;
+    } else if (!isWeb) {
+      try {
+        await refetchThreadHistory(false);
+      } catch (_5) {
+      }
     }
   } catch (err) {
     console.error("send failed", err);

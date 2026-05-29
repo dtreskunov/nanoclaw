@@ -279,7 +279,8 @@ export async function sendChat(text, files) {
   if (!isWeb) {
     const now = new Date().toISOString();
     const fileMetas = hasFiles ? files.map((f) => ({ filename: f.name, size: f.size })) : null;
-    appendMsg('out', text || '', fileMetas, now);
+    // 'in' = viewer's own bubble (see chat-main CSS); 'out' is the agent.
+    appendMsg('in', text || '', fileMetas, now);
     refs.lastSeenTs = now;
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
@@ -304,6 +305,11 @@ export async function sendChat(text, files) {
       let detail = `HTTP ${res.status}`;
       try { const j = await res.json(); if (j && j.error) detail = j.error + (j.detail ? ` (${j.detail})` : ''); } catch (_) {}
       chatStatus.value = `send failed: ${detail}`;
+    } else if (!isWeb) {
+      // Reconcile the optimistic bubble against server truth: the server
+      // logs the relayed message in inbound with its own clock. If server
+      // ts > client ts (any skew), the next poll would append a duplicate.
+      try { await refetchThreadHistory(false); } catch (_) {}
     }
   } catch (err) {
     console.error('send failed', err);
