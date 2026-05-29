@@ -496,6 +496,55 @@
       .markdown-preview table { border-collapse: collapse; margin: 8px 0; }
       .markdown-preview th, .markdown-preview td { border: 1px solid var(--border); padding: 4px 8px; }
 
+      /* Syntax highlighting for text-file preview. Minimal theme tuned
+         to follow the rest of the chrome via CSS vars and currentColor.
+         Uses standard highlight.js token class names. */
+      .files-pane pre.hljs {
+        background: var(--wash-strong);
+        padding: 12px;
+        border-radius: 6px;
+        overflow: auto;
+        position: relative;
+      }
+      .files-pane pre.hljs code { font: inherit; background: transparent; padding: 0; white-space: pre; }
+      .files-pane pre.hljs::before {
+        content: attr(data-lang);
+        position: absolute; top: 4px; right: 8px;
+        font-size: 10px; color: var(--muted);
+        text-transform: uppercase; letter-spacing: 0.5px;
+        pointer-events: none;
+      }
+      .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+      .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag {
+        color: #a26aff;
+      }
+      .hljs-string, .hljs-doctag, .hljs-template-tag, .hljs-template-variable,
+      .hljs-regexp, .hljs-link, .hljs-meta-string {
+        color: #c8923a;
+      }
+      .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet, .hljs-variable {
+        color: #2da671;
+      }
+      .hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-function .hljs-title {
+        color: #2f7be0;
+      }
+      .hljs-type, .hljs-class .hljs-title, .hljs-params {
+        color: #b8632a;
+      }
+      .hljs-meta, .hljs-meta-keyword { color: var(--muted); }
+      .hljs-deletion { background: rgba(220, 80, 80, 0.18); }
+      .hljs-addition { background: rgba(80, 200, 100, 0.18); }
+      .hljs-emphasis { font-style: italic; }
+      .hljs-strong { font-weight: 600; }
+      @media (prefers-color-scheme: dark) {
+        .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #c792ea; }
+        .hljs-string, .hljs-doctag, .hljs-template-tag, .hljs-template-variable,
+        .hljs-regexp, .hljs-link, .hljs-meta-string { color: #ecc48d; }
+        .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet, .hljs-variable { color: #addb67; }
+        .hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-function .hljs-title { color: #82aaff; }
+        .hljs-type, .hljs-class .hljs-title, .hljs-params { color: #f78c6c; }
+      }
+
       /* Backdrop for mobile drawers */
       .backdrop { display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 5; }
       .backdrop.show { display: block; }
