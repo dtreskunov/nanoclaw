@@ -3,7 +3,7 @@
 import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import {
-  chatMessages, chatStatus, threadId, channelType, canSend, pending,
+  chatMessages, chatStatus, chatLoading, threadId, channelType, canSend, pending,
   contextDismissed, threads, groupId, channelMeta,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state.js';
@@ -41,11 +41,13 @@ function MessageLog() {
   const list = chatMessages.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
-      ${!threadId.value
-        ? html`<div class="empty">Pick or start a chat.</div>`
-        : list.length === 0
-          ? html`<div class="empty">No messages yet.</div>`
-          : list.map((m, i) => html`<${Message} key=${i} m=${m} />`)}
+      ${chatLoading.value
+        ? null
+        : !threadId.value
+          ? html`<div class="empty">Pick or start a chat.</div>`
+          : list.length === 0
+            ? html`<div class="empty">No messages yet.</div>`
+            : list.map((m, i) => html`<${Message} key=${i} m=${m} />`)}
     </div>
   `;
 }

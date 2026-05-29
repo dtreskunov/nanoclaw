@@ -3,7 +3,7 @@
 import { batch } from '@preact/signals';
 import {
   groupId, threads, threadId, channelType, messagingGroupId, canSend,
-  chatMessages, chatStatus, refs, treePath, filePath, treeEntries,
+  chatMessages, chatStatus, chatLoading, refs, treePath, filePath, treeEntries,
   treeError, contextDismissed, pending, previewBlock, POLL_INTERVAL_MS,
   THREADS_POLL_MS,
 } from './state.js';
@@ -79,6 +79,7 @@ export function clearChat() {
   batch(() => {
     chatMessages.value = [];
     chatStatus.value = '';
+    chatLoading.value = false;
     threadId.value = null;
     channelType.value = 'web';
     messagingGroupId.value = null;
@@ -170,25 +171,35 @@ export async function openChat(gid, resumeTid, opts) {
     channelType.value = ct;
     messagingGroupId.value = mg;
     canSend.value = ct === 'web' ? true : cs;
+    if (resumeTid) {
+      threadId.value = resumeTid;
+      chatLoading.value = true;
+      chatStatus.value = 'loading history\u2026';
+    }
   });
 
   if (resumeTid) {
-    threadId.value = resumeTid;
+    // threadId + loading flag landed in the batch above so MessageLog
+    // doesn't paint "No messages yet" between threadId set and history.
     writeHash();
-    chatStatus.value = 'loading history\u2026';
     try {
       const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin' });
       if (r.ok) {
         const { messages } = await r.json();
-        chatMessages.value = (messages || []).map((m) => ({
-          direction: m.direction === 'in' ? 'in' : 'out',
-          text: m.text,
-          files: m.files || null,
-          ts: m.timestamp,
-        }));
+        batch(() => {
+          chatMessages.value = (messages || []).map((m) => ({
+            direction: m.direction === 'in' ? 'in' : 'out',
+            text: m.text,
+            files: m.files || null,
+            ts: m.timestamp,
+          }));
+          chatLoading.value = false;
+        });
         if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
+      } else {
+        chatLoading.value = false;
       }
-    } catch (err) { console.error('history load failed', err); }
+    } catch (err) { console.error('history load failed', err); chatLoading.value = false; }
     if (ct === 'web') connectChatWs();
     else { chatStatus.value = ''; startChatPoll(); }
     return;

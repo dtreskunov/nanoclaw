@@ -255,60 +255,8 @@ n = v.slice, l = { __e: function(n4, l7, u4, t5) {
   return n4.__v.__b - l7.__v.__b;
 }, P.__r = 0, f = /(PointerCapture)$|Capture$/i, c = 0, s = O(false), a = O(true), h = 0;
 
-// node_modules/htm/dist/htm.module.js
-var n2 = function(t5, s5, r4, e4) {
-  var u4;
-  s5[0] = 0;
-  for (var h4 = 1; h4 < s5.length; h4++) {
-    var p4 = s5[h4++], a4 = s5[h4] ? (s5[0] |= p4 ? 1 : 2, r4[s5[h4++]]) : s5[++h4];
-    3 === p4 ? e4[0] = a4 : 4 === p4 ? e4[1] = Object.assign(e4[1] || {}, a4) : 5 === p4 ? (e4[1] = e4[1] || {})[s5[++h4]] = a4 : 6 === p4 ? e4[1][s5[++h4]] += a4 + "" : p4 ? (u4 = t5.apply(a4, n2(t5, a4, r4, ["", null])), e4.push(u4), a4[0] ? s5[0] |= 2 : (s5[h4 - 2] = 0, s5[h4] = u4)) : e4.push(a4);
-  }
-  return e4;
-};
-var t2 = /* @__PURE__ */ new Map();
-function htm_module_default(s5) {
-  var r4 = t2.get(this);
-  return r4 || (r4 = /* @__PURE__ */ new Map(), t2.set(this, r4)), (r4 = n2(this, r4.get(s5) || (r4.set(s5, r4 = function(n4) {
-    for (var t5, s6, r5 = 1, e4 = "", u4 = "", h4 = [0], p4 = function(n5) {
-      1 === r5 && (n5 || (e4 = e4.replace(/^\s*\n\s*|\s*\n\s*$/g, ""))) ? h4.push(0, n5, e4) : 3 === r5 && (n5 || e4) ? (h4.push(3, n5, e4), r5 = 2) : 2 === r5 && "..." === e4 && n5 ? h4.push(4, n5, 0) : 2 === r5 && e4 && !n5 ? h4.push(5, 0, true, e4) : r5 >= 5 && ((e4 || !n5 && 5 === r5) && (h4.push(r5, 0, e4, s6), r5 = 6), n5 && (h4.push(r5, n5, 0, s6), r5 = 6)), e4 = "";
-    }, a4 = 0; a4 < n4.length; a4++) {
-      a4 && (1 === r5 && p4(), p4(a4));
-      for (var l7 = 0; l7 < n4[a4].length; l7++) t5 = n4[a4][l7], 1 === r5 ? "<" === t5 ? (p4(), h4 = [h4], r5 = 3) : e4 += t5 : 4 === r5 ? "--" === e4 && ">" === t5 ? (r5 = 1, e4 = "") : e4 = t5 + e4[0] : u4 ? t5 === u4 ? u4 = "" : e4 += t5 : '"' === t5 || "'" === t5 ? u4 = t5 : ">" === t5 ? (p4(), r5 = 1) : r5 && ("=" === t5 ? (r5 = 5, s6 = e4, e4 = "") : "/" === t5 && (r5 < 5 || ">" === n4[a4][l7 + 1]) ? (p4(), 3 === r5 && (h4 = h4[0]), r5 = h4, (h4 = h4[0]).push(2, 0, r5), r5 = 0) : " " === t5 || "	" === t5 || "\n" === t5 || "\r" === t5 ? (p4(), r5 = 2) : e4 += t5), 3 === r5 && "!--" === e4 && (r5 = 4, h4 = h4[0]);
-    }
-    return p4(), h4;
-  }(s5)), r4), arguments, [])).length > 1 ? r4 : r4[0];
-}
-
-// src/html.js
-var html = htm_module_default.bind(g);
-
-// src/api.js
-async function api(url, opts) {
-  const r4 = await fetch(url, Object.assign({ credentials: "same-origin" }, opts || {}));
-  if (r4.status === 401) {
-    document.body.innerHTML = '<div style="padding:24px;font:14px system-ui">Not logged in. Visit the magic link your operator sent you.</div>';
-    throw new Error("unauthorized");
-  }
-  if (!r4.ok) throw new Error("HTTP " + r4.status);
-  return r4.json();
-}
-async function postJson(path, body) {
-  const r4 = await fetch(path, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body || {})
-  });
-  let data = {};
-  try {
-    data = await r4.json();
-  } catch (_5) {
-  }
-  return { ok: r4.ok, status: r4.status, data };
-}
-
 // node_modules/preact/hooks/dist/hooks.module.js
-var t3;
+var t2;
 var r2;
 var u2;
 var i2;
@@ -327,7 +275,7 @@ function d2(n4, t5) {
   return n4 >= u4.__.length && u4.__.push({}), u4.__[n4];
 }
 function y2(n4, u4) {
-  var i4 = d2(t3++, 3);
+  var i4 = d2(t2++, 3);
   !c2.__s && C2(i4.__H, u4) && (i4.__ = n4, i4.i = u4, r2.__H.__h.push(i4));
 }
 function A2(n4) {
@@ -336,7 +284,7 @@ function A2(n4) {
   }, []);
 }
 function T2(n4, r4) {
-  var u4 = d2(t3++, 7);
+  var u4 = d2(t2++, 7);
   return C2(u4.__H, r4) && (u4.__ = n4(), u4.__H = r4, u4.__h = n4), u4.__;
 }
 function j2() {
@@ -351,11 +299,11 @@ c2.__b = function(n4) {
 }, c2.__ = function(n4, t5) {
   n4 && t5.__k && t5.__k.__m && (n4.__m = t5.__k.__m), s2 && s2(n4, t5);
 }, c2.__r = function(n4) {
-  a2 && a2(n4), t3 = 0;
+  a2 && a2(n4), t2 = 0;
   var i4 = (r2 = n4.__c).__H;
   i4 && (u2 === r2 ? (i4.__h = [], r2.__h = [], i4.__.forEach(function(n5) {
     n5.__N && (n5.__ = n5.__N), n5.i = n5.__N = void 0;
-  })) : (i4.__h.forEach(z2), i4.__h.forEach(B2), i4.__h = [], t3 = 0)), u2 = r2;
+  })) : (i4.__h.forEach(z2), i4.__h.forEach(B2), i4.__h = [], t2 = 0)), u2 = r2;
 }, c2.diffed = function(n4) {
   v2 && v2(n4);
   var t5 = n4.__c;
@@ -408,7 +356,7 @@ function C2(n4, t5) {
 
 // node_modules/@preact/signals-core/dist/signals-core.module.js
 var i3 = Symbol.for("preact-signals");
-function t4() {
+function t3() {
   if (!(s3 > 1)) {
     var i4, t5 = false;
     !function() {
@@ -443,14 +391,14 @@ function t4() {
     if (t5) throw i4;
   } else s3--;
 }
-function n3(i4) {
+function n2(i4) {
   if (s3 > 0) return i4();
   e3 = ++u3;
   s3++;
   try {
     return i4();
   } finally {
-    t4();
+    t3();
   }
 }
 var r3 = void 0;
@@ -591,7 +539,7 @@ Object.defineProperty(l3.prototype, "value", { get: function() {
     try {
       for (var n4 = this.t; void 0 !== n4; n4 = n4.x) n4.t.N();
     } finally {
-      t4();
+      t3();
     }
   }
 } });
@@ -721,7 +669,7 @@ function S2(i4) {
       throw t5;
     } finally {
       r3 = o4;
-      t4();
+      t3();
     }
   }
 }
@@ -737,7 +685,7 @@ function x2(i4) {
   r3 = i4;
   this.f &= -2;
   if (8 & this.f) m3(this);
-  t4();
+  t3();
 }
 function E(i4, t5) {
   this.x = i4;
@@ -987,13 +935,65 @@ var k3 = function(i4) {
   });
 };
 function x3() {
-  n3(function() {
+  n2(function() {
     var i4;
     while (i4 = p3.shift()) s4.call(i4);
   });
 }
 function A3() {
   if (1 === p3.push(this)) (l.requestAnimationFrame || k3)(x3);
+}
+
+// node_modules/htm/dist/htm.module.js
+var n3 = function(t5, s5, r4, e4) {
+  var u4;
+  s5[0] = 0;
+  for (var h4 = 1; h4 < s5.length; h4++) {
+    var p4 = s5[h4++], a4 = s5[h4] ? (s5[0] |= p4 ? 1 : 2, r4[s5[h4++]]) : s5[++h4];
+    3 === p4 ? e4[0] = a4 : 4 === p4 ? e4[1] = Object.assign(e4[1] || {}, a4) : 5 === p4 ? (e4[1] = e4[1] || {})[s5[++h4]] = a4 : 6 === p4 ? e4[1][s5[++h4]] += a4 + "" : p4 ? (u4 = t5.apply(a4, n3(t5, a4, r4, ["", null])), e4.push(u4), a4[0] ? s5[0] |= 2 : (s5[h4 - 2] = 0, s5[h4] = u4)) : e4.push(a4);
+  }
+  return e4;
+};
+var t4 = /* @__PURE__ */ new Map();
+function htm_module_default(s5) {
+  var r4 = t4.get(this);
+  return r4 || (r4 = /* @__PURE__ */ new Map(), t4.set(this, r4)), (r4 = n3(this, r4.get(s5) || (r4.set(s5, r4 = function(n4) {
+    for (var t5, s6, r5 = 1, e4 = "", u4 = "", h4 = [0], p4 = function(n5) {
+      1 === r5 && (n5 || (e4 = e4.replace(/^\s*\n\s*|\s*\n\s*$/g, ""))) ? h4.push(0, n5, e4) : 3 === r5 && (n5 || e4) ? (h4.push(3, n5, e4), r5 = 2) : 2 === r5 && "..." === e4 && n5 ? h4.push(4, n5, 0) : 2 === r5 && e4 && !n5 ? h4.push(5, 0, true, e4) : r5 >= 5 && ((e4 || !n5 && 5 === r5) && (h4.push(r5, 0, e4, s6), r5 = 6), n5 && (h4.push(r5, n5, 0, s6), r5 = 6)), e4 = "";
+    }, a4 = 0; a4 < n4.length; a4++) {
+      a4 && (1 === r5 && p4(), p4(a4));
+      for (var l7 = 0; l7 < n4[a4].length; l7++) t5 = n4[a4][l7], 1 === r5 ? "<" === t5 ? (p4(), h4 = [h4], r5 = 3) : e4 += t5 : 4 === r5 ? "--" === e4 && ">" === t5 ? (r5 = 1, e4 = "") : e4 = t5 + e4[0] : u4 ? t5 === u4 ? u4 = "" : e4 += t5 : '"' === t5 || "'" === t5 ? u4 = t5 : ">" === t5 ? (p4(), r5 = 1) : r5 && ("=" === t5 ? (r5 = 5, s6 = e4, e4 = "") : "/" === t5 && (r5 < 5 || ">" === n4[a4][l7 + 1]) ? (p4(), 3 === r5 && (h4 = h4[0]), r5 = h4, (h4 = h4[0]).push(2, 0, r5), r5 = 0) : " " === t5 || "	" === t5 || "\n" === t5 || "\r" === t5 ? (p4(), r5 = 2) : e4 += t5), 3 === r5 && "!--" === e4 && (r5 = 4, h4 = h4[0]);
+    }
+    return p4(), h4;
+  }(s5)), r4), arguments, [])).length > 1 ? r4 : r4[0];
+}
+
+// src/html.js
+var html = htm_module_default.bind(g);
+
+// src/api.js
+async function api(url, opts) {
+  const r4 = await fetch(url, Object.assign({ credentials: "same-origin" }, opts || {}));
+  if (r4.status === 401) {
+    document.body.innerHTML = '<div style="padding:24px;font:14px system-ui">Not logged in. Visit the magic link your operator sent you.</div>';
+    throw new Error("unauthorized");
+  }
+  if (!r4.ok) throw new Error("HTTP " + r4.status);
+  return r4.json();
+}
+async function postJson(path, body) {
+  const r4 = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  let data = {};
+  try {
+    data = await r4.json();
+  } catch (_5) {
+  }
+  return { ok: r4.ok, status: r4.status, data };
 }
 
 // src/state.js
@@ -1011,6 +1011,7 @@ var messagingGroupId = y3(null);
 var canSend = y3(true);
 var chatMessages = y3([]);
 var chatStatus = y3("");
+var chatLoading = y3(false);
 var pending = y3([]);
 var contextDismissed = y3(false);
 var paneOpen = {
@@ -2452,7 +2453,7 @@ async function applyHash(router2) {
     return;
   }
   const groupChanged = groupId.value !== parsed.groupId;
-  n3(() => {
+  n2(() => {
     groupId.value = parsed.groupId;
     filePath.value = null;
   });
@@ -2579,9 +2580,10 @@ function updateActiveThreadTitleFromFirstMessage(text) {
   threads.value = list;
 }
 function clearChat() {
-  n3(() => {
+  n2(() => {
     chatMessages.value = [];
     chatStatus.value = "";
+    chatLoading.value = false;
     threadId.value = null;
     channelType.value = "web";
     messagingGroupId.value = null;
@@ -2698,31 +2700,40 @@ async function openChat(gid, resumeTid, opts) {
       cs = !!t5.canSend;
     }
   }
-  n3(() => {
+  n2(() => {
     groupId.value = gid;
     chatMessages.value = [];
     channelType.value = ct;
     messagingGroupId.value = mg;
     canSend.value = ct === "web" ? true : cs;
+    if (resumeTid) {
+      threadId.value = resumeTid;
+      chatLoading.value = true;
+      chatStatus.value = "loading history\u2026";
+    }
   });
   if (resumeTid) {
-    threadId.value = resumeTid;
     writeHash();
-    chatStatus.value = "loading history\u2026";
     try {
       const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin" });
       if (r4.ok) {
         const { messages } = await r4.json();
-        chatMessages.value = (messages || []).map((m6) => ({
-          direction: m6.direction === "in" ? "in" : "out",
-          text: m6.text,
-          files: m6.files || null,
-          ts: m6.timestamp
-        }));
+        n2(() => {
+          chatMessages.value = (messages || []).map((m6) => ({
+            direction: m6.direction === "in" ? "in" : "out",
+            text: m6.text,
+            files: m6.files || null,
+            ts: m6.timestamp
+          }));
+          chatLoading.value = false;
+        });
         if (Array.isArray(messages) && messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
+      } else {
+        chatLoading.value = false;
       }
     } catch (err) {
       console.error("history load failed", err);
+      chatLoading.value = false;
     }
     if (ct === "web") connectChatWs();
     else {
@@ -2731,7 +2742,7 @@ async function openChat(gid, resumeTid, opts) {
     }
     return;
   }
-  n3(() => {
+  n2(() => {
     channelType.value = "web";
     messagingGroupId.value = null;
     canSend.value = true;
@@ -2868,7 +2879,7 @@ function startThreadsPoll(gid) {
   }, THREADS_POLL_MS);
 }
 async function selectGroup(gid) {
-  n3(() => {
+  n2(() => {
     groupId.value = gid;
     treePath.value = "";
     filePath.value = null;
@@ -2885,7 +2896,7 @@ async function selectGroup(gid) {
   }
 }
 async function loadTree(p4) {
-  n3(() => {
+  n2(() => {
     treePath.value = p4;
     filePath.value = null;
     previewBlock.value = null;
@@ -2971,7 +2982,7 @@ async function selectFile(entry) {
   }
 }
 function closePreview() {
-  n3(() => {
+  n2(() => {
     filePath.value = null;
     previewBlock.value = null;
   });
@@ -3167,7 +3178,7 @@ function MessageLog() {
   const list = chatMessages.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
-      ${!threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : list.map((m6, i4) => html`<${Message} key=${i4} m=${m6} />`)}
+      ${chatLoading.value ? null : !threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : list.map((m6, i4) => html`<${Message} key=${i4} m=${m6} />`)}
     </div>
   `;
 }
@@ -3723,7 +3734,7 @@ function applyPanelClasses() {
   }
 }
 
-// src/components/App.js
+// src/router.js
 var router = {
   selectGroup,
   loadThreads,
@@ -3735,10 +3746,10 @@ var router = {
     console.warn(msg);
   }
 };
+
+// src/components/App.js
 function App() {
   y2(() => {
-    restorePanelState();
-    applyPanelClasses();
     const onChange = () => applyPanelClasses();
     MOBILE_MQ.addEventListener("change", onChange);
     const onHashChange = () => {
@@ -3749,7 +3760,6 @@ function App() {
       applyHash(router).catch(console.error);
     };
     window.addEventListener("hashchange", onHashChange);
-    applyHash(router).catch(console.error);
     return () => {
       MOBILE_MQ.removeEventListener("change", onChange);
       window.removeEventListener("hashchange", onHashChange);
@@ -3759,7 +3769,6 @@ function App() {
   const filesOpen = paneOpen.files.value;
   y2(() => {
     persistPanelState();
-    applyPanelClasses();
   }, [threadsOpen, filesOpen]);
   const mainCls = (threadsOpen ? "" : " threads-collapsed") + (filesOpen ? "" : " files-collapsed");
   const backdropShown = drawerOpen.threads.value || drawerOpen.files.value;
@@ -3810,11 +3819,14 @@ function setupViewportFit() {
 async function init() {
   initNotif();
   setupViewportFit();
+  restorePanelState();
+  applyPanelClasses();
   try {
-    const meRes = await api("api/me");
-    me.value = meRes.userId;
-    const { groups: gs } = await api("api/groups");
-    groups.value = sortGroups(gs);
+    const [meRes, groupsRes] = await Promise.all([api("api/me"), api("api/groups")]);
+    n2(() => {
+      me.value = meRes.userId;
+      groups.value = sortGroups(groupsRes.groups);
+    });
   } catch (_5) {
     return;
   }
@@ -3822,6 +3834,10 @@ async function init() {
     document.getElementById("app").innerHTML = '<div style="padding:24px;font:14px system-ui">No accessible groups.</div>';
     return;
   }
+  applyAdminFlag();
+  const parsed = parseHash();
+  if (parsed && parsed.groupId) chatLoading.value = true;
+  applyHash(router).catch((err) => console.error("initial route failed", err));
   D(html`<${App} />`, document.getElementById("app"));
 }
 init().catch((err) => console.error(err));
