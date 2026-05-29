@@ -335,13 +335,17 @@
         border-radius: 4px;
         font-size: 12px;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        /* auto-fill pairs of [label | value] tracks; each pair is one visual
+           column. Each .row spans one pair and uses subgrid so labels share
+           a track width across all rows in that visual column. */
+        grid-template-columns: repeat(auto-fill, [label] minmax(60px, max-content) [value] minmax(120px, 1fr));
         column-gap: 24px;
         row-gap: 3px;
       }
       .files-pane .preview-meta .row {
         display: grid;
-        grid-template-columns: max-content 1fr;
+        grid-template-columns: subgrid;
+        grid-column: span 2;
         column-gap: 12px;
         min-width: 0;
       }
