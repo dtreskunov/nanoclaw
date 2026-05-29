@@ -403,6 +403,59 @@ export function writeOutboundDirect(
 }
 
 /**
+ * Read the container-side `progress` hint (key in session_state) for this
+ * session, if any. Used by the typing module to enrich the typing
+ * indicator with a one-line activity string. Best-effort — returns null
+ * on any error (db missing, locked, malformed).
+ */
+export function readSessionProgress(agentGroupId: string, sessionId: string): string | null {
+  let db: Database.Database | undefined;
+  try {
+    db = openOutboundDb(agentGroupId, sessionId);
+    const row = db.prepare("SELECT value FROM session_state WHERE key = 'progress'").get() as
+      | { value: string }
+      | undefined;
+    return row?.value ?? null;
+  } catch {
+    return null;
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Read the container-side `turn_ended_at` marker (epoch ms) from
+ * session_state. The container sets this on the SDK's `result` / `error`
+ * event and clears it when a new turn starts. Used by the typing module
+ * to drop the indicator immediately when the agent finishes (rather than
+ * waiting for the heartbeat to age out). Returns 0 when unset.
+ */
+export function readSessionTurnEndedAt(agentGroupId: string, sessionId: string): number {
+  let db: Database.Database | undefined;
+  try {
+    db = openOutboundDb(agentGroupId, sessionId);
+    const row = db.prepare("SELECT value FROM session_state WHERE key = 'turn_ended_at'").get() as
+      | { value: string }
+      | undefined;
+    if (!row) return 0;
+    const n = Number(row.value);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
  * @deprecated Use openInboundDb / openOutboundDb instead.
  */
 export function openSessionDb(agentGroupId: string, sessionId: string): Database.Database {

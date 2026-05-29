@@ -3,7 +3,7 @@
 import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import {
-  chatMessages, chatStatus, chatLoading, threadId, channelType, canSend, pending,
+  chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state.js';
@@ -43,6 +43,7 @@ function MessageLog() {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   });
   const list = chatMessages.value;
+  const typing = isTyping.value && threadId.value && !chatLoading.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
       ${chatLoading.value
@@ -52,6 +53,12 @@ function MessageLog() {
           : list.length === 0
             ? html`<div class="empty">No messages yet.</div>`
             : list.map((m, i) => html`<${Message} key=${i} m=${m} />`)}
+      ${typing
+        ? html`<div class="typing" aria-live="polite">
+            <span></span><span></span><span></span>
+            ${typingHint.value ? html`<span class="hint">${typingHint.value}</span>` : null}
+          </div>`
+        : null}
     </div>
   `;
 }

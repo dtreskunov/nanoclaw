@@ -53,9 +53,13 @@ export function createDeliveryBridge(opts: DeliveryBridgeOptions) {
       }
       return adapter.deliver(platformId, threadId, { kind, content: JSON.parse(content), files, id });
     },
-    async setTyping(channelType: string, platformId: string, threadId: string | null): Promise<void> {
+    async setTyping(channelType: string, platformId: string, threadId: string | null, hint?: string): Promise<void> {
       const adapter = getChannelAdapter(channelType);
-      await adapter?.setTyping?.(platformId, threadId);
+      await adapter?.setTyping?.(platformId, threadId, hint);
+    },
+    async clearTyping(channelType: string, platformId: string, threadId: string | null): Promise<void> {
+      const adapter = getChannelAdapter(channelType);
+      await adapter?.clearTyping?.(platformId, threadId);
     },
   };
 }
