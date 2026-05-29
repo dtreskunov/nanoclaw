@@ -1018,7 +1018,7 @@ var paneOpen = {
   threads: y3(true),
   files: y3(true)
 };
-var drawerOpen2 = {
+var drawerOpen = {
   threads: y3(false),
   files: y3(false)
 };
@@ -2923,6 +2923,10 @@ async function navTree(p4) {
   writeHash();
 }
 async function navFile(entry) {
+  if (isMobile.value) drawerOpen.files.value = true;
+  else paneOpen.files.value = true;
+  const parent = parentPath(entry.path);
+  if (treePath.value !== parent) await loadTree(parent);
   await selectFile(entry);
   writeHash();
 }
@@ -3042,8 +3046,8 @@ function Header() {
     <header>
       <button type="button" class="icon-btn mobile-only" aria-label="Threads"
               onClick=${() => {
-    drawerOpen2.threads.value = !drawerOpen2.threads.value;
-    drawerOpen2.files.value = false;
+    drawerOpen.threads.value = !drawerOpen.threads.value;
+    drawerOpen.files.value = false;
   }}>\u2630</button>
       <span class="brand">NanoClaw</span>
       <select id="group-select" aria-label="Agent group" value=${groupId.value || ""} onChange=${onChange}>
@@ -3055,8 +3059,8 @@ function Header() {
               onClick=${toggleMute}>${muted ? "\u{1F515}" : "\u{1F514}"}</button>
       <button type="button" class="icon-btn mobile-only" aria-label="Files"
               onClick=${() => {
-    drawerOpen2.files.value = !drawerOpen2.files.value;
-    drawerOpen2.threads.value = false;
+    drawerOpen.files.value = !drawerOpen.files.value;
+    drawerOpen.threads.value = false;
   }}>\uD83D\uDCC1</button>
       <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
         <button type="submit" aria-label="Log out" title="Log out">
@@ -3077,7 +3081,7 @@ function Header() {
 function Pane({ paneKey, name, label, extraClass, headActions, children }) {
   const mobile = isMobile.value;
   const collapsed = !mobile && !paneOpen[paneKey].value;
-  const drawer = drawerOpen2[paneKey].value;
+  const drawer = drawerOpen[paneKey].value;
   const cls = "nc-pane " + name + (collapsed ? " collapsed" : "") + (drawer ? " open" : "") + (extraClass ? " " + extraClass : "");
   const toggle = () => {
     paneOpen[paneKey].value = !paneOpen[paneKey].value;
@@ -3124,7 +3128,7 @@ function ThreadRow({ t: t5 }) {
   const onOpen = (ev) => {
     if (ev.target.classList.contains("del")) return;
     openChat(groupId.value, t5.threadId, threadCtxOf2(t5)).catch(console.error);
-    drawerOpen2.threads.value = false;
+    drawerOpen.threads.value = false;
   };
   const onDel = async (ev) => {
     ev.stopPropagation();
@@ -3151,8 +3155,8 @@ function ThreadsRail() {
     openChat(groupId.value, null).then(() => {
       const el = document.getElementById("chat-input");
       if (el) el.focus();
-      drawerOpen2.threads.value = false;
-      drawerOpen2.files.value = false;
+      drawerOpen.threads.value = false;
+      drawerOpen.files.value = false;
     }).catch(console.error);
   };
   return html`
@@ -3487,27 +3491,33 @@ async function notifyAgent(paths) {
 function Crumb() {
   const ref = A2(null);
   const p4 = treePath.value;
+  const fp = filePath.value;
   const segs = p4 ? p4.split("/").filter(Boolean) : [];
+  const fileName = fp ? fp.slice(fp.lastIndexOf("/") + 1) : "";
   y2(() => {
     if (ref.current) requestAnimationFrame(() => {
       ref.current.scrollLeft = ref.current.scrollWidth;
     });
-  }, [p4]);
+  }, [p4, fp]);
   let acc = "";
   return html`
     <div class="breadcrumb" id="crumb" ref=${ref}>
-      <button type="button" class=${"crumb root" + (segs.length === 0 ? " current" : "")} data-path="" title="Root"
+      <button type="button" class=${"crumb root" + (segs.length === 0 && !fileName ? " current" : "")} data-path="" title="Root"
               onClick=${() => navTree("")}>/</button>
       ${segs.map((s5, i4) => {
     acc = acc ? acc + "/" + s5 : s5;
     const path = acc;
-    const last = i4 === segs.length - 1;
+    const last = i4 === segs.length - 1 && !fileName;
     return html`
           <span class="sep" aria-hidden="true">\u203a</span>
           <button type="button" class=${"crumb" + (last ? " current" : "")} data-path=${path} title=${"/" + path}
                   onClick=${last ? null : () => navTree(path)}>${s5}</button>
         `;
   })}
+      ${fileName ? html`
+        <span class="sep" aria-hidden="true">\u203a</span>
+        <span class="crumb file current" title=${"/" + fp}>${fileName}</span>
+      ` : null}
     </div>
   `;
 }
@@ -3516,9 +3526,7 @@ function Row({ e: e4 }) {
   const onClick = (ev) => {
     if (ev.target.closest(".row-actions")) return;
     if (e4.type === "dir") navTree(e4.path);
-    else navFile(e4).then(() => {
-      drawerOpen.files.value = true;
-    }).catch(console.error);
+    else navFile(e4).catch(console.error);
   };
   return html`
     <div class=${"row tier-" + e4.tier + (active ? " active" : "")} data-path=${e4.path} onClick=${onClick}>
@@ -3717,8 +3725,8 @@ function applyPanelClasses() {
     document.body.classList.add("mobile");
   } else {
     document.body.classList.remove("mobile");
-    drawerOpen2.threads.value = false;
-    drawerOpen2.files.value = false;
+    drawerOpen.threads.value = false;
+    drawerOpen.files.value = false;
   }
 }
 
@@ -3759,10 +3767,10 @@ function App() {
     persistPanelState();
   }, [threadsOpen, filesOpen]);
   const mainCls = (threadsOpen ? "" : " threads-collapsed") + (filesOpen ? "" : " files-collapsed");
-  const backdropShown = drawerOpen2.threads.value || drawerOpen2.files.value;
+  const backdropShown = drawerOpen.threads.value || drawerOpen.files.value;
   const onBackdrop = () => {
-    drawerOpen2.threads.value = false;
-    drawerOpen2.files.value = false;
+    drawerOpen.threads.value = false;
+    drawerOpen.files.value = false;
   };
   return html`
     <${Header} />
