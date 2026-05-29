@@ -3794,10 +3794,12 @@ function LyricsPanel({ text }) {
   }, [activeIdx]);
   const seek = (sec) => {
     const media = document.querySelector(".media-player audio, .media-player video");
-    if (media) {
-      media.currentTime = sec;
-      mediaCurrentTime.value = sec;
-    }
+    if (!media) return;
+    media.currentTime = sec;
+    mediaCurrentTime.value = sec;
+    const p5 = media.play();
+    if (p5 && typeof p5.catch === "function") p5.catch(() => {
+    });
   };
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>

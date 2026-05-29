@@ -74,7 +74,11 @@ export function LyricsPanel({ text }) {
 
   const seek = (sec) => {
     const media = document.querySelector('.media-player audio, .media-player video');
-    if (media) { media.currentTime = sec; mediaCurrentTime.value = sec; }
+    if (!media) return;
+    media.currentTime = sec;
+    mediaCurrentTime.value = sec;
+    const p = media.play();
+    if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay blocked — ignore */ });
   };
 
   return html`
