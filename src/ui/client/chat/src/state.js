@@ -22,7 +22,6 @@ export const chatMessages = signal([]);
 export const chatStatus = signal('');
 export const chatLoading = signal(false);
 export const pending = signal([]);
-export const contextDismissed = signal(false);
 
 // Panels / drawers
 export const paneOpen = {
