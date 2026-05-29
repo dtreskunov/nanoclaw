@@ -3491,27 +3491,33 @@ async function notifyAgent(paths) {
 function Crumb() {
   const ref = A2(null);
   const p4 = treePath.value;
+  const fp = filePath.value;
   const segs = p4 ? p4.split("/").filter(Boolean) : [];
+  const fileName = fp ? fp.slice(fp.lastIndexOf("/") + 1) : "";
   y2(() => {
     if (ref.current) requestAnimationFrame(() => {
       ref.current.scrollLeft = ref.current.scrollWidth;
     });
-  }, [p4]);
+  }, [p4, fp]);
   let acc = "";
   return html`
     <div class="breadcrumb" id="crumb" ref=${ref}>
-      <button type="button" class=${"crumb root" + (segs.length === 0 ? " current" : "")} data-path="" title="Root"
+      <button type="button" class=${"crumb root" + (segs.length === 0 && !fileName ? " current" : "")} data-path="" title="Root"
               onClick=${() => navTree("")}>/</button>
       ${segs.map((s5, i4) => {
     acc = acc ? acc + "/" + s5 : s5;
     const path = acc;
-    const last = i4 === segs.length - 1;
+    const last = i4 === segs.length - 1 && !fileName;
     return html`
           <span class="sep" aria-hidden="true">\u203a</span>
           <button type="button" class=${"crumb" + (last ? " current" : "")} data-path=${path} title=${"/" + path}
                   onClick=${last ? null : () => navTree(path)}>${s5}</button>
         `;
   })}
+      ${fileName ? html`
+        <span class="sep" aria-hidden="true">\u203a</span>
+        <span class="crumb file current" title=${"/" + fp}>${fileName}</span>
+      ` : null}
     </div>
   `;
 }
