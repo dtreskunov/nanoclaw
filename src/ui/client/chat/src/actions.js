@@ -416,25 +416,48 @@ export async function selectFile(entry) {
     }
   } catch (_) {}
   const ext = entry.name.toLowerCase().split('.').pop();
-  const meta = { name: entry.name, size, mtime, url };
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { previewBlock.value = { kind: 'image', ...meta }; return; }
-  if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) { previewBlock.value = { kind: 'audio', ...meta }; return; }
-  if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) { previewBlock.value = { kind: 'video', ...meta }; return; }
-  if (ext === 'pdf') { previewBlock.value = { kind: 'pdf', ...meta }; return; }
-  try {
-    const r = await fetch(url, { credentials: 'same-origin' });
-    if (!r.ok) { previewBlock.value = { kind: 'error', text: `HTTP ${r.status}`, ...meta }; return; }
-    const ctType = r.headers.get('content-type') || '';
-    if (ctType.startsWith('text/') || ctType.includes('json') || ctType.includes('xml')) {
-      const txt = await r.text();
-      const isMd = ext === 'md' || ext === 'markdown';
-      previewBlock.value = { kind: isMd ? 'markdown' : 'text', text: txt, ...meta };
-    } else {
-      previewBlock.value = { kind: 'binary', mime: ctType, ...meta };
+  const meta = { name: entry.name, size, mtime, url, path: entry.path };
+  const mediaExts = new Set([
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'tif', 'tiff', 'heic', 'heif',
+    'mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba',
+    'mp4', 'm4v', 'mov', 'webm', 'ogv',
+  ]);
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) previewBlock.value = { kind: 'image', ...meta };
+  else if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) previewBlock.value = { kind: 'audio', ...meta };
+  else if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) previewBlock.value = { kind: 'video', ...meta };
+  else if (ext === 'pdf') previewBlock.value = { kind: 'pdf', ...meta };
+  else {
+    try {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) { previewBlock.value = { kind: 'error', text: `HTTP ${r.status}`, ...meta }; return; }
+      const ctType = r.headers.get('content-type') || '';
+      if (ctType.startsWith('text/') || ctType.includes('json') || ctType.includes('xml')) {
+        const txt = await r.text();
+        const isMd = ext === 'md' || ext === 'markdown';
+        previewBlock.value = { kind: isMd ? 'markdown' : 'text', text: txt, ...meta };
+      } else {
+        previewBlock.value = { kind: 'binary', mime: ctType, ...meta };
+      }
+    } catch (err) {
+      previewBlock.value = { kind: 'error', text: String(err && err.message || err), ...meta };
     }
-  } catch (err) {
-    previewBlock.value = { kind: 'error', text: String(err && err.message || err), ...meta };
   }
+  // Fire embedded-metadata fetch for media files. Best-effort: if the
+  // server doesn't have music-metadata/exifr installed, `tags` will be
+  // absent and the panel just shows size/mtime.
+  if (mediaExts.has(ext)) fetchAndAttachMeta(entry.path).catch(() => {});
+}
+
+async function fetchAndAttachMeta(p) {
+  const gid = groupId.value;
+  const u = `api/groups/${encodeURIComponent(gid)}/meta?path=${encodeURIComponent(p)}`;
+  const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store' });
+  if (!r.ok) return;
+  const data = await r.json();
+  // Race guard: user may have navigated to a different file in the meantime.
+  const cur = previewBlock.value;
+  if (!cur || cur.path !== p) return;
+  previewBlock.value = { ...cur, tags: data.tags || null, mime: data.mime || cur.mime };
 }
 
 export function closePreview() {

@@ -141,6 +141,21 @@ function Preview() {
       <button class="text-btn" onClick=${closePreview} style="margin-left:auto" title="Close preview">\u00d7</button>
     </div>
   `;
+  // Always-shown metadata strip above the body. Starts with size/mtime/mime
+  // (cheap, from selectFile) and gains embedded media tags once the async
+  // /meta fetch resolves. Hidden when there's nothing useful (e.g. text
+  // files where size/mtime are already in the toolbar).
+  const metaRows = [];
+  if (p.mime) metaRows.push(['Type', p.mime]);
+  if (p.size != null) metaRows.push(['Size', fmtBytes(p.size)]);
+  if (p.mtime) metaRows.push(['Modified', new Date(p.mtime).toLocaleString()]);
+  if (p.tags) for (const [k, v] of Object.entries(p.tags)) metaRows.push([k, String(v)]);
+  const isMedia = p.kind === 'image' || p.kind === 'audio' || p.kind === 'video' || p.kind === 'pdf';
+  const meta = (isMedia && metaRows.length > 0) ? html`
+    <dl class="preview-meta">
+      ${metaRows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
+    </dl>
+  ` : null;
   let body = null;
   if (p.kind === 'image') body = html`<img alt=${p.name} src=${p.url} />`;
   else if (p.kind === 'audio') body = html`<audio controls preload="metadata" src=${p.url} />`;
@@ -154,7 +169,7 @@ function Preview() {
   } else if (p.kind === 'text') body = html`<pre>${p.text}</pre>`;
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${meta}${body}</div>`;
 }
 
 export function FilesPane() {

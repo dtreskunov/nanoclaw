@@ -75,12 +75,13 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
 
-    const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file)$/);
+    const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file|meta)$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && groupMatch) {
       const [, groupId, kind] = groupMatch;
       const relPath = url.searchParams.get('path') ?? '';
       if (kind === 'tree' && req.method === 'GET') return handleTree(ctx, session.userId, groupId, relPath);
       if (kind === 'file') return handleFile(ctx, session.userId, groupId, relPath);
+      if (kind === 'meta' && req.method === 'GET') return await handleMeta(ctx, session.userId, groupId, relPath);
     }
 
     return json(ctx, 404, { error: 'not_found' });
@@ -218,6 +219,122 @@ function handleFile(ctx: Ctx, userId: string, groupId: string, relPath: string):
     return;
   }
   fs.createReadStream(abs).pipe(ctx.res);
+}
+
+// File extensions we'll try to extract embedded metadata from. music-metadata
+// covers audio/video container tags (ID3, Vorbis, MP4 atoms…); exifr covers
+// image EXIF. Both are dynamically imported — if either isn't installed the
+// endpoint just returns basic stat info.
+const AUDIO_META_EXTS = new Set(['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga', '.opus', '.flac', '.weba']);
+const VIDEO_META_EXTS = new Set(['.mp4', '.m4v', '.mov', '.webm', '.ogv']);
+const IMAGE_META_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.tif', '.tiff', '.heic', '.heif']);
+
+async function handleMeta(ctx: Ctx, userId: string, groupId: string, relPath: string): Promise<void> {
+  const group = resolveGroupAccess(userId, groupId);
+  if (!group) return json(ctx, 403, { error: 'forbidden' });
+  if (!relPath) return json(ctx, 400, { error: 'invalid_path' });
+
+  const cls = classify(relPath);
+  if (cls.kind === 'hidden') return json(ctx, 404, { error: 'not_found' });
+  const isAdmin = hasAdminPrivilege(userId, group.id);
+  if (cls.tier === 'admin' && !isAdmin) return json(ctx, 403, { error: 'forbidden' });
+
+  const groupDir = path.resolve(GROUPS_DIR, group.folder);
+  const abs = resolveSafe(groupDir, relPath);
+  if (!abs) return json(ctx, 400, { error: 'invalid_path' });
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(abs);
+  } catch {
+    return json(ctx, 404, { error: 'not_found' });
+  }
+  if (!stat.isFile()) return json(ctx, 400, { error: 'not_a_file' });
+
+  const ext = path.extname(abs).toLowerCase();
+  const out: Record<string, unknown> = {
+    name: path.basename(abs),
+    size: stat.size,
+    mtime: stat.mtime.toISOString(),
+    mime: mimeFor(ext).type,
+    ext,
+  };
+  const tags = await readMediaTags(abs, ext);
+  if (tags) out.tags = tags;
+  return json(ctx, 200, out);
+}
+
+async function readMediaTags(abs: string, ext: string): Promise<Record<string, string> | null> {
+  try {
+    if (AUDIO_META_EXTS.has(ext) || VIDEO_META_EXTS.has(ext)) {
+      const mm = await import('music-metadata').catch(() => null);
+      if (!mm) return null;
+      const parsed = await mm.parseFile(abs, { duration: true });
+      const c = parsed.common;
+      const f = parsed.format;
+      const t: Record<string, string> = {};
+      if (c.title) t.Title = c.title;
+      if (c.artist) t.Artist = c.artist;
+      if (c.albumartist && c.albumartist !== c.artist) t['Album artist'] = c.albumartist;
+      if (c.album) t.Album = c.album;
+      if (c.year) t.Year = String(c.year);
+      if (c.track?.no != null) t.Track = c.track.of ? `${c.track.no}/${c.track.of}` : String(c.track.no);
+      if (c.genre?.length) t.Genre = c.genre.join(', ');
+      if (c.composer?.length) t.Composer = c.composer.join(', ');
+      if (f.duration) t.Duration = formatDuration(f.duration);
+      if (f.bitrate) t.Bitrate = `${Math.round(f.bitrate / 1000)} kbps`;
+      if (f.sampleRate) t['Sample rate'] = `${f.sampleRate} Hz`;
+      if (f.numberOfChannels) t.Channels = String(f.numberOfChannels);
+      if (f.codec) t.Codec = f.codec;
+      if (f.container && f.container !== f.codec) t.Container = f.container;
+      return Object.keys(t).length > 0 ? t : null;
+    }
+    if (IMAGE_META_EXTS.has(ext)) {
+      const exifr = await import('exifr').catch(() => null);
+      if (!exifr) return null;
+      const fn =
+        (exifr as { parse?: (p: string) => Promise<Record<string, unknown> | undefined> }).parse ??
+        (exifr as { default?: { parse: (p: string) => Promise<Record<string, unknown> | undefined> } }).default?.parse;
+      if (!fn) return null;
+      const e = await fn(abs).catch(() => null);
+      if (!e) return null;
+      const t: Record<string, string> = {};
+      const make = e.Make ? String(e.Make).trim() : '';
+      const model = e.Model ? String(e.Model).trim() : '';
+      if (make || model) t.Camera = [make, model].filter(Boolean).join(' ');
+      if (e.LensModel) t.Lens = String(e.LensModel);
+      if (e.DateTimeOriginal) {
+        const d = e.DateTimeOriginal instanceof Date ? e.DateTimeOriginal : new Date(String(e.DateTimeOriginal));
+        if (!Number.isNaN(d.getTime())) t.Taken = d.toISOString();
+      }
+      if (typeof e.ExposureTime === 'number' && e.ExposureTime > 0) {
+        t.Exposure = e.ExposureTime >= 1 ? `${e.ExposureTime} s` : `1/${Math.round(1 / e.ExposureTime)} s`;
+      }
+      if (typeof e.FNumber === 'number') t.Aperture = `f/${e.FNumber}`;
+      if (e.ISO != null) t.ISO = String(e.ISO);
+      if (typeof e.FocalLength === 'number') t['Focal length'] = `${e.FocalLength} mm`;
+      const w = e.ImageWidth ?? e.ExifImageWidth;
+      const h = e.ImageHeight ?? e.ExifImageHeight;
+      if (typeof w === 'number' && typeof h === 'number') t.Dimensions = `${w} × ${h}`;
+      if (e.Orientation != null) t.Orientation = String(e.Orientation);
+      if (e.latitude != null && e.longitude != null)
+        t.GPS = `${Number(e.latitude).toFixed(5)}, ${Number(e.longitude).toFixed(5)}`;
+      return Object.keys(t).length > 0 ? t : null;
+    }
+  } catch (err) {
+    // music-metadata throws on malformed media; treat as "no tags".
+    log.debug('media metadata extraction failed', { abs, err });
+  }
+  return null;
+}
+
+function formatDuration(seconds: number): string {
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
 function handleTokenDownload(ctx: Ctx): void {
