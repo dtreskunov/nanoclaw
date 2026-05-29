@@ -64,9 +64,6 @@ export const refs = {
   // openChat / clearChat. Initial-load and full-replace rebuild it
   // from scratch; append-only refetch and appendMsg add to it.
   seenIds: new Set(),
-  // Newest server timestamp we've painted, used only to drive
-  // bumpActiveThread side effects (not for dedup).
-  lastSeenTs: '',
   suppressHashCount: 0,
   uploadDragDepth: 0,
 };

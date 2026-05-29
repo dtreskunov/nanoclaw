@@ -1039,9 +1039,6 @@ var refs = {
   // openChat / clearChat. Initial-load and full-replace rebuild it
   // from scratch; append-only refetch and appendMsg add to it.
   seenIds: /* @__PURE__ */ new Set(),
-  // Newest server timestamp we've painted, used only to drive
-  // bumpActiveThread side effects (not for dedup).
-  lastSeenTs: "",
   suppressHashCount: 0,
   uploadDragDepth: 0
 };
@@ -2610,7 +2607,6 @@ function clearChat() {
     clearTimeout(refs.reconnectTimer);
     refs.reconnectTimer = null;
   }
-  refs.lastSeenTs = "";
   refs.seenIds.clear();
 }
 function stopChatPoll() {
@@ -2645,7 +2641,6 @@ function appendMsg(direction, text, files, ts, id) {
   if (key && refs.seenIds.has(key)) return;
   if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
-  if (ts && (!refs.lastSeenTs || ts > refs.lastSeenTs)) refs.lastSeenTs = ts;
 }
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
@@ -2661,10 +2656,9 @@ async function refetchThreadHistory(appendNewOnly) {
       ts: m6.timestamp
     }));
     refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
-    if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
     return;
   }
-  let maxTs = refs.lastSeenTs, bumped = false;
+  let maxTs = "";
   const additions = [];
   for (const m6 of messages) {
     const direction = m6.direction === "in" ? "in" : "out";
@@ -2673,15 +2667,11 @@ async function refetchThreadHistory(appendNewOnly) {
     const ts = m6.timestamp || "";
     additions.push({ direction, text: m6.text, files: m6.files || null, ts });
     if (key) refs.seenIds.add(key);
-    if (!maxTs || ts > maxTs) {
-      maxTs = ts;
-    }
-    bumped = true;
+    if (ts > maxTs) maxTs = ts;
     if (direction !== "in") maybeNotify(m6.text, m6.files || []);
   }
-  if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
-  if (bumped) {
-    refs.lastSeenTs = maxTs || refs.lastSeenTs;
+  if (additions.length) {
+    chatMessages.value = chatMessages.value.concat(additions);
     bumpActiveThread(maxTs);
   }
 }
@@ -2700,7 +2690,6 @@ async function openChat(gid, resumeTid, opts) {
   }
   stopChatPoll();
   refs.reconnectAttempt = 0;
-  refs.lastSeenTs = "";
   let ct = "web", mg = null, cs = true;
   if (opts && opts.channelType) {
     ct = opts.channelType;
@@ -2743,7 +2732,6 @@ async function openChat(gid, resumeTid, opts) {
         });
         if (Array.isArray(messages)) {
           refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
-          if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || "";
         }
       } else {
         chatLoading.value = false;

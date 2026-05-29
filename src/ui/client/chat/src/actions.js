@@ -88,7 +88,6 @@ export function clearChat() {
   stopChatPoll();
   if (refs.ws) { try { refs.ws.close(); } catch (_) {} refs.ws = null; }
   if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
-  refs.lastSeenTs = '';
   refs.seenIds.clear();
 }
 
@@ -115,14 +114,12 @@ function historyUrl(gid, tid) {
 function appendMsg(direction, text, files, ts, id) {
   // Dedup against history refetch by stable per-row id. Live WS pushes
   // carry `id` (messages_in.id / messages_out.id); optimistic local
-  // bubbles for non-web sends pass a synthetic `local:<ts>` sentinel,
-  // which won't collide with any server id and so won't block the real
-  // row on refetch (content-match in refetchThreadHistory handles that).
+  // bubbles for non-web sends pass no id and rely on the post-send full
+  // refetch (refetchThreadHistory(false)) to reconcile.
   const key = id ? `${direction}:${id}` : null;
   if (key && refs.seenIds.has(key)) return;
   if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
-  if (ts && (!refs.lastSeenTs || ts > refs.lastSeenTs)) refs.lastSeenTs = ts;
 }
 
 async function refetchThreadHistory(appendNewOnly) {
@@ -139,10 +136,9 @@ async function refetchThreadHistory(appendNewOnly) {
       ts: m.timestamp,
     }));
     refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${m.direction === 'in' ? 'in' : 'out'}:${m.id}`));
-    if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
     return;
   }
-  let maxTs = refs.lastSeenTs, bumped = false;
+  let maxTs = '';
   const additions = [];
   for (const m of messages) {
     const direction = m.direction === 'in' ? 'in' : 'out';
@@ -151,12 +147,13 @@ async function refetchThreadHistory(appendNewOnly) {
     const ts = m.timestamp || '';
     additions.push({ direction, text: m.text, files: m.files || null, ts });
     if (key) refs.seenIds.add(key);
-    if (!maxTs || ts > maxTs) { maxTs = ts; }
-    bumped = true;
+    if (ts > maxTs) maxTs = ts;
     if (direction !== 'in') maybeNotify(m.text, m.files || []);
   }
-  if (additions.length) chatMessages.value = chatMessages.value.concat(additions);
-  if (bumped) { refs.lastSeenTs = maxTs || refs.lastSeenTs; bumpActiveThread(maxTs); }
+  if (additions.length) {
+    chatMessages.value = chatMessages.value.concat(additions);
+    bumpActiveThread(maxTs);
+  }
 }
 
 export async function openChat(gid, resumeTid, opts) {
@@ -166,7 +163,6 @@ export async function openChat(gid, resumeTid, opts) {
   if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
   stopChatPoll();
   refs.reconnectAttempt = 0;
-  refs.lastSeenTs = '';
 
   let ct = 'web', mg = null, cs = true;
   if (opts && opts.channelType) {
@@ -208,7 +204,6 @@ export async function openChat(gid, resumeTid, opts) {
         });
         if (Array.isArray(messages)) {
           refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${m.direction === 'in' ? 'in' : 'out'}:${m.id}`));
-          if (messages.length > 0) refs.lastSeenTs = messages[messages.length - 1].timestamp || '';
         }
       } else {
         chatLoading.value = false;
@@ -485,10 +480,11 @@ export function clearPending() { pending.value = []; }
 // Keep relative-time labels fresh and recover messages missed while the
 // tab/phone was asleep. Two triggers:
 //   - 30s interval bumps nowTick so <RelativeTime> re-renders.
-//   - visibilitychange \u2192 visible: bump nowTick immediately, fetch any
-//     messages since refs.lastSeenTs, and force the WS to reconnect if
-//     it's not currently open (mobile OSes routinely silently kill
-//     sockets on resume without firing onclose).
+//   - visibilitychange → visible: bump nowTick immediately, refetch
+//     any new messages (dedup'd by row id against refs.seenIds), and
+//     force the WS to reconnect if it's not currently open (mobile
+//     OSes routinely silently kill sockets on resume without firing
+//     onclose).
 const NOW_TICK_MS = 30000;
 export function installLivenessHandlers() {
   setInterval(() => { if (!document.hidden) nowTick.value = Date.now(); }, NOW_TICK_MS);
