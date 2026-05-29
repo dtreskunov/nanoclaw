@@ -2859,6 +2859,11 @@ async function sendChat(text, files) {
       } catch (_5) {
       }
       chatStatus.value = `send failed: ${detail}`;
+    } else if (!isWeb) {
+      try {
+        await refetchThreadHistory(false);
+      } catch (_5) {
+      }
     }
   } catch (err) {
     console.error("send failed", err);
