@@ -19,15 +19,20 @@ import { getDb } from '../../db/connection.js';
 import {
   createMessagingGroup,
   createMessagingGroupAgent,
+  getMessagingGroup,
   getMessagingGroupAgents,
   getMessagingGroupAgentByPair,
   getMessagingGroupByPlatform,
 } from '../../db/messaging-groups.js';
 import { deleteSession, findSessionByAgentGroup, findSessionForAgent } from '../../db/sessions.js';
-import { openInboundDb, openOutboundDb, sessionDir } from '../../session-manager.js';
+import { openInboundDb, openOutboundDb, sessionDir, writeSessionMessage } from '../../session-manager.js';
 import { canAccessAgentGroup } from '../../modules/permissions/access.js';
+import { getUser } from '../../modules/permissions/db/users.js';
 import { log } from '../../log.js';
+import { getChannelAdapter } from '../../channels/channel-registry.js';
 import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../channels/web.js';
+import { setResendPendingWebOverride } from '../../channels/resend.js';
+import type { OutboundMessage } from '../../channels/adapter.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
 import fs from 'fs';
 
@@ -277,6 +282,39 @@ export async function handleChatRequest(
       writeJson(res, 400, { error: 'empty_message' });
       return true;
     }
+
+    // Cross-channel send: when the client passes ?channel=&mg=, dispatch
+    // through that channel's adapter.deliver instead of the web inbound
+    // path. The web case stays separate because web has no platform-side
+    // delivery — the agent's reply IS the platform message.
+    const q = new URLSearchParams((req.url || '').split('?')[1] || '');
+    const qChannel = q.get('channel') || undefined;
+    const qMg = q.get('mg') || undefined;
+
+    if (qChannel && qMg && qChannel !== WEB_CHANNEL_TYPE) {
+      try {
+        const id = await sendViaChannelAdapter({
+          userId,
+          agentGroupId: m.groupId,
+          threadId: m.threadId,
+          channelType: qChannel,
+          messagingGroupId: qMg,
+          text,
+          attachments,
+        });
+        writeJson(res, 200, { id });
+      } catch (err) {
+        const code = (err as Error).message;
+        const status = code.startsWith('http_') ? Number(code.slice(5)) : 500;
+        log.warn('cross-channel chat send failed', { userId, groupId: m.groupId, channel: qChannel, err });
+        writeJson(res, Number.isFinite(status) ? status : 500, {
+          error: code || 'send_failed',
+          detail: (err as { detail?: string }).detail,
+        });
+      }
+      return true;
+    }
+
     ensureWebMessagingGroup(userId, m.groupId);
     const platformId = platformIdFor(userId, m.groupId);
     try {
@@ -381,8 +419,13 @@ function readChatHistory(
         .all(target.channelType, threadId) as { timestamp: string; content: string }[];
       for (const r of rows) {
         const parsed = parseInboundContent(r.content);
-        if (parsed != null)
-          messages.push({ direction: 'in', timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+        if (parsed != null) {
+          // _via:'web' marks a message that was relayed *from* the viewer
+          // through the web UI. From the viewer's perspective it belongs
+          // in their own bubble, not the bot's.
+          const direction: 'in' | 'out' = parsed.viaWeb ? 'out' : 'in';
+          messages.push({ direction, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+        }
       }
     } finally {
       inDb.close();
@@ -485,22 +528,119 @@ function resolveSessionForMode(
   );
 }
 
+/**
+ * Cross-channel web send: ship the viewer's message out through the
+ * named channel's existing adapter.deliver, then log it as an inbound
+ * row with trigger=0 (the agent sees it as context on its next natural
+ * wake; no auto-response). Throws Error('http_NNN') with optional .detail
+ * for the route handler to map to an HTTP status.
+ */
+async function sendViaChannelAdapter(args: {
+  userId: string;
+  agentGroupId: string;
+  threadId: string;
+  channelType: string;
+  messagingGroupId: string;
+  text: string;
+  attachments: { filename: string; contentType: string; data: string; size: number }[];
+}): Promise<string> {
+  const target = resolveTargetMessagingGroup(args.userId, args.agentGroupId, {
+    channelType: args.channelType,
+    messagingGroupId: args.messagingGroupId,
+  });
+  if (!target) throw Object.assign(new Error('http_403'), { detail: 'not_owner_of_messaging_group' });
+
+  const adapter = getChannelAdapter(args.channelType);
+  if (!adapter || !adapter.isConnected()) {
+    throw Object.assign(new Error('http_503'), { detail: 'channel_offline' });
+  }
+  if (!adapter.supportsMultiFile && args.attachments.length > 1) {
+    throw Object.assign(new Error('http_400'), { detail: 'multifile_not_supported' });
+  }
+
+  const session = resolveSessionForMode(args.agentGroupId, target.messagingGroupId, target.sessionMode, args.threadId);
+  if (!session) throw Object.assign(new Error('http_409'), { detail: 'no_active_session' });
+
+  const mg = getMessagingGroup(target.messagingGroupId);
+  if (!mg) throw Object.assign(new Error('http_404'), { detail: 'messaging_group_not_found' });
+
+  const fileBuffers = args.attachments.map((a) => ({
+    filename: a.filename,
+    data: Buffer.from(a.data, 'base64'),
+  }));
+  const outbound: OutboundMessage = {
+    kind: 'chat',
+    content: { text: args.text, files: args.attachments.map((a) => ({ filename: a.filename, size: a.size })) },
+    files: fileBuffers.length > 0 ? fileBuffers : undefined,
+  };
+
+  // Per-channel UX tweaks before the generic dispatch.
+  if (args.channelType === 'resend') {
+    const u = getUser(args.userId);
+    const fallback = args.userId.includes(':') ? args.userId.split(':')[1] : args.userId;
+    const localPart = fallback.split('@')[0] || fallback;
+    const displayName = (u?.display_name && u.display_name.trim()) || localPart;
+    setResendPendingWebOverride({
+      fromName: `${displayName} (via web)`,
+      extraHeaders: { 'X-Sent-Via': 'web-ui', 'X-Sent-By': args.userId },
+    });
+  }
+
+  let platformMsgId: string | undefined;
+  try {
+    platformMsgId = await adapter.deliver(mg.platform_id, args.threadId, outbound);
+  } catch (err) {
+    // Clear stash even on failure so a later send doesn't pick up stale state.
+    if (args.channelType === 'resend') setResendPendingWebOverride({ fromName: null, extraHeaders: null });
+    throw Object.assign(new Error('http_500'), { detail: (err as Error).message || 'channel_send_failed' });
+  }
+
+  // Log the user's send as an inbound row so the agent can see what the
+  // user did on its next natural wake. trigger=0 means it won't auto-wake
+  // the container.
+  const id = `web-relay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const contentPayload: Record<string, unknown> = {
+    text: args.text,
+    sender: args.userId,
+    senderId: args.userId,
+    _via: 'web',
+    _sender: args.userId,
+    _platform_msg_id: platformMsgId,
+  };
+  if (args.attachments.length > 0) {
+    contentPayload.files = args.attachments.map((a) => ({ filename: a.filename, size: a.size }));
+  }
+  writeSessionMessage(args.agentGroupId, session.id, {
+    id,
+    kind: 'chat',
+    timestamp: new Date().toISOString(),
+    platformId: mg.platform_id,
+    channelType: args.channelType,
+    threadId: args.threadId,
+    content: JSON.stringify(contentPayload),
+    trigger: 0,
+  });
+  return id;
+}
+
 function normTs(s: string): string {
   return s.includes('T') ? s : s.replace(' ', 'T') + 'Z';
 }
 
-function parseInboundContent(content: string): { text: string; files?: { filename: string; size: number }[] } | null {
+function parseInboundContent(
+  content: string,
+): { text: string; files?: { filename: string; size: number }[]; viaWeb?: boolean } | null {
   try {
     const o = JSON.parse(content);
     if (typeof o === 'string') return { text: o };
-    if (typeof o?.text === 'string' || Array.isArray(o?.attachments)) {
+    if (typeof o?.text === 'string' || Array.isArray(o?.attachments) || Array.isArray(o?.files)) {
       const text = typeof o?.text === 'string' ? o.text : '';
-      const files = Array.isArray(o?.attachments)
-        ? o.attachments
+      // `attachments` for native inbound (base64 + name/mimeType); `files`
+      // for web-relayed sends (filename + size only).
+      const filesArr = Array.isArray(o?.attachments) ? o.attachments : Array.isArray(o?.files) ? o.files : undefined;
+      const files = filesArr
+        ? filesArr
             .map((a: { filename?: string; name?: string; data?: string; size?: number }) => {
-              // The on-disk inbox dir is the source of truth for the agent;
-              // for history display we just need filename + an approximate
-              // size (length of the base64 string ≈ 4/3 × bytes).
               const size =
                 typeof a?.size === 'number'
                   ? a.size
@@ -511,7 +651,11 @@ function parseInboundContent(content: string): { text: string; files?: { filenam
             })
             .filter((f: { filename: string }) => f.filename)
         : undefined;
-      return { text, files: files && files.length > 0 ? files : undefined };
+      return {
+        text,
+        files: files && files.length > 0 ? files : undefined,
+        viaWeb: o?._via === 'web' || undefined,
+      };
     }
   } catch {
     /* not JSON */
@@ -549,6 +693,8 @@ interface ThreadSummary {
   lastActivityAt: string;
   messageCount: number;
   counterparty?: string;
+  /** True when the web UI can dispatch a send through this channel's adapter. */
+  canSend?: boolean;
 }
 
 interface UserMessagingContext {
@@ -684,6 +830,20 @@ function listAllThreadsForUser(userId: string, agentGroupId: string): ThreadSumm
   if (ctxs.length > 0 && hasAgentSharedSession(agentGroupId)) {
     enumerateAgentShared(agentGroupId, ctxs, out);
   }
+
+  // Stamp canSend by channel — true iff the adapter is registered and
+  // connected. Web is always sendable (handled by submitWebInbound).
+  const canSendByChannel = new Map<string, boolean>();
+  for (const t of out) {
+    if (canSendByChannel.has(t.channelType)) continue;
+    if (t.channelType === WEB_CHANNEL_TYPE) {
+      canSendByChannel.set(t.channelType, true);
+    } else {
+      const a = getChannelAdapter(t.channelType);
+      canSendByChannel.set(t.channelType, !!a && a.isConnected());
+    }
+  }
+  for (const t of out) t.canSend = canSendByChannel.get(t.channelType) === true;
 
   out.sort((a, b) => Date.parse(normTs(b.lastActivityAt)) - Date.parse(normTs(a.lastActivityAt)));
   return out;

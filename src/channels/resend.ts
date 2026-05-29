@@ -67,6 +67,23 @@ export function ensureBodyForAttachments<T extends { markdown?: unknown; files?:
   return { ...message, markdown: `Attached:\n\n${names}` };
 }
 
+// Module-scope stash for the next outbound send. The web-UI send route
+// sets these before invoking adapter.deliver so the email goes out with a
+// distinguishing From display name ("<Name> (via web) <alias>") and audit
+// headers. Safe because the bridge runs with concurrency: 'queue' — only
+// one send is in flight at a time. Consumed and cleared by the
+// resendClient.emails.send override below.
+let pendingWebFromName: string | null = null;
+let pendingWebExtraHeaders: Record<string, string> | null = null;
+
+export function setResendPendingWebOverride(opts: {
+  fromName?: string | null;
+  extraHeaders?: Record<string, string> | null;
+}): void {
+  pendingWebFromName = opts.fromName ?? null;
+  pendingWebExtraHeaders = opts.extraHeaders ?? null;
+}
+
 registerChannelAdapter('resend', {
   factory: () => {
     const env = readEnvFile(['RESEND_API_KEY', 'RESEND_FROM_ADDRESS', 'RESEND_FROM_NAME', 'RESEND_WEBHOOK_SECRET']);
@@ -368,6 +385,23 @@ registerChannelAdapter('resend', {
       if (pendingAttachments) {
         payload = { ...payload, attachments: pendingAttachments };
         pendingAttachments = null;
+      }
+      if (pendingWebFromName) {
+        // Resend accepts `"Display Name <address>"` for `from`. Extract
+        // the bare address from the payload (the chat-sdk-adapter may
+        // pass it already-formatted or bare).
+        const rawFrom = String(payload.from || '');
+        const angle = rawFrom.match(/<([^>]+)>/);
+        const bareAddr = (angle ? angle[1] : rawFrom).trim();
+        if (bareAddr) {
+          payload = { ...payload, from: `${pendingWebFromName} <${bareAddr}>` };
+        }
+        pendingWebFromName = null;
+      }
+      if (pendingWebExtraHeaders) {
+        const existing = (payload.headers || {}) as Record<string, string>;
+        payload = { ...payload, headers: { ...existing, ...pendingWebExtraHeaders } };
+        pendingWebExtraHeaders = null;
       }
       return origSend(payload);
     };
