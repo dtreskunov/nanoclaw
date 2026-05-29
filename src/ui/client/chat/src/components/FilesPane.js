@@ -16,6 +16,7 @@ import { RelativeTime } from './RelativeTime.js';
 import { ActionsMenu } from './ActionsMenu.js';
 import { MediaPlayer } from './MediaPlayer.js';
 import { LyricsPanel } from './LyricsPanel.js';
+import { highlightCode } from '../highlight.js';
 
 function Crumb() {
   const ref = useRef(null);
@@ -171,7 +172,12 @@ function Preview() {
     body = md != null
       ? html`<div class="markdown-preview" dangerouslySetInnerHTML=${{ __html: md }} />`
       : html`<pre>${p.text}</pre>`;
-  } else if (p.kind === 'text') body = html`<pre>${p.text}</pre>`;
+  } else if (p.kind === 'text') {
+    const hi = highlightCode(p.text, p.name);
+    body = hi
+      ? html`<pre class="hljs" data-lang=${hi.language}><code dangerouslySetInnerHTML=${{ __html: hi.html }} /></pre>`
+      : html`<pre>${p.text}</pre>`;
+  }
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
   return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${fileMeta}${tagMeta}${body}</div>`;
