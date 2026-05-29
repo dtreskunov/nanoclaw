@@ -162,7 +162,7 @@ function Preview() {
   `;
   const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
   const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
-  const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} />` : null;
+  const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} path=${p.path} />` : null;
   let body = null;
   if (p.kind === 'image') body = html`<img alt=${p.name} src=${p.url} />`;
   else if (p.kind === 'pdf') body = html`<iframe src=${p.url} style="width:100%;height:90vh;border:0" />`;

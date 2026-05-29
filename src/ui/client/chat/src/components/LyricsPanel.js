@@ -5,16 +5,25 @@
 // Supported timestamp form: [mm:ss], [mm:ss.x], [mm:ss.xx], [mm:ss.xxx].
 // A line may carry multiple timestamps — common in LRC files for
 // repeated choruses. Click a synced line to seek the media element.
-import { useMemo, useRef, useEffect } from 'preact/hooks';
+//
+// Sync offset: honors the LRC `[offset:NNN]` header (milliseconds,
+// positive = lyrics late in the file, shift earlier) and lets the user
+// nudge a per-file offset via the floating control. The user offset is
+// persisted in localStorage keyed by file path.
+import { useMemo, useRef, useEffect, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { mediaCurrentTime } from '../state.js';
 
 const TS_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+const OFFSET_RE = /^\s*\[offset:\s*([+-]?\d+)\s*\]\s*$/i;
 
 function parseLyrics(text) {
   const lines = [];
   let sawTimestamp = false;
+  let lrcOffset = 0; // seconds
   for (const raw of text.split(/\r?\n/)) {
+    const om = OFFSET_RE.exec(raw);
+    if (om) { lrcOffset = Number(om[1]) / 1000; continue; }
     const times = [];
     let m;
     TS_RE.lastIndex = 0;
@@ -32,15 +41,12 @@ function parseLyrics(text) {
     sawTimestamp = true;
     for (const t of times) lines.push({ t, text: content });
   }
-  if (!sawTimestamp) return { synced: false, lines };
-  // Drop untimed lines in synced mode (usually LRC header tags like
-  // [ar:...], [ti:...] that already stripped to empty) and sort by time.
+  if (!sawTimestamp) return { synced: false, lines, lrcOffset: 0 };
   const synced = lines.filter((l) => l.t != null).sort((a, b) => a.t - b.t);
-  return { synced: true, lines: synced };
+  return { synced: true, lines: synced, lrcOffset };
 }
 
 function findActiveIdx(lines, t) {
-  // Largest index i such that lines[i].t <= t. Lines are time-sorted.
   let lo = 0;
   let hi = lines.length - 1;
   let ans = -1;
@@ -51,10 +57,33 @@ function findActiveIdx(lines, t) {
   return ans;
 }
 
-export function LyricsPanel({ text }) {
+const OFFSET_KEY_PREFIX = 'nanoclaw.lyricsOffset.';
+
+function loadUserOffset(path) {
+  if (!path) return 0;
+  try { return Number(localStorage.getItem(OFFSET_KEY_PREFIX + path)) || 0; } catch { return 0; }
+}
+
+function saveUserOffset(path, sec) {
+  if (!path) return;
+  try {
+    if (sec === 0) localStorage.removeItem(OFFSET_KEY_PREFIX + path);
+    else localStorage.setItem(OFFSET_KEY_PREFIX + path, String(sec));
+  } catch { /* quota or disabled — ignore */ }
+}
+
+export function LyricsPanel({ text, path }) {
   const parsed = useMemo(() => parseLyrics(text || ''), [text]);
-  const t = mediaCurrentTime.value;
-  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, t) : -1;
+  const [userOffset, setUserOffset] = useState(() => loadUserOffset(path));
+  useEffect(() => { setUserOffset(loadUserOffset(path)); }, [path]);
+
+  const currentTime = mediaCurrentTime.value;
+  // Effective time used to match the active line. Subtract the LRC
+  // file's own offset (positive in the tag = lyrics late, shift
+  // earlier), then add the user's per-file nudge.
+  const effective = currentTime - parsed.lrcOffset + userOffset;
+  const activeIdx = parsed.synced ? findActiveIdx(parsed.lines, effective) : -1;
+
   const scrollerRef = useRef(null);
   const activeRef = useRef(null);
   const lastIdxRef = useRef(-2);
@@ -64,21 +93,45 @@ export function LyricsPanel({ text }) {
     const el = activeRef.current;
     const c = scrollerRef.current;
     if (!el || !c) return;
-    // Use bounding-rect delta so we don't depend on the scroller being
-    // positioned (offsetTop is otherwise relative to the wrong ancestor).
     const elRect = el.getBoundingClientRect();
     const cRect = c.getBoundingClientRect();
     const delta = elRect.top - cRect.top - (c.clientHeight - el.clientHeight) / 2;
     c.scrollBy({ top: delta, behavior: 'smooth' });
   }, [activeIdx]);
 
-  const seek = (sec) => {
+  const seek = (lineT) => {
+    // Audio time that should make `lineT` the active line.
+    const audioT = lineT + parsed.lrcOffset - userOffset;
     const media = document.querySelector('.media-player audio, .media-player video');
-    if (media) { media.currentTime = sec; mediaCurrentTime.value = sec; }
+    if (media) { media.currentTime = Math.max(0, audioT); mediaCurrentTime.value = media.currentTime; }
   };
+
+  const nudge = (delta) => {
+    const next = Math.round((userOffset + delta) * 10) / 10;
+    setUserOffset(next);
+    saveUserOffset(path, next);
+  };
+  // "Sync here": treat the currently-highlighted line as the one that
+  // should be playing right now and compute the offset to match.
+  const syncHere = () => {
+    if (activeIdx < 0) return;
+    const lineT = parsed.lines[activeIdx].t;
+    const next = Math.round((lineT - (currentTime - parsed.lrcOffset)) * 10) / 10;
+    setUserOffset(next);
+    saveUserOffset(path, next);
+  };
+  const reset = () => { setUserOffset(0); saveUserOffset(path, 0); };
 
   return html`
     <div class="preview-lyrics" ref=${scrollerRef}>
+      ${parsed.synced ? html`
+        <div class="lyrics-offset" title="Lyrics sync offset (saved per file). Negative = lyrics earlier, positive = lyrics later.">
+          <button type="button" onClick=${() => nudge(-0.5)} title="Lyrics 0.5s earlier">\u2212</button>
+          <button type="button" class="lyrics-offset-val" onClick=${reset} title="Reset to 0">${formatOffset(userOffset)}</button>
+          <button type="button" onClick=${() => nudge(0.5)} title="Lyrics 0.5s later">+</button>
+          <button type="button" class="lyrics-offset-sync" onClick=${syncHere} title="Sync the highlighted line to the current playback time">sync</button>
+        </div>
+      ` : null}
       ${parsed.synced
         ? html`<ol class="lyrics-synced">
             ${parsed.lines.map((l, i) => html`
@@ -98,4 +151,9 @@ function formatTime(s) {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+function formatOffset(s) {
+  if (s === 0) return '0.0s';
+  return `${s > 0 ? '+' : ''}${s.toFixed(1)}s`;
 }
