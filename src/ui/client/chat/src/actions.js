@@ -5,7 +5,7 @@ import {
   groupId, threads, threadId, channelType, messagingGroupId, canSend,
   chatMessages, chatStatus, chatLoading, refs, treePath, filePath, treeEntries,
   treeError, contextDismissed, pending, previewBlock, paneOpen, drawerOpen,
-  isMobile, POLL_INTERVAL_MS, THREADS_POLL_MS,
+  isMobile, nowTick, POLL_INTERVAL_MS, THREADS_POLL_MS,
 } from './state.js';
 import { api } from './api.js';
 import { writeHash } from './hash.js';
@@ -236,7 +236,17 @@ function connectChatWs() {
   const wsUrl = `${proto}//${location.host}/ui/chat/api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/ws`;
   const ws = new WebSocket(wsUrl);
   refs.ws = ws;
-  ws.onopen = () => { refs.reconnectAttempt = 0; chatStatus.value = 'connected'; };
+  ws.onopen = () => {
+    const wasReconnect = refs.reconnectAttempt > 0;
+    refs.reconnectAttempt = 0;
+    chatStatus.value = 'connected';
+    // Catch up on any messages that arrived while we were disconnected
+    // (phone asleep, network blip, server restart). Safe on initial
+    // connect too — it's a no-op when no new rows exist.
+    if (wasReconnect) {
+      refetchThreadHistory(true).catch((err) => console.error('reconnect catchup failed', err));
+    }
+  };
   ws.onclose = () => {
     if (refs.ws !== ws) return;
     refs.ws = null;
@@ -454,3 +464,29 @@ export function removePending(i) {
 }
 
 export function clearPending() { pending.value = []; }
+
+// ── liveness / catchup ──────────────────────────────────────────────
+// Keep relative-time labels fresh and recover messages missed while the
+// tab/phone was asleep. Two triggers:
+//   - 30s interval bumps nowTick so <RelativeTime> re-renders.
+//   - visibilitychange \u2192 visible: bump nowTick immediately, fetch any
+//     messages since refs.lastSeenTs, and force the WS to reconnect if
+//     it's not currently open (mobile OSes routinely silently kill
+//     sockets on resume without firing onclose).
+const NOW_TICK_MS = 30000;
+export function installLivenessHandlers() {
+  setInterval(() => { if (!document.hidden) nowTick.value = Date.now(); }, NOW_TICK_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    nowTick.value = Date.now();
+    if (!threadId.value) return;
+    refetchThreadHistory(true).catch((err) => console.error('resume catchup failed', err));
+    const ws = refs.ws;
+    const open = ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
+    if (channelType.value === 'web' && !open) {
+      if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
+      connectChatWs();
+    }
+  });
+}
+

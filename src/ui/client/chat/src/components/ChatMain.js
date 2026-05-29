@@ -7,8 +7,9 @@ import {
   contextDismissed, threads, groupId, channelMeta,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state.js';
-import { renderMarkdown, rewriteFileLinks, fmtBytes, fmtBytesShort, fmtRelative, fmtAbsolute } from '../utils.js';
+import { renderMarkdown, rewriteFileLinks, fmtBytes, fmtBytesShort } from '../utils.js';
 import { sendChat, addPendingFiles, removePending, clearPending, currentContextPath, navFile } from '../actions.js';
+import { RelativeTime } from './RelativeTime.js';
 
 function Message({ m }) {
   const ref = useRef(null);
@@ -27,7 +28,7 @@ function Message({ m }) {
       ${m.files && m.files.length
         ? html`<div class="files">${m.files.map((f) => `\uD83D\uDCCE ${f.filename} (${fmtBytes(f.size)})`).join('  ')}</div>`
         : null}
-      ${m.ts ? html`<div class="meta" title=${fmtAbsolute(m.ts)}><span class="ts" title=${fmtAbsolute(m.ts)}>${fmtRelative(m.ts)}</span></div>` : null}
+      ${m.ts ? html`<div class="meta"><${RelativeTime} ts=${m.ts} /></div>` : null}
     </div>
   `;
 }
