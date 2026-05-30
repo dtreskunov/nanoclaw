@@ -14,6 +14,7 @@ import { migration014 } from './014-container-configs.js';
 import { migration015 } from './015-cli-scope.js';
 import { migration016 } from './016-ui.js';
 import { migration017 } from './017-ui-download-tokens.js';
+import { migration018 } from './018-identities.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
@@ -41,6 +42,7 @@ const migrations: Migration[] = [
   migration015,
   migration016,
   migration017,
+  migration018,
   moduleResendThreadRoots,
   moduleContainerConfigsPip,
 ];
