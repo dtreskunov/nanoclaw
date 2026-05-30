@@ -47,38 +47,40 @@ export const migration018: Migration = {
        VALUES (?, ?, ?, ?, 1)`,
     );
 
-    for (const u of users) {
-      const newId = randomUUID();
-      idMap.set(u.id, newId);
-
-      const idx = u.id.indexOf(':');
-      let channel: string;
-      let handle: string;
-      if (idx < 0) {
-        channel = u.kind || 'unknown';
-        handle = u.id;
-      } else {
-        const prefix = u.id.slice(0, idx);
-        const rest = u.id.slice(idx + 1);
-        if (u.kind && u.kind !== prefix) {
-          // Teams-style: kind doesn't match prefix → full id is the handle.
-          channel = u.kind;
-          handle = u.id;
-        } else {
-          channel = prefix;
-          handle = rest;
-        }
-      }
-      insertIdentity.run(newId, channel, handle, now);
-    }
-
-    // Rewrite every column holding a user id. FKs must be off so we can
-    // mutate users.id (with-FK columns reference it); we update FK columns
-    // first to keep the intermediate state self-consistent.
-    const fkWasOn = (db.pragma('foreign_keys', { simple: true }) as number) === 1;
-    if (fkWasOn) db.pragma('foreign_keys = OFF');
+    // Defer FK checks until commit: identity rows reference users.id
+    // (which we're about to rewrite), and every FK column on dependent
+    // tables points at users.id too. `foreign_keys` pragma is a no-op
+    // inside a transaction; `defer_foreign_keys` is the supported way
+    // to bypass intermediate FK violations until the transaction is
+    // self-consistent at commit. Resets automatically at commit.
+    db.pragma('defer_foreign_keys = ON');
 
     try {
+      for (const u of users) {
+        const newId = randomUUID();
+        idMap.set(u.id, newId);
+
+        const idx = u.id.indexOf(':');
+        let channel: string;
+        let handle: string;
+        if (idx < 0) {
+          channel = u.kind || 'unknown';
+          handle = u.id;
+        } else {
+          const prefix = u.id.slice(0, idx);
+          const rest = u.id.slice(idx + 1);
+          if (u.kind && u.kind !== prefix) {
+            // Teams-style: kind doesn't match prefix → full id is the handle.
+            channel = u.kind;
+            handle = u.id;
+          } else {
+            channel = prefix;
+            handle = rest;
+          }
+        }
+        insertIdentity.run(newId, channel, handle, now);
+      }
+
       const userIdCols: { table: string; col: string }[] = [
         { table: 'user_roles', col: 'user_id' },
         { table: 'user_roles', col: 'granted_by' },
@@ -116,7 +118,7 @@ export const migration018: Migration = {
         updateUserPk.run(newId, oldId);
       }
     } finally {
-      if (fkWasOn) db.pragma('foreign_keys = ON');
+      // defer_foreign_keys resets to OFF on commit/rollback automatically.
     }
   },
 };
