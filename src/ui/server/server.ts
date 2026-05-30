@@ -25,6 +25,7 @@ import {
 } from './auth.js';
 import { purgeExpired } from './db.js';
 import { handleOidcRoute, renderLoginPage } from './oidc-routes.js';
+import { handleSettings } from './settings.js';
 import { handle as chatHandle, CHAT_MOUNT_PREFIX, handleChatUpgrade } from './chat/routes.js';
 
 /** Path prefix every UI app lives under. Shared cookie path. */
@@ -102,6 +103,9 @@ export function startUi(): void {
   // Per-app mounts. Add more here as new UI apps are introduced.
   mountHandler(CHAT_MOUNT_PREFIX, withAccessLog('chat', chatHandle));
   mountUpgradeHandler(CHAT_MOUNT_PREFIX, handleChatUpgrade);
+
+  // Settings (identity linking, etc.) — server-rendered, no SPA.
+  mountHandler(`${UI_MOUNT_PREFIX}/settings`, withAccessLog('settings', handleSettings));
 
   // Root convenience redirect — '/' → chat. Only fires on exact '/' because
   // the mount matcher requires `pathname === prefix || startsWith(prefix + '/')`,
