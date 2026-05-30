@@ -22,6 +22,8 @@ export function Header() {
               onClick=${toggleMute}>${muted ? '\uD83D\uDD15' : '\uD83D\uDD14'}</button>
       <button type="button" class="icon-btn mobile-only" aria-label="Files"
               onClick=${() => { drawerOpen.files.value = !drawerOpen.files.value; drawerOpen.threads.value = false; }}>\uD83D\uDCC1</button>
+      <a href="/ui/settings/identities" class="icon-btn" aria-label="Settings" title="Settings"
+         style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">\u2699\uFE0F</a>
       <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
         <button type="submit" aria-label="Log out" title="Log out">
           <svg class="mobile-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
