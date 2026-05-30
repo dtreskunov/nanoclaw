@@ -13,5 +13,6 @@ import './destinations.js';
 import './user-dms.js';
 import './dropped-messages.js';
 import './approvals.js';
+import './pending-approvals.js';
 import './sessions.js';
 import './email-bots.js';
