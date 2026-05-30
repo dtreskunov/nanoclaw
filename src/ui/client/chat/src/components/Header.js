@@ -1,13 +1,11 @@
-// Header: brand, group select, user, notif button, mobile drawer buttons,
-// logout form.
+// Header: brand, group select, user, settings button, mobile drawer
+// buttons, logout form.
 import { html } from '../html.js';
-import { groups, groupId, me, notifMutedSig, drawerOpen } from '../state.js';
+import { groups, groupId, me, drawerOpen, settingsOpen } from '../state.js';
 import { selectGroup } from '../actions.js';
-import { toggleMute } from '../notify.js';
 
 export function Header() {
   const onChange = (e) => { selectGroup(e.target.value).catch(console.error); };
-  const muted = notifMutedSig.value;
   return html`
     <header>
       <button type="button" class="icon-btn mobile-only" aria-label="Threads"
@@ -18,12 +16,10 @@ export function Header() {
       </select>
       <div class="spacer"></div>
       <span class="user" id="me">${me.value}</span>
-      <button type="button" class="icon-btn" aria-label="Notifications" title=${muted ? 'Notifications muted (click to enable)' : 'Mute notifications'}
-              onClick=${toggleMute}>${muted ? '\uD83D\uDD15' : '\uD83D\uDD14'}</button>
       <button type="button" class="icon-btn mobile-only" aria-label="Files"
               onClick=${() => { drawerOpen.files.value = !drawerOpen.files.value; drawerOpen.threads.value = false; }}>\uD83D\uDCC1</button>
-      <a href="/ui/settings/identities" class="icon-btn" aria-label="Settings" title="Settings"
-         style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">\u2699\uFE0F</a>
+      <button type="button" class="icon-btn" aria-label="Settings" title="Settings"
+              onClick=${() => { settingsOpen.value = !settingsOpen.value; }}>\u2699\uFE0F</button>
       <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
         <button type="submit" aria-label="Log out" title="Log out">
           <svg class="mobile-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

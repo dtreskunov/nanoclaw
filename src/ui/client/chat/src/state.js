@@ -47,6 +47,7 @@ export const uploadItems = signal([]);
 // Misc
 export const me = signal('');
 export const notifMutedSig = signal(false);
+export const settingsOpen = signal(false);
 export const previewBlock = signal(null);  // { kind, url?, html?, text?, mime?, ext?, name?, size?, mtime? } | null
 
 // Global "now" tick — bumped on a timer + on visibility resume so

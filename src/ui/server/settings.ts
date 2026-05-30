@@ -66,7 +66,11 @@ export async function handleSettings(req: http.IncomingMessage, res: http.Server
       res.end();
       return;
     }
-    return serveIdentitiesPage(res, session.userId);
+    // The settings page is now embedded in the chat SPA — redirect there
+    // with ?settings=1 so the modal opens on first paint.
+    res.writeHead(303, { Location: '/ui/chat/?settings=1' });
+    res.end();
+    return;
   }
 
   // JSON API.
@@ -76,9 +80,9 @@ export async function handleSettings(req: http.IncomingMessage, res: http.Server
     return await handleApi(req, res, pathname.slice('/api'.length), session.userId);
   }
 
-  // Root → identities page.
+  // Root → chat with settings open.
   if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
-    res.writeHead(303, { Location: `${SETTINGS_PREFIX}/identities` });
+    res.writeHead(303, { Location: '/ui/chat/?settings=1' });
     res.end();
     return;
   }
@@ -198,138 +202,6 @@ async function handleApi(
   json(res, 404, { error: 'not_found' });
 }
 
-// ── HTML page (server-rendered, no SPA) ──────────────────────────────────
-
-function serveIdentitiesPage(res: http.ServerResponse, userId: string): void {
-  const rows = getIdentitiesForUser(userId);
-  const channels = getRegisteredChannelNames().filter((c) => c !== 'web');
-  const items = rows
-    .map(
-      (r) =>
-        `<tr>
-          <td><code>${escape(r.channel)}</code></td>
-          <td><code>${escape(r.handle)}</code></td>
-          <td>${r.primary_for_channel === 1 ? 'yes' : ''}</td>
-          <td>${rows.length > 1 ? `<button data-channel="${escape(r.channel)}" data-handle="${escape(r.handle)}" class="unlink">Unlink</button>` : '<span class="muted">last — cannot unlink</span>'}</td>
-        </tr>`,
-    )
-    .join('');
-  const channelOptions =
-    channels.length > 0
-      ? channels.map((c) => `<option value="${escape(c)}">${escape(c)}</option>`).join('')
-      : '<option disabled>(no channels installed)</option>';
-  const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>Identities — NanoClaw</title>
-<style>
-  body { font: 14px/1.5 system-ui, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; color: #222; }
-  h1 { font-size: 20px; } h2 { font-size: 15px; margin-top: 32px; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
-  code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; }
-  button, input, select { font: inherit; padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; }
-  button { background: #1a73e8; color: #fff; border-color: #1a73e8; cursor: pointer; }
-  button:hover { background: #1664c1; }
-  button.unlink { background: #c0392b; border-color: #c0392b; }
-  .muted { color: #888; font-size: 13px; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  #status { margin: 12px 0; padding: 8px 12px; border-radius: 4px; display: none; }
-  #status.ok { background: #e6f4ea; color: #137333; display: block; }
-  #status.err { background: #fce8e6; color: #c5221f; display: block; }
-  .nav { margin-bottom: 16px; }
-  .nav a { color: #1a73e8; text-decoration: none; margin-right: 12px; }
-</style></head><body>
-<div class="nav"><a href="/ui/chat/">&larr; Chat</a></div>
-<h1>Your identities</h1>
-<p class="muted">Identities are how NanoClaw recognizes you across channels. Add more so any channel you DM the bot from is treated as the same user.</p>
-
-<table>
-  <thead><tr><th>Channel</th><th>Handle</th><th>Primary</th><th></th></tr></thead>
-  <tbody>${items}</tbody>
-</table>
-
-<h2>Link a new identity</h2>
-<p class="muted">We'll DM a 6-digit code to the handle you enter. Paste the code below to prove you own it. The code expires in 10 minutes.</p>
-<div class="row">
-  <select id="channel">${channelOptions}</select>
-  <input id="handle" placeholder="handle (platform-specific)" size="32">
-  <button id="start">Send code</button>
-</div>
-<div class="row" style="margin-top: 10px;">
-  <input id="code" placeholder="6-digit code" size="10" maxlength="6">
-  <button id="verify" disabled>Verify</button>
-  <span id="challengeInfo" class="muted"></span>
-</div>
-<div id="status"></div>
-
-<script>
-let challengeId = null;
-const $ = (id) => document.getElementById(id);
-const setStatus = (msg, ok) => {
-  const el = $('status');
-  el.textContent = msg;
-  el.className = ok ? 'ok' : 'err';
-};
-const clearStatus = () => { $('status').className = ''; $('status').textContent = ''; };
-
-$('start').onclick = async () => {
-  clearStatus();
-  const channel = $('channel').value;
-  const handle = $('handle').value.trim();
-  if (!handle) return setStatus('Enter a handle.', false);
-  $('start').disabled = true;
-  try {
-    const r = await fetch('/ui/settings/api/identities/link/start', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({channel, handle}),
-    });
-    const j = await r.json();
-    if (!r.ok) return setStatus(j.message || j.error || 'Failed.', false);
-    challengeId = j.challengeId;
-    $('challengeInfo').textContent = 'Code sent to ' + channel + ':' + handle + '. Expires ' + new Date(j.expiresAt).toLocaleTimeString() + '.';
-    $('verify').disabled = false;
-    $('code').focus();
-    setStatus('Code DM\\'d. Paste it above.', true);
-  } finally { $('start').disabled = false; }
-};
-
-$('verify').onclick = async () => {
-  clearStatus();
-  if (!challengeId) return;
-  const code = $('code').value.trim();
-  if (!code) return setStatus('Enter the code.', false);
-  $('verify').disabled = true;
-  try {
-    const r = await fetch('/ui/settings/api/identities/link/verify', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({challengeId, code}),
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      const remaining = j.attemptsRemaining != null ? ' (' + j.attemptsRemaining + ' attempts left)' : '';
-      return setStatus((j.message || j.error || 'Failed.') + remaining, false);
-    }
-    setStatus('Linked ' + j.channel + ':' + j.handle + '. Reloading…', true);
-    setTimeout(() => location.reload(), 800);
-  } finally { $('verify').disabled = false; }
-};
-
-document.querySelectorAll('button.unlink').forEach((btn) => {
-  btn.onclick = async () => {
-    clearStatus();
-    const channel = btn.dataset.channel, handle = btn.dataset.handle;
-    if (!confirm('Unlink ' + channel + ':' + handle + '?')) return;
-    const r = await fetch('/ui/settings/api/identities/' + encodeURIComponent(channel) + '/' + encodeURIComponent(handle), {method: 'DELETE'});
-    const j = await r.json();
-    if (!r.ok) return setStatus(j.message || j.error || 'Failed.', false);
-    location.reload();
-  };
-});
-</script>
-</body></html>`;
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(html);
-}
-
 // ── tiny helpers ─────────────────────────────────────────────────────────
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {
@@ -346,8 +218,4 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
   } catch {
     return null;
   }
-}
-
-function escape(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }

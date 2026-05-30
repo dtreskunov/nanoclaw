@@ -4,6 +4,7 @@ import { batch } from '@preact/signals';
 import { html } from './html.js';
 import { api } from './api.js';
 import { me, groups } from './state.js';
+import { settingsOpen } from './state.js';
 import { App } from './components/App.js';
 import { initNotif } from './notify.js';
 import { restorePanelState, applyPanelClasses } from './panels.js';
@@ -73,6 +74,16 @@ async function init() {
   if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error('initial route failed', err));
   render(html`<${App} />`, document.getElementById('app'));
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('settings') === '1') {
+      settingsOpen.value = true;
+      sp.delete('settings');
+      const q = sp.toString();
+      const url = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
+      window.history.replaceState(null, '', url);
+    }
+  } catch (_) {}
 }
 
 init().catch((err) => console.error(err));

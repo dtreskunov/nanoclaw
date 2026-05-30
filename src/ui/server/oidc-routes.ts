@@ -103,13 +103,55 @@ function renderHtml(res: http.ServerResponse, status: number, body: string): voi
 
 const PAGE_STYLE = `
   <style>
-    body { font: 14px/1.5 system-ui, sans-serif; max-width: 480px; margin: 48px auto; padding: 0 16px; color: #222; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
+    :root {
+      color-scheme: light dark;
+      --surface: Canvas;
+      --surface-fg: CanvasText;
+      --border: rgba(127, 127, 127, 0.25);
+      --muted: rgba(127, 127, 127, 0.7);
+      --wash: rgba(127, 127, 127, 0.12);
+      --shadow: rgba(0, 0, 0, 0.28);
+      --accent: #1a73e8;
+      --accent-hover: #1664c1;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100%; }
+    body {
+      font: 14px/1.5 system-ui, -apple-system, sans-serif;
+      background: var(--surface); color: var(--surface-fg);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      width: 100%; max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 28px var(--shadow);
+      padding: 28px 28px 24px;
+    }
+    .brand {
+      font-size: 13px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 12px;
+    }
+    h1 { font-size: 20px; margin: 0 0 16px; font-weight: 600; }
     p { margin: 8px 0; }
-    .btn { display: inline-block; padding: 8px 16px; background: #1a73e8; color: #fff; border-radius: 4px; text-decoration: none; }
-    .btn:hover { background: #1664c1; }
-    .muted { color: #666; font-size: 13px; }
-    code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+    .btn {
+      display: block; width: 100%; text-align: center;
+      padding: 10px 16px; margin: 8px 0;
+      background: var(--accent); color: #fff;
+      border-radius: 6px; text-decoration: none;
+      font-weight: 500;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .muted { color: var(--muted); font-size: 13px; }
+    code {
+      background: var(--wash); padding: 1px 5px;
+      border-radius: 3px; font-size: 12.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
   </style>
 `;
 
@@ -127,28 +169,37 @@ export function renderLoginPage(next: string | null): string {
       ? `<p>No sign-in providers configured. Ask your operator to set <code>OIDC_GOOGLE_CLIENT_ID</code> and <code>OIDC_GOOGLE_CLIENT_SECRET</code> in <code>.env</code>, or to DM you a magic link.</p>`
       : `<p class="muted">Or wait for your operator to DM you a magic link.</p>`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>Sign in — NanoClaw</title>${PAGE_STYLE}</head><body>
-    <h1>Sign in to NanoClaw</h1>
-    ${buttons}
-    ${fallback}
+    <div class="card">
+      <div class="brand">NanoClaw</div>
+      <h1>Sign in</h1>
+      ${buttons}
+      ${fallback}
+    </div>
   </body></html>`;
 }
 
 function renderPendingPage(pendingId: string, email: string | null): string {
   const who = email ? `<code>${email}</code>` : 'this account';
   return `<!doctype html><html><head><meta charset="utf-8"><title>Pending approval — NanoClaw</title>${PAGE_STYLE}</head><body>
-    <h1>Waiting for admin approval</h1>
-    <p>${who} isn't recognized yet. We've recorded your sign-in request.</p>
-    <p>Ask an admin to run:</p>
-    <p><code>ncl pending-approvals approve ${pendingId} --group &lt;agent-group-id&gt;</code></p>
-    <p class="muted">Once approved, sign in again with the same provider.</p>
+    <div class="card">
+      <div class="brand">NanoClaw</div>
+      <h1>Waiting for admin approval</h1>
+      <p>${who} isn't recognized yet. We've recorded your sign-in request.</p>
+      <p>Ask an admin to run:</p>
+      <p><code>ncl pending-approvals approve ${pendingId} --group &lt;agent-group-id&gt;</code></p>
+      <p class="muted">Once approved, sign in again with the same provider.</p>
+    </div>
   </body></html>`;
 }
 
 function renderError(message: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Sign-in error</title>${PAGE_STYLE}</head><body>
-    <h1>Sign-in failed</h1>
-    <p>${message}</p>
-    <p><a href="/ui/login">Try again</a></p>
+    <div class="card">
+      <div class="brand">NanoClaw</div>
+      <h1>Sign-in failed</h1>
+      <p>${message}</p>
+      <p><a class="btn" href="/ui/login">Try again</a></p>
+    </div>
   </body></html>`;
 }
 

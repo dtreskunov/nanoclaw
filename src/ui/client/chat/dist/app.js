@@ -15174,6 +15174,7 @@ var isMobile = y3(false);
 var uploadItems = y3([]);
 var me = y3("");
 var notifMutedSig = y3(false);
+var settingsOpen = y3(false);
 var previewBlock = y3(null);
 var nowTick = y3(Date.now());
 var pinnedContext = y3([]);
@@ -17236,7 +17237,6 @@ function Header() {
   const onChange = (e4) => {
     selectGroup(e4.target.value).catch(console.error);
   };
-  const muted = notifMutedSig.value;
   return html`
     <header>
       <button type="button" class="icon-btn mobile-only" aria-label="Threads"
@@ -17250,15 +17250,15 @@ function Header() {
       </select>
       <div class="spacer"></div>
       <span class="user" id="me">${me.value}</span>
-      <button type="button" class="icon-btn" aria-label="Notifications" title=${muted ? "Notifications muted (click to enable)" : "Mute notifications"}
-              onClick=${toggleMute}>${muted ? "\u{1F515}" : "\u{1F514}"}</button>
       <button type="button" class="icon-btn mobile-only" aria-label="Files"
               onClick=${() => {
     drawerOpen.files.value = !drawerOpen.files.value;
     drawerOpen.threads.value = false;
   }}>\uD83D\uDCC1</button>
-      <a href="/ui/settings/identities" class="icon-btn" aria-label="Settings" title="Settings"
-         style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">\u2699\uFE0F</a>
+      <button type="button" class="icon-btn" aria-label="Settings" title="Settings"
+              onClick=${() => {
+    settingsOpen.value = !settingsOpen.value;
+  }}>\u2699\uFE0F</button>
       <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
         <button type="submit" aria-label="Log out" title="Log out">
           <svg class="mobile-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -18287,6 +18287,176 @@ function FilesPane() {
   `;
 }
 
+// src/components/Settings.js
+var API = "/ui/settings/api";
+async function jget(p5) {
+  const r4 = await fetch(p5, { credentials: "same-origin" });
+  return { ok: r4.ok, status: r4.status, data: await r4.json().catch(() => ({})) };
+}
+async function jsend(p5, method, body) {
+  const r4 = await fetch(p5, {
+    method,
+    credentials: "same-origin",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : void 0
+  });
+  return { ok: r4.ok, status: r4.status, data: await r4.json().catch(() => ({})) };
+}
+function chanLabel(c4) {
+  const m6 = CHANNEL_META[c4];
+  return m6 ? `${m6.icon} ${m6.label}` : c4;
+}
+function Settings() {
+  const open = settingsOpen.value;
+  const [identities, setIdentities] = h2([]);
+  const [channels, setChannels] = h2([]);
+  const [chan, setChan] = h2("");
+  const [handle, setHandle] = h2("");
+  const [code, setCode] = h2("");
+  const [challenge, setChallenge] = h2(null);
+  const [status, setStatus] = h2(null);
+  const [busy, setBusy] = h2(false);
+  y2(() => {
+    if (!open) return;
+    setStatus(null);
+    setChallenge(null);
+    setCode("");
+    refresh();
+  }, [open]);
+  async function refresh() {
+    const r4 = await jget(`${API}/identities`);
+    if (!r4.ok) {
+      setStatus({ err: r4.data?.error || `HTTP ${r4.status}` });
+      return;
+    }
+    setIdentities(r4.data.identities || []);
+    const linked = new Set((r4.data.identities || []).map((i4) => i4.channel));
+    const opts = Object.keys(CHANNEL_META).filter((c4) => c4 !== "web" && !linked.has(c4));
+    setChannels(opts);
+    if (opts.length && !opts.includes(chan)) setChan(opts[0]);
+  }
+  async function startLink() {
+    if (!handle.trim()) return setStatus({ err: "Enter a handle." });
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await jsend(`${API}/identities/link/start`, "POST", { channel: chan, handle: handle.trim() });
+      if (!r4.ok) return setStatus({ err: r4.data?.message || r4.data?.error || `HTTP ${r4.status}` });
+      setChallenge({ id: r4.data.challengeId, channel: r4.data.channel, handle: r4.data.handle, expiresAt: r4.data.expiresAt });
+      setStatus({ ok: `Code DM'd to ${r4.data.channel}:${r4.data.handle}.` });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verify() {
+    if (!challenge || !code.trim()) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await jsend(`${API}/identities/link/verify`, "POST", { challengeId: challenge.id, code: code.trim() });
+      if (!r4.ok) {
+        const left = r4.data?.attemptsRemaining != null ? ` (${r4.data.attemptsRemaining} attempts left)` : "";
+        return setStatus({ err: (r4.data?.message || r4.data?.error || `HTTP ${r4.status}`) + left });
+      }
+      setStatus({ ok: `Linked ${r4.data.channel}:${r4.data.handle}.` });
+      setChallenge(null);
+      setHandle("");
+      setCode("");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function unlink(channel, h5) {
+    if (!confirm(`Unlink ${channel}:${h5}?`)) return;
+    const r4 = await jsend(`${API}/identities/${encodeURIComponent(channel)}/${encodeURIComponent(h5)}`, "DELETE");
+    if (!r4.ok) return setStatus({ err: r4.data?.message || r4.data?.error || `HTTP ${r4.status}` });
+    setStatus({ ok: `Unlinked ${channel}:${h5}.` });
+    refresh();
+  }
+  function close() {
+    settingsOpen.value = false;
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close();
+  }
+  function onKey(e4) {
+    if (e4.key === "Escape") close();
+  }
+  y2(() => {
+    if (!open) return;
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  if (!open) return null;
+  const muted = notifMutedSig.value;
+  return html`
+    <div class="settings-backdrop" onClick=${onBackdrop}>
+      <div class="settings-modal" role="dialog" aria-label="Settings">
+        <header class="settings-head">
+          <span class="title">Settings</span>
+          <button type="button" class="icon-btn" aria-label="Close" onClick=${close}>\u2715</button>
+        </header>
+        <div class="settings-body">
+          <section>
+            <h3>Notifications</h3>
+            <label class="settings-row">
+              <input type="checkbox" checked=${!muted} onChange=${toggleMute} />
+              <span>Browser notifications for new messages</span>
+            </label>
+            <p class="muted">${muted ? "Currently muted. New messages will not raise notifications." : "Enabled. Permission is requested on first toggle."}</p>
+          </section>
+
+          <section>
+            <h3>Linked identities</h3>
+            <p class="muted">Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user.</p>
+            ${identities.length === 0 ? html`<p class="muted">No identities yet.</p>` : html`
+                <table class="settings-table">
+                  <thead><tr><th>Channel</th><th>Handle</th><th>Primary</th><th></th></tr></thead>
+                  <tbody>
+                    ${identities.map((i4) => html`
+                      <tr>
+                        <td>${chanLabel(i4.channel)}</td>
+                        <td><code>${i4.handle}</code></td>
+                        <td>${i4.primary ? "yes" : ""}</td>
+                        <td>${identities.length > 1 ? html`<button class="danger" onClick=${() => unlink(i4.channel, i4.handle)}>Unlink</button>` : html`<span class="muted">last</span>`}</td>
+                      </tr>
+                    `)}
+                  </tbody>
+                </table>
+              `}
+
+            <h4>Link a new identity</h4>
+            ${channels.length === 0 ? html`<p class="muted">No additional channels available.</p>` : html`
+                <div class="settings-row">
+                  <select value=${chan} onChange=${(e4) => setChan(e4.target.value)}>
+                    ${channels.map((c4) => html`<option value=${c4}>${chanLabel(c4)}</option>`)}
+                  </select>
+                  <input placeholder="handle" value=${handle} onInput=${(e4) => setHandle(e4.target.value)} />
+                  <button onClick=${startLink} disabled=${busy || !!challenge}>Send code</button>
+                </div>
+                ${challenge ? html`
+                  <div class="settings-row" style="margin-top:8px">
+                    <input placeholder="6-digit code" maxlength="6" value=${code} onInput=${(e4) => setCode(e4.target.value)} style="width:120px" />
+                    <button onClick=${verify} disabled=${busy || !code.trim()}>Verify</button>
+                    <button class="ghost" onClick=${() => {
+    setChallenge(null);
+    setCode("");
+    setStatus(null);
+  }}>Cancel</button>
+                    <span class="muted">expires ${new Date(challenge.expiresAt).toLocaleTimeString()}</span>
+                  </div>
+                ` : null}
+              `}
+          </section>
+
+          ${status ? html`<div class=${"settings-status " + (status.err ? "err" : "ok")}>${status.err || status.ok}</div>` : null}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // src/panels.js
 var KEYS = { threads: "nc:pane:threads", files: "nc:pane:files" };
 function restorePanelState() {
@@ -18369,6 +18539,7 @@ function App() {
       <${FilesPane} />
     </main>
     <div class=${"backdrop" + (backdropShown ? " show" : "")} id="backdrop" onClick=${onBackdrop}></div>
+    <${Settings} />
   `;
 }
 
@@ -18425,6 +18596,17 @@ async function init() {
   if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error("initial route failed", err));
   D(html`<${App} />`, document.getElementById("app"));
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("settings") === "1") {
+      settingsOpen.value = true;
+      sp.delete("settings");
+      const q3 = sp.toString();
+      const url = window.location.pathname + (q3 ? "?" + q3 : "") + window.location.hash;
+      window.history.replaceState(null, "", url);
+    }
+  } catch (_5) {
+  }
 }
 init().catch((err) => console.error(err));
 //# sourceMappingURL=app.js.map

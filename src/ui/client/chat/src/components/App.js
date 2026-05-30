@@ -6,6 +6,7 @@ import { Header } from './Header.js';
 import { ThreadsRail } from './ThreadsRail.js';
 import { ChatMain } from './ChatMain.js';
 import { FilesPane } from './FilesPane.js';
+import { Settings } from './Settings.js';
 import { persistPanelState, applyPanelClasses } from '../panels.js';
 import { applyHash } from '../hash.js';
 import { router } from '../router.js';
@@ -47,5 +48,6 @@ export function App() {
       <${FilesPane} />
     </main>
     <div class=${'backdrop' + (backdropShown ? ' show' : '')} id="backdrop" onClick=${onBackdrop}></div>
+    <${Settings} />
   `;
 }
