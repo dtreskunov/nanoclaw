@@ -17,8 +17,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { initTestDb, closeDb, runMigrations } from '../../db/index.js';
 import { createAgentGroup } from '../../db/agent-groups.js';
 import { createMessagingGroup, createMessagingGroupAgent } from '../../db/messaging-groups.js';
-import { upsertUser } from './db/users.js';
+import { seedUserWithIdentity } from '../../test-utils/seed-identity.js';
+import { getIdentity } from './db/identities.js';
 import { grantRole } from './db/user-roles.js';
+
+let ownerId: string;
+let adminBobId: string;
 
 // Mock container runner — prevent actual docker spawn.
 vi.mock('../../container-runner.js', () => ({
@@ -101,9 +105,9 @@ beforeEach(async () => {
   });
 
   // Owner user + their DM messaging group (pickApprover + ensureUserDm target).
-  upsertUser({ id: 'telegram:owner', kind: 'telegram', display_name: 'Owner', created_at: now() });
+  ownerId = seedUserWithIdentity('telegram', 'owner', 'Owner');
   grantRole({
-    user_id: 'telegram:owner',
+    user_id: ownerId,
     role: 'owner',
     agent_group_id: null,
     granted_by: null,
@@ -124,7 +128,7 @@ beforeEach(async () => {
       `INSERT INTO user_dms (user_id, channel_type, messaging_group_id, resolved_at)
        VALUES (?, ?, ?, ?)`,
     )
-    .run('telegram:owner', 'telegram', 'mg-dm-owner', now());
+    .run(ownerId, 'telegram', 'mg-dm-owner', now());
 
   deliverMock.mockClear();
 });
@@ -143,7 +147,7 @@ function stranger(text: string) {
       id: `stranger-${Math.random().toString(36).slice(2, 8)}`,
       kind: 'chat' as const,
       content: JSON.stringify({
-        senderId: 'tg:stranger',
+        senderId: 'stranger',
         senderName: 'Stranger',
         text,
       }),
@@ -218,9 +222,10 @@ describe('unknown-sender request_approval flow', () => {
     }
 
     // Member row added for the stranger against the wired agent group.
+    const strangerId = getIdentity('telegram', 'stranger')!.user_id;
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
-      .get('tg:stranger', 'ag-1');
+      .get(strangerId, 'ag-1');
     expect(member).toBeDefined();
 
     // Pending row cleared.
@@ -256,9 +261,10 @@ describe('unknown-sender request_approval flow', () => {
 
     const count = (getDb().prepare('SELECT COUNT(*) AS c FROM pending_sender_approvals').get() as { c: number }).c;
     expect(count).toBe(0);
+    const strangerId = getIdentity('telegram', 'stranger')!.user_id;
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
-      .get('tg:stranger', 'ag-1');
+      .get(strangerId, 'ag-1');
     expect(member).toBeUndefined();
   });
 
@@ -290,9 +296,10 @@ describe('unknown-sender request_approval flow', () => {
     }
 
     // No member added for the stranger.
+    const strangerId = getIdentity('telegram', 'stranger')!.user_id;
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
-      .get('tg:stranger', 'ag-1');
+      .get(strangerId, 'ag-1');
     expect(member).toBeUndefined();
 
     // Pending row is still there — a legitimate approver can still act on it.
@@ -303,12 +310,12 @@ describe('unknown-sender request_approval flow', () => {
 
   it('accepts a click from a global admin even if they are not the designated approver', async () => {
     // Pre-seed a separate admin user so we can click as them.
-    upsertUser({ id: 'telegram:admin-bob', kind: 'telegram', display_name: 'Bob', created_at: now() });
+    adminBobId = seedUserWithIdentity('telegram', 'admin-bob', 'Bob');
     grantRole({
-      user_id: 'telegram:admin-bob',
+      user_id: adminBobId,
       role: 'admin',
       agent_group_id: null,
-      granted_by: 'telegram:owner',
+      granted_by: ownerId,
       granted_at: now(),
     });
 
@@ -336,9 +343,10 @@ describe('unknown-sender request_approval flow', () => {
     }
 
     // Stranger admitted thanks to the admin's authority.
+    const strangerId = getIdentity('telegram', 'stranger')!.user_id;
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
-      .get('tg:stranger', 'ag-1');
+      .get(strangerId, 'ag-1');
     expect(member).toBeDefined();
   });
 });

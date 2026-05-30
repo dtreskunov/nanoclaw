@@ -35,7 +35,8 @@
 import { getChannelAdapter } from '../../channels/channel-registry.js';
 import { getMessagingGroup, getMessagingGroupByPlatform, createMessagingGroup } from '../../db/messaging-groups.js';
 import { log } from '../../log.js';
-import type { MessagingGroup, User } from '../../types.js';
+import type { MessagingGroup } from '../../types.js';
+import { getIdentitiesForUser } from './db/identities.js';
 import { getUser } from './db/users.js';
 import { getUserDm, upsertUserDm } from './db/user-dms.js';
 
@@ -56,11 +57,12 @@ export async function ensureUserDm(userId: string): Promise<MessagingGroup | nul
     return null;
   }
 
-  const { channelType, handle } = parseUserId(user);
-  if (!channelType || !handle) {
-    log.warn('ensureUserDm: user id not namespaced', { userId });
+  const parsed = parseUserId(userId);
+  if (!parsed) {
+    log.warn('ensureUserDm: user has no identity rows', { userId });
     return null;
   }
+  const { channelType, handle } = parsed;
 
   // Cache hit: existing user_dms row → load and return the messaging_group.
   const cached = getUserDm(userId, channelType);
@@ -133,17 +135,14 @@ async function resolveDmPlatformId(channelType: string, handle: string): Promise
   }
 }
 
-function parseUserId(user: User): { channelType: string; handle: string } | { channelType: null; handle: null } {
-  const idx = user.id.indexOf(':');
-  if (idx < 0) return { channelType: null, handle: null };
-  const prefix = user.id.slice(0, idx);
-  const handle = user.id.slice(idx + 1);
-  if (!prefix || !handle) return { channelType: null, handle: null };
-  // Teams user IDs use a `29:` prefix, not `teams:`. When the id prefix
-  // isn't a registered adapter, fall back to user.kind and treat the full
-  // id as the handle.
-  if (!getChannelAdapter(prefix) && user.kind && getChannelAdapter(user.kind)) {
-    return { channelType: user.kind, handle: user.id };
-  }
-  return { channelType: prefix, handle };
+function parseUserId(userId: string): { channelType: string; handle: string } | null {
+  // After migration 018, users.id is a UUID and `(channel, handle)` lives in
+  // the `identities` table. Pick the user's primary identity (or first one
+  // ordered by channel/handle). In a multi-identity future (Phase 4), callers
+  // that want a specific channel should pass a channel preference; for now
+  // every user has exactly one identity so "first" is unambiguous.
+  const identities = getIdentitiesForUser(userId);
+  if (identities.length === 0) return null;
+  const primary = identities.find((i) => i.primary_for_channel === 1) ?? identities[0];
+  return { channelType: primary.channel, handle: primary.handle };
 }

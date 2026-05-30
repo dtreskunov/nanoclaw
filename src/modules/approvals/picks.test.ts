@@ -14,6 +14,7 @@ import {
 import { closeDb, createAgentGroup, initTestDb, runMigrations } from '../../db/index.js';
 import { createUser } from '../permissions/db/users.js';
 import { grantRole } from '../permissions/db/user-roles.js';
+import { seedUserWithIdentity } from '../../test-utils/seed-identity.js';
 import { pickApprovalDelivery, pickApprover } from './primitive.js';
 
 function now(): string {
@@ -113,34 +114,34 @@ describe('pickApprovalDelivery', () => {
 
   it('returns the first reachable approver', async () => {
     await mountMockAdapter('telegram');
-    seedUser('telegram:111', 'telegram');
-    seedUser('telegram:222', 'telegram');
+    const u1 = seedUserWithIdentity('telegram', '111');
+    const u2 = seedUserWithIdentity('telegram', '222');
 
-    const result = await pickApprovalDelivery(['telegram:111', 'telegram:222'], 'telegram');
-    expect(result?.userId).toBe('telegram:111');
+    const result = await pickApprovalDelivery([u1, u2], 'telegram');
+    expect(result?.userId).toBe(u1);
     expect(result?.messagingGroup.platform_id).toBe('111');
   });
 
   it('prefers same-channel-kind approver on tie-break', async () => {
     await mountMockAdapter('telegram');
     await mountMockAdapter('discord', async (h) => `dm-${h}`);
-    seedUser('telegram:111', 'telegram');
-    seedUser('discord:222', 'discord');
+    const tg = seedUserWithIdentity('telegram', '111');
+    const dc = seedUserWithIdentity('discord', '222');
 
-    const result = await pickApprovalDelivery(['telegram:111', 'discord:222'], 'discord');
-    expect(result?.userId).toBe('discord:222');
+    const result = await pickApprovalDelivery([tg, dc], 'discord');
+    expect(result?.userId).toBe(dc);
   });
 
   it('falls through to any reachable approver when none match origin', async () => {
     await mountMockAdapter('telegram');
-    seedUser('telegram:111', 'telegram');
+    const tg = seedUserWithIdentity('telegram', '111');
 
-    const result = await pickApprovalDelivery(['telegram:111'], 'discord');
-    expect(result?.userId).toBe('telegram:111');
+    const result = await pickApprovalDelivery([tg], 'discord');
+    expect(result?.userId).toBe(tg);
   });
 
   it('returns null when nobody is reachable', async () => {
-    seedUser('telegram:111', 'telegram');
-    expect(await pickApprovalDelivery(['telegram:111'], 'telegram')).toBeNull();
+    const tg = seedUserWithIdentity('telegram', '111');
+    expect(await pickApprovalDelivery([tg], 'telegram')).toBeNull();
   });
 });

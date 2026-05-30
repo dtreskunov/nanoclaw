@@ -17,6 +17,7 @@ import { addMember, isMember } from './db/agent-group-members.js';
 import { createUser } from './db/users.js';
 import { grantRole, hasAnyOwner, isOwner } from './db/user-roles.js';
 import { getUserDm } from './db/user-dms.js';
+import { seedUserWithIdentity } from '../../test-utils/seed-identity.js';
 import { ensureUserDm } from './user-dm.js';
 
 function now(): string {
@@ -167,63 +168,63 @@ describe('role helpers', () => {
 describe('ensureUserDm', () => {
   it('adapter without openDM: falls through to using the bare handle as platform_id', async () => {
     await mountMockAdapter('nodm');
-    seedUser('nodm:123', 'nodm');
+    const uid = seedUserWithIdentity('nodm', '123');
 
-    const mg = await ensureUserDm('nodm:123');
+    const mg = await ensureUserDm(uid);
     expect(mg).toBeDefined();
     expect(mg!.channel_type).toBe('nodm');
     expect(mg!.platform_id).toBe('123');
     expect(mg!.is_group).toBe(0);
 
-    const cached = getUserDm('nodm:123', 'nodm');
+    const cached = getUserDm(uid, 'nodm');
     expect(cached?.messaging_group_id).toBe(mg!.id);
   });
 
   it('Telegram via chat-sdk-bridge: adapter.openDM returns prefixed platform_id', async () => {
     const mock = await mountMockAdapter('telegram', async (handle) => `telegram:${handle}`);
-    seedUser('telegram:6037840640', 'telegram');
+    const uid = seedUserWithIdentity('telegram', '6037840640');
 
-    const mg = await ensureUserDm('telegram:6037840640');
+    const mg = await ensureUserDm(uid);
     expect(mg).toBeDefined();
     expect(mg!.platform_id).toBe('telegram:6037840640');
     expect(mock.openDMCalls).toEqual(['6037840640']);
 
-    const mg2 = await ensureUserDm('telegram:6037840640');
+    const mg2 = await ensureUserDm(uid);
     expect(mg2!.id).toBe(mg!.id);
     expect(mock.openDMCalls).toEqual(['6037840640']);
   });
 
   it('resolution-required channels: calls adapter.openDM, uses its result, caches', async () => {
     const mock = await mountMockAdapter('discord', async (handle) => `dm-channel-${handle}`);
-    seedUser('discord:user-1', 'discord');
+    const uid = seedUserWithIdentity('discord', 'user-1');
 
-    const mg = await ensureUserDm('discord:user-1');
+    const mg = await ensureUserDm(uid);
     expect(mg).toBeDefined();
     expect(mg!.platform_id).toBe('dm-channel-user-1');
     expect(mock.openDMCalls).toEqual(['user-1']);
 
-    const mg2 = await ensureUserDm('discord:user-1');
+    const mg2 = await ensureUserDm(uid);
     expect(mg2!.id).toBe(mg!.id);
     expect(mock.openDMCalls).toEqual(['user-1']);
   });
 
   it('returns null when the adapter is not registered', async () => {
-    seedUser('missing:42', 'missing');
-    expect(await ensureUserDm('missing:42')).toBeNull();
+    const uid = seedUserWithIdentity('missing', '42');
+    expect(await ensureUserDm(uid)).toBeNull();
   });
 
   it('returns null when adapter.openDM throws', async () => {
     await mountMockAdapter('slack', async () => {
       throw new Error('openDM boom');
     });
-    seedUser('slack:u1', 'slack');
-    expect(await ensureUserDm('slack:u1')).toBeNull();
-    expect(getUserDm('slack:u1', 'slack')).toBeUndefined();
+    const uid = seedUserWithIdentity('slack', 'u1');
+    expect(await ensureUserDm(uid)).toBeNull();
+    expect(getUserDm(uid, 'slack')).toBeUndefined();
   });
 
   it('reuses an existing messaging_group row if one already matches', async () => {
     await mountMockAdapter('telegram');
-    seedUser('telegram:555', 'telegram');
+    const uid = seedUserWithIdentity('telegram', '555');
     const existing = {
       id: 'mg-preexisting',
       channel_type: 'telegram',
@@ -235,8 +236,8 @@ describe('ensureUserDm', () => {
     };
     createMessagingGroup(existing);
 
-    const mg = await ensureUserDm('telegram:555');
+    const mg = await ensureUserDm(uid);
     expect(mg?.id).toBe('mg-preexisting');
-    expect(getUserDm('telegram:555', 'telegram')?.messaging_group_id).toBe('mg-preexisting');
+    expect(getUserDm(uid, 'telegram')?.messaging_group_id).toBe('mg-preexisting');
   });
 });

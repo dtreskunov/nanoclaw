@@ -19,8 +19,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { initTestDb, closeDb, runMigrations } from '../../db/index.js';
 import { createAgentGroup } from '../../db/agent-groups.js';
 import { createMessagingGroup, getMessagingGroupByPlatform } from '../../db/messaging-groups.js';
-import { upsertUser } from './db/users.js';
+import { seedUserWithIdentity } from '../../test-utils/seed-identity.js';
+import { getIdentity } from './db/identities.js';
 import { grantRole } from './db/user-roles.js';
+
+let ownerId: string;
+let scopedAdminId: string;
 
 // Mock container runner — prevent actual docker spawn.
 vi.mock('../../container-runner.js', () => ({
@@ -74,9 +78,9 @@ beforeEach(async () => {
   // Base fixtures: one agent group + owner with a DM on 'telegram'.
   createAgentGroup({ id: 'ag-1', name: 'Andy', folder: 'andy', agent_provider: null, created_at: now() });
 
-  upsertUser({ id: 'telegram:owner', kind: 'telegram', display_name: 'Owner', created_at: now() });
+  ownerId = seedUserWithIdentity('telegram', 'owner', 'Owner');
   grantRole({
-    user_id: 'telegram:owner',
+    user_id: ownerId,
     role: 'owner',
     agent_group_id: null,
     granted_by: null,
@@ -99,7 +103,7 @@ beforeEach(async () => {
       `INSERT INTO user_dms (user_id, channel_type, messaging_group_id, resolved_at)
        VALUES (?, ?, ?, ?)`,
     )
-    .run('telegram:owner', 'telegram', 'mg-dm-owner', now());
+    .run(ownerId, 'telegram', 'mg-dm-owner', now());
 
   deliverMock.mockClear();
 });
@@ -236,9 +240,10 @@ describe('unknown-channel registration flow', () => {
 
     // Triggering sender auto-admitted so sender_scope='known' doesn't
     // bounce the replay into sender-approval.
+    const callerId = getIdentity('telegram', 'caller')!.user_id;
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
-      .get('telegram:caller', 'ag-1');
+      .get(callerId, 'ag-1');
     expect(member).toBeDefined();
 
     // Pending row cleared and container woken via replay.
@@ -364,12 +369,12 @@ describe('unknown-channel registration flow', () => {
     const { getDb } = await import('../../db/connection.js');
 
     createAgentGroup({ id: 'ag-2', name: 'Betty', folder: 'betty', agent_provider: null, created_at: now() });
-    upsertUser({ id: 'telegram:scoped-admin', kind: 'telegram', display_name: 'Scoped Admin', created_at: now() });
+    scopedAdminId = seedUserWithIdentity('telegram', 'scoped-admin', 'Scoped Admin');
     grantRole({
-      user_id: 'telegram:scoped-admin',
+      user_id: scopedAdminId,
       role: 'admin',
       agent_group_id: 'ag-1',
-      granted_by: 'telegram:owner',
+      granted_by: ownerId,
       granted_at: now(),
     });
     createMessagingGroup({
@@ -386,7 +391,7 @@ describe('unknown-channel registration flow', () => {
         `INSERT INTO user_dms (user_id, channel_type, messaging_group_id, resolved_at)
        VALUES (?, ?, ?, ?)`,
       )
-      .run('telegram:scoped-admin', 'telegram', 'mg-dm-scoped-admin', now());
+      .run(scopedAdminId, 'telegram', 'mg-dm-scoped-admin', now());
 
     await routeInbound(groupMention('chat-scoped-cross-group'));
     await new Promise((r) => setTimeout(r, 10));

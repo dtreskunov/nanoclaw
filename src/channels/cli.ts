@@ -212,7 +212,7 @@ function createAdapter(): ChannelAdapter {
           content: JSON.stringify({
             text: payload.text,
             sender: typeof payload.sender === 'string' ? payload.sender : 'cli',
-            senderId: typeof payload.senderId === 'string' ? payload.senderId : `cli:${PLATFORM_ID}`,
+            senderId: typeof payload.senderId === 'string' ? payload.senderId : PLATFORM_ID,
           }),
         },
         replyTo: replyTo ?? undefined,
@@ -236,7 +236,7 @@ function createAdapter(): ChannelAdapter {
         content: {
           text: payload.text,
           sender: 'cli',
-          senderId: `cli:${PLATFORM_ID}`,
+          senderId: PLATFORM_ID,
         },
       });
     } catch (err) {

@@ -31,6 +31,7 @@ import { writeSessionMessage } from '../../session-manager.js';
 import type { MessagingGroup, Session } from '../../types.js';
 import { getAdminsOfAgentGroup, getGlobalAdmins, getOwners } from '../permissions/db/user-roles.js';
 import { ensureUserDm } from '../permissions/user-dm.js';
+import { getPrimaryIdentityForChannel } from '../permissions/db/identities.js';
 
 /** Two-button approval UI — the only options the primitive supports today. */
 const APPROVAL_OPTIONS: RawOption[] = [
@@ -106,7 +107,7 @@ export async function pickApprovalDelivery(
 ): Promise<{ userId: string; messagingGroup: MessagingGroup } | null> {
   if (originChannelType) {
     for (const userId of approvers) {
-      if (channelTypeOf(userId) !== originChannelType) continue;
+      if (!getPrimaryIdentityForChannel(userId, originChannelType)) continue;
       const mg = await ensureUserDm(userId);
       if (mg) return { userId, messagingGroup: mg };
     }
@@ -116,11 +117,6 @@ export async function pickApprovalDelivery(
     if (mg) return { userId, messagingGroup: mg };
   }
   return null;
-}
-
-function channelTypeOf(userId: string): string {
-  const idx = userId.indexOf(':');
-  return idx < 0 ? '' : userId.slice(0, idx);
 }
 
 // ── Request API ──

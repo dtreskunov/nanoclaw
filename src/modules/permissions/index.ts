@@ -49,8 +49,10 @@ import {
   updatePendingChannelApprovalCard,
 } from './db/pending-channel-approvals.js';
 import { deletePendingSenderApproval, getPendingSenderApproval } from './db/pending-sender-approvals.js';
+import { getIdentity, getOrCreateUserByIdentity } from './db/identities.js';
 import { hasAdminPrivilege } from './db/user-roles.js';
-import { getUser, upsertUser } from './db/users.js';
+import { getUser } from './db/users.js';
+import { WEB_CHANNEL_TYPE } from '../../channels/web.js';
 import { requestSenderApproval } from './sender-approval.js';
 import { ensureUserDm } from './user-dm.js';
 
@@ -90,16 +92,21 @@ function extractAndUpsertUser(event: InboundEvent): string | null {
   const rawHandle = senderIdField ?? senderField ?? authorUserId;
   if (!rawHandle) return null;
 
-  const userId = rawHandle.includes(':') ? rawHandle : `${event.channelType}:${rawHandle}`;
-  if (!getUser(userId)) {
-    upsertUser({
-      id: userId,
-      kind: event.channelType,
-      display_name: senderName ?? null,
-      created_at: new Date().toISOString(),
-    });
+  // Web channel: senderId is already a pre-resolved user UUID from the
+  // logged-in UI session. Don't create an identity row for it — verify and
+  // pass through.
+  if (event.channelType === WEB_CHANNEL_TYPE) {
+    return getUser(rawHandle) ? rawHandle : null;
   }
-  return userId;
+
+  // Every other channel: rawHandle is the platform's raw user handle
+  // (e.g. Telegram chat id, Discord snowflake, Teams "29:xxx"). Look up
+  // or lazily create the identity row keyed on (channel, handle).
+  return getOrCreateUserByIdentity({
+    channel: event.channelType,
+    handle: rawHandle,
+    displayName: senderName,
+  });
 }
 
 function safeParseContent(raw: string): { text?: string; sender?: string; senderId?: string } {
@@ -226,15 +233,10 @@ async function handleSenderApprovalResponse(payload: ResponsePayload): Promise<b
   const row = getPendingSenderApproval(payload.questionId);
   if (!row) return false;
 
-  // payload.userId is the raw platform userId (e.g. "6037840640"); namespace it
-  // with the channel type so it matches users(id) format. Some platforms
-  // (e.g. Teams "29:xxx") already include a colon — mirror resolveOrCreateUser
-  // logic and only prefix when the raw id has no colon.
-  const clickerId = payload.userId
-    ? payload.userId.includes(':')
-      ? payload.userId
-      : `${payload.channelType}:${payload.userId}`
-    : null;
+  // payload.userId is the raw platform handle from the click event. Look up
+  // the clicker's identity to get their user UUID. Unknown clickers (no
+  // matching identity row) cannot authorize.
+  const clickerId = payload.userId ? (getIdentity(payload.channelType, payload.userId)?.user_id ?? null) : null;
   const isAuthorized =
     clickerId !== null && (clickerId === row.approver_user_id || hasAdminPrivilege(clickerId, row.agent_group_id));
   if (!isAuthorized) {
@@ -311,11 +313,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
   const row = getPendingChannelApproval(payload.questionId);
   if (!row) return false;
 
-  const clickerId = payload.userId
-    ? payload.userId.includes(':')
-      ? payload.userId
-      : `${payload.channelType}:${payload.userId}`
-    : null;
+  const clickerId = payload.userId ? (getIdentity(payload.channelType, payload.userId)?.user_id ?? null) : null;
   const isAuthorized =
     clickerId !== null && (clickerId === row.approver_user_id || hasAdminPrivilege(clickerId, row.agent_group_id));
   if (!isAuthorized) {
