@@ -96,7 +96,11 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
 // ── handlers ──────────────────────────────────────────────────────────────
 
 function handleMe(ctx: Ctx, userId: string): void {
-  json(ctx, 200, { userId });
+  const row = getDb().prepare('SELECT display_name FROM users WHERE id = ?').get(userId) as
+    | { display_name: string | null }
+    | undefined;
+  const displayName = row?.display_name?.trim() || null;
+  json(ctx, 200, { userId, displayName });
 }
 
 function handleGroups(ctx: Ctx, userId: string): void {

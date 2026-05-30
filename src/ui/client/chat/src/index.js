@@ -49,7 +49,7 @@ async function init() {
   try {
     const [meRes, groupsRes] = await Promise.all([api('api/me'), api('api/groups')]);
     batch(() => {
-      me.value = meRes.userId;
+      me.value = meRes.displayName || meRes.userId;
       groups.value = sortGroups(groupsRes.groups);
     });
   } catch (_) {
