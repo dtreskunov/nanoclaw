@@ -315,7 +315,7 @@ function completeLogin(res: http.ServerResponse, userId: string, next: string, s
   const session = createUiSessionForUser(userId);
   res.writeHead(303, {
     Location: next,
-    'Set-Cookie': [buildSessionCookie(session.token, secureCookie), clearStateCookie(secureCookie)].join(', '),
+    'Set-Cookie': [buildSessionCookie(session.token, secureCookie), clearStateCookie(secureCookie)],
   });
   res.end();
 }
