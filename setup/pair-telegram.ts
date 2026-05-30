@@ -89,7 +89,7 @@ export async function run(args: string[]): Promise<void> {
         PLATFORM_ID: consumed.consumed!.platformId,
         IS_GROUP: consumed.consumed!.isGroup,
         PAIRED_USER_ID: consumed.consumed!.adminUserId
-          ? `telegram:${consumed.consumed!.adminUserId}`
+          ? String(consumed.consumed!.adminUserId)
           : '',
       });
       return;

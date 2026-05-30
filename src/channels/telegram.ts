@@ -9,7 +9,7 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { createMessagingGroup, getMessagingGroupByPlatform, updateMessagingGroup } from '../db/messaging-groups.js';
 import { grantRole, hasAnyOwner } from '../modules/permissions/db/user-roles.js';
-import { upsertUser } from '../modules/permissions/db/users.js';
+import { getOrCreateUserByIdentity } from '../modules/permissions/db/identities.js';
 import { createChatSdkBridge, type ReplyContext } from './chat-sdk-bridge.js';
 import { sanitizeTelegramLegacyMarkdown } from './telegram-markdown-sanitize.js';
 import { registerChannelAdapter } from './channel-registry.js';
@@ -159,12 +159,9 @@ function createPairingInterceptor(
         });
       }
 
-      const pairedUserId = `telegram:${consumed.consumed!.adminUserId}`;
-      upsertUser({
-        id: pairedUserId,
-        kind: 'telegram',
-        display_name: null,
-        created_at: new Date().toISOString(),
+      const pairedUserId = getOrCreateUserByIdentity({
+        channel: 'telegram',
+        handle: String(consumed.consumed!.adminUserId),
       });
 
       let promotedToOwner = false;

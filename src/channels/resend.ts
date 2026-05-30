@@ -29,6 +29,7 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { getUserDmByMessagingGroup } from '../modules/permissions/db/user-dms.js';
 import { getOwners, getGlobalAdmins, getAdminsOfAgentGroup } from '../modules/permissions/db/user-roles.js';
+import { getPrimaryIdentityForChannel } from '../modules/permissions/db/identities.js';
 import { dispatchResponse } from '../response-registry.js';
 import { normalizeOptions } from './ask-question.js';
 import { createChatSdkBridge } from './chat-sdk-bridge.js';
@@ -250,7 +251,7 @@ registerChannelAdapter('resend', {
         const claimed = await dispatchResponse({
           questionId: approvalId,
           value: optionValue,
-          userId: `resend:${senderAddress}`,
+          userId: senderAddress,
           channelType: 'resend',
           platformId,
           threadId: threadIdForReply,
@@ -497,7 +498,7 @@ registerChannelAdapter('resend', {
       if (!tid && /^resend:[^:]+$/.test(platformId)) {
         const mg = getMessagingGroupByPlatform('resend', platformId);
         const dm = mg ? getUserDmByMessagingGroup(mg.id) : undefined;
-        const recipient = dm?.user_id.startsWith('resend:') ? dm.user_id.slice('resend:'.length) : undefined;
+        const recipient = dm ? getPrimaryIdentityForChannel(dm.user_id, 'resend')?.handle : undefined;
         if (!recipient) {
           throw new Error(`Resend cold DM: no user_dms row for messaging group ${platformId} — cannot infer recipient`);
         }
@@ -599,8 +600,9 @@ function pickReplyToEmail(agentGroupId: string | undefined): string | null {
   candidates.push(...getGlobalAdmins());
   candidates.push(...getOwners());
   for (const c of candidates) {
-    if (c.user_id.startsWith('resend:')) {
-      const email = c.user_id.slice('resend:'.length).trim().toLowerCase();
+    const ident = getPrimaryIdentityForChannel(c.user_id, 'resend');
+    if (ident) {
+      const email = ident.handle.trim().toLowerCase();
       if (/^[^@\s]+@[^@\s]+$/.test(email)) return email;
     }
   }

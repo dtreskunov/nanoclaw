@@ -8,21 +8,20 @@ registerResource({
   plural: 'users',
   table: 'users',
   description:
-    'User — a messaging-platform identity. Each row is one sender on one channel. A single human may have multiple user rows across channels (no cross-channel linking yet).',
+    'User — a person who may be reachable on one or more messaging channels. Identities (channel + handle pairs) link a user to specific platform addresses; see the identities table.',
   idColumn: 'id',
   columns: [
     {
       name: 'id',
       type: 'string',
-      description:
-        'Namespaced "channel_type:handle" — e.g. "tg:6037840640", "discord:123456789", "email:user@example.com". Must be provided on create.',
+      description: 'User UUID (v4). Auto-generated when a new identity is observed; do not craft by hand.',
       required: true,
     },
     {
       name: 'kind',
       type: 'string',
       description:
-        'Channel type identifier (e.g. "telegram", "discord"). Used as a fallback for DM resolution when the id prefix doesn\'t match a registered adapter.',
+        'Primary channel type for this user (e.g. "telegram", "discord"). Mostly informational once identities exist.',
       required: true,
     },
     {

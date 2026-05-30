@@ -118,7 +118,7 @@ export async function runDiscordChannel(displayName: string): Promise<ChannelFlo
     [
       'exec', 'tsx', 'scripts/init-first-agent.ts',
       '--channel', 'discord',
-      '--user-id', `discord:${ownerUserId}`,
+      '--user-id', ownerUserId,
       '--platform-id', platformId,
       '--display-name', displayName,
       '--agent-name', agentName,

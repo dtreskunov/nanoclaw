@@ -18,6 +18,7 @@ import { log } from '../../log.js';
 import { canAccessAgentGroup } from '../../modules/permissions/access.js';
 import { hasAdminPrivilege } from '../../modules/permissions/db/user-roles.js';
 import { ensureUserDm } from '../../modules/permissions/user-dm.js';
+import { getIdentitiesForUser } from '../../modules/permissions/db/identities.js';
 import { createDownloadToken } from './download-tokens.js';
 import { classify, resolveSafe } from './chat/classify.js';
 import { isUiEnabled, uiBaseUrl } from './server.js';
@@ -105,9 +106,10 @@ registerDeliveryAction('mint_file_link', async (content, session) => {
     targetPlatformId = dm.platform_id;
     targetThreadId = null;
   } else {
-    const handle = userId.includes(':') ? userId.slice(userId.indexOf(':') + 1) : userId;
     const isOriginAlreadyUserDm =
-      originChannelType !== null && originPlatformId !== null && originPlatformId === handle;
+      originChannelType !== null &&
+      originPlatformId !== null &&
+      getIdentitiesForUser(userId).some((i) => i.channel === originChannelType && i.handle === originPlatformId);
     if (!isOriginAlreadyUserDm) {
       log.warn('mint_file_link: cannot resolve DM and origin is not a 1:1 with the user', {
         userId,

@@ -46,7 +46,7 @@ import { runMigrations } from '../src/db/migrations/index.js';
 import { normalizeName } from '../src/modules/agent-to-agent/db/agent-destinations.js';
 import { addMember } from '../src/modules/permissions/db/agent-group-members.js';
 import { getUserRoles, grantRole } from '../src/modules/permissions/db/user-roles.js';
-import { upsertUser } from '../src/modules/permissions/db/users.js';
+import { getOrCreateUserByIdentity } from '../src/modules/permissions/db/identities.js';
 import { updateContainerConfigScalars } from '../src/db/container-configs.js';
 import { initGroupFilesystem } from '../src/group-init.js';
 import { namespacedPlatformId } from '../src/platform-id.js';
@@ -135,10 +135,6 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
-function namespacedUserId(channel: string, raw: string): string {
-  return raw.includes(':') ? raw : `${channel}:${raw}`;
-}
-
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -175,13 +171,11 @@ async function main(): Promise<void> {
 
   const now = new Date().toISOString();
 
-  // 1. User + (conditional) owner grant.
-  const userId = namespacedUserId(args.channel, args.userId);
-  upsertUser({
-    id: userId,
-    kind: args.channel,
-    display_name: args.displayName,
-    created_at: now,
+  // 1. User + identity + (conditional) owner grant.
+  const userId = getOrCreateUserByIdentity({
+    channel: args.channel,
+    handle: args.userId,
+    displayName: args.displayName,
   });
 
   // Owner grant is deferred until after the agent group is resolved, since
@@ -288,7 +282,7 @@ async function main(): Promise<void> {
   // container synchronously — no sweep wait. The paired user's identity is
   // passed so the sender resolver sees the real owner, not cli:local.
   await sendWelcomeViaCliSocket(dmMg, args.welcome, {
-    senderId: userId,
+    senderId: args.userId,
     sender: args.displayName,
   });
 

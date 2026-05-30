@@ -96,7 +96,7 @@ export async function runSlackChannel(displayName: string): Promise<ChannelFlowR
     [
       'exec', 'tsx', 'scripts/init-first-agent.ts',
       '--channel', 'slack',
-      '--user-id', `slack:${ownerUserId}`,
+      '--user-id', ownerUserId,
       '--platform-id', platformId,
       '--display-name', displayName,
       '--agent-name', agentName,
