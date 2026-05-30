@@ -26,6 +26,15 @@ export function issueMagicLink(userId: string): { token: string; expiresAt: stri
   return out;
 }
 
+/** Create a session for a user that was already authenticated upstream
+ * (OIDC callback, admin impersonation, etc.). Magic-link redeem uses
+ * the wrapper below; both paths funnel through `createSession`. */
+export function createUiSessionForUser(userId: string): { token: string; expiresAt: string } {
+  const session = createSession(userId, SESSION_TTL_MS);
+  log.info('UI session created', { userId, expiresAt: session.expiresAt });
+  return session;
+}
+
 /** Returns user_id on success; null on invalid/expired/already-redeemed. */
 export function redeemAndCreateSession(token: string): { token: string; userId: string; expiresAt: string } | null {
   const userId = redeemMagicLink(token);

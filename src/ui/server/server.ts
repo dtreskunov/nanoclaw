@@ -24,6 +24,7 @@ import {
   redeemAndCreateSession,
 } from './auth.js';
 import { purgeExpired } from './db.js';
+import { handleOidcRoute, renderLoginPage } from './oidc-routes.js';
 import { handle as chatHandle, CHAT_MOUNT_PREFIX, handleChatUpgrade } from './chat/routes.js';
 
 /** Path prefix every UI app lives under. Shared cookie path. */
@@ -87,6 +88,17 @@ export function startUi(): void {
     withAccessLog('auth', (req, res) => handleAuth(req, res, cfg.secure)),
   );
 
+  // Stand-alone login page (served outside the chat app so the 401
+  // redirect target is independent of any app's bundle).
+  mountHandler(
+    `${UI_MOUNT_PREFIX}/login`,
+    withAccessLog('login', async (req, res) => {
+      const u = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderLoginPage(u.searchParams.get('next')));
+    }),
+  );
+
   // Per-app mounts. Add more here as new UI apps are introduced.
   mountHandler(CHAT_MOUNT_PREFIX, withAccessLog('chat', chatHandle));
   mountUpgradeHandler(CHAT_MOUNT_PREFIX, handleChatUpgrade);
@@ -131,6 +143,7 @@ async function handleAuth(req: http.IncomingMessage, res: http.ServerResponse, s
 
   if (req.method === 'GET' && pathname === '/redeem') return handleRedeem(req, res, url, secureCookie);
   if (req.method === 'POST' && pathname === '/logout') return handleLogout(req, res, secureCookie);
+  if (pathname.startsWith('/oidc/')) return handleOidcRoute(req, res, pathname, url, secureCookie);
 
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');

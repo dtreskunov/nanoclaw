@@ -15120,7 +15120,8 @@ var html = htm_module_default.bind(g);
 async function api(url, opts) {
   const r4 = await fetch(url, Object.assign({ credentials: "same-origin" }, opts || {}));
   if (r4.status === 401) {
-    document.body.innerHTML = '<div style="padding:24px;font:14px system-ui">Not logged in. Visit the magic link your operator sent you.</div>';
+    const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+    window.location.replace(`/ui/login?next=${next}`);
     throw new Error("unauthorized");
   }
   if (!r4.ok) throw new Error("HTTP " + r4.status);
