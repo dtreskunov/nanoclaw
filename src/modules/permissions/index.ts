@@ -51,8 +51,6 @@ import {
 import { deletePendingSenderApproval, getPendingSenderApproval } from './db/pending-sender-approvals.js';
 import { getIdentity, getOrCreateUserByIdentity } from './db/identities.js';
 import { hasAdminPrivilege } from './db/user-roles.js';
-import { getUser } from './db/users.js';
-import { WEB_CHANNEL_TYPE } from '../../channels/web.js';
 import { requestSenderApproval } from './sender-approval.js';
 import { ensureUserDm } from './user-dm.js';
 
@@ -92,16 +90,10 @@ function extractAndUpsertUser(event: InboundEvent): string | null {
   const rawHandle = senderIdField ?? senderField ?? authorUserId;
   if (!rawHandle) return null;
 
-  // Web channel: senderId is already a pre-resolved user UUID from the
-  // logged-in UI session. Don't create an identity row for it — verify and
-  // pass through.
-  if (event.channelType === WEB_CHANNEL_TYPE) {
-    return getUser(rawHandle) ? rawHandle : null;
-  }
-
-  // Every other channel: rawHandle is the platform's raw user handle
-  // (e.g. Telegram chat id, Discord snowflake, Teams "29:xxx"). Look up
-  // or lazily create the identity row keyed on (channel, handle).
+  // Every channel — including web — resolves through the identities table.
+  // Web users are seeded at UI auth time (redeemAndCreateSession) with a
+  // (channel='web', handle=<user uuid>) identity; new platforms create one
+  // lazily here.
   return getOrCreateUserByIdentity({
     channel: event.channelType,
     handle: rawHandle,

@@ -9,6 +9,7 @@
 import http from 'http';
 
 import { log } from '../../log.js';
+import { insertIdentity, getIdentity } from '../../modules/permissions/db/identities.js';
 import { createMagicLink, createSession, deleteSession, lookupSession, logAccess, redeemMagicLink } from './db.js';
 
 // Cookie scope. Kept in sync with UI_MOUNT_PREFIX in server.ts; inlined to
@@ -29,6 +30,11 @@ export function issueMagicLink(userId: string): { token: string; expiresAt: stri
 export function redeemAndCreateSession(token: string): { token: string; userId: string; expiresAt: string } | null {
   const userId = redeemMagicLink(token);
   if (!userId) return null;
+  // First successful redeem mints the web identity (channel='web',
+  // handle=<user uuid>). Idempotent: subsequent logins are no-ops.
+  if (!getIdentity('web', userId)) {
+    insertIdentity({ userId, channel: 'web', handle: userId, primary: true });
+  }
   const session = createSession(userId, SESSION_TTL_MS);
   log.info('UI session created', { userId, expiresAt: session.expiresAt });
   return { token: session.token, userId, expiresAt: session.expiresAt };
