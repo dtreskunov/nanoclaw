@@ -116,8 +116,12 @@ export async function ensureUserDm(userId: string): Promise<MessagingGroup | nul
 /**
  * Call the adapter's openDM if it has one; otherwise fall through to using
  * the handle directly. Returns null if the adapter is missing entirely.
+ *
+ * Exported so callers that need to DM an arbitrary handle (e.g. the
+ * identity-linking verification flow) can reuse it without having to
+ * mint a fake user first.
  */
-async function resolveDmPlatformId(channelType: string, handle: string): Promise<string | null> {
+export async function resolveDmPlatformId(channelType: string, handle: string): Promise<string | null> {
   const adapter = getChannelAdapter(channelType);
   if (!adapter) {
     log.warn('ensureUserDm: no adapter for channel', { channelType });
