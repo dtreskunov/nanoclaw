@@ -103,6 +103,14 @@ export function startUi(): void {
   mountHandler(CHAT_MOUNT_PREFIX, withAccessLog('chat', chatHandle));
   mountUpgradeHandler(CHAT_MOUNT_PREFIX, handleChatUpgrade);
 
+  // Root convenience redirect — '/' → chat. Only fires on exact '/' because
+  // the mount matcher requires `pathname === prefix || startsWith(prefix + '/')`,
+  // and '//' never matches a real request path.
+  mountHandler('/', (_req, res) => {
+    res.writeHead(303, { Location: CHAT_MOUNT_PREFIX + '/' });
+    res.end();
+  });
+
   mounted = true;
   log.info('UI mounted', { prefix: UI_MOUNT_PREFIX, apps: [CHAT_MOUNT_PREFIX], secure: cfg.secure });
 
