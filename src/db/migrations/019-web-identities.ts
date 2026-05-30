@@ -43,7 +43,13 @@ export const migration019: Migration = {
       platform_id: string;
     }[];
     for (const r of mgRows) {
-      const u = db.prepare(`SELECT id FROM users WHERE id=?`).get(r.platform_id) as { id: string } | undefined;
+      // Web platform_id is `<userId>#<agentGroupId>` (see
+      // src/ui/server/chat/chat.ts platformIdFor). Split on `#`
+      // before looking up the user — otherwise we'd compare the
+      // whole composite string against users.id and never match.
+      const hash = r.platform_id.indexOf('#');
+      const userIdPrefix = hash < 0 ? r.platform_id : r.platform_id.slice(0, hash);
+      const u = db.prepare(`SELECT id FROM users WHERE id=?`).get(userIdPrefix) as { id: string } | undefined;
       if (u) candidates.add(u.id);
     }
 

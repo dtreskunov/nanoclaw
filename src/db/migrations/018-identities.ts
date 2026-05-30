@@ -117,6 +117,29 @@ export const migration018: Migration = {
       for (const [oldId, newId] of idMap) {
         updateUserPk.run(newId, oldId);
       }
+
+      // Web messaging groups encode `<userId>#<agentGroupId>` in
+      // platform_id (see src/ui/server/chat/chat.ts platformIdFor).
+      // The userId prefix is a hard reference into users.id, so it
+      // needs the same composite→UUID rewrite as the FK columns above.
+      // Done last so it sees the final UUIDs (cosmetic — idMap also
+      // works — but matches the FK update direction).
+      if (tableExists('messaging_groups')) {
+        const webRows = db.prepare(`SELECT id, platform_id FROM messaging_groups WHERE channel_type='web'`).all() as {
+          id: string;
+          platform_id: string;
+        }[];
+        const updateMg = db.prepare('UPDATE messaging_groups SET platform_id = ? WHERE id = ?');
+        for (const row of webRows) {
+          const hash = row.platform_id.indexOf('#');
+          if (hash < 0) continue;
+          const prefix = row.platform_id.slice(0, hash);
+          const suffix = row.platform_id.slice(hash);
+          const mapped = idMap.get(prefix);
+          if (!mapped) continue;
+          updateMg.run(mapped + suffix, row.id);
+        }
+      }
     } finally {
       // defer_foreign_keys resets to OFF on commit/rollback automatically.
     }
