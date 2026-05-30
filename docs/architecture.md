@@ -679,12 +679,24 @@ CREATE TABLE messaging_groups (
   UNIQUE(channel_type, platform_id)
 );
 
--- Users (messaging platform identities, namespaced "<channel_type>:<handle>")
+-- Users (people; one row per logical user, UUID v4 PK)
 CREATE TABLE users (
-  id           TEXT PRIMARY KEY,   -- e.g. 'telegram:123456', 'discord:1470...'
-  kind         TEXT NOT NULL,      -- mirrors the channel_type prefix
+  id           TEXT PRIMARY KEY,   -- UUID, generated server-side
+  kind         TEXT NOT NULL,      -- primary channel type (informational)
   display_name TEXT,
   created_at   TEXT NOT NULL
+);
+
+-- Channel handles owned by a user. Multiple identities per user allow the
+-- same human to be reached over Telegram, Discord, Slack, etc.
+CREATE TABLE identities (
+  channel              TEXT NOT NULL,
+  handle               TEXT NOT NULL,
+  user_id              TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  verified_at          TEXT NOT NULL,
+  primary_for_channel  INTEGER NOT NULL DEFAULT 0,
+  metadata_json        TEXT,
+  PRIMARY KEY (channel, handle)
 );
 
 -- Roles (owner is global only; admin can be global or scoped to an agent_group)

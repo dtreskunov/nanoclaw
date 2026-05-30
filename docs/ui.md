@@ -37,7 +37,7 @@ ncl users issue-link --user <userId>
 # optionally --base-url <url> to override UI_BASE_URL for this call
 ```
 
-`<userId>` is the namespaced channel identity (e.g. `tg:6037840640`, `resend:alice@example.com`).
+`<userId>` is the user UUID from `users.id`. Look one up with `ncl users list`, or resolve from a channel handle via the `identities` table: `ncl exec 'SELECT user_id FROM identities WHERE channel=? AND handle=?' --args tg,6037840640`.
 
 After redeem the browser lands on `/ui/chat/`. Log out via the button in the header (`POST /ui/auth/logout`).
 

@@ -6,6 +6,7 @@ import './groups.js';
 import './messaging-groups.js';
 import './wirings.js';
 import './users.js';
+import './identities.js';
 import './roles.js';
 import './members.js';
 import './destinations.js';

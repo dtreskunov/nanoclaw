@@ -70,18 +70,46 @@ CREATE TABLE messaging_group_agents (
 
 ### 1.4 `users`
 
-Platform user identities. ID is namespaced: `tg:123456`, `discord:abc`, `phone:+1555...`, `email:a@x.com`. One human may own several rows — no cross-channel linking yet.
+A person. `id` is an opaque UUID v4 generated server-side; never construct it
+from a channel handle. Channel handles live in the separate `identities`
+table (§1.4a) and may be many-to-one against a single user.
 
 ```sql
 CREATE TABLE users (
-  id           TEXT PRIMARY KEY,
-  kind         TEXT NOT NULL,
+  id           TEXT PRIMARY KEY,   -- UUID v4
+  kind         TEXT NOT NULL,      -- primary channel type (informational)
   display_name TEXT,
   created_at   TEXT NOT NULL
 );
 ```
 
 - **Writers/readers:** `src/db/users.ts`; channel auth flows
+
+### 1.4a `identities`
+
+The (channel, handle) → user mapping. Adding a row links a platform handle
+to a user; multiple rows let the same human be reached over many channels.
+`getOrCreateUserByIdentity()` in `src/modules/permissions/db/identities.ts`
+is the canonical write path.
+
+```sql
+CREATE TABLE identities (
+  channel              TEXT NOT NULL,
+  handle               TEXT NOT NULL,
+  user_id              TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  verified_at          TEXT NOT NULL,
+  primary_for_channel  INTEGER NOT NULL DEFAULT 0,
+  metadata_json        TEXT,
+  PRIMARY KEY (channel, handle)
+);
+CREATE INDEX idx_identities_user ON identities(user_id);
+```
+
+- **Lookup keys:** `(channel, handle)` is unique (one user per handle on a
+  given channel); `getIdentitiesForUser(userId)` returns all handles for a
+  user.
+- **Teams gotcha:** Teams handles include their own `29:` prefix; that goes
+  in `handle` as-is, channel is `'teams'`. No string-splitting.
 
 ### 1.5 `user_roles`
 
