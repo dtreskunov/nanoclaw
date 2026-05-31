@@ -232,7 +232,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // can stamp it on outbound rows — needed for a2a return-path routing.
     setCurrentInReplyTo(routing.inReplyTo);
     try {
-      const result = await processQuery(query, routing, processingIds, config.providerName);
+      const result = await processQuery(query, routing, processingIds, config.providerName, continuation);
       if (result.continuation && result.continuation !== continuation) {
         continuation = result.continuation;
         setContinuation(config.providerName, continuation);
@@ -313,8 +313,10 @@ async function processQuery(
   routing: RoutingContext,
   initialBatchIds: string[],
   providerName: string,
+  priorContinuation: string | undefined,
 ): Promise<QueryResult> {
   let queryContinuation: string | undefined;
+  let resultSeen = false;
   let done = false;
   let unwrappedNudged = false;
 
@@ -447,6 +449,7 @@ async function processQuery(
         // Claude session with no prior context.
         setContinuation(providerName, event.continuation);
       } else if (event.type === 'result') {
+        resultSeen = true;
         // A result — with or without text — means the turn is done. Mark
         // the initial batch completed now so the host sweep doesn't see
         // stale 'processing' claims while the query stays open for
@@ -473,6 +476,20 @@ async function processQuery(
   } finally {
     done = true;
     clearInterval(pollHandle);
+    // Atomic continuation rollback. The `init` handler persisted the new
+    // SDK session id immediately (for mid-turn crash recovery), but if the
+    // turn never reached a `result` event — the stream errored out or the
+    // SDK threw — that new id points at a half-baked transcript with no
+    // completed assistant turn. Resuming from it on the next message tends
+    // to drop prior context, which cascades: every subsequent turn forks
+    // into a fresh session and the agent eventually has nothing to anchor
+    // on. Restore the prior good id so the next turn resumes from a
+    // session that actually completed at least one turn cleanly.
+    if (!resultSeen && priorContinuation && queryContinuation && queryContinuation !== priorContinuation) {
+      log(`Turn ended without result; restoring prior continuation ${priorContinuation} (discarding ${queryContinuation})`);
+      try { setContinuation(providerName, priorContinuation); } catch { /* best-effort */ }
+      queryContinuation = priorContinuation;
+    }
   }
 
   return { continuation: queryContinuation };
