@@ -270,11 +270,11 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
       } catch (e) {
         log(`Failed to persist failed-turn record: ${e instanceof Error ? e.message : String(e)}`);
       }
-      const ack = await tryAcknowledgeFailure(config, routing, continuation, errMsg, undefined);
-      if (ack.continuation && ack.continuation !== continuation) {
-        continuation = ack.continuation;
-        setContinuation(config.providerName, continuation);
-      }
+      const ack = await tryAcknowledgeFailure(config, routing, errMsg, undefined);
+      // Intentionally do NOT persist ack.continuation — the ack runs
+      // in a fresh one-shot session with no real conversation state;
+      // the user's next turn should resume the rolled-back
+      // `continuation` we already have.
       if (!ack.delivered) {
         writeMessageOut({
           id: generateId(),
@@ -282,7 +282,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
           platform_id: routing.platformId,
           channel_type: routing.channelType,
           thread_id: routing.threadId,
-          content: JSON.stringify({ text: `Error: ${errMsg}` }),
+          content: JSON.stringify({ text: friendlyProviderErrorFallback(errMsg) }),
         });
       }
     } finally {
@@ -355,30 +355,43 @@ interface AcknowledgeResult {
   /** True when the agent emitted at least one user-visible message
    *  during the ack turn — caller skips the static error fallback. */
   delivered: boolean;
-  /** New continuation if the ack turn cleanly produced one, so the
-   *  outer loop can persist it for the next user turn. */
-  continuation?: string;
+}
+
+/**
+ * Static fallback message used only when both the agent's normal turn
+ * AND the in-turn ack failed. Pulls the human-readable message out of
+ * Claude Code-style API errors so the user gets one short line instead
+ * of a wall of JSON. Best-effort — if extraction misses, returns a
+ * generic message and drops the raw error entirely (the user can't act
+ * on it anyway).
+ */
+function friendlyProviderErrorFallback(errMsg: string): string {
+  // Match either `"message":"..."` (JSON-escaped) or a bare error line
+  // anywhere in the string. The first capture wins.
+  const jsonMatch = errMsg.match(/"message"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+  if (jsonMatch) {
+    const quoted = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ').trim();
+    if (quoted) return `Your message couldn't be processed: "${quoted}". You may want to rephrase and try again.`;
+  }
+  return "Your message couldn't be processed due to a provider error. You may want to rephrase and try again.";
 }
 
 /**
  * Best-effort in-turn acknowledgment of a provider failure.
  *
- * Pairs with the continuation rollback in processQuery: after a turn
- * dies, we restore the prior good session id and run this short
- * follow-up so the agent can tell the user what happened in its own
- * voice. The user-supplied prompt that triggered the failure is
- * intentionally NOT included — content-filter style failures would
- * just repeat.
+ * Runs in a FRESH session (no continuation) so whatever context tripped
+ * the failure (e.g. a content-filter trigger in the rolled-back
+ * transcript) can't immediately re-trip it. The user-supplied prompt is
+ * also intentionally NOT included for the same reason.
  *
  * Single query call, no recursion. If it also fails (throws or returns
- * its own unsurfacedError) the caller falls back to a static error
+ * its own unsurfacedError) the caller falls back to a short static
  * message; nothing here calls setFailedTurn so a busted ack never
  * poisons the next turn's replay.
  */
 async function tryAcknowledgeFailure(
   config: PollLoopConfig,
   routing: RoutingContext,
-  ackContinuation: string | undefined,
   errorMessage: string,
   errorClassification: string | undefined,
 ): Promise<AcknowledgeResult> {
@@ -393,16 +406,20 @@ async function tryAcknowledgeFailure(
     `</system>`,
   ].join('\n');
 
+  // Always use a fresh session (no continuation). The rolled-back
+  // transcript still carries whatever content tripped the filter, so
+  // re-asking the model there often trips it again. The ack only needs
+  // the error string itself — no conversation context required.
   log('Generating in-turn acknowledgment of provider error');
   try {
     const query = config.provider.query({
       prompt: ackPrompt,
-      continuation: ackContinuation,
+      continuation: undefined,
       cwd: config.cwd,
       systemContext: config.systemContext,
     });
-    const result = await processQuery(query, routing, [], config.providerName, ackContinuation);
-    return { delivered: true, continuation: result.continuation };
+    await processQuery(query, routing, [], config.providerName, undefined);
+    return { delivered: true };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     log(`Acknowledgment turn threw: ${errMsg}`);
