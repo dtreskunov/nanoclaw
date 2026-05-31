@@ -599,11 +599,32 @@ async function sendViaChannelAdapter(args: {
     throw Object.assign(new Error('http_400'), { detail: 'multifile_not_supported' });
   }
 
-  const session = resolveSessionForMode(args.agentGroupId, target.messagingGroupId, target.sessionMode, args.threadId);
+  // Threadless DM rooms use a synthetic '__dm:<mgId>' threadId in the web
+  // UI. Translate to a real null thread before talking to the channel
+  // adapter or writing the session message — the platform has no such id.
+  const isDm = args.threadId.startsWith('__dm:');
+  const realThreadId: string | null = isDm ? null : args.threadId;
+  const session = resolveSessionForMode(
+    args.agentGroupId,
+    target.messagingGroupId,
+    target.sessionMode,
+    isDm ? '' : args.threadId,
+  );
   if (!session) throw Object.assign(new Error('http_409'), { detail: 'no_active_session' });
 
   const mg = getMessagingGroup(target.messagingGroupId);
   if (!mg) throw Object.assign(new Error('http_404'), { detail: 'messaging_group_not_found' });
+
+  // For DMs, resolve the actual platform_id of the recipient (the viewer's
+  // own handle on that channel) — this is who the bot will message.
+  let dmPlatformId: string | null = null;
+  if (isDm) {
+    const handles = viewerHandlesForChannel(args.userId, args.channelType);
+    // Prefer the prefixed form the adapter expects (matches mg.platform_id
+    // convention on most channels). Fall back to whatever we have.
+    dmPlatformId = handles.find((h) => h.startsWith(`${args.channelType}:`)) || handles[0] || null;
+    if (!dmPlatformId) throw Object.assign(new Error('http_404'), { detail: 'no_identity_for_channel' });
+  }
 
   const fileBuffers = args.attachments.map((a) => ({
     filename: a.filename,
@@ -629,7 +650,7 @@ async function sendViaChannelAdapter(args: {
 
   let platformMsgId: string | undefined;
   try {
-    platformMsgId = await adapter.deliver(mg.platform_id, args.threadId, outbound);
+    platformMsgId = await adapter.deliver(dmPlatformId || mg.platform_id, realThreadId, outbound);
   } catch (err) {
     // Clear stash even on failure so a later send doesn't pick up stale state.
     if (args.channelType === 'resend') setResendPendingWebOverride({ fromName: null, extraHeaders: null });
@@ -656,9 +677,9 @@ async function sendViaChannelAdapter(args: {
     id,
     kind: 'chat',
     timestamp: new Date().toISOString(),
-    platformId: mg.platform_id,
+    platformId: dmPlatformId || mg.platform_id,
     channelType: args.channelType,
-    threadId: args.threadId,
+    threadId: realThreadId,
     content: JSON.stringify(contentPayload),
     trigger: 1,
   });
@@ -934,8 +955,6 @@ function listAllThreadsForUser(userId: string, agentGroupId: string): ThreadSumm
     }
   }
   for (const t of out) t.canSend = canSendByChannel.get(t.channelType) === true;
-  // DM rows are read-only from web for now — see enumerateThreadlessDm.
-  for (const t of out) if (t.kind === 'dm') t.canSend = false;
 
   out.sort((a, b) => Date.parse(normTs(b.lastActivityAt)) - Date.parse(normTs(a.lastActivityAt)));
   return out;
