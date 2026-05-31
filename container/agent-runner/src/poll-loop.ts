@@ -2,7 +2,7 @@ import { findByName, getAllDestinations, type DestinationEntry } from './destina
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { getInboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
-import { clearContinuation, migrateLegacyContinuation, setContinuation } from './db/session-state.js';
+import { clearContinuation, clearFailedTurn, getFailedTurn, migrateLegacyContinuation, setContinuation, setFailedTurn } from './db/session-state.js';
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
 import {
   formatMessages,
@@ -214,7 +214,22 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 
     // Format messages: passthrough commands get raw text (only if the
     // provider natively handles slash commands), others get XML.
-    const prompt = formatMessagesWithCommands(keep, config.provider.supportsNativeSlashCommands);
+    let prompt = formatMessagesWithCommands(keep, config.provider.supportsNativeSlashCommands);
+
+    // Replay any prior failed turn. The continuation rollback in
+    // processQuery restores the agent to a session that completed before
+    // the failure, so the resumed transcript has no record of the lost
+    // user message or the error. Prepend a context block so the agent
+    // knows what happened and can acknowledge it rather than acting as
+    // if the user never spoke. Cleared regardless of whether the prompt
+    // ends up being sent successfully — if the new turn also fails, its
+    // own record will overwrite this one.
+    const failed = getFailedTurn();
+    if (failed) {
+      clearFailedTurn();
+      prompt = renderFailedTurnReplay(failed) + '\n\n' + prompt;
+      log(`Replaying failed turn from ${new Date(failed.recorded_at).toISOString()}`);
+    }
 
     log(`Processing ${keep.length} message(s), kinds: ${[...new Set(keep.map((m) => m.kind))].join(',')}`);
 
@@ -259,6 +274,11 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
         thread_id: routing.threadId,
         content: JSON.stringify({ text: `Error: ${errMsg}` }),
       });
+      try {
+        setFailedTurn({ prompt, error: errMsg, recorded_at: Date.now() });
+      } catch (e) {
+        log(`Failed to persist failed-turn record: ${e instanceof Error ? e.message : String(e)}`);
+      }
     } finally {
       clearCurrentInReplyTo();
     }
@@ -302,6 +322,27 @@ function formatMessagesWithCommands(messages: MessageInRow[], nativeSlashCommand
   }
 
   return parts.join('\n\n');
+}
+
+/**
+ * Render the prior failed-turn record as an XML block to prepend to the
+ * next prompt. Tells the agent verbatim what the user said last time and
+ * what error the provider returned, so it can acknowledge the failure
+ * instead of acting as if the message never happened. Paired with the
+ * continuation rollback in processQuery — the resumed transcript has no
+ * memory of the failed turn, so this block is the only signal.
+ */
+function renderFailedTurnReplay(failed: { prompt: string; error: string; recorded_at: number }): string {
+  const when = new Date(failed.recorded_at).toISOString();
+  return [
+    `<previous_turn_failed at="${when}">`,
+    `<user_message_that_was_not_processed>`,
+    failed.prompt,
+    `</user_message_that_was_not_processed>`,
+    `<provider_error>${failed.error}</provider_error>`,
+    `<note>The provider rejected the previous turn with the error above. The user was already told their message was not processed. You have no transcript of it because the session was rolled back to its last good state. Acknowledge the failure briefly when relevant; do not silently retry the failed action.</note>`,
+    `</previous_turn_failed>`,
+  ].join('\n');
 }
 
 interface QueryResult {
