@@ -18310,16 +18310,19 @@ function Settings() {
   const open = settingsOpen.value;
   const [identities, setIdentities] = h2([]);
   const [channels, setChannels] = h2([]);
+  const [deepLinkChannels, setDeepLinkChannels] = h2([]);
   const [chan, setChan] = h2("");
   const [handle, setHandle] = h2("");
   const [code, setCode] = h2("");
   const [challenge, setChallenge] = h2(null);
+  const [deepLink, setDeepLink] = h2(null);
   const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
   y2(() => {
     if (!open) return;
     setStatus(null);
     setChallenge(null);
+    setDeepLink(null);
     setCode("");
     refresh();
   }, [open]);
@@ -18330,6 +18333,7 @@ function Settings() {
       return;
     }
     setIdentities(r4.data.identities || []);
+    setDeepLinkChannels(r4.data.deepLinkChannels || []);
     const linked = new Set((r4.data.identities || []).map((i4) => i4.channel));
     const opts = Object.keys(CHANNEL_META).filter((c4) => c4 !== "web" && !linked.has(c4));
     setChannels(opts);
@@ -18348,6 +18352,35 @@ function Settings() {
       setBusy(false);
     }
   }
+  async function startDeepLink() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await jsend(`${API}/identities/link/start-deeplink`, "POST", { channel: chan });
+      if (!r4.ok) return setStatus({ err: r4.data?.message || r4.data?.error || `HTTP ${r4.status}` });
+      setDeepLink({ id: r4.data.challengeId, channel: r4.data.channel, url: r4.data.deepLink, expiresAt: r4.data.expiresAt });
+      window.open(r4.data.deepLink, "_blank", "noopener");
+      setStatus({ ok: `Opened ${chanLabel(r4.data.channel)}. Confirm the link there, then come back.` });
+    } finally {
+      setBusy(false);
+    }
+  }
+  y2(() => {
+    if (!deepLink) return void 0;
+    const t5 = setInterval(async () => {
+      const r4 = await jget(`${API}/identities/link/status?challengeId=${encodeURIComponent(deepLink.id)}`);
+      if (!r4.ok) return;
+      if (r4.data.consumed) {
+        setStatus({ ok: `Linked ${r4.data.channel}:${r4.data.handle}.` });
+        setDeepLink(null);
+        refresh();
+      } else if (r4.data.expired) {
+        setStatus({ err: "Link expired \u2014 try again." });
+        setDeepLink(null);
+      }
+    }, 2e3);
+    return () => clearInterval(t5);
+  }, [deepLink]);
   async function verify() {
     if (!challenge || !code.trim()) return;
     setBusy(true);
@@ -18427,27 +18460,54 @@ function Settings() {
               `}
 
             <h4>Link a new identity</h4>
-            ${channels.length === 0 ? html`<p class="muted">No additional channels available.</p>` : html`
-                <div class="settings-row">
-                  <select value=${chan} onChange=${(e4) => setChan(e4.target.value)}>
-                    ${channels.map((c4) => html`<option value=${c4}>${chanLabel(c4)}</option>`)}
-                  </select>
-                  <input placeholder="handle" value=${handle} onInput=${(e4) => setHandle(e4.target.value)} />
-                  <button onClick=${startLink} disabled=${busy || !!challenge}>Send code</button>
-                </div>
-                ${challenge ? html`
-                  <div class="settings-row" style="margin-top:8px">
-                    <input placeholder="6-digit code" maxlength="6" value=${code} onInput=${(e4) => setCode(e4.target.value)} style="width:120px" />
-                    <button onClick=${verify} disabled=${busy || !code.trim()}>Verify</button>
-                    <button class="ghost" onClick=${() => {
+            ${channels.length === 0 ? html`<p class="muted">No additional channels available.</p>` : deepLinkChannels.includes(chan) ? html`
+                  <div class="settings-row">
+                    <select value=${chan} onChange=${(e4) => {
+    setChan(e4.target.value);
+    setDeepLink(null);
+    setChallenge(null);
+    setStatus(null);
+  }}>
+                      ${channels.map((c4) => html`<option value=${c4}>${chanLabel(c4)}</option>`)}
+                    </select>
+                    <button onClick=${startDeepLink} disabled=${busy || !!deepLink}>Open ${chanLabel(chan)} to confirm</button>
+                  </div>
+                  ${deepLink ? html`
+                    <div class="settings-row" style="margin-top:8px">
+                      <a href=${deepLink.url} target="_blank" rel="noopener">Reopen link</a>
+                      <button class="ghost" onClick=${() => {
+    setDeepLink(null);
+    setStatus(null);
+  }}>Cancel</button>
+                      <span class="muted">expires ${new Date(deepLink.expiresAt).toLocaleTimeString()}</span>
+                    </div>
+                  ` : null}
+                ` : html`
+                  <div class="settings-row">
+                    <select value=${chan} onChange=${(e4) => {
+    setChan(e4.target.value);
+    setDeepLink(null);
+    setChallenge(null);
+    setStatus(null);
+  }}>
+                      ${channels.map((c4) => html`<option value=${c4}>${chanLabel(c4)}</option>`)}
+                    </select>
+                    <input placeholder="handle" value=${handle} onInput=${(e4) => setHandle(e4.target.value)} />
+                    <button onClick=${startLink} disabled=${busy || !!challenge}>Send code</button>
+                  </div>
+                  ${challenge ? html`
+                    <div class="settings-row" style="margin-top:8px">
+                      <input placeholder="6-digit code" maxlength="6" value=${code} onInput=${(e4) => setCode(e4.target.value)} style="width:120px" />
+                      <button onClick=${verify} disabled=${busy || !code.trim()}>Verify</button>
+                      <button class="ghost" onClick=${() => {
     setChallenge(null);
     setCode("");
     setStatus(null);
   }}>Cancel</button>
-                    <span class="muted">expires ${new Date(challenge.expiresAt).toLocaleTimeString()}</span>
-                  </div>
-                ` : null}
-              `}
+                      <span class="muted">expires ${new Date(challenge.expiresAt).toLocaleTimeString()}</span>
+                    </div>
+                  ` : null}
+                `}
           </section>
 
           ${status ? html`<div class=${"settings-status " + (status.err ? "err" : "ok")}>${status.err || status.ok}</div>` : null}

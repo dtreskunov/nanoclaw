@@ -10,6 +10,13 @@ import { log } from '../log.js';
 import { createMessagingGroup, getMessagingGroupByPlatform, updateMessagingGroup } from '../db/messaging-groups.js';
 import { grantRole, hasAnyOwner } from '../modules/permissions/db/user-roles.js';
 import { getOrCreateUserByIdentity } from '../modules/permissions/db/identities.js';
+import {
+  consumeChallenge,
+  findActiveDeepLinkChallengeByCode,
+  setChallengeHandle,
+} from '../modules/permissions/db/identity-link-challenges.js';
+import { claimIdentity } from '../modules/permissions/identity-claim.js';
+import { registerDeepLinkBuilder } from '../modules/permissions/identity-link-deeplinks.js';
 import { createChatSdkBridge, type ReplyContext } from './chat-sdk-bridge.js';
 import { sanitizeTelegramLegacyMarkdown } from './telegram-markdown-sanitize.js';
 import { registerChannelAdapter } from './channel-registry.js';
@@ -192,6 +199,87 @@ function createPairingInterceptor(
   };
 }
 
+/**
+ * Send a one-shot reply to a chat. Best-effort: failures don't roll back
+ * the identity link, since the DB write already happened.
+ */
+async function sendChatReply(token: string, platformId: string, text: string): Promise<void> {
+  const chatId = platformId.split(':').slice(1).join(':');
+  if (!chatId) return;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+    if (!res.ok) log.warn('Telegram chat reply non-OK', { status: res.status });
+  } catch (err) {
+    log.warn('Telegram chat reply failed', { err });
+  }
+}
+
+/**
+ * Intercept `/start link-<token>` deep-link payloads before they reach
+ * the router. On match: claim the challenge for the user who initiated
+ * it, insert a (telegram, chat_id) identity, and reply confirmation.
+ * Only valid in 1:1 chats — group `/start` payloads are ignored.
+ */
+function createIdentityLinkInterceptor(
+  hostOnInbound: ChannelSetup['onInbound'],
+  token: string,
+): ChannelSetup['onInbound'] {
+  return async (platformId, threadId, message) => {
+    try {
+      if (isGroupPlatformId(platformId)) return hostOnInbound(platformId, threadId, message);
+      const { text, authorUserId } = readInboundFields(message);
+      const m = text?.match(/^\/start\s+link-([A-Za-z0-9]+)\s*$/);
+      if (!m || !authorUserId) return hostOnInbound(platformId, threadId, message);
+      const linkToken = m[1];
+      const challenge = findActiveDeepLinkChallengeByCode('telegram', linkToken);
+      if (!challenge) {
+        await sendChatReply(
+          token,
+          platformId,
+          'That link is invalid or has expired. Generate a new one from NanoClaw settings.',
+        );
+        return;
+      }
+      const handle = String(authorUserId);
+      let result;
+      try {
+        result = claimIdentity({ targetUserId: challenge.user_id, channel: 'telegram', handle });
+      } catch (err) {
+        log.warn('identity deep-link claim failed', {
+          challengeId: challenge.id,
+          err: (err as Error).message,
+        });
+        consumeChallenge(challenge.id);
+        await sendChatReply(token, platformId, 'Could not link this Telegram account. Please try again.');
+        return;
+      }
+      setChallengeHandle(challenge.id, handle);
+      consumeChallenge(challenge.id);
+      log.info('identity linked via deep link', {
+        userId: challenge.user_id,
+        channel: 'telegram',
+        handle,
+        outcome: result.outcome,
+        donorUserId: result.donorUserId,
+      });
+      const replyText =
+        result.outcome === 'merged'
+          ? 'Linked! This Telegram account was previously connected to another NanoClaw user; that account has been merged into yours.'
+          : result.outcome === 'transferred' && result.donorUserId
+            ? 'Linked! This Telegram account was reassigned from a different NanoClaw user to you.'
+            : 'Linked! Your Telegram account is now connected to NanoClaw.';
+      await sendChatReply(token, platformId, replyText);
+    } catch (err) {
+      log.error('Telegram identity-link interceptor error', { err });
+      hostOnInbound(platformId, threadId, message);
+    }
+  };
+}
+
 registerChannelAdapter('telegram', {
   factory: () => {
     const env = readEnvFile(['TELEGRAM_BOT_TOKEN']);
@@ -212,6 +300,14 @@ registerChannelAdapter('telegram', {
 
     const botUsernamePromise = fetchBotUsername(token);
 
+    // Make this adapter discoverable to the settings UI as a deep-link
+    // channel. The builder embeds the bot username so the URL points at
+    // *this* bot — there can be many Telegram bots on the same instance.
+    registerDeepLinkBuilder('telegram', async (linkToken) => {
+      const u = await botUsernamePromise;
+      return u ? `https://t.me/${u}?start=link-${linkToken}` : null;
+    });
+
     const wrapped: ChannelAdapter = {
       ...bridge,
       resolveChannelName: async (platformId: string) => {
@@ -230,9 +326,13 @@ registerChannelAdapter('telegram', {
         }
       },
       async setup(hostConfig: ChannelSetup) {
+        // Compose: identity-link → pairing → host. Identity link runs
+        // first so a deep-link `/start link-<token>` is never confused
+        // with a pairing code.
+        const pairing = createPairingInterceptor(botUsernamePromise, hostConfig.onInbound, token);
         const intercepted: ChannelSetup = {
           ...hostConfig,
-          onInbound: createPairingInterceptor(botUsernamePromise, hostConfig.onInbound, token),
+          onInbound: createIdentityLinkInterceptor(pairing, token),
         };
         return withRetry(() => bridge.setup(intercepted), 'bridge.setup');
       },

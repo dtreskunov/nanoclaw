@@ -41,12 +41,14 @@ import {
   MAX_ATTEMPTS,
   countActiveForUser,
   createChallenge,
+  createDeepLinkChallenge,
   getChallenge,
   incrementAttempts,
   consumeChallenge,
   verifyCode,
 } from '../../modules/permissions/db/identity-link-challenges.js';
 import { sendHandleDm } from '../../modules/permissions/handle-dm.js';
+import { buildDeepLink, hasDeepLinkBuilder } from '../../modules/permissions/identity-link-deeplinks.js';
 
 import { authenticate } from './auth.js';
 
@@ -108,6 +110,48 @@ async function handleApi(
         primary: r.primary_for_channel === 1,
         verified_at: r.verified_at,
       })),
+      deepLinkChannels: getRegisteredChannelNames().filter((c) => hasDeepLinkBuilder(c)),
+    });
+  }
+
+  if (req.method === 'POST' && pathname === '/identities/link/start-deeplink') {
+    const body = await readJson(req);
+    const channel = String(body?.channel || '').trim();
+    if (!channel) return json(res, 400, { error: 'channel is required' });
+    if (!hasDeepLinkBuilder(channel))
+      return json(res, 400, {
+        error: 'no_deeplink',
+        message: `Channel ${channel} does not support deep-link linking.`,
+      });
+    if (countActiveForUser(userId) >= MAX_ACTIVE_PER_USER)
+      return json(res, 429, {
+        error: 'too_many_pending',
+        message: `You have ${MAX_ACTIVE_PER_USER} active link requests. Wait for them to expire (10 min) or verify them first.`,
+      });
+    const { row, token } = createDeepLinkChallenge({ user_id: userId, channel_type: channel });
+    const deepLink = await buildDeepLink(channel, token);
+    if (!deepLink) {
+      log.warn('identity deep-link build failed', { userId, channel, challengeId: row.id });
+      return json(res, 502, { error: 'deeplink_failed', message: `Could not build deep link for ${channel}.` });
+    }
+    log.info('identity deep-link challenge created', { userId, channel, challengeId: row.id });
+    return json(res, 200, { challengeId: row.id, channel, deepLink, expiresAt: row.expires_at });
+  }
+
+  if (req.method === 'GET' && pathname === '/identities/link/status') {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const challengeId = url.searchParams.get('challengeId') || '';
+    if (!challengeId) return json(res, 400, { error: 'challengeId is required' });
+    const ch = getChallenge(challengeId);
+    if (!ch || ch.user_id !== userId) return json(res, 404, { error: 'not_found' });
+    const consumed = !!ch.consumed_at;
+    const expired = !consumed && new Date(ch.expires_at).getTime() < Date.now();
+    return json(res, 200, {
+      consumed,
+      expired,
+      channel: ch.channel_type,
+      handle: ch.handle || null,
+      expiresAt: ch.expires_at,
     });
   }
 
