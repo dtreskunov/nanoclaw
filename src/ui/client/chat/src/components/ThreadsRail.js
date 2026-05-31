@@ -42,8 +42,33 @@ function ThreadRow({ t }) {
   `;
 }
 
+function DmRow({ t }) {
+  const ct = t.channelType || 'web';
+  const meta = channelMeta(ct);
+  const active = t.threadId === threadId.value;
+  const onOpen = () => {
+    openChat(groupId.value, t.threadId, threadCtxOf(t)).catch(console.error);
+    drawerOpen.threads.value = false;
+  };
+  return html`
+    <div class=${'thread dm' + (active ? ' active' : '')} data-id=${t.threadId} onClick=${onOpen}>
+      <div class="title">
+        <span class="ch-pill dm" title=${meta.label}>${meta.icon}</span>
+        ${meta.label}
+      </div>
+      <div class="meta">
+        <${RelativeTime} ts=${t.lastActivityAt} />
+        ${t.counterparty ? ' \u00b7 ' + t.counterparty : ''}
+        ${t.messageCount ? ' \u00b7 ' + t.messageCount + ' msg' : ''}
+      </div>
+    </div>
+  `;
+}
+
 export function ThreadsRail() {
   const list = threads.value;
+  const dms = list.filter((t) => t.kind === 'dm');
+  const rest = list.filter((t) => t.kind !== 'dm');
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null).then(() => {
@@ -61,9 +86,14 @@ export function ThreadsRail() {
         </button>
       </div>
       <div class="list" id="threads-list">
-        ${list.length === 0
+        ${dms.length > 0 ? html`
+          <div class="thread-section">Direct messages</div>
+          ${dms.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${DmRow} key=${t.threadId} t=${t} />`)}
+          ${rest.length > 0 ? html`<div class="thread-section">Chats</div>` : null}
+        ` : null}
+        ${rest.length === 0 && dms.length === 0
           ? html`<div class="empty">No chats yet</div>`
-          : list.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
+          : rest.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
       </div>
     <//>
   `;

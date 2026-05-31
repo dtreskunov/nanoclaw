@@ -17352,8 +17352,32 @@ function ThreadRow({ t: t5 }) {
     </div>
   `;
 }
+function DmRow({ t: t5 }) {
+  const ct = t5.channelType || "web";
+  const meta = channelMeta(ct);
+  const active = t5.threadId === threadId.value;
+  const onOpen = () => {
+    openChat(groupId.value, t5.threadId, threadCtxOf2(t5)).catch(console.error);
+    drawerOpen.threads.value = false;
+  };
+  return html`
+    <div class=${"thread dm" + (active ? " active" : "")} data-id=${t5.threadId} onClick=${onOpen}>
+      <div class="title">
+        <span class="ch-pill dm" title=${meta.label}>${meta.icon}</span>
+        ${meta.label}
+      </div>
+      <div class="meta">
+        <${RelativeTime} ts=${t5.lastActivityAt} />
+        ${t5.counterparty ? " \xB7 " + t5.counterparty : ""}
+        ${t5.messageCount ? " \xB7 " + t5.messageCount + " msg" : ""}
+      </div>
+    </div>
+  `;
+}
 function ThreadsRail() {
   const list = threads.value;
+  const dms = list.filter((t5) => t5.kind === "dm");
+  const rest = list.filter((t5) => t5.kind !== "dm");
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null).then(() => {
@@ -17371,7 +17395,12 @@ function ThreadsRail() {
         </button>
       </div>
       <div class="list" id="threads-list">
-        ${list.length === 0 ? html`<div class="empty">No chats yet</div>` : list.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
+        ${dms.length > 0 ? html`
+          <div class="thread-section">Direct messages</div>
+          ${dms.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${DmRow} key=${t5.threadId} t=${t5} />`)}
+          ${rest.length > 0 ? html`<div class="thread-section">Chats</div>` : null}
+        ` : null}
+        ${rest.length === 0 && dms.length === 0 ? html`<div class="empty">No chats yet</div>` : rest.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
       </div>
     <//>
   `;
