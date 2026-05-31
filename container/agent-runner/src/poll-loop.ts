@@ -265,19 +265,25 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
         clearContinuation(config.providerName);
       }
 
-      // Write error response so the user knows something went wrong
-      writeMessageOut({
-        id: generateId(),
-        kind: 'chat',
-        platform_id: routing.platformId,
-        channel_type: routing.channelType,
-        thread_id: routing.threadId,
-        content: JSON.stringify({ text: `Error: ${errMsg}` }),
-      });
       try {
         setFailedTurn({ prompt, error: errMsg, recorded_at: Date.now() });
       } catch (e) {
         log(`Failed to persist failed-turn record: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      const ack = await tryAcknowledgeFailure(config, routing, continuation, errMsg, undefined);
+      if (ack.continuation && ack.continuation !== continuation) {
+        continuation = ack.continuation;
+        setContinuation(config.providerName, continuation);
+      }
+      if (!ack.delivered) {
+        writeMessageOut({
+          id: generateId(),
+          kind: 'chat',
+          platform_id: routing.platformId,
+          channel_type: routing.channelType,
+          thread_id: routing.threadId,
+          content: JSON.stringify({ text: `Error: ${errMsg}` }),
+        });
       }
     } finally {
       clearCurrentInReplyTo();
@@ -343,6 +349,65 @@ function renderFailedTurnReplay(failed: { prompt: string; error: string; recorde
     `<note>The provider rejected the previous turn with the error above. The user was already told their message was not processed. You have no transcript of it because the session was rolled back to its last good state. Acknowledge the failure briefly when relevant; do not silently retry the failed action.</note>`,
     `</previous_turn_failed>`,
   ].join('\n');
+}
+
+interface AcknowledgeResult {
+  /** True when the agent emitted at least one user-visible message
+   *  during the ack turn — caller skips the static error fallback. */
+  delivered: boolean;
+  /** New continuation if the ack turn cleanly produced one, so the
+   *  outer loop can persist it for the next user turn. */
+  continuation?: string;
+}
+
+/**
+ * Best-effort in-turn acknowledgment of a provider failure.
+ *
+ * Pairs with the continuation rollback in processQuery: after a turn
+ * dies, we restore the prior good session id and run this short
+ * follow-up so the agent can tell the user what happened in its own
+ * voice. The user-supplied prompt that triggered the failure is
+ * intentionally NOT included — content-filter style failures would
+ * just repeat.
+ *
+ * Single query call, no recursion. If it also fails (throws or returns
+ * its own unsurfacedError) the caller falls back to a static error
+ * message; nothing here calls setFailedTurn so a busted ack never
+ * poisons the next turn's replay.
+ */
+async function tryAcknowledgeFailure(
+  config: PollLoopConfig,
+  routing: RoutingContext,
+  ackContinuation: string | undefined,
+  errorMessage: string,
+  errorClassification: string | undefined,
+): Promise<AcknowledgeResult> {
+  const tag = errorClassification ? ` (${errorClassification})` : '';
+  const ackPrompt = [
+    `<system>`,
+    `The user's most recent message could not be processed because the model provider returned an error${tag}:`,
+    ``,
+    errorMessage,
+    ``,
+    `Briefly (one or two short sentences) tell the user that their message failed and, if useful, quote the most relevant phrase from the error verbatim so they can act on it. Do not retry the failed action. Do not speculate about causes beyond what the error literally says. Do not apologize at length.`,
+    `</system>`,
+  ].join('\n');
+
+  log('Generating in-turn acknowledgment of provider error');
+  try {
+    const query = config.provider.query({
+      prompt: ackPrompt,
+      continuation: ackContinuation,
+      cwd: config.cwd,
+      systemContext: config.systemContext,
+    });
+    const result = await processQuery(query, routing, [], config.providerName, ackContinuation);
+    return { delivered: true, continuation: result.continuation };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Acknowledgment turn threw: ${errMsg}`);
+    return { delivered: false };
+  }
 }
 
 interface QueryResult {
