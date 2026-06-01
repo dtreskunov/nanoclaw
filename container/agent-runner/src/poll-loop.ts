@@ -104,6 +104,13 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
   // This lets the new container re-process those messages.
   clearStaleProcessingAcks();
 
+  // Warm the heartbeat as soon as the runner is up. Provider boot
+  // (e.g. opencode SDK cold start, OpenRouter handshake) can take
+  // longer than the host typing module's grace window before
+  // processQuery's liveHandle starts touching it — leaving the
+  // typing indicator to flicker off mid-cold-start.
+  try { touchHeartbeat(); } catch { /* best-effort */ }
+
   let pollCount = 0;
   let isFirstPoll = true;
   while (true) {
@@ -134,6 +141,11 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
       await sleep(POLL_INTERVAL_MS);
       continue;
     }
+
+    // Touch the heartbeat the moment we pick up a batch — before any
+    // potentially-slow provider boot inside processQuery — so the host
+    // typing indicator stays lit through cold-start.
+    try { touchHeartbeat(); } catch { /* best-effort */ }
 
     const ids = messages.map((m) => m.id);
     markProcessing(ids);
