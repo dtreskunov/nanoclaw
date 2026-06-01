@@ -293,24 +293,26 @@ export class OpenCodeProvider implements AgentProvider {
         const roleByMessageId = new Map<string, string>();
         let lastEventAt = Date.now();
         let eventTimedOut = false;
+        let timeoutReject: ((err: Error) => void) | undefined;
+        const timeoutPromise = new Promise<never>((_, reject) => { timeoutReject = reject; });
         const timeoutCheck = setInterval(() => {
+          if (eventTimedOut) return;
           if (Date.now() - lastEventAt > IDLE_TIMEOUT_MS) {
             log(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms) — clearing session ${sessionId}`);
             eventTimedOut = true;
+            clearInterval(timeoutCheck);
             self.activeSessionId = undefined;
             destroySharedRuntime();
             kick();
+            timeoutReject?.(new Error(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms)`));
           }
         }, 5000);
 
         try {
           turn: while (true) {
             if (aborted) return;
-            if (eventTimedOut) {
-              throw new Error(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms)`);
-            }
 
-            const { value: ev, done } = await stream.next();
+            const { value: ev, done } = await Promise.race([stream.next(), timeoutPromise]);
             if (done) {
               throw new Error('OpenCode SSE stream ended unexpectedly');
             }
