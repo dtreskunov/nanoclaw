@@ -47,8 +47,27 @@ export function tsKey(s) {
 
 export function parentPath(p) { const i = p.lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); }
 
+// Pre-process raw markdown to make file-link destinations parseable when the
+// model emits unescaped spaces or parens in the URL — e.g.
+// [`Foo (v2).mp3`](music/Foo (v2).mp3). CommonMark allows wrapping the
+// destination in <...> to permit those characters; we add the wrap when the
+// destination looks like a relative path (no URL scheme, not already wrapped).
+function normalizeFileLinks(text) {
+  // Match [text](dest) with balanced parens in dest, dest not already <-wrapped.
+  const re = /\[([^\]\n]+)\]\(([^<>\n()]*(?:\([^()\n]*\)[^<>\n()]*)*)\)/g;
+  return text.replace(re, (match, label, dest) => {
+    const d = dest.trim();
+    if (!d) return match;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(d)) return match; // has URL scheme
+    if (d.startsWith('#') || d.startsWith('//') || d.startsWith('mailto:')) return match;
+    // Only rewrite if it actually needs the angle-bracket form.
+    if (!/[ ()]/.test(d)) return match;
+    return `[${label}](<${d}>)`;
+  });
+}
+
 export function renderMarkdown(text) {
-  try { return marked.parse(text || '', { breaks: true, gfm: true }); } catch (_) { return null; }
+  try { return marked.parse(normalizeFileLinks(text || ''), { breaks: true, gfm: true }); } catch (_) { return null; }
 }
 
 // Rewrite relative-path markdown links inside a chat message bubble (post-
@@ -59,6 +78,9 @@ export function rewriteFileLinks(root, groupId, onNavFile) {
   if (!groupId || !root) return;
   const gid = encodeURIComponent(groupId);
   const isExternal = (h) => /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith('#') || h.startsWith('//') || h.startsWith('mailto:');
+  // Marked percent-encodes spaces/parens in hrefs, so decode back to a real
+  // path before normalizing/re-encoding for the API endpoint.
+  const decodeHref = (h) => { try { return decodeURIComponent(h); } catch { return h; } };
   const normalizeRel = (p) => String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
   const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
   const attachPreviewClick = (a, rel) => {
@@ -71,7 +93,7 @@ export function rewriteFileLinks(root, groupId, onNavFile) {
   root.querySelectorAll('a[href]').forEach((a) => {
     const href = a.getAttribute('href') || '';
     if (!href || isExternal(href)) return;
-    const rel = normalizeRel(href);
+    const rel = normalizeRel(decodeHref(href));
     if (!rel) return;
     a.setAttribute('href', toFileUrl(rel));
     a.setAttribute('target', '_blank');

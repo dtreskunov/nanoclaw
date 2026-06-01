@@ -16497,9 +16497,20 @@ function parentPath(p5) {
   const i4 = p5.lastIndexOf("/");
   return i4 < 0 ? "" : p5.slice(0, i4);
 }
+function normalizeFileLinks(text) {
+  const re = /\[([^\]\n]+)\]\(([^<>\n()]*(?:\([^()\n]*\)[^<>\n()]*)*)\)/g;
+  return text.replace(re, (match, label, dest) => {
+    const d5 = dest.trim();
+    if (!d5) return match;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(d5)) return match;
+    if (d5.startsWith("#") || d5.startsWith("//") || d5.startsWith("mailto:")) return match;
+    if (!/[ ()]/.test(d5)) return match;
+    return `[${label}](<${d5}>)`;
+  });
+}
 function renderMarkdown(text) {
   try {
-    return g4.parse(text || "", { breaks: true, gfm: true });
+    return g4.parse(normalizeFileLinks(text || ""), { breaks: true, gfm: true });
   } catch (_5) {
     return null;
   }
@@ -16508,6 +16519,13 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
   if (!groupId2 || !root) return;
   const gid = encodeURIComponent(groupId2);
   const isExternal = (h5) => /^[a-z][a-z0-9+.-]*:/i.test(h5) || h5.startsWith("#") || h5.startsWith("//") || h5.startsWith("mailto:");
+  const decodeHref = (h5) => {
+    try {
+      return decodeURIComponent(h5);
+    } catch {
+      return h5;
+    }
+  };
   const normalizeRel = (p5) => String(p5 || "").replace(/^\.?\/+/, "").replace(/^workspace\/+/, "");
   const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
   const attachPreviewClick = (a4, rel) => {
@@ -16520,7 +16538,7 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
   root.querySelectorAll("a[href]").forEach((a4) => {
     const href = a4.getAttribute("href") || "";
     if (!href || isExternal(href)) return;
-    const rel = normalizeRel(href);
+    const rel = normalizeRel(decodeHref(href));
     if (!rel) return;
     a4.setAttribute("href", toFileUrl(rel));
     a4.setAttribute("target", "_blank");
