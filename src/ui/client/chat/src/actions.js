@@ -178,6 +178,8 @@ export async function openChat(gid, resumeTid, opts) {
     channelType.value = ct;
     messagingGroupId.value = mg;
     canSend.value = ct === 'web' ? true : cs;
+    isTyping.value = false;
+    typingHint.value = '';
     if (resumeTid) {
       threadId.value = resumeTid;
       chatLoading.value = true;
