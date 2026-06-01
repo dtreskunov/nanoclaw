@@ -25,6 +25,7 @@ function Message({ m }) {
   const cls = 'msg ' + m.direction + (md != null ? ' markdown' : '');
   return html`
     <div class=${cls}>
+      ${m.direction === 'internal' ? html`<div class="internal-label">internal</div>` : null}
       ${md != null
         ? html`<div ref=${ref} dangerouslySetInnerHTML=${{ __html: md }} />`
         : (m.text || '')}

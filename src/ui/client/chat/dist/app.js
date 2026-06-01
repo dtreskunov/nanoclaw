@@ -16810,6 +16810,9 @@ function appendMsg(direction, text, files, ts, id) {
   if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
 }
+function normDirection(d5) {
+  return d5 === "in" ? "in" : d5 === "internal" ? "internal" : "out";
+}
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
   const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin", cache: "no-store" });
@@ -16818,25 +16821,25 @@ async function refetchThreadHistory(appendNewOnly) {
   if (!Array.isArray(messages)) return;
   if (!appendNewOnly) {
     chatMessages.value = messages.map((m6) => ({
-      direction: m6.direction === "in" ? "in" : "out",
+      direction: normDirection(m6.direction),
       text: m6.text,
       files: m6.files || null,
       ts: m6.timestamp
     }));
-    refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
+    refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${normDirection(m6.direction)}:${m6.id}`));
     return;
   }
   let maxTs = "";
   const additions = [];
   for (const m6 of messages) {
-    const direction = m6.direction === "in" ? "in" : "out";
+    const direction = normDirection(m6.direction);
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
     additions.push({ direction, text: m6.text, files: m6.files || null, ts });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
-    if (direction !== "in") maybeNotify(m6.text, m6.files || []);
+    if (direction === "out") maybeNotify(m6.text, m6.files || []);
   }
   if (additions.length) {
     chatMessages.value = chatMessages.value.concat(additions);
@@ -16893,7 +16896,7 @@ async function openChat(gid, resumeTid, opts) {
         const { messages } = await r4.json();
         n2(() => {
           chatMessages.value = (messages || []).map((m6) => ({
-            direction: m6.direction === "in" ? "in" : "out",
+            direction: normDirection(m6.direction),
             text: m6.text,
             files: m6.files || null,
             ts: m6.timestamp
@@ -16901,7 +16904,7 @@ async function openChat(gid, resumeTid, opts) {
           chatLoading.value = false;
         });
         if (Array.isArray(messages)) {
-          refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${m6.direction === "in" ? "in" : "out"}:${m6.id}`));
+          refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${normDirection(m6.direction)}:${m6.id}`));
         }
       } else {
         chatLoading.value = false;
@@ -17000,9 +17003,10 @@ function connectChatWs() {
     if (payload.kind === "outbound") {
       const c4 = payload.content || {};
       const text = typeof c4 === "string" ? c4 : c4.text || c4.markdown || "";
-      appendMsg("out", text, payload.files || [], payload.timestamp, payload.id);
+      const dir = payload.messageKind === "internal" ? "internal" : "out";
+      appendMsg(dir, text, payload.files || [], payload.timestamp, payload.id);
       bumpActiveThread();
-      maybeNotify(text, payload.files || []);
+      if (dir === "out") maybeNotify(text, payload.files || []);
       return;
     }
   };
@@ -17438,6 +17442,7 @@ function Message({ m: m6 }) {
   const cls = "msg " + m6.direction + (md != null ? " markdown" : "");
   return html`
     <div class=${cls}>
+      ${m6.direction === "internal" ? html`<div class="internal-label">internal</div>` : null}
       ${md != null ? html`<div ref=${ref} dangerouslySetInnerHTML=${{ __html: md }} />` : m6.text || ""}
       ${m6.files && m6.files.length ? html`<div class="files">${m6.files.map(
     (f4) => f4.path ? html`<button
