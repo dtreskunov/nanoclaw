@@ -99,7 +99,7 @@ export function registerWebhookAdapter(chat: Chat, adapterName: string): void {
  * whose `req.url` path starts with `prefix` (or equals it).
  */
 export function mountHandler(prefix: string, handler: MountHandler): void {
-  const normalized = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  const normalized = prefix === '/' ? '/' : prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
   mounts.push({ prefix: normalized, handler });
   ensureSharedHttpServer();
   log.info('HTTP mount registered', { prefix: normalized });
@@ -112,7 +112,7 @@ export function mountHandler(prefix: string, handler: MountHandler): void {
  * the upgrade (e.g. via the `ws` library's `wss.handleUpgrade`).
  */
 export function mountUpgradeHandler(prefix: string, handler: UpgradeHandler): void {
-  const normalized = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  const normalized = prefix === '/' ? '/' : prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
   upgradeMounts.push({ prefix: normalized, handler });
   ensureSharedHttpServer();
   log.info('HTTP upgrade mount registered', { prefix: normalized });
