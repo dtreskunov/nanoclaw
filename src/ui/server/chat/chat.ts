@@ -395,7 +395,7 @@ export async function handleChatRequest(
 }
 
 interface HistoryMessage {
-  direction: 'in' | 'out';
+  direction: 'in' | 'out' | 'internal';
   // messages_in.id / messages_out.id — stable per-row id the client uses
   // as the dedup key against live WS pushes.
   id: string;
@@ -484,6 +484,17 @@ function readChatHistory(
             )
             .all(target.channelType, threadId) as { id: string; timestamp: string; kind: string; content: string }[]);
       for (const r of rows) {
+        if (r.kind === 'internal') {
+          const parsed = parseOutboundContent(r.content);
+          messages.push({
+            direction: 'internal',
+            id: r.id,
+            timestamp: r.timestamp,
+            text: parsed.text,
+            files: parsed.files,
+          });
+          continue;
+        }
         if (r.kind !== 'chat' && r.kind !== 'text') continue;
         const parsed = parseOutboundContent(r.content);
         messages.push({ direction: 'out', id: r.id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });

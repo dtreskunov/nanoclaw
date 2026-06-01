@@ -286,3 +286,18 @@ function escapeXml(str: string): string {
 export function stripInternalTags(text: string): string {
   return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
 }
+
+/**
+ * Return the concatenated content of `<internal>...</internal>` blocks,
+ * separated by blank lines. Empty string if none.
+ */
+export function extractInternalTags(text: string): string {
+  const re = /<internal>([\s\S]*?)<\/internal>/g;
+  const parts: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const inner = m[1].trim();
+    if (inner) parts.push(inner);
+  }
+  return parts.join('\n\n');
+}

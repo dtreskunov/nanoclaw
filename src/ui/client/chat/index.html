@@ -176,6 +176,8 @@
       .chat-main .msg { padding: 6px 10px; border-radius: 6px; max-width: 78%; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
       .chat-main .msg.in { align-self: flex-end; background: var(--accent); }
       .chat-main .msg.out { align-self: flex-start; background: var(--wash); }
+      .chat-main .msg.internal { align-self: flex-start; background: transparent; border: 1px dashed var(--border, var(--muted)); color: var(--muted); font-style: italic; opacity: 0.85; max-width: 92%; }
+      .chat-main .msg.internal::before { content: 'internal'; display: block; font-size: 10px; font-style: normal; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 2px; opacity: 0.7; }
       .chat-main .msg .files { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
       .chat-main .msg .file-chip { font: inherit; color: inherit; background: var(--wash-strong); border: 1px solid var(--border, transparent); border-radius: 4px; padding: 2px 6px; cursor: pointer; }
       .chat-main .msg .file-chip:hover { background: var(--accent); color: var(--fg); }

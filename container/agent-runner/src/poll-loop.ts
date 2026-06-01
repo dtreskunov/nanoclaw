@@ -11,6 +11,7 @@ import {
   isClearCommand,
   isRunnerCommand,
   stripInternalTags,
+  extractInternalTags,
   type RoutingContext,
 } from './formatter.js';
 import { isUploadTraceCommand, uploadTrace } from './upload-trace.js';
@@ -828,6 +829,22 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
 function dispatchResultText(text: string, routing: RoutingContext): { sent: number; hasUnwrapped: boolean } {
   const MESSAGE_RE = /<message\s+to="([^"]+)"\s*>([\s\S]*?)<\/message>/g;
 
+  // Surface <internal>...</internal> reasoning to the web UI as a separate
+  // messages_out row, BEFORE dispatching <message> blocks so the internal
+  // bubble sequences ahead of the response in the UI's seq-ordered view.
+  const internalText = extractInternalTags(text);
+  if (internalText && routing.channelType === 'web' && routing.platformId) {
+    writeMessageOut({
+      id: generateId(),
+      in_reply_to: routing.inReplyTo,
+      kind: 'internal',
+      platform_id: routing.platformId,
+      channel_type: routing.channelType,
+      thread_id: routing.threadId,
+      content: JSON.stringify({ text: internalText }),
+    });
+  }
+
   let match: RegExpExecArray | null;
   let sent = 0;
   let lastIndex = 0;
@@ -854,7 +871,8 @@ function dispatchResultText(text: string, routing: RoutingContext): { sent: numb
     scratchpadParts.push(text.slice(lastIndex));
   }
 
-  const scratchpad = stripInternalTags(scratchpadParts.join(''));
+  const rawScratchpad = scratchpadParts.join('');
+  const scratchpad = stripInternalTags(rawScratchpad);
 
   if (scratchpad) {
     log(`[scratchpad] ${scratchpad.slice(0, 500)}${scratchpad.length > 500 ? '…' : ''}`);
