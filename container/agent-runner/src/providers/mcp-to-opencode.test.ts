@@ -56,4 +56,42 @@ describe('mcpServersToOpenCodeConfig', () => {
   it('returns empty record for undefined', () => {
     expect(mcpServersToOpenCodeConfig(undefined)).toEqual({});
   });
+
+  it('maps http remote server to OpenCode remote entry', () => {
+    const mcp = mcpServersToOpenCodeConfig({
+      tavily: {
+        type: 'http',
+        url: 'https://mcp.tavily.com/mcp/?tavilyApiKey=tvly-test',
+        headers: { Authorization: 'Bearer tvly-test' },
+      },
+    });
+    expect(mcp.tavily).toEqual({
+      type: 'remote',
+      url: 'https://mcp.tavily.com/mcp/?tavilyApiKey=tvly-test',
+      headers: { Authorization: 'Bearer tvly-test' },
+      enabled: true,
+    });
+  });
+
+  it('maps sse remote server without headers', () => {
+    const mcp = mcpServersToOpenCodeConfig({
+      remote: { type: 'sse', url: 'https://example.com/sse' },
+    });
+    expect(mcp.remote).toEqual({
+      type: 'remote',
+      url: 'https://example.com/sse',
+      enabled: true,
+    });
+  });
+
+  it('treats absent type as stdio', () => {
+    const mcp = mcpServersToOpenCodeConfig({
+      legacy: { command: 'echo', args: ['hi'], env: {} },
+    });
+    expect(mcp.legacy).toEqual({
+      type: 'local',
+      command: ['echo', 'hi'],
+      enabled: true,
+    });
+  });
 });

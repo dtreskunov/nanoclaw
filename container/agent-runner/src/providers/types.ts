@@ -74,11 +74,20 @@ export interface QueryInput {
   };
 }
 
-export interface McpServerConfig {
+export type McpStdioServerConfig = {
+  type?: 'stdio';
   command: string;
-  args: string[];
-  env: Record<string, string>;
-}
+  args?: string[];
+  env?: Record<string, string>;
+};
+
+export type McpHttpServerConfig = {
+  type: 'http' | 'sse';
+  url: string;
+  headers?: Record<string, string>;
+};
+
+export type McpServerConfig = McpStdioServerConfig | McpHttpServerConfig;
 
 export interface AgentQuery {
   /** Push a follow-up message into the active query. */

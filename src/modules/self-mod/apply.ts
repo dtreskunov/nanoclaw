@@ -105,11 +105,22 @@ export const applyAddMcpServer: ApprovalHandler = async ({ session, payload, use
 
   // Add the new MCP server to the existing map in the DB
   const servers = JSON.parse(configRow.mcp_servers) as Record<string, McpServerConfig>;
-  servers[payload.name as string] = {
-    command: payload.command as string,
-    args: (payload.args as string[]) || [],
-    env: (payload.env as Record<string, string>) || {},
-  };
+  if (payload.url) {
+    const transport = payload.transport === 'sse' ? 'sse' : 'http';
+    servers[payload.name as string] = {
+      type: transport,
+      url: payload.url as string,
+      ...(payload.headers && Object.keys(payload.headers as Record<string, string>).length > 0
+        ? { headers: payload.headers as Record<string, string> }
+        : {}),
+    };
+  } else {
+    servers[payload.name as string] = {
+      command: payload.command as string,
+      args: (payload.args as string[]) || [],
+      env: (payload.env as Record<string, string>) || {},
+    };
+  }
   updateContainerConfigJson(agentGroup.id, 'mcp_servers', servers);
 
   writeSessionMessage(session.agent_group_id, session.id, {

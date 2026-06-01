@@ -70,11 +70,50 @@ export async function handleAddMcpServer(content: Record<string, unknown>, sessi
     return;
   }
   const serverName = content.name as string;
-  const command = content.command as string;
-  if (!serverName || !command) {
-    notifyAgent(session, 'add_mcp_server failed: name and command are required.');
+  const command = content.command as string | undefined;
+  const url = content.url as string | undefined;
+  if (!serverName) {
+    notifyAgent(session, 'add_mcp_server failed: name is required.');
     return;
   }
+  if (!command && !url) {
+    notifyAgent(session, 'add_mcp_server failed: either command (stdio) or url (remote) is required.');
+    return;
+  }
+  if (command && url) {
+    notifyAgent(session, 'add_mcp_server failed: provide either command (stdio) or url (remote), not both.');
+    return;
+  }
+
+  if (url) {
+    // Basic URL sanity — must be http(s)
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        notifyAgent(session, `add_mcp_server failed: url must be http(s), got "${parsed.protocol}".`);
+        return;
+      }
+    } catch {
+      notifyAgent(session, `add_mcp_server failed: invalid url "${url}".`);
+      return;
+    }
+    const transport = (content.transport as string) === 'sse' ? 'sse' : 'http';
+    await requestApproval({
+      session,
+      agentName: agentGroup.name,
+      action: 'add_mcp_server',
+      payload: {
+        name: serverName,
+        url,
+        transport,
+        headers: (content.headers as Record<string, string>) || {},
+      },
+      title: 'Add MCP Request',
+      question: `Agent "${agentGroup.name}" is attempting to add a remote MCP server:\n${serverName} (${transport.toUpperCase()} ${url})`,
+    });
+    return;
+  }
+
   await requestApproval({
     session,
     agentName: agentGroup.name,
