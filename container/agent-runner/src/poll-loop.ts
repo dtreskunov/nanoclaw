@@ -418,7 +418,7 @@ async function tryAcknowledgeFailure(
       cwd: config.cwd,
       systemContext: config.systemContext,
     });
-    await processQuery(query, routing, [], config.providerName, undefined);
+    await processQuery(query, routing, [], config.providerName, undefined, false);
     return { delivered: true };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -437,6 +437,7 @@ async function processQuery(
   initialBatchIds: string[],
   providerName: string,
   priorContinuation: string | undefined,
+  persistContinuation = true,
 ): Promise<QueryResult> {
   let queryContinuation: string | undefined;
   let resultSeen = false;
@@ -570,7 +571,12 @@ async function processQuery(
         // container died between `init` and `result`, the SDK session was
         // effectively orphaned and the next message started a blank
         // Claude session with no prior context.
-        setContinuation(providerName, event.continuation);
+        // Skip for one-shot calls (e.g. the in-turn ack), which run in a
+        // throwaway session and would otherwise clobber the rolled-back
+        // continuation set by the failing turn's processQuery.
+        if (persistContinuation) {
+          setContinuation(providerName, event.continuation);
+        }
       } else if (event.type === 'result') {
         resultSeen = true;
         // A result — with or without text — means the turn is done. Mark
