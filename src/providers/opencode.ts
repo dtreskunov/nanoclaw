@@ -54,6 +54,11 @@ registerProviderContainerConfig('opencode', (ctx) => {
     if (value && env[key] === undefined) env[key] = value;
   }
 
+  // Per-group model override from container config (highest priority).
+  if (ctx.containerConfig.model) {
+    env.OPENCODE_MODEL = ctx.containerConfig.model;
+  }
+
   return {
     mounts: [{ hostPath: opencodeDir, containerPath: '/opencode-xdg', readonly: false }],
     env,

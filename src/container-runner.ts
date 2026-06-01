@@ -264,6 +264,7 @@ function resolveProviderContribution(
         sessionDir: sessionDir(agentGroup.id, session.id),
         agentGroupId: agentGroup.id,
         hostEnv: process.env,
+        containerConfig,
       })
     : {};
   return { provider, contribution };
