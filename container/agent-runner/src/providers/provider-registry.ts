@@ -11,6 +11,7 @@ import type { AgentProvider, ProviderOptions } from './types.js';
 export type ProviderFactory = (options: ProviderOptions) => AgentProvider;
 
 const registry = new Map<string, ProviderFactory>();
+const skipped = new Map<string, string>();
 
 export function registerProvider(name: string, factory: ProviderFactory): void {
   if (registry.has(name)) {
@@ -19,10 +20,18 @@ export function registerProvider(name: string, factory: ProviderFactory): void {
   registry.set(name, factory);
 }
 
+export function recordSkippedProvider(name: string, reason: string): void {
+  skipped.set(name, reason);
+}
+
 export function getProviderFactory(name: string): ProviderFactory {
   const factory = registry.get(name);
   if (!factory) {
     const known = [...registry.keys()].join(', ') || '(none)';
+    const skipReason = skipped.get(name);
+    if (skipReason) {
+      throw new Error(`Unknown provider: ${name}. It failed to load: ${skipReason}. Registered: ${known}`);
+    }
     throw new Error(`Unknown provider: ${name}. Registered: ${known}`);
   }
   return factory;

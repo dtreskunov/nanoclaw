@@ -6,6 +6,8 @@
 //
 // `claude` and `mock` are always required — failures there are fatal.
 
+import { recordSkippedProvider } from './provider-registry.js';
+
 const REQUIRED_PROVIDER_MODULES = ['./claude.js', './mock.js'] as const;
 const OPTIONAL_PROVIDER_MODULES = ['./opencode.js'] as const;
 
@@ -18,6 +20,9 @@ for (const mod of OPTIONAL_PROVIDER_MODULES) {
     await import(mod);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Extract provider name from module path (e.g. './opencode.js' -> 'opencode')
+    const name = mod.replace(/^\.\//, '').replace(/\.js$/, '');
+    recordSkippedProvider(name, msg);
     console.error(`[providers] Skipping ${mod}: ${msg}`);
   }
 }

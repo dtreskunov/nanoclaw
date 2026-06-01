@@ -396,6 +396,13 @@ export class OpenCodeProvider implements AgentProvider {
             resultText = partTextByMessageId.get(msgId) ?? resultText;
           }
         }
+        // OpenCode's SSE stream strips the leading '<' from the assistant
+        // response text (first character only). If the response starts with
+        // something that looks like a stripped opening tag — a tag-name token
+        // followed by '>' or by an attribute (`word="`) — restore the '<'.
+        if (resultText && resultText[0] !== '<' && /^[a-zA-Z][\w-]*(\s+[\w-]+="|>)/.test(resultText)) {
+          resultText = '<' + resultText;
+        }
         yield { type: 'result', text: resultText || null };
       }
     }
