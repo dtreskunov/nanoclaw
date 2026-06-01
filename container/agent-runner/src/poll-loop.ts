@@ -2,7 +2,7 @@ import { findByName, getAllDestinations, type DestinationEntry } from './destina
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { getInboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
-import { clearContinuation, clearFailedTurn, getFailedTurn, migrateLegacyContinuation, setContinuation, setFailedTurn } from './db/session-state.js';
+import { clearContinuation, clearFailedTurn, getContinuation, getFailedTurn, migrateLegacyContinuation, setContinuation, setFailedTurn } from './db/session-state.js';
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
 import {
   formatMessages,
@@ -138,6 +138,19 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     const ids = messages.map((m) => m.id);
     markProcessing(ids);
 
+    // Resync continuation from session_state at the top of each batch.
+    // The local variable only gets updated on processQuery's success
+    // return path; on the error path (and inside long-lived queries that
+    // outlive a single batch via follow-up pushes) the canonical value
+    // lives in session_state — written by the init handler and rolled
+    // back by the failure-recovery path. Without this resync, after a
+    // failed follow-up turn the next batch would start a brand-new
+    // Claude session, dropping all prior context.
+    const persisted = getContinuation(config.providerName);
+    if (persisted !== continuation) {
+      continuation = persisted;
+    }
+
     const routing = extractRouting(messages);
 
     // Command handling: the host router gates filtered and unauthorized
@@ -246,8 +259,22 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // Publish the batch's in_reply_to so MCP tools (send_message, send_file)
     // can stamp it on outbound rows — needed for a2a return-path routing.
     setCurrentInReplyTo(routing.inReplyTo);
+    // Mutable holder so processQuery can report the most recent prompt
+    // it actually pushed to the SDK. The initial batch's prompt is
+    // seeded here; follow-up pushes overwrite it. On failure we record
+    // *that* prompt as the failed turn — not the initial one, which
+    // may have completed cleanly turns earlier in the same query.
+    const promptTracker = { latest: prompt };
     try {
-      const result = await processQuery(query, routing, processingIds, config.providerName, continuation);
+      const result = await processQuery(
+        query,
+        routing,
+        processingIds,
+        config.providerName,
+        continuation,
+        true,
+        promptTracker,
+      );
       if (result.continuation && result.continuation !== continuation) {
         continuation = result.continuation;
         setContinuation(config.providerName, continuation);
@@ -266,7 +293,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
       }
 
       try {
-        setFailedTurn({ prompt, error: errMsg, recorded_at: Date.now() });
+        setFailedTurn({ prompt: promptTracker.latest, error: errMsg, recorded_at: Date.now() });
       } catch (e) {
         log(`Failed to persist failed-turn record: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -346,7 +373,7 @@ function renderFailedTurnReplay(failed: { prompt: string; error: string; recorde
     failed.prompt,
     `</user_message_that_was_not_processed>`,
     `<provider_error>${failed.error}</provider_error>`,
-    `<note>The provider rejected the previous turn with the error above. The user was already told their message was not processed. You have no transcript of it because the session was rolled back to its last good state. Acknowledge the failure briefly when relevant; do not silently retry the failed action.</note>`,
+    `<note>The provider rejected ONLY the single user turn shown above. Your earlier conversation history (everything before that turn) is intact and resumed normally — do not claim you have forgotten it. The user was already told that one turn was not processed. Acknowledge the failure briefly only if directly relevant; do not silently retry the failed action.</note>`,
     `</previous_turn_failed>`,
   ].join('\n');
 }
@@ -438,6 +465,7 @@ async function processQuery(
   providerName: string,
   priorContinuation: string | undefined,
   persistContinuation = true,
+  promptTracker?: { latest: string },
 ): Promise<QueryResult> {
   let queryContinuation: string | undefined;
   let resultSeen = false;
@@ -518,6 +546,7 @@ async function processQuery(
         const prompt = formatMessages(keep);
         log(`Pushing ${keep.length} follow-up message(s) into active query`);
         unwrappedNudged = false;
+        if (promptTracker) promptTracker.latest = prompt;
         query.push(prompt);
         markCompleted(keptIds);
       } catch (err) {
@@ -599,6 +628,16 @@ async function processQuery(
                 `Please re-send your response with the correct wrapping.</system>`,
             );
           }
+        }
+        // One-shot calls (in-turn ack): end the stream immediately after
+        // the first result. Without this, the query stays open waiting
+        // for stream-close, and the follow-up poller pushes the next
+        // user message into this throwaway session — defeating the
+        // continuation rollback. The user's next turn must start a
+        // fresh query against the rolled-back continuation.
+        if (!persistContinuation) {
+          endedForCommand = true;
+          query.end();
         }
       }
     }
