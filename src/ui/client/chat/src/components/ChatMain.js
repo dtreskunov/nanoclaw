@@ -35,8 +35,8 @@ function Message({ m }) {
                 class="file-chip"
                 title=${'/' + f.path}
                 onClick=${() => navFile({ path: f.path, name: f.filename, size: f.size }).catch(console.error)}
-              >\uD83D\uDCCE ${f.filename} (${fmtBytes(f.size)})</button>`
-            : html`<span class="file-chip inert" title="Source not in workspace">\uD83D\uDCCE ${f.filename} (${fmtBytes(f.size)})</span>`
+              >\uD83D\uDCCE ${f.filename}</button>`
+            : html`<span class="file-chip inert" title="Source not in workspace">\uD83D\uDCCE ${f.filename}</span>`
           )}</div>`
         : null}
       ${m.ts ? html`<div class="meta"><${RelativeTime} ts=${m.ts} /></div>` : null}

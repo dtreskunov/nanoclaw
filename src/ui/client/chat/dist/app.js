@@ -17443,7 +17443,7 @@ function Message({ m: m6 }) {
                 class="file-chip"
                 title=${"/" + f4.path}
                 onClick=${() => navFile({ path: f4.path, name: f4.filename, size: f4.size }).catch(console.error)}
-              >\uD83D\uDCCE ${f4.filename} (${fmtBytes(f4.size)})</button>` : html`<span class="file-chip inert" title="Source not in workspace">\uD83D\uDCCE ${f4.filename} (${fmtBytes(f4.size)})</span>`
+              >\uD83D\uDCCE ${f4.filename}</button>` : html`<span class="file-chip inert" title="Source not in workspace">\uD83D\uDCCE ${f4.filename}</span>`
   )}</div>` : null}
       ${m6.ts ? html`<div class="meta"><${RelativeTime} ts=${m6.ts} /></div>` : null}
     </div>
