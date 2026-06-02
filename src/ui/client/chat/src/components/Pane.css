@@ -1,0 +1,55 @@
+/* .nc-pane — reusable collapsible side panel.
+   Markup:
+     <aside class="nc-pane [my-pane] [no-animate]">
+       <div class="head">
+         <button class="icon-btn">›</button>
+         <span class="title">Label</span>
+       </div>
+       <div class="my-body">…</div>
+     </aside>
+   Toggling adds/removes `collapsed`; CSS handles the rest. */
+
+.nc-pane { position: relative; overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
+.nc-pane.collapsed { cursor: pointer; }
+.nc-pane.collapsed:hover > .head { background: var(--wash-soft); }
+.nc-pane.collapsed > :not(.head) { display: none; }
+
+.nc-pane > .head {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: var(--handle-h);
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--head-tint);
+  white-space: nowrap;
+  z-index: 2;
+  cursor: pointer;
+}
+.nc-pane > .head:hover { background: var(--wash-soft); }
+.nc-pane.collapsed > .head {
+  right: auto; width: var(--collapsed-w);
+  flex-direction: column; gap: 6px;
+  justify-content: flex-start; padding: 8px 0;
+  border-bottom-color: transparent;
+  border-right: 1px solid var(--border);
+}
+.nc-pane.collapsed > .head .title {
+  flex: 0 0 auto;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: left;
+}
+.nc-pane > .head .icon-btn {
+  min-width: 24px; min-height: 24px; padding: 0; border: 0;
+  font-size: 16px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+#btn-threads-toggle::before { content: '‹'; }
+.threads-rail.collapsed #btn-threads-toggle::before { content: '›'; }
+#btn-files-toggle::before { content: '›'; }
+.files-pane.collapsed #btn-files-toggle::before { content: '‹'; }
+.nc-pane > .head .title {
+  flex: 1; font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+}

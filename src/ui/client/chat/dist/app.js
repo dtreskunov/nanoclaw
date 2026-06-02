@@ -16910,12 +16910,7 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
 }
 
 // src/hash.ts
-var PATTERNS = [
-  "/g/:gid/t/:tid/:kind/*filepath",
-  "/g/:gid/t/:tid",
-  "/g/:gid/:kind/*filepath",
-  "/g/:gid"
-];
+var PATTERNS = ["/g/:gid/t/:tid/:kind/*filepath", "/g/:gid/t/:tid", "/g/:gid/:kind/*filepath", "/g/:gid"];
 var matchers = PATTERNS.map((p5) => (0, import_path_to_regexp.match)(p5));
 var builders = Object.fromEntries(
   PATTERNS.map((p5) => [p5, (0, import_path_to_regexp.compile)(p5)])
@@ -17002,7 +16997,8 @@ async function applyHash(router2) {
     router2.openChat(parsed.groupId, parsed.threadId, null).catch((err) => console.error("chat open failed", err));
   } else if (groupChanged) {
     const latest = threads.value.length > 0 ? threads.value[0] : null;
-    if (latest) router2.openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error("chat open failed", err));
+    if (latest)
+      router2.openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error("chat open failed", err));
     else router2.clearChat();
   }
   if (parsed.isDir) {
@@ -17297,7 +17293,10 @@ async function openChat(gid, resumeTid, opts) {
   chatStatus.value = "starting\u2026";
   let started;
   try {
-    const r4 = await fetch(`api/groups/${encodeURIComponent(gid)}/chat/start`, { method: "POST", credentials: "same-origin" });
+    const r4 = await fetch(`api/groups/${encodeURIComponent(gid)}/chat/start`, {
+      method: "POST",
+      credentials: "same-origin"
+    });
     if (!r4.ok) throw new Error("HTTP " + r4.status);
     started = await r4.json();
   } catch (err) {
@@ -17306,16 +17305,19 @@ async function openChat(gid, resumeTid, opts) {
     return;
   }
   threadId.value = started.threadId;
-  threads.value = [{
-    threadId: started.threadId,
-    sessionId: started.sessionId || null,
-    channelType: "web",
-    messagingGroupId: started.messagingGroupId || null,
-    sessionMode: started.sessionMode || "per-thread",
-    title: "(new thread)",
-    lastActivityAt: (/* @__PURE__ */ new Date()).toISOString(),
-    messageCount: 0
-  }, ...threads.value];
+  threads.value = [
+    {
+      threadId: started.threadId,
+      sessionId: started.sessionId || null,
+      channelType: "web",
+      messagingGroupId: started.messagingGroupId || null,
+      sessionMode: started.sessionMode || "per-thread",
+      title: "(new thread)",
+      lastActivityAt: (/* @__PURE__ */ new Date()).toISOString(),
+      messageCount: 0
+    },
+    ...threads.value
+  ];
   writeHash();
   connectChatWs();
 }
@@ -17437,8 +17439,9 @@ function startThreadsPoll(gid) {
     refs.threadsPollTimer = null;
   }
   refs.threadsPollTimer = setInterval(() => {
-    if (groupId.value === gid) loadThreads(gid).catch(() => {
-    });
+    if (groupId.value === gid)
+      loadThreads(gid).catch(() => {
+      });
     else if (refs.threadsPollTimer) {
       clearInterval(refs.threadsPollTimer);
       refs.threadsPollTimer = null;
@@ -17523,7 +17526,8 @@ async function selectFile(entry) {
   const ext = entry.name.toLowerCase().split(".").pop() || "";
   const meta = { name: entry.name, size: size ?? null, mtime: mtime ?? null, url, path: entry.path };
   if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) previewBlock.value = { kind: "image", ...meta };
-  else if (["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "weba"].includes(ext)) previewBlock.value = { kind: "audio", ...meta };
+  else if (["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "weba"].includes(ext))
+    previewBlock.value = { kind: "audio", ...meta };
   else if (["mp4", "m4v", "mov", "webm", "ogv"].includes(ext)) previewBlock.value = { kind: "video", ...meta };
   else if (ext === "pdf") previewBlock.value = { kind: "pdf", ...meta };
   else {
@@ -18239,10 +18243,12 @@ function resolveConflict(idx, action) {
     return;
   }
   updateItem(idx, { status: "uploading", pct: 0, statusText: "uploading\u2026" });
-  uploadOne(idx, action).catch((err) => updateItem(idx, {
-    status: "error",
-    statusText: String(err?.message || err)
-  }));
+  uploadOne(idx, action).catch(
+    (err) => updateItem(idx, {
+      status: "error",
+      statusText: String(err?.message || err)
+    })
+  );
 }
 function uploadOne(idx, mode) {
   return new Promise((resolve) => {
@@ -18294,10 +18300,12 @@ async function uploadFiles(fileList) {
     path: null
   }));
   for (let i5 = 0; i5 < uploadItems.value.length; i5++) {
-    await uploadOne(i5, "skip").catch((err) => updateItem(i5, {
-      status: "error",
-      statusText: String(err?.message || err)
-    }));
+    await uploadOne(i5, "skip").catch(
+      (err) => updateItem(i5, {
+        status: "error",
+        statusText: String(err?.message || err)
+      })
+    );
   }
   await loadTree(treePath.value);
 }

@@ -1,4 +1,5 @@
 // Lyrics panel: plain or LRC-synced.
+import './LyricsPanel.css';
 import { useMemo, useRef, useEffect, useState } from 'preact/hooks';
 import { mediaCurrentTime } from '../state';
 

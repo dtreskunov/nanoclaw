@@ -1,4 +1,5 @@
 // Modal for "Share with link".
+import './Settings.css';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { shareModalRequest } from '../state';

@@ -1,4 +1,5 @@
 // Settings overlay — identities + notifications, in-app modal.
+import './Settings.css';
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { settingsOpen, notifMutedSig, CHANNEL_META } from '../state';

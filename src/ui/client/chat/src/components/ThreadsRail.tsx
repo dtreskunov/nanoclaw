@@ -1,4 +1,5 @@
 // Threads rail.
+import './ThreadsRail.css';
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import {

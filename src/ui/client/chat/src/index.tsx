@@ -1,4 +1,5 @@
 // Entry point: bootstrap data, mount Preact App.
+import './styles/global.css';
 import { render } from 'preact';
 import { batch } from '@preact/signals';
 import { api } from './api';

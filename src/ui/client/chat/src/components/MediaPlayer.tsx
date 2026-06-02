@@ -1,4 +1,5 @@
 // Floating media player widget.
+import './MediaPlayer.css';
 import type { RefObject } from 'preact';
 import { useRef, useEffect } from 'preact/hooks';
 import { mediaCurrentTime } from '../state';

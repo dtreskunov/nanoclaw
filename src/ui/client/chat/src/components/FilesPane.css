@@ -1,0 +1,262 @@
+/* Files pane: breadcrumb, listing rows, upload strip, drop hint,
+   preview body shell + markdown preview + hljs syntax highlighting,
+   plus the .files-pane.previewing visibility toggles. */
+
+.files-pane { border-left: 1px solid var(--border); }
+.files-pane .files-body {
+  position: absolute; top: var(--handle-h); left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.files-pane .breadcrumb {
+  display: flex; align-items: center; gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+.files-pane .breadcrumb::-webkit-scrollbar { display: none; }
+.files-pane .breadcrumb .crumb {
+  display: inline-flex; align-items: center;
+  padding: 3px 7px; border-radius: 4px;
+  color: var(--muted); cursor: pointer; text-decoration: none;
+  background: transparent; border: 0; font: inherit;
+  flex: 0 0 auto;
+}
+.files-pane .breadcrumb .crumb:hover { background: var(--wash); color: inherit; }
+.files-pane .breadcrumb .crumb.current { color: inherit; cursor: default; }
+.files-pane .breadcrumb .crumb.current:hover { background: transparent; }
+.files-pane .breadcrumb .crumb.root { padding: 3px 6px; font-size: 14px; line-height: 1; }
+.files-pane .breadcrumb .sep { color: var(--muted); opacity: 0.5; padding: 0 1px; user-select: none; }
+.files-pane .listing { flex: 1; overflow: auto; }
+.files-pane .row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.files-pane .row:hover { background: var(--wash); }
+.files-pane .row.active { background: var(--accent); }
+.files-pane .row.selected { background: var(--selection); }
+.files-pane .row.selected.active { background: var(--accent); }
+.files-pane .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.files-pane .row .size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.files-pane .row .meta { font-size: 11px; color: var(--muted); white-space: nowrap; opacity: 0.7; }
+.files-pane .row .row-sel { display: inline-flex; align-items: center; cursor: pointer; }
+.files-pane .row .row-sel input { margin: 0; cursor: pointer; }
+.files-pane .row .row-actions { display: inline-flex; }
+.files-pane .row .row-actions .action-trigger { color: var(--muted); }
+.files-pane .row:hover .row-actions .action-trigger,
+.files-pane .row .action-menu.open .action-trigger { color: inherit; }
+
+body.is-admin .files-pane .drop-hint { display: block; }
+/* Hide admin actions when the files pane is collapsed. */
+body.is-admin .files-pane.collapsed .admin-only { display: none; }
+/* Action overlay anchored to the right edge of the files pane,
+   sitting on top of the .head so the title can flex underneath. */
+.files-pane .head-actions {
+  position: absolute; top: 0; right: 0;
+  height: var(--handle-h);
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 10px;
+  z-index: 3;
+}
+.files-pane.collapsed .head-actions { display: none; }
+/* Small text button for header actions like UPL. */
+.files-pane .text-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer;
+  font-size: 11px; font-weight: 600; line-height: 1;
+  padding: 3px 6px; border-radius: 3px;
+  font-family: inherit;
+}
+.files-pane .text-btn:hover { color: inherit; background: var(--wash); }
+
+.files-pane .preview-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 8px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.files-pane .preview-toolbar .preview-spacer { flex: 1; }
+.files-pane .preview-toolbar .preview-actions {
+  display: flex; align-items: center; gap: 4px;
+}
+.files-pane .preview-toolbar .close-preview { font-size: 16px; padding: 0 6px; line-height: 1; }
+.files-pane .preview-toolbar .clippy { font-size: 13px; padding: 2px 6px; }
+.files-pane .preview-toolbar .clippy.active { color: inherit; background: var(--accent); }
+.files-pane .preview-toolbar button:disabled { opacity: 0.4; cursor: default; background: transparent; }
+
+.files-pane .preview-meta {
+  margin: 0 0 8px 0;
+  padding: 6px 8px;
+  background: var(--wash-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.files-pane .preview-meta > summary {
+  display: block;
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.files-pane .preview-meta > summary::-webkit-details-marker { display: none; }
+.files-pane .preview-meta > summary:hover { color: var(--surface-fg); }
+.files-pane .preview-meta:not([open]):hover { background: var(--wash); border-color: var(--accent); }
+.files-pane .preview-meta[open] > summary {
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  white-space: normal;
+}
+.files-pane .preview-meta-rows {
+  margin: 0;
+  display: grid;
+  /* auto-fill pairs of [label | value] tracks; each pair is one visual
+     column. Each .row spans one pair and uses subgrid so labels share
+     a track width across all rows in that visual column. */
+  grid-template-columns: repeat(auto-fill, [label] minmax(60px, max-content) [value] minmax(120px, 1fr));
+  column-gap: 24px;
+  row-gap: 3px;
+}
+.files-pane .preview-meta-rows .row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: span 2;
+  column-gap: 12px;
+  min-width: 0;
+}
+.files-pane .preview-meta-rows dt { color: var(--muted); white-space: nowrap; }
+.files-pane .preview-meta-rows dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+
+/* Drag-and-drop hint pinned to bottom of files-body */
+.files-pane .drop-hint {
+  border-top: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  background: var(--wash-subtle);
+  transition: background 0.12s, color 0.12s;
+}
+.files-pane .drop-hint code {
+  background: var(--wash-strong);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.files-pane .drop-hint.drag-over {
+  background: var(--drag-target);
+  color: inherit;
+}
+
+/* Upload progress strip */
+.files-pane .upload-strip {
+  border-bottom: 1px solid var(--border);
+  background: var(--wash-subtle);
+  padding: 6px 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 40vh; overflow: auto;
+}
+.upload-strip .row {
+  display: flex; align-items: center; gap: 8px; font-size: 12px;
+  padding: 2px 0;
+}
+.upload-strip .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upload-strip .row .bar {
+  width: 60px; height: 4px; background: var(--wash-strong); border-radius: 2px; overflow: hidden;
+}
+.upload-strip .row .bar > i { display: block; height: 100%; background: var(--accent); width: 0; }
+.upload-strip .row.ok .status { color: var(--success); }
+.upload-strip .row.error .status { color: var(--error-soft); }
+.upload-strip .row.conflict .status { color: var(--warning); }
+.upload-strip .row .actions button {
+  background: transparent; border: 1px solid var(--border); color: inherit;
+  font-size: 11px; padding: 1px 6px; border-radius: 3px; cursor: pointer;
+}
+.upload-strip .row .actions button:hover { background: var(--wash); }
+.upload-strip .footer {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding-top: 4px; border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.upload-strip .footer button {
+  background: var(--accent); color: white; border: 0;
+  font-size: 12px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
+}
+.upload-strip .footer button[disabled] { opacity: 0.5; cursor: not-allowed; }
+.upload-strip .footer .close {
+  background: transparent; color: var(--muted); border: 0;
+  cursor: pointer; font-size: 16px; line-height: 1;
+}
+
+/* Preview body — occupies the files pane below the breadcrumb when a file is selected. */
+.files-pane .preview-body {
+  flex: 1; min-height: 0; overflow: auto;
+  padding: 12px; display: none;
+}
+.files-pane.previewing .listing,
+.files-pane.previewing .upload-strip,
+.files-pane.previewing .drop-hint { display: none !important; }
+.files-pane.previewing .preview-body { display: block; }
+.files-pane.previewing .head-actions { display: none !important; }
+.files-pane pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, monospace; }
+.files-pane img, .files-pane iframe { max-width: 100%; }
+.markdown-preview { max-width: 100%; line-height: 1.5; }
+.markdown-preview pre { background: var(--wash-strong); padding: 12px; border-radius: 6px; overflow: auto; }
+.markdown-preview code { background: var(--wash-strong); padding: 2px 4px; border-radius: 3px; }
+.markdown-preview pre code { background: transparent; padding: 0; }
+.markdown-preview blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding-left: 12px; color: var(--muted); }
+.markdown-preview table { border-collapse: collapse; margin: 8px 0; }
+.markdown-preview th, .markdown-preview td { border: 1px solid var(--border); padding: 4px 8px; }
+
+/* Syntax highlighting for text-file preview. Minimal theme tuned
+   to follow the rest of the chrome via CSS vars and currentColor.
+   Uses standard highlight.js token class names. */
+.files-pane pre.hljs {
+  background: var(--wash-soft);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 4px;
+  overflow: auto;
+  position: relative;
+}
+.files-pane pre.hljs code { font: inherit; background: transparent; padding: 0; white-space: pre; }
+.files-pane pre.hljs::before {
+  content: attr(data-lang);
+  position: absolute; top: 4px; right: 8px;
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  pointer-events: none;
+}
+.hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag {
+  color: #a26aff;
+}
+.hljs-string, .hljs-doctag, .hljs-template-tag, .hljs-template-variable,
+.hljs-regexp, .hljs-link, .hljs-meta-string {
+  color: #c8923a;
+}
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet, .hljs-variable {
+  color: #2da671;
+}
+.hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-function .hljs-title {
+  color: #2f7be0;
+}
+.hljs-type, .hljs-class .hljs-title, .hljs-params {
+  color: #b8632a;
+}
+.hljs-meta, .hljs-meta-keyword { color: var(--muted); }
+.hljs-deletion { background: rgba(220, 80, 80, 0.18); }
+.hljs-addition { background: rgba(80, 200, 100, 0.18); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+@media (prefers-color-scheme: dark) {
+  .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #c792ea; }
+  .hljs-string, .hljs-doctag, .hljs-template-tag, .hljs-template-variable,
+  .hljs-regexp, .hljs-link, .hljs-meta-string { color: #ecc48d; }
+  .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet, .hljs-variable { color: #addb67; }
+  .hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-function .hljs-title { color: #82aaff; }
+  .hljs-type, .hljs-class .hljs-title, .hljs-params { color: #f78c6c; }
+}

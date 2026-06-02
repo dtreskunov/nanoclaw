@@ -1,5 +1,6 @@
 // Chat main: message log, status, context chip, pending tray, readonly
 // banner, composer.
+import './ChatMain.css';
 import type { JSX } from 'preact';
 import { useRef, useEffect, useState } from 'preact/hooks';
 import {

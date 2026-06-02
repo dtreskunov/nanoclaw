@@ -1,0 +1,51 @@
+/* Chat main: message log, message bubbles, status, context chips,
+   pending uploads tray, composer form, and the typing indicator. */
+
+.chat-main { display: grid; grid-template-rows: 1fr auto auto auto auto; min-height: 0; position: relative; }
+.chat-main .log { overflow: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+.chat-main .msg { padding: 6px 10px; border-radius: 6px; max-width: 78%; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+.chat-main .msg.in { align-self: flex-end; background: var(--accent); }
+.chat-main .msg.out { align-self: flex-start; background: var(--wash); }
+.chat-main .msg.internal { align-self: flex-start; background: transparent !important; border: 1px dashed var(--muted); color: var(--muted); opacity: 0.85; max-width: 92%; }
+.chat-main .msg.internal, .chat-main .msg.internal * { font-style: italic; }
+.chat-main .msg.internal .internal-label { font-size: 10px; font-style: normal; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; opacity: 0.7; }
+.chat-main .msg.internal pre, .chat-main .msg.internal code { background: transparent; }
+.chat-main .thought-group { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; align-self: stretch; }
+.chat-main .thought-group .thoughts-toggle { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--wash); border: 0; border-radius: 6px; color: var(--muted); font: inherit; font-size: 11px; font-style: italic; cursor: pointer; line-height: 1.2; }
+.chat-main .thought-group .thoughts-toggle:hover { background: var(--wash-strong, var(--wash)); color: var(--fg); }
+.chat-main .msg .files { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+.chat-main .msg .file-chip { font: inherit; color: inherit; background: var(--wash-strong); border: 1px solid var(--border, transparent); border-radius: 4px; padding: 2px 6px; cursor: pointer; }
+.chat-main .msg .file-chip:hover { background: var(--accent); color: var(--fg); }
+.chat-main .msg .file-chip.inert { cursor: default; opacity: 0.7; }
+.chat-main .msg .file-chip.inert:hover { background: var(--wash-strong); color: var(--muted); }
+.chat-main .msg .meta { font-size: 10px; color: var(--muted); margin-top: 4px; opacity: 0.7; }
+.chat-main .msg.in .meta { text-align: right; }
+.chat-main .msg.markdown { white-space: normal; }
+.chat-main .msg.markdown > :first-child { margin-top: 0; }
+.chat-main .msg.markdown > :last-child { margin-bottom: 0; }
+.chat-main .msg.markdown p { margin: 4px 0; }
+.chat-main .msg.markdown pre { background: var(--wash-strong); padding: 8px; border-radius: 4px; overflow: auto; font-size: 12px; }
+.chat-main .msg.markdown code { background: var(--wash-strong); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.chat-main .msg.markdown pre code { background: transparent; padding: 0; }
+.chat-main .msg.markdown ul, .chat-main .msg.markdown ol { margin: 4px 0; padding-left: 20px; }
+.chat-main .typing { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--wash); border-radius: 6px; max-width: 78%; }
+.chat-main .typing > span:not(.hint) { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: 0.5; animation: typing-bounce 1.2s infinite ease-in-out; }
+.chat-main .typing > span:nth-child(2) { animation-delay: 0.15s; }
+.chat-main .typing > span:nth-child(3) { animation-delay: 0.3s; }
+.chat-main .typing .hint { font-size: 11px; color: var(--muted); font-style: italic; margin-left: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+@keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-3px); opacity: 0.85; } }
+.chat-main .msg.markdown h1, .chat-main .msg.markdown h2, .chat-main .msg.markdown h3 { margin: 8px 0 4px; font-size: 1.05em; }
+.chat-main .msg.markdown a { color: inherit; text-decoration: underline; }
+.chat-main .msg.markdown blockquote { border-left: 3px solid var(--border-strong); margin: 4px 0; padding: 0 8px; color: var(--muted); font-size: 12px; }
+
+.chat-main .status { padding: 0 16px; font-size: 11px; color: var(--muted); min-height: 14px; }
+.chat-main .context { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 16px; font-size: 11px; color: var(--muted); }
+.chat-main .context .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent); padding: 2px 6px; border-radius: 10px; max-width: 100%; }
+.chat-main .context .chip .path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; font-family: ui-monospace, monospace; }
+.chat-main .context .chip button { padding: 0 4px; border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; }
+.chat-main .pending { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 16px; font-size: 11px; color: var(--muted); }
+.chat-main .pending .item { display: inline-flex; align-items: center; gap: 4px; background: var(--wash-strong); padding: 2px 6px; border-radius: 10px; }
+.chat-main .pending .item button { padding: 0 4px; border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; }
+.chat-main form { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--border); }
+.chat-main textarea { flex: 1; min-height: 32px; max-height: 140px; resize: vertical; padding: 6px 8px; font: inherit; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; }
+.chat-main.drag-active { outline: 2px dashed var(--accent-strong); outline-offset: -4px; }

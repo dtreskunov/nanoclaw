@@ -2,6 +2,7 @@
 //   - 'header'  bulk on pinnedContext + create file/folder in current dir
 //   - 'row'     single entry
 //   - 'preview' acts on the currently-previewed file
+import './ActionsMenu.css';
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {

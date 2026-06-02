@@ -1,0 +1,28 @@
+/* Reusable media player widget — sticks to the top of the preview
+   body while metadata / transcript / etc scrolls underneath. */
+
+.media-player {
+  position: sticky; top: 0; z-index: 4;
+  margin: 0 0 12px 0;
+}
+.media-player audio,
+.media-player video { display: block; width: 100%; }
+.media-player-video video { max-height: 60vh; background: black; border-radius: 3px; }
+.media-player-audio audio { height: 36px; }
+
+/* Floating variant: pinned to the bottom of the preview body so it
+   stays in view while the user scrolls metadata/lyrics/etc. */
+.media-player-floating {
+  position: sticky;
+  top: auto;
+  bottom: 0;
+  margin: 12px 0 0 0;
+  background: var(--surface);
+}
+.files-pane.previewing .preview-body.has-floating-player {
+  display: flex;
+  flex-direction: column;
+}
+.files-pane .preview-body.has-floating-player .media-player-floating {
+  margin-top: auto;
+}

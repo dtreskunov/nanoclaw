@@ -1,5 +1,6 @@
 // Header: brand, group select, user, settings button, mobile drawer
 // buttons, logout form.
+import './Header.css';
 import type { JSX } from 'preact';
 import { groups, groupId, me, drawerOpen, settingsOpen } from '../state';
 import { selectGroup } from '../actions';

@@ -1,4 +1,5 @@
 // Reusable collapsible/drawer pane.
+import './Pane.css';
 import type { ComponentChildren, JSX } from 'preact';
 import { paneOpen, drawerOpen, isMobile } from '../state';
 

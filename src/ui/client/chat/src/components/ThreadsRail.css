@@ -1,0 +1,43 @@
+/* Threads rail: thread list grouped by channel, plus the read-only
+   banner / chat subnotice that ride directly under it on mobile. */
+
+.threads-rail { border-right: 1px solid var(--border); }
+.threads-rail .threads-actions {
+  position: absolute; top: var(--handle-h); left: 0; right: 0;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.threads-rail .threads-actions #btn-new-chat { width: 100%; font-size: 13px; font-weight: 600; }
+.threads-rail .list {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  top: calc(var(--handle-h) + 49px);
+  overflow: auto;
+}
+.rail-label { display: none; }
+.threads-rail .thread { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border); position: relative; }
+.threads-rail .thread:hover { background: var(--wash-soft); }
+.threads-rail .thread.active { background: var(--accent); }
+.threads-rail .thread .title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 18px; }
+.threads-rail .thread .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.threads-rail .thread .title .ch-pill { font-size: 13px; margin-right: 5px; opacity: 0.85; display: inline-block; vertical-align: -1px; }
+.readonly-banner { padding: 10px 12px; border-top: 1px solid var(--border); background: var(--wash-soft); font-size: 12px; color: var(--muted); }
+.chat-subnotice { padding: 4px 12px; border-top: 1px solid var(--border); background: var(--wash-subtle); font-size: 11px; color: var(--muted); }
+.threads-rail .thread .del { position: absolute; top: 6px; right: 6px; padding: 0 5px; border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; display: none; }
+.threads-rail .thread:hover .del { display: block; }
+.threads-rail .thread .del:hover { color: var(--error); }
+.threads-rail .thread-section { padding: 8px 10px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.threads-rail .thread-show-older {
+  display: block; width: calc(100% - 16px); margin: 4px 8px 8px;
+  padding: 6px 10px; background: transparent; color: var(--muted);
+  border: 1px dashed var(--border); border-radius: 4px;
+  font: inherit; font-size: 11px; text-align: left; cursor: pointer;
+}
+.threads-rail .thread-show-older:hover { background: var(--wash-soft); color: var(--fg); }
+.threads-rail .thread.dm .title { font-size: 14px; padding-right: 0; }
+.threads-rail .thread.dm .title .ch-pill.dm { font-size: 18px; margin-right: 8px; opacity: 1; vertical-align: -2px; }
+
+/* Show delete on touch devices (no hover). */
+@media (hover: none) {
+  .threads-rail .thread .del { display: flex !important; align-items: center; justify-content: center; opacity: 0.7; top: 50%; right: 4px; transform: translateY(-50%); font-size: 26px; min-width: 40px; min-height: 40px; padding: 0; }
+  .threads-rail .thread .title { padding-right: 40px; }
+}

@@ -1,5 +1,6 @@
 // Files pane: head + breadcrumb + upload strip + listing + drop hint +
 // preview body.
+import './FilesPane.css';
 import type { ComponentChildren, JSX, VNode } from 'preact';
 import { useRef, useEffect } from 'preact/hooks';
 import {

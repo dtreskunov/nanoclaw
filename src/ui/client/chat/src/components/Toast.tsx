@@ -1,4 +1,5 @@
 // Tiny corner-toast for transient feedback (e.g. "Copied").
+import './Toast.css';
 import { useEffect } from 'preact/hooks';
 import { toastMessage } from '../state';
 
