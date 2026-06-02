@@ -2,7 +2,7 @@
 import { groupId, isAdmin, uploadItems, threadId, treePath } from './state';
 import { postJson } from './api';
 import { loadTree } from './actions';
-import { requestInput } from './components/PromptModal';
+import { requestInput, requestConfirm } from './components/PromptModal';
 import type { TreeEntry, UploadItem } from './types';
 
 function curDir(): string {
@@ -64,7 +64,13 @@ export async function renameEntry(entry: TreeEntry): Promise<void> {
 
 export async function deleteEntry(entry: TreeEntry): Promise<void> {
   if (!isAdmin.value || !groupId.value) return;
-  if (!confirm(`Delete ${entry.type === 'dir' ? 'folder' : 'file'} "${entry.name}"?`)) return;
+  const ok = await requestConfirm({
+    title: `Delete ${entry.type === 'dir' ? 'folder' : 'file'}`,
+    message: `Delete ${entry.type === 'dir' ? 'folder' : 'file'} "${entry.name}"?`,
+    okLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
   const r = await postJson<ApiError>(`api/groups/${groupId.value}/delete`, { path: entry.path });
   if (!r.ok) {
     alert('delete failed: ' + (r.data.error || r.status));
@@ -75,7 +81,13 @@ export async function deleteEntry(entry: TreeEntry): Promise<void> {
 
 export async function deletePaths(paths: string[]): Promise<void> {
   if (!isAdmin.value || !groupId.value || paths.length === 0) return;
-  if (!confirm(`Delete ${paths.length} item${paths.length === 1 ? '' : 's'}?`)) return;
+  const ok = await requestConfirm({
+    title: 'Delete items',
+    message: `Delete ${paths.length} item${paths.length === 1 ? '' : 's'}?`,
+    okLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
   const errors: string[] = [];
   for (const p of paths) {
     const r = await postJson<ApiError>(`api/groups/${groupId.value}/delete`, { path: p });

@@ -4,6 +4,7 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { settingsOpen, notifMutedSig, CHANNEL_META } from '../state';
 import { toggleMute } from '../notify';
+import { requestConfirm } from './PromptModal';
 import type { Identity } from '../types';
 
 const API = '/ui/settings/api';
@@ -148,7 +149,13 @@ export function Settings() {
   }
 
   async function unlink(channel: string, h: string): Promise<void> {
-    if (!confirm(`Unlink ${channel}:${h}?`)) return;
+    const ok = await requestConfirm({
+      title: 'Unlink identity',
+      message: `Unlink ${channel}:${h}?`,
+      okLabel: 'Unlink',
+      danger: true,
+    });
+    if (!ok) return;
     const r = await jsend<{ message?: string; error?: string }>(`${API}/identities/${encodeURIComponent(channel)}/${encodeURIComponent(h)}`, 'DELETE');
     if (!r.ok) { setStatus({ err: r.data.message || r.data.error || `HTTP ${r.status}` }); return; }
     setStatus({ ok: `Unlinked ${channel}:${h}.` });

@@ -6,6 +6,7 @@ import {
   threads, threadId, groupId, drawerOpen, channelMeta,
 } from '../state';
 import { openChat, deleteThread } from '../actions';
+import { requestConfirm } from './PromptModal';
 import { tsKey } from '../utils';
 import { Pane } from './Pane';
 import { RelativeTime } from './RelativeTime';
@@ -29,7 +30,13 @@ function ThreadRow({ t }: { t: Thread }) {
   };
   const onDel = async (ev: JSX.TargetedMouseEvent<HTMLButtonElement>): Promise<void> => {
     ev.stopPropagation();
-    if (!confirm(`Delete this thread?\n\n"${t.title}"`)) return;
+    const ok = await requestConfirm({
+      title: 'Delete thread',
+      message: `Delete this thread?\n\n"${t.title}"`,
+      okLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     await deleteThread(t.threadId);
   };
   return (

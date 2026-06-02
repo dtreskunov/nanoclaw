@@ -17741,6 +17741,132 @@ function Header() {
   ] });
 }
 
+// src/components/PromptModal.tsx
+var promptRequest = y3(null);
+function requestInput(opts) {
+  return new Promise((resolve) => {
+    promptRequest.value = { ...opts, resolve };
+  });
+}
+function PromptModal() {
+  const req = promptRequest.value;
+  const [value, setValue] = h2("");
+  const inputRef = A2(null);
+  y2(() => {
+    if (!req) return;
+    setValue(req.initialValue || "");
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [req]);
+  if (!req) return null;
+  function close(result) {
+    const r4 = promptRequest.value;
+    promptRequest.value = null;
+    r4?.resolve(result);
+  }
+  function onSubmit(e4) {
+    e4.preventDefault();
+    const trimmed = value.trim();
+    close(trimmed ? trimmed : null);
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close(null);
+  }
+  function onKey(e4) {
+    if (e4.key === "Escape") close(null);
+  }
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4(
+    "form",
+    {
+      class: "settings-modal",
+      role: "dialog",
+      "aria-label": req.title,
+      style: "max-width:420px",
+      onSubmit,
+      children: [
+        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+          /* @__PURE__ */ u4("span", { class: "title", children: req.title }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: () => close(null), children: "\u2715" })
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+          req.label ? /* @__PURE__ */ u4("label", { style: "display:block;margin-bottom:6px;font-size:12px;color:var(--muted)", children: req.label }) : null,
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              ref: inputRef,
+              type: "text",
+              value,
+              placeholder: req.placeholder || "",
+              onInput: (e4) => setValue(e4.currentTarget.value),
+              onKeyDown: onKey,
+              style: "width:100%"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("footer", { class: "settings-foot", style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)", children: [
+          /* @__PURE__ */ u4("button", { type: "button", onClick: () => close(null), children: "Cancel" }),
+          /* @__PURE__ */ u4("button", { type: "submit", class: "primary", children: req.okLabel || "OK" })
+        ] })
+      ]
+    }
+  ) });
+}
+var confirmRequest = y3(null);
+function requestConfirm(opts) {
+  return new Promise((resolve) => {
+    confirmRequest.value = { ...opts, resolve };
+  });
+}
+function ConfirmModal() {
+  const req = confirmRequest.value;
+  const okRef = A2(null);
+  y2(() => {
+    if (!req) return;
+    requestAnimationFrame(() => okRef.current?.focus());
+  }, [req]);
+  if (!req) return null;
+  function close(result) {
+    const r4 = confirmRequest.value;
+    confirmRequest.value = null;
+    r4?.resolve(result);
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close(false);
+  }
+  function onKey(e4) {
+    if (e4.key === "Escape") close(false);
+    else if (e4.key === "Enter") close(true);
+  }
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, onKeyDown: onKey, tabIndex: -1, children: /* @__PURE__ */ u4(
+    "div",
+    {
+      class: "settings-modal",
+      role: "alertdialog",
+      "aria-label": req.title,
+      style: "max-width:420px",
+      children: [
+        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+          /* @__PURE__ */ u4("span", { class: "title", children: req.title }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: () => close(false), children: "\u2715" })
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-body", style: "white-space:pre-wrap", children: req.message }),
+        /* @__PURE__ */ u4("footer", { class: "settings-foot", style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)", children: [
+          /* @__PURE__ */ u4("button", { type: "button", onClick: () => close(false), children: req.cancelLabel || "Cancel" }),
+          /* @__PURE__ */ u4(
+            "button",
+            {
+              ref: okRef,
+              type: "button",
+              class: req.danger ? "danger" : "primary",
+              onClick: () => close(true),
+              children: req.okLabel || "OK"
+            }
+          )
+        ] })
+      ]
+    }
+  ) });
+}
+
 // src/components/Pane.tsx
 function Pane({ paneKey, name, label, extraClass, headActions, children }) {
   const mobile = isMobile.value;
@@ -17808,9 +17934,15 @@ function ThreadRow({ t: t4 }) {
   };
   const onDel = async (ev) => {
     ev.stopPropagation();
-    if (!confirm(`Delete this thread?
+    const ok = await requestConfirm({
+      title: "Delete thread",
+      message: `Delete this thread?
 
-"${t4.title}"`)) return;
+"${t4.title}"`,
+      okLabel: "Delete",
+      danger: true
+    });
+    if (!ok) return;
     await deleteThread(t4.threadId);
   };
   return /* @__PURE__ */ u4("div", { class: "thread" + (active ? " active" : ""), "data-id": t4.threadId, onClick: onOpen, children: [
@@ -18153,76 +18285,6 @@ function ChatMain() {
   ] });
 }
 
-// src/components/PromptModal.tsx
-var promptRequest = y3(null);
-function requestInput(opts) {
-  return new Promise((resolve) => {
-    promptRequest.value = { ...opts, resolve };
-  });
-}
-function PromptModal() {
-  const req = promptRequest.value;
-  const [value, setValue] = h2("");
-  const inputRef = A2(null);
-  y2(() => {
-    if (!req) return;
-    setValue(req.initialValue || "");
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, [req]);
-  if (!req) return null;
-  function close(result) {
-    const r4 = promptRequest.value;
-    promptRequest.value = null;
-    r4?.resolve(result);
-  }
-  function onSubmit(e4) {
-    e4.preventDefault();
-    const trimmed = value.trim();
-    close(trimmed ? trimmed : null);
-  }
-  function onBackdrop(e4) {
-    if (e4.target.classList.contains("settings-backdrop")) close(null);
-  }
-  function onKey(e4) {
-    if (e4.key === "Escape") close(null);
-  }
-  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4(
-    "form",
-    {
-      class: "settings-modal",
-      role: "dialog",
-      "aria-label": req.title,
-      style: "max-width:420px",
-      onSubmit,
-      children: [
-        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
-          /* @__PURE__ */ u4("span", { class: "title", children: req.title }),
-          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: () => close(null), children: "\u2715" })
-        ] }),
-        /* @__PURE__ */ u4("div", { class: "settings-body", children: [
-          req.label ? /* @__PURE__ */ u4("label", { style: "display:block;margin-bottom:6px;font-size:12px;color:var(--muted)", children: req.label }) : null,
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              ref: inputRef,
-              type: "text",
-              value,
-              placeholder: req.placeholder || "",
-              onInput: (e4) => setValue(e4.currentTarget.value),
-              onKeyDown: onKey,
-              style: "width:100%"
-            }
-          )
-        ] }),
-        /* @__PURE__ */ u4("footer", { class: "settings-foot", style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)", children: [
-          /* @__PURE__ */ u4("button", { type: "button", onClick: () => close(null), children: "Cancel" }),
-          /* @__PURE__ */ u4("button", { type: "submit", class: "primary", children: req.okLabel || "OK" })
-        ] })
-      ]
-    }
-  ) });
-}
-
 // src/uploads.ts
 function curDir() {
   return treePath.value || "";
@@ -18261,7 +18323,13 @@ async function renameEntry(entry) {
 }
 async function deleteEntry(entry) {
   if (!isAdmin.value || !groupId.value) return;
-  if (!confirm(`Delete ${entry.type === "dir" ? "folder" : "file"} "${entry.name}"?`)) return;
+  const ok = await requestConfirm({
+    title: `Delete ${entry.type === "dir" ? "folder" : "file"}`,
+    message: `Delete ${entry.type === "dir" ? "folder" : "file"} "${entry.name}"?`,
+    okLabel: "Delete",
+    danger: true
+  });
+  if (!ok) return;
   const r4 = await postJson(`api/groups/${groupId.value}/delete`, { path: entry.path });
   if (!r4.ok) {
     alert("delete failed: " + (r4.data.error || r4.status));
@@ -18271,7 +18339,13 @@ async function deleteEntry(entry) {
 }
 async function deletePaths(paths) {
   if (!isAdmin.value || !groupId.value || paths.length === 0) return;
-  if (!confirm(`Delete ${paths.length} item${paths.length === 1 ? "" : "s"}?`)) return;
+  const ok = await requestConfirm({
+    title: "Delete items",
+    message: `Delete ${paths.length} item${paths.length === 1 ? "" : "s"}?`,
+    okLabel: "Delete",
+    danger: true
+  });
+  if (!ok) return;
   const errors = [];
   for (const p5 of paths) {
     const r4 = await postJson(`api/groups/${groupId.value}/delete`, { path: p5 });
@@ -19222,7 +19296,13 @@ function Settings() {
     }
   }
   async function unlink(channel, h5) {
-    if (!confirm(`Unlink ${channel}:${h5}?`)) return;
+    const ok = await requestConfirm({
+      title: "Unlink identity",
+      message: `Unlink ${channel}:${h5}?`,
+      okLabel: "Unlink",
+      danger: true
+    });
+    if (!ok) return;
     const r4 = await jsend(`${API}/identities/${encodeURIComponent(channel)}/${encodeURIComponent(h5)}`, "DELETE");
     if (!r4.ok) {
       setStatus({ err: r4.data.message || r4.data.error || `HTTP ${r4.status}` });
@@ -19591,6 +19671,7 @@ function App() {
     /* @__PURE__ */ u4(Settings, {}),
     /* @__PURE__ */ u4(ShareLinkModal, {}),
     /* @__PURE__ */ u4(PromptModal, {}),
+    /* @__PURE__ */ u4(ConfirmModal, {}),
     /* @__PURE__ */ u4(Toast, {})
   ] });
 }
