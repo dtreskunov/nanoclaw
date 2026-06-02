@@ -1135,10 +1135,19 @@ header .mobile-only {
 }
 .chat-main .approval-details {
   font-size: 12px;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
   color: var(--fg);
   margin-top: 4px;
   word-break: break-word;
-  opacity: 0.85;
+  opacity: 0.9;
+  background: var(--wash);
+  border-radius: 3px;
+  padding: 4px 6px;
 }
 .chat-main .approval-meta {
   font-size: 11px;
