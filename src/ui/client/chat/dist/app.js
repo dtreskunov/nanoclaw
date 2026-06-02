@@ -18285,6 +18285,28 @@ function ChatMain() {
   ] });
 }
 
+// src/components/Toast.tsx
+var nextId = 1;
+var hideTimer = null;
+function showToast(text, kind = "ok", ms = 1800) {
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  const id = nextId++;
+  toastMessage.value = { id, text, kind };
+  hideTimer = setTimeout(() => {
+    if (toastMessage.value && toastMessage.value.id === id) toastMessage.value = null;
+    hideTimer = null;
+  }, ms);
+}
+function Toast() {
+  const t4 = toastMessage.value;
+  y2(() => void 0, [t4?.id]);
+  if (!t4) return null;
+  return /* @__PURE__ */ u4("div", { class: "toast toast-" + (t4.kind || "ok"), role: "status", "aria-live": "polite", children: t4.text }, t4.id);
+}
+
 // src/uploads.ts
 function curDir() {
   return treePath.value || "";
@@ -18294,9 +18316,7 @@ function joinPath(dir, name) {
 }
 function dropPinned(paths) {
   if (paths.length === 0) return;
-  pinnedContext.value = pinnedContext.value.filter(
-    (p5) => !paths.some((d5) => p5 === d5 || p5.startsWith(d5 + "/"))
-  );
+  pinnedContext.value = pinnedContext.value.filter((p5) => !paths.some((d5) => p5 === d5 || p5.startsWith(d5 + "/")));
 }
 async function mkdirPrompt() {
   if (!groupId.value || !isAdmin.value) return;
@@ -18307,14 +18327,19 @@ async function mkdirPrompt() {
   const target = joinPath(curDir(), trimmed);
   const r4 = await postJson(`api/groups/${groupId.value}/mkdir`, { path: target });
   if (!r4.ok) {
-    alert("mkdir failed: " + (r4.data.error || r4.status));
+    showToast("mkdir failed: " + (r4.data.error || r4.status), "err");
     return;
   }
   await loadTree(treePath.value);
 }
 async function renameEntry(entry) {
   if (!isAdmin.value || !groupId.value) return;
-  const next = prompt("Rename to:", entry.name);
+  const next = await requestInput({
+    title: "Rename",
+    placeholder: entry.name,
+    initialValue: entry.name,
+    okLabel: "Rename"
+  });
   if (!next) return;
   const trimmed = next.trim();
   if (!trimmed || trimmed === entry.name) return;
@@ -18322,7 +18347,7 @@ async function renameEntry(entry) {
   const toPath = joinPath(dir, trimmed);
   const r4 = await postJson(`api/groups/${groupId.value}/rename`, { from: entry.path, to: toPath });
   if (!r4.ok) {
-    alert("rename failed: " + (r4.data.error || r4.status));
+    showToast("rename failed: " + (r4.data.error || r4.status), "err");
     return;
   }
   pinnedContext.value = pinnedContext.value.map(
@@ -18341,7 +18366,7 @@ async function deleteEntry(entry) {
   if (!ok) return;
   const r4 = await postJson(`api/groups/${groupId.value}/delete`, { path: entry.path });
   if (!r4.ok) {
-    alert("delete failed: " + (r4.data.error || r4.status));
+    showToast("delete failed: " + (r4.data.error || r4.status), "err");
     return;
   }
   dropPinned([entry.path]);
@@ -18363,7 +18388,7 @@ async function deletePaths(paths) {
     if (!r4.ok) errors.push(`${p5}: ${r4.data.error || r4.status}`);
     else succeeded.push(p5);
   }
-  if (errors.length) alert("Some deletes failed:\n" + errors.join("\n"));
+  if (errors.length) showToast("Some deletes failed:\n" + errors.join("\n"), "err");
   dropPinned(succeeded);
   await loadTree(treePath.value);
 }
@@ -18480,32 +18505,10 @@ async function notifyAgent(paths) {
   const text = `Files updated via web UI: ${list}${more}`;
   const r4 = await postJson(`api/groups/${groupId.value}/chat/${threadId.value}/send`, { text });
   if (!r4.ok) {
-    alert("notify failed: " + (r4.data.error || r4.status));
+    showToast("notify failed: " + (r4.data.error || r4.status), "err");
     return;
   }
   clearUploadStrip();
-}
-
-// src/components/Toast.tsx
-var nextId = 1;
-var hideTimer = null;
-function showToast(text, kind = "ok", ms = 1800) {
-  if (hideTimer) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-  const id = nextId++;
-  toastMessage.value = { id, text, kind };
-  hideTimer = setTimeout(() => {
-    if (toastMessage.value && toastMessage.value.id === id) toastMessage.value = null;
-    hideTimer = null;
-  }, ms);
-}
-function Toast() {
-  const t4 = toastMessage.value;
-  y2(() => void 0, [t4?.id]);
-  if (!t4) return null;
-  return /* @__PURE__ */ u4("div", { class: "toast toast-" + (t4.kind || "ok"), role: "status", "aria-live": "polite", children: t4.text }, t4.id);
 }
 
 // src/components/ActionsMenu.tsx

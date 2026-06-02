@@ -3,6 +3,7 @@ import { groupId, isAdmin, uploadItems, threadId, treePath, pinnedContext } from
 import { postJson } from './api';
 import { loadTree } from './actions';
 import { requestInput, requestConfirm } from './components/PromptModal';
+import { showToast } from './components/Toast';
 import type { TreeEntry, UploadItem } from './types';
 
 function curDir(): string {
@@ -30,7 +31,7 @@ export async function mkdirPrompt(): Promise<void> {
   const target = joinPath(curDir(), trimmed);
   const r = await postJson<ApiError>(`api/groups/${groupId.value}/mkdir`, { path: target });
   if (!r.ok) {
-    alert('mkdir failed: ' + (r.data.error || r.status));
+    showToast('mkdir failed: ' + (r.data.error || r.status), 'err');
     return;
   }
   await loadTree(treePath.value);
@@ -45,7 +46,7 @@ export async function touchPrompt(): Promise<void> {
   const target = joinPath(curDir(), trimmed);
   const r = await postJson<ApiError>(`api/groups/${groupId.value}/touch`, { path: target });
   if (!r.ok) {
-    alert('create file failed: ' + (r.data.error || r.status));
+    showToast('create file failed: ' + (r.data.error || r.status), 'err');
     return;
   }
   await loadTree(treePath.value);
@@ -53,7 +54,12 @@ export async function touchPrompt(): Promise<void> {
 
 export async function renameEntry(entry: TreeEntry): Promise<void> {
   if (!isAdmin.value || !groupId.value) return;
-  const next = prompt('Rename to:', entry.name);
+  const next = await requestInput({
+    title: 'Rename',
+    placeholder: entry.name,
+    initialValue: entry.name,
+    okLabel: 'Rename',
+  });
   if (!next) return;
   const trimmed = next.trim();
   if (!trimmed || trimmed === entry.name) return;
@@ -61,7 +67,7 @@ export async function renameEntry(entry: TreeEntry): Promise<void> {
   const toPath = joinPath(dir, trimmed);
   const r = await postJson<ApiError>(`api/groups/${groupId.value}/rename`, { from: entry.path, to: toPath });
   if (!r.ok) {
-    alert('rename failed: ' + (r.data.error || r.status));
+    showToast('rename failed: ' + (r.data.error || r.status), 'err');
     return;
   }
   pinnedContext.value = pinnedContext.value.map((p) =>
@@ -81,7 +87,7 @@ export async function deleteEntry(entry: TreeEntry): Promise<void> {
   if (!ok) return;
   const r = await postJson<ApiError>(`api/groups/${groupId.value}/delete`, { path: entry.path });
   if (!r.ok) {
-    alert('delete failed: ' + (r.data.error || r.status));
+    showToast('delete failed: ' + (r.data.error || r.status), 'err');
     return;
   }
   dropPinned([entry.path]);
@@ -104,7 +110,7 @@ export async function deletePaths(paths: string[]): Promise<void> {
     if (!r.ok) errors.push(`${p}: ${r.data.error || r.status}`);
     else succeeded.push(p);
   }
-  if (errors.length) alert('Some deletes failed:\n' + errors.join('\n'));
+  if (errors.length) showToast('Some deletes failed:\n' + errors.join('\n'), 'err');
   dropPinned(succeeded);
   await loadTree(treePath.value);
 }
@@ -246,7 +252,7 @@ export async function notifyAgent(paths: string[]): Promise<void> {
   const text = `Files updated via web UI: ${list}${more}`;
   const r = await postJson<ApiError>(`api/groups/${groupId.value}/chat/${threadId.value}/send`, { text });
   if (!r.ok) {
-    alert('notify failed: ' + (r.data.error || r.status));
+    showToast('notify failed: ' + (r.data.error || r.status), 'err');
     return;
   }
   clearUploadStrip();
