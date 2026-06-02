@@ -5854,7 +5854,7 @@ var require_java = __commonJS({
     };
     function recurRegex(re, substitution, depth) {
       if (depth === -1) return "";
-      return re.replace(substitution, (_5) => {
+      return re.replace(substitution, (_6) => {
         return recurRegex(re, substitution, depth - 1);
       });
     }
@@ -14537,8 +14537,8 @@ function P() {
   P.__r = 0;
 }
 function $(n4, l7, u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h5, y5, d5, w5, _5, g5 = t5 && t5.__k || v, m6 = l7.length;
-  for (f4 = I(u4, l7, g5, f4, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u4.__k[a4]) && (h5 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _5 = j(n4, y5, h5, i4, r4, o4, e4, f4, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f4 = A(y5, f4, n4) : "function" == typeof y5.type && void 0 !== _5 ? f4 = _5 : d5 && (f4 = d5.nextSibling), y5.__u &= -7);
+  var a4, h5, y5, d5, w5, _6, g5 = t5 && t5.__k || v, m6 = l7.length;
+  for (f4 = I(u4, l7, g5, f4, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u4.__k[a4]) && (h5 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _6 = j(n4, y5, h5, i4, r4, o4, e4, f4, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f4 = A(y5, f4, n4) : "function" == typeof y5.type && void 0 !== _6 ? f4 = _6 : d5 && (f4 = d5.nextSibling), y5.__u &= -7);
   return u4.__e = w5, f4;
 }
 function I(n4, l7, u4, t5, i4) {
@@ -14788,6 +14788,10 @@ function p2(n4, u4, i4) {
 function y2(n4, u4) {
   var i4 = d2(t2++, 3);
   !c2.__s && C2(i4.__H, u4) && (i4.__ = n4, i4.i = u4, r2.__H.__h.push(i4));
+}
+function _2(n4, u4) {
+  var i4 = d2(t2++, 4);
+  !c2.__s && C2(i4.__H, u4) && (i4.__ = n4, i4.i = u4, r2.__h.push(i4));
 }
 function A2(n4) {
   return o2 = 5, T2(function() {
@@ -15064,7 +15068,7 @@ function w3(i4) {
   for (var t5 = i4.s; void 0 !== t5; t5 = t5.n) if (t5.S.i !== t5.i || !t5.S.h() || t5.S.i !== t5.i) return true;
   return false;
 }
-function _2(i4) {
+function _3(i4) {
   for (var t5 = i4.s; void 0 !== t5; t5 = t5.n) {
     var n4 = t5.S.n;
     if (void 0 !== n4) t5.r = n4;
@@ -15116,7 +15120,7 @@ p3.prototype.h = function() {
   }
   var i4 = r3;
   try {
-    _2(this);
+    _3(this);
     r3 = this;
     var t5 = this.x();
     if (16 & this.f || this.v !== t5 || 0 === this.i) {
@@ -15226,7 +15230,7 @@ E.prototype.S = function() {
   this.f |= 1;
   this.f &= -9;
   S2(this);
-  _2(this);
+  _3(this);
   s3++;
   var i4 = r3;
   r3 = this;
@@ -15267,7 +15271,7 @@ var p4 = [];
 j3(function() {
   s4 = this.N;
 })();
-function _3(i4, r4) {
+function _4(i4, r4) {
   l[i4] = r4.bind(null, l[i4] || function() {
   });
 }
@@ -15308,7 +15312,7 @@ g3.displayName = "_st";
 Object.defineProperties(l3.prototype, { constructor: { configurable: true, value: void 0 }, type: { configurable: true, value: g3 }, props: { configurable: true, get: function() {
   return { data: this };
 } }, __b: { configurable: true, value: 1 } });
-_3("__b", function(i4, n4) {
+_4("__b", function(i4, n4) {
   if ("string" == typeof n4.type) {
     var r4, t5 = n4.props;
     for (var f4 in t5) if ("children" !== f4) {
@@ -15322,7 +15326,7 @@ _3("__b", function(i4, n4) {
   }
   i4(n4);
 });
-_3("__r", function(i4, n4) {
+_4("__r", function(i4, n4) {
   m4();
   var r4, t5 = n4.__c;
   if (t5) {
@@ -15343,12 +15347,12 @@ _3("__r", function(i4, n4) {
   m4(r4);
   i4(n4);
 });
-_3("__e", function(i4, n4, r4, t5) {
+_4("__e", function(i4, n4, r4, t5) {
   m4();
   h4 = void 0;
   i4(n4, r4, t5);
 });
-_3("diffed", function(i4, n4) {
+_4("diffed", function(i4, n4) {
   m4();
   h4 = void 0;
   var r4;
@@ -15394,7 +15398,7 @@ function b2(i4, n4, r4, t5) {
     }
   }) };
 }
-_3("unmount", function(i4, n4) {
+_4("unmount", function(i4, n4) {
   if ("string" == typeof n4.type) {
     var r4 = n4.__e;
     if (r4) {
@@ -15419,7 +15423,7 @@ _3("unmount", function(i4, n4) {
   }
   i4(n4);
 });
-_3("__h", function(i4, n4, r4, t5) {
+_4("__h", function(i4, n4, r4, t5) {
   if (t5 < 3 || 9 === t5) n4.__$f |= 2;
   i4(n4, r4, t5);
 });
@@ -15506,7 +15510,7 @@ async function postJson(path, body) {
   let data = {};
   try {
     data = await r4.json();
-  } catch (_5) {
+  } catch (_6) {
   }
   return { ok: r4.ok, status: r4.status, data };
 }
@@ -15595,7 +15599,7 @@ var T3 = M2();
 function N2(l7) {
   T3 = l7;
 }
-var _4 = { exec: () => null };
+var _5 = { exec: () => null };
 function E2(l7) {
   let e4 = [];
   return (t5) => {
@@ -15637,10 +15641,10 @@ var K = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
 var ze = d4("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", K).replace("tag", H).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
 var le = d4(F2).replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H).getRegex();
 var Me = d4(/^( {0,3}> ?(paragraph|[^\n]*)(?:\n|$))+/).replace("paragraph", le).getRegex();
-var W = { blockquote: Me, code: we, def: Le, fences: ye, heading: Pe, hr: B3, html: ze, lheading: ae, list: _e, newline: Oe, paragraph: le, table: _4, text: $e };
+var W = { blockquote: Me, code: we, def: Le, fences: ye, heading: Pe, hr: B3, html: ze, lheading: ae, list: _e, newline: Oe, paragraph: le, table: _5, text: $e };
 var se = d4("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H).getRegex();
 var Ee = { ...W, lheading: Se, table: se, paragraph: d4(F2).replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", se).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H).getRegex() };
-var Ie = { ...W, html: d4(`^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))`).replace("comment", K).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: _4, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: d4(F2).replace("hr", B3).replace("heading", ` *#{1,6} *[^
+var Ie = { ...W, html: d4(`^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))`).replace("comment", K).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: _5, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: d4(F2).replace("hr", B3).replace("heading", ` *#{1,6} *[^
 ]`).replace("lheading", ae).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex() };
 var Ae = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
 var Ce = /^(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/;
@@ -15674,7 +15678,7 @@ var ke = d4(/^!?\[(label)\]\[(ref)\]/).replace("label", v4).replace("ref", U).ge
 var de = d4(/^!?\[(ref)\](?:\[\])?/).replace("ref", U).getRegex();
 var et = d4("reflink|nolink(?!\\()", "g").replace("reflink", ke).replace("nolink", de).getRegex();
 var ie = /[hH][tT][tT][pP][sS]?|[fF][tT][pP]/;
-var J = { _backpedal: _4, anyPunctuation: We, autolink: Xe, blockSkip: He, br: ue, code: Ce, del: _4, delLDelim: _4, delRDelim: _4, emStrongLDelim: Ze, emStrongRDelimAst: Ne, emStrongRDelimUnd: je, escape: Ae, link: Ye, nolink: de, punctuation: De, reflink: ke, reflinkSearch: et, tag: Ve, text: Be, url: _4 };
+var J = { _backpedal: _5, anyPunctuation: We, autolink: Xe, blockSkip: He, br: ue, code: Ce, del: _5, delLDelim: _5, delRDelim: _5, emStrongLDelim: Ze, emStrongRDelimAst: Ne, emStrongRDelimUnd: je, escape: Ae, link: Ye, nolink: de, punctuation: De, reflink: ke, reflinkSearch: et, tag: Ve, text: Be, url: _5 };
 var tt = { ...J, link: d4(/^!?\[(label)\]\((.*?)\)/).replace("label", v4).getRegex(), reflink: d4(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label", v4).getRegex() };
 var Q = { ...J, emStrongRDelimAst: Qe, emStrongLDelim: Ge, delLDelim: Fe, delRDelim: Ke, url: d4(/^((?:protocol):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/).replace("protocol", ie).replace("email", /[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![-_])/).getRegex(), _backpedal: /(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/, del: /^(~~?)(?=[^\s~])((?:\\[\s\S]|[^\\])*?(?:\\[\s\S]|[^\s~\\]))\1(?=[^~]|$)/, text: d4(/^([`~]+|[^`~])(?:(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|protocol:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)))/).replace("protocol", ie).getRegex() };
 var nt = { ...Q, br: d4(ue).replace("{2,}", "*").getRegex(), text: d4(Q.text).replace("\\b_", "\\b_| {2,}\\n").replace(/\{2,\}/g, "*").getRegex() };
@@ -16883,7 +16887,7 @@ function normalizeFileLinks(text) {
 function renderMarkdown(text) {
   try {
     return g4.parse(normalizeFileLinks(text || ""), { breaks: true, gfm: true });
-  } catch (_5) {
+  } catch (_6) {
     return null;
   }
 }
@@ -17041,7 +17045,7 @@ async function applyHash(router2) {
 function loadMuted() {
   try {
     return localStorage.getItem(NOTIF_MUTE_KEY) === "1";
-  } catch (_5) {
+  } catch (_6) {
     return false;
   }
 }
@@ -17050,7 +17054,7 @@ function initNotif() {
   j3(() => {
     try {
       localStorage.setItem(NOTIF_MUTE_KEY, notifMutedSig.value ? "1" : "0");
-    } catch (_5) {
+    } catch (_6) {
     }
   });
 }
@@ -17072,7 +17076,7 @@ function maybeNotify(text, files) {
       window.focus();
       n4.close();
     };
-  } catch (_5) {
+  } catch (_6) {
   }
 }
 
@@ -17153,7 +17157,7 @@ function clearChat() {
   if (refs.ws) {
     try {
       refs.ws.close();
-    } catch (_5) {
+    } catch (_6) {
     }
     refs.ws = null;
   }
@@ -17237,7 +17241,7 @@ async function openChat(gid, resumeTid, opts) {
   if (refs.ws) {
     try {
       refs.ws.close();
-    } catch (_5) {
+    } catch (_6) {
     }
     refs.ws = null;
   }
@@ -17371,7 +17375,7 @@ function connectChatWs() {
     let payload;
     try {
       payload = JSON.parse(ev.data);
-    } catch (_5) {
+    } catch (_6) {
       return;
     }
     if (payload.kind === "ready") return;
@@ -17430,13 +17434,13 @@ async function sendChat(text, files) {
       try {
         const j5 = await res.json();
         if (j5 && j5.error) detail = j5.error + (j5.detail ? ` (${j5.detail})` : "");
-      } catch (_5) {
+      } catch (_6) {
       }
       chatStatus.value = `send failed: ${detail}`;
     } else if (!isWeb) {
       try {
         await refetchThreadHistory(false);
-      } catch (_5) {
+      } catch (_6) {
       }
     }
   } catch (err) {
@@ -17528,7 +17532,7 @@ async function selectFile(entry) {
         if (t5) mtime = new Date(t5).toISOString();
       }
     }
-  } catch (_5) {
+  } catch (_6) {
   }
   const ext = entry.name.toLowerCase().split(".").pop();
   const meta = { name: entry.name, size, mtime, url, path: entry.path };
@@ -18166,7 +18170,7 @@ function uploadOne(idx, mode) {
       let body = {};
       try {
         body = JSON.parse(xhr.responseText || "{}");
-      } catch (_5) {
+      } catch (_6) {
       }
       const r4 = body.results && body.results[0] || {};
       if (xhr.status >= 200 && xhr.status < 300 && r4.status === "ok") {
@@ -18665,14 +18669,85 @@ function UploadStrip() {
     </div>
   `;
 }
+function OverflowMenu({ items }) {
+  const [open, setOpen] = h2(false);
+  const wrapRef = A2(null);
+  y2(() => {
+    if (!open) return void 0;
+    const onDoc = (ev) => {
+      if (wrapRef.current && !wrapRef.current.contains(ev.target)) setOpen(false);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const empty = items.length === 0;
+  return html`
+    <div class=${"action-menu" + (open ? " open" : "")} ref=${wrapRef}
+         style=${empty ? "visibility:hidden" : null}>
+      <button type="button" class="text-btn action-trigger" aria-haspopup="menu" aria-expanded=${open}
+              title="More actions" tabIndex=${empty ? -1 : 0} aria-hidden=${empty}
+              onClick=${(ev) => {
+    ev.stopPropagation();
+    if (!empty) setOpen((o4) => !o4);
+  }}>\u22EF</button>
+      ${open && !empty ? html`
+        <div class="action-panel" role="menu">
+          ${items.map((it) => html`
+            <button type="button" class=${"action-item" + (it.danger ? " danger" : "")}
+                    role="menuitem" key=${it.id} disabled=${it.disabled}
+                    onClick=${(ev) => {
+    ev.stopPropagation();
+    setOpen(false);
+    it.onClick();
+  }}>
+              <span class="ico">${it.ico}</span>
+              <span class="lbl">${it.label}</span>
+            </button>
+          `)}
+        </div>
+      ` : null}
+    </div>
+  `;
+}
 function Preview() {
   const ref = A2(null);
+  const toolbarRef = A2(null);
+  const [overflow, setOverflow] = h2(0);
   const p5 = previewBlock.value;
+  _2(() => {
+    const tb = toolbarRef.current;
+    if (!tb) return void 0;
+    const measure = () => {
+      const btns = Array.from(tb.querySelectorAll("button[data-action]"));
+      btns.forEach((b4) => {
+        b4.style.display = "";
+      });
+      let hidden = 0;
+      while (hidden < btns.length && tb.scrollWidth > tb.clientWidth + 1) {
+        hidden++;
+        btns[btns.length - hidden].style.display = "none";
+      }
+      setOverflow((prev) => prev === hidden ? prev : hidden);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(tb);
+    return () => ro.disconnect();
+  });
   if (!p5) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const fp = filePath.value;
   const gid = groupId.value;
   const pinned = !!fp && pinnedContext.value.includes(fp);
   const clippyTitle = pinned ? "Detach from next message" : "Attach to next message";
+  const admin = isAdmin.value;
+  const entryForPath = fp ? treeEntries.value.find((e4) => e4.path === fp) || { path: fp, name: p5.name, type: "file" } : null;
   const openInNewTab2 = () => {
     if (!fp || !gid) return;
     const segs = String(fp).split("/").filter(Boolean).map(encodeURIComponent);
@@ -18682,8 +18757,59 @@ function Preview() {
     if (!fp || !gid) return;
     shareFile(gid, { path: fp, name: p5.name || fp.slice(fp.lastIndexOf("/") + 1) });
   };
+  const actions = [
+    {
+      id: "share",
+      ico: "\u21AA",
+      label: "Share",
+      title: "Share",
+      cls: "share-btn",
+      onClick: onShare,
+      disabled: !fp || !gid
+    },
+    {
+      id: "open",
+      ico: "\u2197",
+      label: "Open in new tab",
+      title: "Open in new tab",
+      cls: "open-tab",
+      onClick: openInNewTab2,
+      disabled: !fp || !gid
+    },
+    {
+      id: "download",
+      ico: "\u2B07",
+      label: "Download",
+      title: "Download",
+      cls: "download-btn",
+      onClick: () => {
+        if (fp) downloadPaths([fp], [entryForPath]);
+      },
+      disabled: !fp
+    }
+  ];
+  if (admin && entryForPath) {
+    actions.push({
+      id: "rename",
+      ico: "\u270E",
+      label: "Rename",
+      title: "Rename",
+      cls: "rename-btn",
+      onClick: () => renameEntry(entryForPath)
+    });
+    actions.push({
+      id: "delete",
+      ico: "\u{1F5D1}",
+      label: "Delete",
+      title: "Delete",
+      cls: "delete-btn",
+      danger: true,
+      onClick: () => deleteEntry(entryForPath)
+    });
+  }
+  const overflowed = overflow > 0 ? actions.slice(actions.length - overflow) : [];
   const toolbar = html`
-    <div class="preview-toolbar">
+    <div class="preview-toolbar" ref=${toolbarRef}>
       <button class=${"text-btn clippy" + (pinned ? " active" : "")}
               onClick=${() => togglePinnedFile(fp)}
               disabled=${!fp}
@@ -18691,13 +18817,13 @@ function Preview() {
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
       <span class="preview-spacer"></span>
       <span class="preview-actions">
-        <button type="button" class="text-btn share-btn"
-                onClick=${onShare} disabled=${!fp || !gid}
-                title="Share" aria-label="Share">\u21AA</button>
-        <button type="button" class="text-btn open-tab"
-                onClick=${openInNewTab2} disabled=${!fp || !gid}
-                title="Open in new tab" aria-label="Open in new tab">\u2197</button>
-        <${ActionsMenu} mode="preview" />
+        ${actions.map((a4) => html`
+          <button type="button" class=${"text-btn " + a4.cls + (a4.danger ? " danger" : "")}
+                  data-action=${a4.id} key=${a4.id}
+                  onClick=${a4.onClick} disabled=${a4.disabled}
+                  title=${a4.title} aria-label=${a4.title}>${a4.ico}</button>
+        `)}
+        <${OverflowMenu} items=${overflowed} />
         <button type="button" class="text-btn close-preview"
                 onClick=${closePreview}
                 title="Close preview" aria-label="Close preview">\u00D7</button>
@@ -19049,14 +19175,14 @@ function restorePanelState() {
     if (t5 === "1") paneOpen.threads.value = true;
     if (f4 === "0") paneOpen.files.value = false;
     if (f4 === "1") paneOpen.files.value = true;
-  } catch (_5) {
+  } catch (_6) {
   }
 }
 function persistPanelState() {
   try {
     localStorage.setItem(KEYS.threads, paneOpen.threads.value ? "1" : "0");
     localStorage.setItem(KEYS.files, paneOpen.files.value ? "1" : "0");
-  } catch (_5) {
+  } catch (_6) {
   }
 }
 function applyPanelClasses() {
@@ -19166,7 +19292,7 @@ async function init() {
       me.value = meRes.displayName || meRes.userId;
       groups.value = sortGroups(groupsRes.groups);
     });
-  } catch (_5) {
+  } catch (_6) {
     return;
   }
   if (groups.value.length === 0) {
@@ -19187,7 +19313,7 @@ async function init() {
       const url = window.location.pathname + (q3 ? "?" + q3 : "") + window.location.hash;
       window.history.replaceState(null, "", url);
     }
-  } catch (_5) {
+  } catch (_6) {
   }
 }
 init().catch((err) => console.error(err));
