@@ -634,7 +634,7 @@
         background: var(--head-tint);
       }
       .settings-head .title { flex: 1; font-weight: 600; font-size: 15px; }
-      .settings-body { padding: 16px; overflow-y: auto; }
+      .settings-body { padding: 16px; overflow-y: auto; overflow-x: hidden; }
       .settings-body section { margin-bottom: 24px; }
       .settings-body section:last-child { margin-bottom: 0; }
       .settings-body h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
@@ -661,6 +661,7 @@
         border-bottom: 1px solid var(--border);
       }
       .settings-table th { font-weight: 600; color: var(--muted); }
+      .settings-table td code { word-break: break-all; overflow-wrap: anywhere; }
       .settings-status {
         margin-top: 12px; padding: 8px 12px; border-radius: 4px; font-size: 13px;
       }
@@ -772,6 +773,16 @@
         .chat-main #chat-send { min-width: 56px; min-height: 44px; font-weight: 600; flex-shrink: 0; }
         .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 10px; } /* 16px prevents iOS zoom on focus */
         .files-pane:not(.previewing) .drop-hint { display: none !important; }
+
+        /* Settings: tighten layout so the linked-identities table and
+           link-form controls fit narrow viewports. */
+        .settings-backdrop { padding: 16px 8px; }
+        .settings-body { padding: 12px; }
+        .settings-table { font-size: 12px; }
+        .settings-table th, .settings-table td { padding: 6px 4px; }
+        .settings-table th:nth-child(3), .settings-table td:nth-child(3) { display: none; }
+        .settings-row select, .settings-row input { min-width: 0; }
+        .settings-row > * { flex-shrink: 1; }
       }
 
       /* Show delete on touch devices (no hover) */
