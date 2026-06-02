@@ -249,7 +249,19 @@
       .files-pane .breadcrumb .crumb.current:hover { background: transparent; }
       .files-pane .breadcrumb .crumb.root { padding: 3px 6px; font-size: 14px; line-height: 1; }
       .files-pane .breadcrumb .sep { color: var(--muted); opacity: 0.5; padding: 0 1px; user-select: none; }
-      .files-pane .files-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+      .files-pane .files-body { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+      .files-pane .files-fab {
+        position: absolute; right: 16px; bottom: 16px;
+        width: 44px; height: 44px; border-radius: 50%;
+        background: var(--accent); color: #fff;
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        font-size: 20px; line-height: 1; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 10; transition: transform 0.1s ease, box-shadow 0.1s ease;
+      }
+      .files-pane .files-fab:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); }
+      .files-pane .files-fab:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
       .files-pane .listing { flex: 1; overflow: auto; }
       .files-pane .row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
       .files-pane .row:hover { background: var(--wash); }

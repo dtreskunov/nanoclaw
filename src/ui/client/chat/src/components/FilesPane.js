@@ -234,6 +234,20 @@ export function FilesPane() {
       <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
     </div>
   `;
+  // Floating action: only visible while previewing an actual file.
+  // Opens the previewed file in a new tab via the path-based /raw route
+  // so HTML documents can resolve relative asset URLs to siblings.
+  const fp = filePath.value;
+  const gid = groupId.value;
+  const fab = (previewing && fp && gid) ? html`
+    <button type="button" class="files-fab" title="Open in new tab"
+            aria-label="Open ${fp} in new tab"
+            onClick=${() => {
+              const segs = String(fp).split('/').filter(Boolean).map(encodeURIComponent);
+              const url = `api/groups/${encodeURIComponent(gid)}/raw/${segs.join('/')}`;
+              window.open(url, '_blank', 'noopener');
+            }}>\u2197</button>
+  ` : null;
   return html`
     <${Pane} paneKey="files" name="files-pane" label="Files"
              extraClass=${previewing ? 'previewing' : ''}
@@ -246,6 +260,7 @@ export function FilesPane() {
           Drag & drop files here to upload to <code id="dropzone-path">/${treePath.value}</code>
         </div>
         <${Preview} />
+        ${fab}
       </div>
     <//>
   `;

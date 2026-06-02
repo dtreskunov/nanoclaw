@@ -242,8 +242,7 @@ function handleFile(ctx: Ctx, userId: string, groupId: string, relPath: string):
   // are still cookie-authenticated because cookies attach by URL, not
   // origin — so relative <img src>, <link href>, etc. work normally.
   if (mime.type === 'text/html; charset=utf-8') {
-    headers['Content-Security-Policy'] =
-      'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+    headers['Content-Security-Policy'] = 'sandbox allow-scripts allow-forms';
   }
 
   recordAccess({ userId, groupId: group.id, path: relPath, action: 'file', req: ctx.req });
@@ -596,14 +595,39 @@ const VIDEO_EXTS: Record<string, string> = {
 };
 const PDF_MIME = 'application/pdf';
 
+// Additional mime types beyond the IMAGE/AUDIO/VIDEO/PDF tables — chosen
+// because they show up as sub-resources of typical HTML/JS content and
+// must be served with the right Content-Type for the browser to use them
+// (fonts, JSON fetched by scripts, source maps, web workers, wasm, etc.).
+const EXTRA_MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.htm': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.cjs': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.wasm': 'application/wasm',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.eot': 'application/vnd.ms-fontobject',
+  '.ico': 'image/x-icon',
+  '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
+};
+
 function mimeFor(ext: string): { type: string; inlineSafe: boolean } {
   if (ext in IMAGE_EXTS) return { type: IMAGE_EXTS[ext], inlineSafe: ext !== '.svg' };
   if (ext in AUDIO_EXTS) return { type: AUDIO_EXTS[ext], inlineSafe: true };
   if (ext in VIDEO_EXTS) return { type: VIDEO_EXTS[ext], inlineSafe: true };
   if (ext === '.pdf') return { type: PDF_MIME, inlineSafe: true };
-  if (ext === '.html' || ext === '.htm') return { type: 'text/html; charset=utf-8', inlineSafe: true };
-  if (ext === '.css') return { type: 'text/css; charset=utf-8', inlineSafe: true };
-  if (ext === '.js' || ext === '.mjs') return { type: 'text/javascript; charset=utf-8', inlineSafe: true };
+  if (ext in EXTRA_MIME) return { type: EXTRA_MIME[ext], inlineSafe: true };
   if (TEXT_EXTS.has(ext)) return { type: 'text/plain; charset=utf-8', inlineSafe: true };
   return { type: 'application/octet-stream', inlineSafe: false };
 }
