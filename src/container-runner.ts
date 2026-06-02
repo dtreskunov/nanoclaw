@@ -491,6 +491,15 @@ async function buildContainerArgs(
   // Everything NanoClaw-specific is in container.json (read by runner at startup).
   args.push('-e', `TZ=${TIMEZONE}`);
 
+  // MCP timeouts. Read by Claude Code (MCP_TIMEOUT, MCP_TOOL_TIMEOUT) and by
+  // our opencode mapper (MCP_TOOL_TIMEOUT → mcp[name].timeout). Pulled from
+  // process.env then .env (the systemd unit doesn't load .env). Forwarded so
+  // a single host-side knob configures both providers.
+  for (const key of ['MCP_TIMEOUT', 'MCP_TOOL_TIMEOUT'] as const) {
+    const value = resolveEnv(key);
+    if (value) args.push('-e', `${key}=${value}`);
+  }
+
   // Provider-contributed env vars (e.g. XDG_DATA_HOME, OPENCODE_*, NO_PROXY).
   if (providerContribution.env) {
     for (const [key, value] of Object.entries(providerContribution.env)) {
