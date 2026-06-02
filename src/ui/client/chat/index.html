@@ -339,11 +339,6 @@
       .media-player {
         position: sticky; top: 0; z-index: 4;
         margin: 0 0 12px 0;
-        padding: 8px 10px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        box-shadow: 0 2px 8px var(--shadow-color);
       }
       .media-player audio,
       .media-player video { display: block; width: 100%; }
@@ -351,17 +346,13 @@
       .media-player-audio audio { height: 36px; }
 
       /* Floating variant: pinned to the bottom of the preview body so it
-         stays in view while the user scrolls metadata/lyrics/etc. The
-         preview body switches to a flex column so the player can claim
-         the empty space below the content; sticky bottom:0 keeps it in
-         view when the body itself is scrolled. */
+         stays in view while the user scrolls metadata/lyrics/etc. */
       .media-player-floating {
         position: sticky;
         top: auto;
         bottom: 0;
         margin: 12px 0 0 0;
         background: var(--surface);
-        box-shadow: 0 -4px 14px var(--shadow-color);
       }
       .files-pane.previewing .preview-body.has-floating-player {
         display: flex;
