@@ -2,6 +2,21 @@
 // components handle escaping via JSX prop interpolation when possible.
 import { marked } from 'marked';
 
+// Open absolute (http/mailto/etc.) links rendered from markdown in a new
+// tab. Relative links are left alone — they get rewritten to in-app
+// file previews by rewriteFileLinks().
+marked.use({
+  renderer: {
+    link({ href, title, tokens }) {
+      const text = this.parser.parseInline(tokens);
+      const isAbs = /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//');
+      const titleAttr = title ? ` title="${title.replace(/"/g, '&quot;')}"` : '';
+      const targetAttr = isAbs ? ' target="_blank" rel="noopener noreferrer"' : '';
+      return `<a href="${href}"${titleAttr}${targetAttr}>${text}</a>`;
+    },
+  },
+});
+
 export function fmtBytes(n: number | null | undefined): string {
   if (n == null) return '';
   if (n < 1024) return n + ' B';

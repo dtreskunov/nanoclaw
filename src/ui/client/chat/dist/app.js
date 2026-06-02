@@ -16798,6 +16798,17 @@ var Vt = b3.parse;
 var Yt = x4.lex;
 
 // src/utils.ts
+g4.use({
+  renderer: {
+    link({ href, title, tokens }) {
+      const text = this.parser.parseInline(tokens);
+      const isAbs = /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//");
+      const titleAttr = title ? ` title="${title.replace(/"/g, "&quot;")}"` : "";
+      const targetAttr = isAbs ? ' target="_blank" rel="noopener noreferrer"' : "";
+      return `<a href="${href}"${titleAttr}${targetAttr}>${text}</a>`;
+    }
+  }
+});
 function fmtBytes(n3) {
   if (n3 == null) return "";
   if (n3 < 1024) return n3 + " B";
