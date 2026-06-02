@@ -350,6 +350,27 @@
       .media-player-video video { max-height: 60vh; background: black; border-radius: 3px; }
       .media-player-audio audio { height: 36px; }
 
+      /* Floating variant: pinned to the bottom of the preview body so it
+         stays in view while the user scrolls metadata/lyrics/etc. The
+         preview body switches to a flex column so the player can claim
+         the empty space below the content; sticky bottom:0 keeps it in
+         view when the body itself is scrolled. */
+      .media-player-floating {
+        position: sticky;
+        top: auto;
+        bottom: 0;
+        margin: 12px 0 0 0;
+        background: var(--surface);
+        box-shadow: 0 -4px 14px var(--shadow-color);
+      }
+      .files-pane.previewing .preview-body.has-floating-player {
+        display: flex;
+        flex-direction: column;
+      }
+      .files-pane .preview-body.has-floating-player .media-player-floating {
+        margin-top: auto;
+      }
+
       .files-pane .preview-meta {
         margin: 0 0 8px 0;
         padding: 6px 8px;

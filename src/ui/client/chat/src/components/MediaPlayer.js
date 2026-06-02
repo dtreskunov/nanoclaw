@@ -5,7 +5,7 @@ import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import { mediaCurrentTime } from '../state.js';
 
-export function MediaPlayer({ kind, url, name }) {
+export function MediaPlayer({ kind, url, name, floating }) {
   if (kind !== 'audio' && kind !== 'video') return null;
   const ref = useRef(null);
   // Attach via addEventListener so we don't depend on Preact's
@@ -29,5 +29,6 @@ export function MediaPlayer({ kind, url, name }) {
   const el = kind === 'audio'
     ? html`<audio controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />`
     : html`<video controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />`;
-  return html`<div class=${'media-player media-player-' + kind}>${el}</div>`;
+  const cls = 'media-player media-player-' + kind + (floating ? ' media-player-floating' : '');
+  return html`<div class=${cls}>${el}</div>`;
 }

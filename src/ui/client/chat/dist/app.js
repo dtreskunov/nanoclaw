@@ -18381,7 +18381,7 @@ function buildItems(mode, entry, onUpload) {
 }
 
 // src/components/MediaPlayer.js
-function MediaPlayer({ kind, url, name }) {
+function MediaPlayer({ kind, url, name, floating }) {
   if (kind !== "audio" && kind !== "video") return null;
   const ref = A2(null);
   y2(() => {
@@ -18401,7 +18401,8 @@ function MediaPlayer({ kind, url, name }) {
     };
   }, [url]);
   const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />` : html`<video controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />`;
-  return html`<div class=${"media-player media-player-" + kind}>${el}</div>`;
+  const cls = "media-player media-player-" + kind + (floating ? " media-player-floating" : "");
+  return html`<div class=${cls}>${el}</div>`;
 }
 
 // src/components/LyricsPanel.js
@@ -18724,21 +18725,17 @@ function Preview() {
       </span>
     </div>
   `;
+  const fileRows = [];
+  if (p5.size != null) fileRows.push(["Size", fmtBytes(p5.size)]);
+  const mimeOrKind = p5.mime || mimeFromKind(p5.kind);
+  if (mimeOrKind) fileRows.push(["Type", mimeOrKind]);
+  if (p5.mtime) fileRows.push(["Modified", formatMtime(p5.mtime)]);
   const tagRows = p5.tags ? Object.entries(p5.tags).map(([k4, v5]) => [k4, String(v5)]) : [];
-  const isMedia = p5.kind === "image" || p5.kind === "audio" || p5.kind === "video" || p5.kind === "pdf";
-  const player = p5.kind === "audio" || p5.kind === "video" ? html`<${MediaPlayer} kind=${p5.kind} url=${p5.url} name=${p5.name} />` : null;
-  const renderMetaPanel = (rows, cls) => {
-    const summary = rows.map(([, v5]) => v5).join(" \xB7 ");
-    return html`
-      <details class=${"preview-meta " + cls}>
-        <summary class="preview-meta-summary">${summary}</summary>
-        <dl class="preview-meta-rows">
-          ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
-        </dl>
-      </details>
-    `;
-  };
-  const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
+  const metaRows = [...fileRows, ...tagRows];
+  const meta = metaRows.length > 0 ? renderMetaPanel(metaRows) : null;
+  const isAudio = p5.kind === "audio";
+  const isVideo = p5.kind === "video";
+  const player = isAudio || isVideo ? html`<${MediaPlayer} kind=${p5.kind} url=${p5.url} name=${p5.name} floating=${isAudio} />` : null;
   const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;
   let body = null;
   if (p5.kind === "image") body = html`<img alt=${p5.name} src=${p5.url} />`;
@@ -18751,7 +18748,47 @@ function Preview() {
     body = hi ? html`<pre class="hljs" data-lang=${hi.language}><code dangerouslySetInnerHTML=${{ __html: hi.html }} /></pre>` : html`<pre>${p5.text}</pre>`;
   } else if (p5.kind === "binary") body = html`<div class="empty">Binary file (${p5.mime}).</div>`;
   else if (p5.kind === "error") body = html`<div class="empty">${p5.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${tagMeta}${body}</div>`;
+  return html`<div class=${"preview-body" + (isAudio ? " has-floating-player" : "")} id="preview" ref=${ref}>
+    ${toolbar}${meta}${isVideo ? player : null}${lyrics}${body}${isAudio ? player : null}
+  </div>`;
+}
+function mimeFromKind(kind) {
+  switch (kind) {
+    case "image":
+      return "image";
+    case "audio":
+      return "audio";
+    case "video":
+      return "video";
+    case "pdf":
+      return "application/pdf";
+    case "markdown":
+      return "text/markdown";
+    case "text":
+      return "text/plain";
+    default:
+      return null;
+  }
+}
+function formatMtime(iso) {
+  try {
+    const d5 = new Date(iso);
+    if (Number.isNaN(d5.getTime())) return iso;
+    return d5.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+function renderMetaPanel(rows) {
+  const summary = rows.map(([, v5]) => v5).join(" \xB7 ");
+  return html`
+    <details class="preview-meta">
+      <summary class="preview-meta-summary">${summary}</summary>
+      <dl class="preview-meta-rows">
+        ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
+      </dl>
+    </details>
+  `;
 }
 function FilesPane() {
   const previewing = !!previewBlock.value;

@@ -146,28 +146,28 @@ function Preview() {
       </span>
     </div>
   `;
-  // Embedded media tags (ID3/EXIF) + lyrics still get their own panels —
-  // those carry info the toolbar can't fit. Size/type/modified for the
-  // file itself is in the toolbar; no separate <details> panel.
+
+  // Metadata panel — shown above the contents for ALL file kinds. Contains
+  // the basic file facts (size / mime / modified) and, when the server
+  // surfaced them, the embedded media tags (ID3, EXIF, …).
+  const fileRows = [];
+  if (p.size != null) fileRows.push(['Size', fmtBytes(p.size)]);
+  const mimeOrKind = p.mime || mimeFromKind(p.kind);
+  if (mimeOrKind) fileRows.push(['Type', mimeOrKind]);
+  if (p.mtime) fileRows.push(['Modified', formatMtime(p.mtime)]);
   const tagRows = p.tags ? Object.entries(p.tags).map(([k, v]) => [k, String(v)]) : [];
-  const isMedia = p.kind === 'image' || p.kind === 'audio' || p.kind === 'video' || p.kind === 'pdf';
-  const player = (p.kind === 'audio' || p.kind === 'video')
-    ? html`<${MediaPlayer} kind=${p.kind} url=${p.url} name=${p.name} />`
+  const metaRows = [...fileRows, ...tagRows];
+  const meta = metaRows.length > 0 ? renderMetaPanel(metaRows) : null;
+
+  const isAudio = p.kind === 'audio';
+  const isVideo = p.kind === 'video';
+  // Audio gets a floating bottom-pinned player so the long preview body
+  // (lyrics / transcript / metadata) reads naturally without the player
+  // hugging the top. Video keeps its in-flow position so the metadata
+  // appears above the video frame.
+  const player = (isAudio || isVideo)
+    ? html`<${MediaPlayer} kind=${p.kind} url=${p.url} name=${p.name} floating=${isAudio} />`
     : null;
-  const renderMetaPanel = (rows, cls) => {
-    // Metadata panel collapses by default; the summary shows a dense
-    // one-liner of just the values. Click to reveal the labelled rows.
-    const summary = rows.map(([, v]) => v).join(' \u00B7 ');
-    return html`
-      <details class=${'preview-meta ' + cls}>
-        <summary class="preview-meta-summary">${summary}</summary>
-        <dl class="preview-meta-rows">
-          ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
-        </dl>
-      </details>
-    `;
-  };
-  const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
   const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} />` : null;
   let body = null;
   if (p.kind === 'image') body = html`<img alt=${p.name} src=${p.url} />`;
@@ -185,7 +185,48 @@ function Preview() {
   }
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${tagMeta}${body}</div>`;
+  // Order: toolbar, meta (always above contents), inline player (video),
+  // lyrics, body, then floating audio player at the very end so it sits
+  // at the bottom of the scroll container.
+  return html`<div class=${'preview-body' + (isAudio ? ' has-floating-player' : '')} id="preview" ref=${ref}>
+    ${toolbar}${meta}${isVideo ? player : null}${lyrics}${body}${isAudio ? player : null}
+  </div>`;
+}
+
+function mimeFromKind(kind) {
+  switch (kind) {
+    case 'image': return 'image';
+    case 'audio': return 'audio';
+    case 'video': return 'video';
+    case 'pdf': return 'application/pdf';
+    case 'markdown': return 'text/markdown';
+    case 'text': return 'text/plain';
+    default: return null;
+  }
+}
+
+function formatMtime(iso) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+// Metadata panel: collapsed by default with a dense one-liner summary,
+// expanded shows the labelled rows. Used for file basics and ID3/EXIF.
+function renderMetaPanel(rows) {
+  const summary = rows.map(([, v]) => v).join(' \u00B7 ');
+  return html`
+    <details class="preview-meta">
+      <summary class="preview-meta-summary">${summary}</summary>
+      <dl class="preview-meta-rows">
+        ${rows.map(([k, v]) => html`<div class="row" key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}
+      </dl>
+    </details>
+  `;
 }
 
 export function FilesPane() {
