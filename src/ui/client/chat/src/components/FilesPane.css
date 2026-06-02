@@ -46,7 +46,7 @@
 .files-pane .row:hover .row-actions .action-trigger,
 .files-pane .row .action-menu.open .action-trigger { color: inherit; }
 
-body.is-admin .files-pane .drop-hint { display: block; }
+body.is-admin .files-pane .drop-hint { display: flex; }
 /* Hide admin actions when the files pane is collapsed. */
 body.is-admin .files-pane.collapsed .admin-only { display: none; }
 /* Action overlay anchored to the right edge of the files pane,

@@ -1252,7 +1252,7 @@ header .mobile-only {
   color: inherit;
 }
 body.is-admin .files-pane .drop-hint {
-  display: block;
+  display: flex;
 }
 body.is-admin .files-pane.collapsed .admin-only {
   display: none;
