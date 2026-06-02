@@ -17695,7 +17695,6 @@ function Header() {
       /* @__PURE__ */ u4("span", { class: "desktop-only", children: "Read-only" })
     ] }) : null,
     /* @__PURE__ */ u4("div", { class: "spacer" }),
-    /* @__PURE__ */ u4("span", { class: "user", id: "me", children: me.value }),
     /* @__PURE__ */ u4(
       "button",
       {
@@ -17709,27 +17708,6 @@ function Header() {
         children: "\u2699\uFE0F"
       }
     ),
-    /* @__PURE__ */ u4("form", { method: "POST", action: "/ui/auth/logout", id: "logout-form", style: "margin:0", children: /* @__PURE__ */ u4("button", { type: "submit", "aria-label": "Log out", title: "Log out", children: [
-      /* @__PURE__ */ u4(
-        "svg",
-        {
-          class: "mobile-only",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          "stroke-width": "2",
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-          "aria-hidden": "true",
-          children: [
-            /* @__PURE__ */ u4("path", { d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" }),
-            /* @__PURE__ */ u4("polyline", { points: "16 17 21 12 16 7" }),
-            /* @__PURE__ */ u4("line", { x1: "21", y1: "12", x2: "9", y2: "12" })
-          ]
-        }
-      ),
-      /* @__PURE__ */ u4("span", { id: "logout-label", class: "desktop-only", children: "Log out" })
-    ] }) }),
     /* @__PURE__ */ u4(
       "button",
       {
@@ -19445,7 +19423,10 @@ function Settings() {
         ] })
       ] }),
       status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null,
-      /* @__PURE__ */ u4("section", { class: "settings-account", children: /* @__PURE__ */ u4("form", { method: "POST", action: "/ui/auth/logout", style: "margin:0", children: /* @__PURE__ */ u4("button", { type: "submit", class: "link-btn", children: "Log out" }) }) })
+      /* @__PURE__ */ u4("section", { class: "settings-account", children: [
+        me.value ? /* @__PURE__ */ u4("span", { class: "settings-account-name", children: me.value }) : null,
+        /* @__PURE__ */ u4("form", { method: "POST", action: "/ui/auth/logout", style: "margin:0", children: /* @__PURE__ */ u4("button", { type: "submit", children: "Log out" }) })
+      ] })
     ] })
   ] }) });
 }

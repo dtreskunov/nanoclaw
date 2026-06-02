@@ -4,7 +4,6 @@ header { padding: 8px 12px; border-bottom: 1px solid var(--border); display: fle
 header .brand { font-size: 14px; font-weight: 600; white-space: nowrap; }
 header select { font: inherit; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; max-width: 280px; }
 header .spacer { flex: 1; }
-header .user { font-size: 12px; color: var(--muted); }
 header .readonly-badge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 11px; color: var(--muted);
@@ -23,10 +22,7 @@ header .mobile-only { display: none; }
     gap: 6px;
   }
   header .mobile-only { display: inline-flex; }
-  header .brand, header #me, header .spacer { display: none !important; }
+  header .brand, header .spacer { display: none !important; }
   header select { flex: 1; min-width: 0; max-width: none; min-height: 44px; height: 44px; font-size: 15px; }
   header .icon-btn { min-width: 44px; min-height: 44px; font-size: 22px; padding: 4px 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
-  header form { flex-shrink: 0; margin: 0; display: none; }
-  header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; position: relative; font-size: 0; }
-  header form button svg { width: 22px; height: 22px; vertical-align: middle; }
 }

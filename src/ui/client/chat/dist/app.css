@@ -143,10 +143,6 @@ header select {
 header .spacer {
   flex: 1;
 }
-header .user {
-  font-size: 12px;
-  color: var(--muted);
-}
 header .readonly-badge {
   display: inline-flex;
   align-items: center;
@@ -176,7 +172,6 @@ header .mobile-only {
     display: inline-flex;
   }
   header .brand,
-  header #me,
   header .spacer {
     display: none !important;
   }
@@ -198,23 +193,6 @@ header .mobile-only {
     align-items: center;
     justify-content: center;
     line-height: 1;
-  }
-  header form {
-    flex-shrink: 0;
-    margin: 0;
-    display: none;
-  }
-  header form button {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 4px 8px;
-    position: relative;
-    font-size: 0;
-  }
-  header form button svg {
-    width: 22px;
-    height: 22px;
-    vertical-align: middle;
   }
 }
 
@@ -638,20 +616,18 @@ header .mobile-only {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.settings-account .link-btn {
-  background: transparent;
-  border: 0;
-  padding: 4px 0;
+.settings-account-name {
+  font-size: 13px;
   color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.settings-account .link-btn:hover {
-  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 @media (max-width: 720px) {
   .settings-backdrop {

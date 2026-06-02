@@ -2,7 +2,7 @@
 import './Settings.css';
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { settingsOpen, notifMutedSig, CHANNEL_META } from '../state';
+import { settingsOpen, notifMutedSig, CHANNEL_META, me } from '../state';
 import { toggleMute } from '../notify';
 import { requestConfirm } from './PromptModal';
 import type { Identity } from '../types';
@@ -263,8 +263,9 @@ export function Settings() {
           {status ? <div class={'settings-status ' + (status.err ? 'err' : 'ok')}>{status.err || status.ok}</div> : null}
 
           <section class="settings-account">
+            {me.value ? <span class="settings-account-name">{me.value}</span> : null}
             <form method="POST" action="/ui/auth/logout" style="margin:0">
-              <button type="submit" class="link-btn">Log out</button>
+              <button type="submit">Log out</button>
             </form>
           </section>
         </div>

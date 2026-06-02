@@ -1,8 +1,7 @@
-// Header: brand, group select, user, settings button, mobile drawer
-// buttons, logout form.
+// Header: brand, group select, settings button, mobile drawer buttons.
 import './Header.css';
 import type { JSX } from 'preact';
-import { groups, groupId, me, drawerOpen, settingsOpen, isAdmin } from '../state';
+import { groups, groupId, drawerOpen, settingsOpen, isAdmin } from '../state';
 import { selectGroup } from '../actions';
 
 export function Header() {
@@ -33,7 +32,6 @@ export function Header() {
         )
         : null}
       <div class="spacer"></div>
-      <span class="user" id="me">{me.value}</span>
       <button
         type="button"
         class="icon-btn"
@@ -41,25 +39,6 @@ export function Header() {
         title="Settings"
         onClick={() => { settingsOpen.value = !settingsOpen.value; }}
       >{'\u2699\uFE0F'}</button>
-      <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
-        <button type="submit" aria-label="Log out" title="Log out">
-          <svg
-            class="mobile-only"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          <span id="logout-label" class="desktop-only">Log out</span>
-        </button>
-      </form>
       <button
         type="button"
         class="icon-btn mobile-only"
