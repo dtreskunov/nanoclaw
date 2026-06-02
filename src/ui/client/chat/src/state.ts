@@ -11,6 +11,7 @@ import type {
   ShareModalRequest,
   ToastMessage,
   PendingFile,
+  PendingApprovalDto,
   ChannelMetaEntry,
 } from './types';
 
@@ -64,6 +65,8 @@ export const toastMessage: Signal<ToastMessage | null> = signal<ToastMessage | n
 export const previewBlock: Signal<PreviewBlock | null> = signal<PreviewBlock | null>(null);
 export const nowTick: Signal<number> = signal(Date.now());
 export const pinnedContext: Signal<string[]> = signal<string[]>([]);
+export const pendingApprovals: Signal<PendingApprovalDto[]> = signal<PendingApprovalDto[]>([]);
+export const respondingApprovalIds: Signal<Set<string>> = signal<Set<string>>(new Set());
 
 // ── non-reactive refs (mutated outside render) ──────────────────────
 export interface Refs {
@@ -72,6 +75,7 @@ export interface Refs {
   reconnectAttempt: number;
   pollTimer: ReturnType<typeof setInterval> | null;
   threadsPollTimer: ReturnType<typeof setInterval> | null;
+  approvalsPollTimer: ReturnType<typeof setInterval> | null;
   seenIds: Set<string>;
   suppressHashCount: number;
   uploadDragDepth: number;
@@ -83,6 +87,7 @@ export const refs: Refs = {
   reconnectAttempt: 0,
   pollTimer: null,
   threadsPollTimer: null,
+  approvalsPollTimer: null,
   seenIds: new Set<string>(),
   suppressHashCount: 0,
   uploadDragDepth: 0,
@@ -95,6 +100,7 @@ export const PANES: { key: 'threads' | 'files'; mainClass: string }[] = [
 ];
 export const POLL_INTERVAL_MS = 10000;
 export const THREADS_POLL_MS = 20000;
+export const APPROVALS_POLL_MS = 15000;
 export const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 export const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
 export const UPLOAD_MAX_FILES = 10;

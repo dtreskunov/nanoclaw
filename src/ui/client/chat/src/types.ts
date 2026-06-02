@@ -123,6 +123,16 @@ export interface PendingFile {
   file?: File;
 }
 
+export interface PendingApprovalDto {
+  approvalId: string;
+  action: string;
+  title: string;
+  options: { label: string; value: string }[];
+  agentGroupId: string | null;
+  agentGroupName: string | null;
+  createdAt: string;
+}
+
 export interface RouterApi {
   selectGroup: (gid: string) => Promise<void>;
   loadThreads: (gid: string) => Promise<void>;

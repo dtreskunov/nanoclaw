@@ -15522,18 +15522,22 @@ var toastMessage = y3(null);
 var previewBlock = y3(null);
 var nowTick = y3(Date.now());
 var pinnedContext = y3([]);
+var pendingApprovals = y3([]);
+var respondingApprovalIds = y3(/* @__PURE__ */ new Set());
 var refs = {
   ws: null,
   reconnectTimer: null,
   reconnectAttempt: 0,
   pollTimer: null,
   threadsPollTimer: null,
+  approvalsPollTimer: null,
   seenIds: /* @__PURE__ */ new Set(),
   suppressHashCount: 0,
   uploadDragDepth: 0
 };
 var POLL_INTERVAL_MS = 1e4;
 var THREADS_POLL_MS = 2e4;
+var APPROVALS_POLL_MS = 15e3;
 var UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 var UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
 var UPLOAD_MAX_FILES = 10;
@@ -17639,6 +17643,8 @@ function installLivenessHandlers() {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
     nowTick.value = Date.now();
+    loadApprovals().catch(() => {
+    });
     if (!threadId.value) return;
     refetchThreadHistory(true).catch((err) => console.error("resume catchup failed", err));
     const ws = refs.ws;
@@ -17651,6 +17657,44 @@ function installLivenessHandlers() {
       connectChatWs();
     }
   });
+}
+async function loadApprovals() {
+  try {
+    const res = await api("api/approvals");
+    pendingApprovals.value = Array.isArray(res.approvals) ? res.approvals : [];
+  } catch {
+  }
+}
+function startApprovalsPoll() {
+  if (refs.approvalsPollTimer) return;
+  loadApprovals().catch(() => {
+  });
+  refs.approvalsPollTimer = setInterval(() => {
+    if (document.hidden) return;
+    loadApprovals().catch(() => {
+    });
+  }, APPROVALS_POLL_MS);
+}
+async function respondApproval(approvalId, value) {
+  if (respondingApprovalIds.value.has(approvalId)) return;
+  const next = new Set(respondingApprovalIds.value);
+  next.add(approvalId);
+  respondingApprovalIds.value = next;
+  try {
+    const res = await postJson(
+      `api/approvals/${encodeURIComponent(approvalId)}/respond`,
+      { value }
+    );
+    if (!res.ok) throw new Error(res.data?.error || "HTTP " + res.status);
+    pendingApprovals.value = pendingApprovals.value.filter((a4) => a4.approvalId !== approvalId);
+  } catch (err) {
+    console.error("approval respond failed", err);
+    chatStatus.value = "approval failed: " + (err instanceof Error ? err.message : String(err));
+  } finally {
+    const cleared = new Set(respondingApprovalIds.value);
+    cleared.delete(approvalId);
+    respondingApprovalIds.value = cleared;
+  }
 }
 
 // node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
@@ -18109,6 +18153,42 @@ function ThoughtGroup({ thoughts, answer }) {
     )
   ] });
 }
+function ApprovalsBanner() {
+  const list = pendingApprovals.value;
+  if (list.length === 0) return null;
+  const busy = respondingApprovalIds.value;
+  return /* @__PURE__ */ u4("div", { class: "approvals-banner", children: [
+    /* @__PURE__ */ u4("div", { class: "approvals-header", children: [
+      "Pending approvals ",
+      /* @__PURE__ */ u4("span", { class: "approvals-count", children: [
+        "(",
+        list.length,
+        ")"
+      ] })
+    ] }),
+    list.map((a4) => /* @__PURE__ */ u4("div", { class: "approval-row", children: [
+      /* @__PURE__ */ u4("div", { class: "approval-text", children: [
+        /* @__PURE__ */ u4("div", { class: "approval-title", children: a4.title || a4.action }),
+        /* @__PURE__ */ u4("div", { class: "approval-meta", children: [
+          a4.agentGroupName ? /* @__PURE__ */ u4("span", { children: a4.agentGroupName }) : /* @__PURE__ */ u4("span", { children: "Global" }),
+          /* @__PURE__ */ u4("span", { class: "dot", children: "\xB7" }),
+          /* @__PURE__ */ u4(RelativeTime, { ts: a4.createdAt })
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("div", { class: "approval-actions", children: a4.options.length === 0 ? /* @__PURE__ */ u4("span", { class: "approval-disabled", children: "no options" }) : a4.options.map((o4) => /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "approval-btn approval-" + (o4.value === "approve" ? "approve" : o4.value === "reject" ? "reject" : "neutral"),
+          disabled: busy.has(a4.approvalId),
+          onClick: () => respondApproval(a4.approvalId, o4.value).catch(console.error),
+          children: o4.label
+        },
+        o4.value
+      )) })
+    ] }, a4.approvalId))
+  ] });
+}
 function MessageLog() {
   const ref = A2(null);
   y2(() => {
@@ -18279,6 +18359,7 @@ function ChatMain() {
     };
   }, []);
   return /* @__PURE__ */ u4("section", { class: "chat-main", id: "chat-main", ref, children: [
+    /* @__PURE__ */ u4(ApprovalsBanner, {}),
     /* @__PURE__ */ u4(MessageLog, {}),
     /* @__PURE__ */ u4("div", { class: "status", id: "chat-status", children: chatStatus.value }),
     /* @__PURE__ */ u4(ContextChip, {}),
@@ -19768,6 +19849,7 @@ async function init() {
   applyHash(router).catch((err) => console.error("initial route failed", err));
   const app = document.getElementById("app");
   if (app) D(/* @__PURE__ */ u4(App, {}), app);
+  startApprovalsPoll();
   try {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("settings") === "1") {

@@ -15,7 +15,9 @@ import { getAgentGroup } from '../../../db/agent-groups.js';
 import { getDb } from '../../../db/connection.js';
 import { log } from '../../../log.js';
 import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
-import { hasAdminPrivilege } from '../../../modules/permissions/db/user-roles.js';
+import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
+import { dispatchResponse } from '../../../response-registry.js';
+import type { PendingApproval } from '../../../types.js';
 import { authenticate, recordAccess } from '../auth.js';
 import { createDownloadToken, redeemDownloadToken } from '../download-tokens.js';
 import { uiBaseUrl } from '../server.js';
@@ -194,7 +196,17 @@ on(
   '/api/groups/:gid/share-token',
   authed((ctx, userId, params) => handleShareToken(ctx, userId, params.gid)),
 );
-
+// Pending approvals visible to this user (banner inbox in ChatMain).
+on(
+  'GET',
+  '/api/approvals',
+  authed((ctx, userId) => handleListApprovals(ctx, userId)),
+);
+on(
+  'POST',
+  '/api/approvals/:id/respond',
+  authed((ctx, userId, params) => handleRespondApproval(ctx, userId, params.id)),
+);
 // ── handlers ──────────────────────────────────────────────────────────────
 
 function handleMe(ctx: Ctx, userId: string): void {
@@ -222,6 +234,102 @@ function handleGroups(ctx: Ctx, userId: string): void {
     lastActivityAt: lastByGroup.get(g.id) ?? null,
   }));
   json(ctx, 200, { groups });
+}
+
+interface ApprovalDto {
+  approvalId: string;
+  action: string;
+  title: string;
+  options: { label: string; value: string }[];
+  agentGroupId: string | null;
+  agentGroupName: string | null;
+  createdAt: string;
+}
+
+function handleListApprovals(ctx: Ctx, userId: string): void {
+  // pending_approvals are unbounded global rows; filter to those the user
+  // is eligible to approve. Owner/global-admin sees all (incl. agent_group_id IS NULL);
+  // a scoped admin sees only rows for their agent groups.
+  const rows = getDb()
+    .prepare("SELECT * FROM pending_approvals WHERE status = 'pending' ORDER BY created_at DESC")
+    .all() as PendingApproval[];
+  const elevated = isOwner(userId) || isGlobalAdmin(userId);
+  const groupNameCache = new Map<string, string | null>();
+  const visible: ApprovalDto[] = [];
+  for (const r of rows) {
+    if (r.agent_group_id == null) {
+      if (!elevated) continue;
+    } else if (!hasAdminPrivilege(userId, r.agent_group_id)) {
+      continue;
+    }
+    let groupName: string | null = null;
+    if (r.agent_group_id) {
+      if (groupNameCache.has(r.agent_group_id)) {
+        groupName = groupNameCache.get(r.agent_group_id) ?? null;
+      } else {
+        const g = getAgentGroup(r.agent_group_id);
+        groupName = g?.name ?? null;
+        groupNameCache.set(r.agent_group_id, groupName);
+      }
+    }
+    let options: { label: string; value: string }[] = [];
+    try {
+      const parsed = JSON.parse(r.options_json) as { label?: string; value?: string }[];
+      if (Array.isArray(parsed)) {
+        options = parsed
+          .filter((o) => o && typeof o.label === 'string' && typeof o.value === 'string')
+          .map((o) => ({ label: o.label as string, value: o.value as string }));
+      }
+    } catch {
+      // ignore — fall back to empty options
+    }
+    visible.push({
+      approvalId: r.approval_id,
+      action: r.action,
+      title: r.title,
+      options,
+      agentGroupId: r.agent_group_id,
+      agentGroupName: groupName,
+      createdAt: r.created_at,
+    });
+  }
+  json(ctx, 200, { approvals: visible });
+}
+
+async function handleRespondApproval(ctx: Ctx, userId: string, approvalId: string): Promise<void> {
+  const row = getDb().prepare('SELECT * FROM pending_approvals WHERE approval_id = ?').get(approvalId) as
+    | PendingApproval
+    | undefined;
+  if (!row) return json(ctx, 404, { error: 'not_found' });
+  if (row.status !== 'pending') return json(ctx, 409, { error: 'not_pending' });
+  if (row.agent_group_id == null) {
+    if (!isOwner(userId) && !isGlobalAdmin(userId)) return json(ctx, 403, { error: 'forbidden' });
+  } else if (!hasAdminPrivilege(userId, row.agent_group_id)) {
+    return json(ctx, 403, { error: 'forbidden' });
+  }
+
+  let body: { value?: unknown };
+  try {
+    body = (await readJsonBody(ctx.req)) as { value?: unknown };
+  } catch {
+    return json(ctx, 400, { error: 'invalid_body' });
+  }
+  const value = typeof body?.value === 'string' ? body.value : null;
+  if (!value) return json(ctx, 400, { error: 'value_required' });
+
+  const claimed = await dispatchResponse({
+    questionId: approvalId,
+    value,
+    userId,
+    channelType: 'web',
+    platformId: userId,
+    threadId: null,
+  });
+  if (!claimed) {
+    log.warn('Web approval response unclaimed', { approvalId, userId, value });
+    return json(ctx, 500, { error: 'unhandled' });
+  }
+  json(ctx, 200, { ok: true });
 }
 
 function handleTree(ctx: Ctx, userId: string, groupId: string, relPath: string): void {

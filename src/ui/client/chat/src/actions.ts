@@ -24,10 +24,13 @@ import {
   isMobile,
   nowTick,
   pinnedContext,
+  pendingApprovals,
+  respondingApprovalIds,
   POLL_INTERVAL_MS,
   THREADS_POLL_MS,
+  APPROVALS_POLL_MS,
 } from './state';
-import { api } from './api';
+import { api, postJson } from './api';
 import { writeHash } from './hash';
 import { maybeNotify } from './notify';
 import { parentPath } from './utils';
@@ -40,6 +43,7 @@ import type {
   TreeEntry,
   PreviewBlock,
   PendingFile,
+  PendingApprovalDto,
   WsPayload,
 } from './types';
 
@@ -719,6 +723,9 @@ export function installLivenessHandlers(): void {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     nowTick.value = Date.now();
+    loadApprovals().catch(() => {
+      /* ignore */
+    });
     if (!threadId.value) return;
     refetchThreadHistory(true).catch((err) => console.error('resume catchup failed', err));
     const ws = refs.ws;
@@ -731,4 +738,49 @@ export function installLivenessHandlers(): void {
       connectChatWs();
     }
   });
+}
+
+// ── pending approvals (banner inbox) ────────────────────────────────
+export async function loadApprovals(): Promise<void> {
+  try {
+    const res = await api<{ approvals: PendingApprovalDto[] }>('api/approvals');
+    pendingApprovals.value = Array.isArray(res.approvals) ? res.approvals : [];
+  } catch {
+    // network/auth blip — leave the previous list visible
+  }
+}
+
+export function startApprovalsPoll(): void {
+  if (refs.approvalsPollTimer) return;
+  loadApprovals().catch(() => {
+    /* ignore */
+  });
+  refs.approvalsPollTimer = setInterval(() => {
+    if (document.hidden) return;
+    loadApprovals().catch(() => {
+      /* ignore */
+    });
+  }, APPROVALS_POLL_MS);
+}
+
+export async function respondApproval(approvalId: string, value: string): Promise<void> {
+  if (respondingApprovalIds.value.has(approvalId)) return;
+  const next = new Set(respondingApprovalIds.value);
+  next.add(approvalId);
+  respondingApprovalIds.value = next;
+  try {
+    const res = await postJson<{ ok?: boolean; error?: string }>(
+      `api/approvals/${encodeURIComponent(approvalId)}/respond`,
+      { value },
+    );
+    if (!res.ok) throw new Error(res.data?.error || 'HTTP ' + res.status);
+    pendingApprovals.value = pendingApprovals.value.filter((a) => a.approvalId !== approvalId);
+  } catch (err) {
+    console.error('approval respond failed', err);
+    chatStatus.value = 'approval failed: ' + (err instanceof Error ? err.message : String(err));
+  } finally {
+    const cleared = new Set(respondingApprovalIds.value);
+    cleared.delete(approvalId);
+    respondingApprovalIds.value = cleared;
+  }
 }

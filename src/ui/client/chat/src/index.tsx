@@ -9,7 +9,7 @@ import { initNotif } from './notify';
 import { restorePanelState, applyPanelClasses } from './panels';
 import { applyHash, applyAdminFlag, parseHash } from './hash';
 import { router } from './router';
-import { installLivenessHandlers } from './actions';
+import { installLivenessHandlers, startApprovalsPoll } from './actions';
 import type { Group } from './types';
 
 interface MeResponse { displayName?: string; userId: string }
@@ -75,6 +75,7 @@ async function init(): Promise<void> {
   applyHash(router).catch((err) => console.error('initial route failed', err));
   const app = document.getElementById('app');
   if (app) render(<App />, app);
+  startApprovalsPoll();
   try {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get('settings') === '1') {

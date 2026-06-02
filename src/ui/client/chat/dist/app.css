@@ -1098,6 +1098,103 @@ header .mobile-only {
     padding: 10px 10px;
   }
 }
+.chat-main .approvals-banner {
+  border-bottom: 1px solid var(--border);
+  background: var(--wash);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-main .approvals-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.chat-main .approvals-header .approvals-count {
+  font-weight: 600;
+  color: var(--fg);
+}
+.chat-main .approval-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.chat-main .approval-text {
+  flex: 1;
+  min-width: 0;
+}
+.chat-main .approval-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-main .approval-meta {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.chat-main .approval-meta .dot {
+  opacity: 0.6;
+}
+.chat-main .approval-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.chat-main .approval-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+.chat-main .approval-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.chat-main .approval-btn.approval-approve {
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+.chat-main .approval-btn.approval-approve:hover:not(:disabled) {
+  background: #2e7d32;
+  color: #fff;
+}
+.chat-main .approval-btn.approval-reject {
+  border-color: #c62828;
+  color: #c62828;
+}
+.chat-main .approval-btn.approval-reject:hover:not(:disabled) {
+  background: #c62828;
+  color: #fff;
+}
+.chat-main .approval-disabled {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+@media (max-width: 720px) {
+  .chat-main .approval-row {
+    flex-wrap: wrap;
+  }
+  .chat-main .approval-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
 
 /* src/components/FilesPane.css */
 .files-pane {

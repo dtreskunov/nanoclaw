@@ -5,13 +5,13 @@ import type { JSX } from 'preact';
 import { useRef, useEffect, useState } from 'preact/hooks';
 import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
-  threads, groupId, channelMeta, pinnedContext,
+  threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
 import { renderMarkdown, rewriteFileLinks, fmtBytesShort } from '../utils';
 import {
   sendChat, addPendingFiles, removePending, clearPending,
-  navFile, removePinnedPath, clearPinnedContext,
+  navFile, removePinnedPath, clearPinnedContext, respondApproval,
 } from '../actions';
 import { RelativeTime } from './RelativeTime';
 import type { ChatMessage } from '../types';
@@ -90,6 +90,44 @@ function ThoughtGroup({ thoughts, answer }: { thoughts: ChatMessage[]; answer: C
         title={title}
         onClick={() => setShowThoughts((v) => !v)}
       >{label}</button>
+    </div>
+  );
+}
+
+function ApprovalsBanner() {
+  const list = pendingApprovals.value;
+  if (list.length === 0) return null;
+  const busy = respondingApprovalIds.value;
+  return (
+    <div class="approvals-banner">
+      <div class="approvals-header">
+        Pending approvals <span class="approvals-count">({list.length})</span>
+      </div>
+      {list.map((a) => (
+        <div class="approval-row" key={a.approvalId}>
+          <div class="approval-text">
+            <div class="approval-title">{a.title || a.action}</div>
+            <div class="approval-meta">
+              {a.agentGroupName ? <span>{a.agentGroupName}</span> : <span>Global</span>}
+              <span class="dot">{'\u00b7'}</span>
+              <RelativeTime ts={a.createdAt} />
+            </div>
+          </div>
+          <div class="approval-actions">
+            {a.options.length === 0
+              ? <span class="approval-disabled">no options</span>
+              : a.options.map((o) => (
+                <button
+                  type="button"
+                  class={'approval-btn approval-' + (o.value === 'approve' ? 'approve' : o.value === 'reject' ? 'reject' : 'neutral')}
+                  disabled={busy.has(a.approvalId)}
+                  onClick={() => respondApproval(a.approvalId, o.value).catch(console.error)}
+                  key={o.value}
+                >{o.label}</button>
+              ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -271,6 +309,7 @@ export function ChatMain() {
   }, []);
   return (
     <section class="chat-main" id="chat-main" ref={ref}>
+      <ApprovalsBanner />
       <MessageLog />
       <div class="status" id="chat-status">{chatStatus.value}</div>
       <ContextChip />
