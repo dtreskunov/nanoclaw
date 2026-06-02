@@ -86,6 +86,10 @@ function ChannelSection({ ct, items, defaultOpen }: { ct: string; items: Thread[
   const [open, setOpen] = useState(defaultOpen);
   const meta = channelMeta(ct);
   const totalMsgs = items.reduce((sum, t) => sum + (t.messageCount || 0), 0);
+  const lastActivityAt = items.reduce((latest, t) => {
+    const ts = t.lastActivityAt || '';
+    return ts > latest ? ts : latest;
+  }, '');
   const handles = Array.from(new Set(items.map((t) => t.counterparty).filter((h): h is string => !!h)));
   const handleStr = handles.length === 0
     ? ''
@@ -103,7 +107,10 @@ function ChannelSection({ ct, items, defaultOpen }: { ct: string; items: Thread[
           <span class="chev" aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span>
           <span class="ch-pill" aria-hidden="true">{meta.icon}</span>
           <span class="label">{meta.label}</span>
-          <span class="count">{items.length} {'\u00b7'} {totalMsgs} msg</span>
+          <span class="count">
+            {lastActivityAt ? <><RelativeTime ts={lastActivityAt} />{' \u00b7 '}</> : null}
+            {items.length} thr {'\u00b7'} {totalMsgs} msg
+          </span>
         </span>
         {handleStr
           ? <span class="handle" title={handles.join(', ')}>{handleStr}</span>

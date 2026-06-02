@@ -17967,6 +17967,10 @@ function ChannelSection({ ct, items, defaultOpen }) {
   const [open, setOpen] = h2(defaultOpen);
   const meta = channelMeta(ct);
   const totalMsgs = items.reduce((sum, t4) => sum + (t4.messageCount || 0), 0);
+  const lastActivityAt = items.reduce((latest, t4) => {
+    const ts = t4.lastActivityAt || "";
+    return ts > latest ? ts : latest;
+  }, "");
   const handles = Array.from(new Set(items.map((t4) => t4.counterparty).filter((h5) => !!h5)));
   const handleStr = handles.length === 0 ? "" : handles.length === 1 ? handles[0] : `${handles[0]} +${handles.length - 1}`;
   return /* @__PURE__ */ u4("div", { class: "thread-section" + (open ? " open" : " collapsed"), children: [
@@ -17983,8 +17987,12 @@ function ChannelSection({ ct, items, defaultOpen }) {
             /* @__PURE__ */ u4("span", { class: "ch-pill", "aria-hidden": "true", children: meta.icon }),
             /* @__PURE__ */ u4("span", { class: "label", children: meta.label }),
             /* @__PURE__ */ u4("span", { class: "count", children: [
+              lastActivityAt ? /* @__PURE__ */ u4(k, { children: [
+                /* @__PURE__ */ u4(RelativeTime, { ts: lastActivityAt }),
+                " \xB7 "
+              ] }) : null,
               items.length,
-              " ",
+              " thr ",
               "\xB7",
               " ",
               totalMsgs,
