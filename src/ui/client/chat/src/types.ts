@@ -127,6 +127,7 @@ export interface PendingApprovalDto {
   approvalId: string;
   action: string;
   title: string;
+  details: string | null;
   options: { label: string; value: string }[];
   agentGroupId: string | null;
   agentGroupName: string | null;

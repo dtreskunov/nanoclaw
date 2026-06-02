@@ -18169,6 +18169,7 @@ function ApprovalsBanner() {
     list.map((a4) => /* @__PURE__ */ u4("div", { class: "approval-row", children: [
       /* @__PURE__ */ u4("div", { class: "approval-text", children: [
         /* @__PURE__ */ u4("div", { class: "approval-title", children: a4.title || a4.action }),
+        a4.details ? /* @__PURE__ */ u4("div", { class: "approval-details", children: a4.details }) : null,
         /* @__PURE__ */ u4("div", { class: "approval-meta", children: [
           a4.agentGroupName ? /* @__PURE__ */ u4("span", { children: a4.agentGroupName }) : /* @__PURE__ */ u4("span", { children: "Global" }),
           /* @__PURE__ */ u4("span", { class: "dot", children: "\xB7" }),

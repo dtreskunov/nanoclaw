@@ -13,6 +13,7 @@ import Router from 'find-my-way';
 import { GROUPS_DIR } from '../../../config.js';
 import { getAgentGroup } from '../../../db/agent-groups.js';
 import { getDb } from '../../../db/connection.js';
+import { getSession } from '../../../db/sessions.js';
 import { log } from '../../../log.js';
 import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
 import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
@@ -240,10 +241,55 @@ interface ApprovalDto {
   approvalId: string;
   action: string;
   title: string;
+  details: string | null;
   options: { label: string; value: string }[];
   agentGroupId: string | null;
   agentGroupName: string | null;
   createdAt: string;
+}
+
+/** Build a one-line description of the approval from the persisted payload
+ * for known actions. The original `question` text from requestApproval is
+ * not stored on the row, so we re-derive a comparable summary here. */
+function describeApproval(action: string, payloadJson: string): string | null {
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(payloadJson) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (action === 'install_packages') {
+    const apt = Array.isArray(payload.apt) ? (payload.apt as string[]) : [];
+    const npm = Array.isArray(payload.npm) ? (payload.npm as string[]) : [];
+    const pkgs = [...apt.map((p) => `apt: ${p}`), ...npm.map((p) => `npm: ${p}`)].join(', ');
+    const reason = typeof payload.reason === 'string' && payload.reason ? ` — ${payload.reason}` : '';
+    return pkgs ? `${pkgs}${reason}` : reason || null;
+  }
+  if (action === 'add_mcp_server') {
+    const name = typeof payload.name === 'string' ? payload.name : '';
+    const url = typeof payload.url === 'string' ? payload.url : '';
+    const command = typeof payload.command === 'string' ? payload.command : '';
+    const transport = typeof payload.transport === 'string' ? payload.transport.toUpperCase() : '';
+    if (url) return `${name} (${transport} ${url})`;
+    if (command) return `${name} (stdio: ${command})`;
+    return name || null;
+  }
+  if (action === 'cli_command') {
+    const frame = (payload.frame as Record<string, unknown> | undefined) || undefined;
+    if (frame) {
+      const cmd = typeof frame.command === 'string' ? frame.command : '';
+      const args = frame.args as Record<string, unknown> | undefined;
+      if (args && typeof args === 'object') {
+        const parts = Object.entries(args)
+          .filter(([k]) => k !== 'help')
+          .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+          .join(' ');
+        return parts ? `${cmd} ${parts}` : cmd || null;
+      }
+      return cmd || null;
+    }
+  }
+  return null;
 }
 
 function handleListApprovals(ctx: Ctx, userId: string): void {
@@ -262,14 +308,22 @@ function handleListApprovals(ctx: Ctx, userId: string): void {
     } else if (!hasAdminPrivilege(userId, r.agent_group_id)) {
       continue;
     }
+    // Display group: prefer row.agent_group_id; fall back to the session's
+    // agent group (cli_command rows have null agent_group_id but their
+    // session is scoped to one).
+    let displayGroupId: string | null = r.agent_group_id;
+    if (displayGroupId == null && r.session_id) {
+      const s = getSession(r.session_id);
+      displayGroupId = s?.agent_group_id ?? null;
+    }
     let groupName: string | null = null;
-    if (r.agent_group_id) {
-      if (groupNameCache.has(r.agent_group_id)) {
-        groupName = groupNameCache.get(r.agent_group_id) ?? null;
+    if (displayGroupId) {
+      if (groupNameCache.has(displayGroupId)) {
+        groupName = groupNameCache.get(displayGroupId) ?? null;
       } else {
-        const g = getAgentGroup(r.agent_group_id);
+        const g = getAgentGroup(displayGroupId);
         groupName = g?.name ?? null;
-        groupNameCache.set(r.agent_group_id, groupName);
+        groupNameCache.set(displayGroupId, groupName);
       }
     }
     let options: { label: string; value: string }[] = [];
@@ -287,8 +341,9 @@ function handleListApprovals(ctx: Ctx, userId: string): void {
       approvalId: r.approval_id,
       action: r.action,
       title: r.title,
+      details: describeApproval(r.action, r.payload),
       options,
-      agentGroupId: r.agent_group_id,
+      agentGroupId: displayGroupId,
       agentGroupName: groupName,
       createdAt: r.created_at,
     });
