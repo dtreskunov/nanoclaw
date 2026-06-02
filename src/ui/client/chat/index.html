@@ -57,7 +57,7 @@
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; overscroll-behavior-x: none; }
       body { font: 14px/1.4 system-ui, -apple-system, sans-serif; height: 100vh; height: 100dvh; height: var(--app-height, 100dvh); overflow-y: hidden; }
-      #app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+      #app { height: 100%; display: flex; flex-direction: column; min-height: 0; }
       button { font: inherit; padding: 4px 10px; border: 1px solid var(--border); background: transparent; border-radius: 4px; cursor: pointer; color: inherit; }
       button:hover { background: var(--wash); }
       .icon-btn { padding: 4px 8px; }
@@ -77,6 +77,7 @@
         flex: 1;
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: minmax(0, 1fr);
         min-height: 0;
       }
       main.threads-collapsed { grid-template-columns: 40px 1fr 1fr; }
@@ -96,7 +97,7 @@
       /* the `collapsed` class on the pane; CSS handles the rest.            */
       :root { --handle-h: 40px; --collapsed-w: 40px; }
 
-      .nc-pane { position: relative; overflow: hidden; min-height: 0; }
+      .nc-pane { position: relative; overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
       .nc-pane.collapsed { cursor: pointer; }
       .nc-pane.collapsed:hover > .head { background: var(--wash-soft); }
       .nc-pane.collapsed > :not(.head) { display: none; }
@@ -249,9 +250,9 @@
       .files-pane .breadcrumb .crumb.current:hover { background: transparent; }
       .files-pane .breadcrumb .crumb.root { padding: 3px 6px; font-size: 14px; line-height: 1; }
       .files-pane .breadcrumb .sep { color: var(--muted); opacity: 0.5; padding: 0 1px; user-select: none; }
-      .files-pane .files-body { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
       .files-pane .files-fab {
-        position: absolute; right: 16px; bottom: 16px;
+        position: absolute; right: 20px;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
         width: 44px; height: 44px; border-radius: 50%;
         background: var(--accent); color: #fff;
         border: 1px solid var(--border);
@@ -679,7 +680,7 @@
         }
         .threads-rail, .files-pane {
           position: fixed;
-          top: 0; bottom: 0;
+          top: 0; height: var(--app-height, 100dvh);
           width: min(86vw, 340px) !important;
           background: Canvas;
           z-index: 10;
@@ -703,12 +704,12 @@
           width: auto !important;
           padding: 8px 10px; gap: 8px; align-items: center;
         }
-        .threads-rail .threads-actions, .files-pane .files-body {
+        .threads-rail .threads-actions {
           position: static !important;
         }
         .threads-rail .list { position: static !important; flex: 1; }
         .threads-rail, .files-pane { display: flex; flex-direction: column; }
-        .files-pane .files-body { flex: 1; min-height: 0; overflow: auto; }
+        .files-pane .files-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; top: 0; }
         .files-pane .row { padding: 10px 12px; font-size: 14px; min-height: 40px; }
         .threads-rail .head { display: flex; }
         .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

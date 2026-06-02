@@ -260,8 +260,8 @@ export function FilesPane() {
           Drag & drop files here to upload to <code id="dropzone-path">/${treePath.value}</code>
         </div>
         <${Preview} />
-        ${fab}
       </div>
+      ${fab}
     <//>
   `;
 }
