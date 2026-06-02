@@ -325,15 +325,7 @@
         padding-bottom: 8px; margin-bottom: 10px;
         border-bottom: 1px solid var(--border);
       }
-      .files-pane .preview-toolbar .preview-meta {
-        flex: 1; min-width: 0;
-        display: flex; align-items: center; gap: 8px;
-        font-size: 11px; color: var(--muted);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      .files-pane .preview-toolbar .preview-meta > * + *::before {
-        content: '\00B7'; margin-right: 8px; opacity: 0.6;
-      }
+      .files-pane .preview-toolbar .preview-spacer { flex: 1; }
       .files-pane .preview-toolbar .preview-actions {
         display: flex; align-items: center; gap: 4px;
       }

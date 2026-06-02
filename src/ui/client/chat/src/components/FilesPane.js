@@ -143,10 +143,7 @@ function Preview() {
               disabled=${!fp}
               title=${clippyTitle}
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
-      <span class="preview-meta">
-        ${p.size != null ? html`<span>${fmtBytes(p.size)}</span>` : null}
-        ${p.mtime ? html`<${RelativeTime} ts=${p.mtime} /> ` : null}
-      </span>
+      <span class="preview-spacer"></span>
       <span class="preview-actions">
         <button type="button" class="text-btn open-tab"
                 onClick=${openInNewTab} disabled=${!fp || !gid}
