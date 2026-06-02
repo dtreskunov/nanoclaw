@@ -1,5 +1,6 @@
 // Threads rail: head + new-chat button + scrollable list. Pane shell
 // (collapse / drawer / chevron toggle) lives in <Pane>.
+import { useState } from 'preact/hooks';
 import { html } from '../html.js';
 import {
   threads, threadId, groupId, drawerOpen, channelMeta,
@@ -8,6 +9,8 @@ import { openChat, deleteThread } from '../actions.js';
 import { tsKey } from '../utils.js';
 import { Pane } from './Pane.js';
 import { RelativeTime } from './RelativeTime.js';
+
+const OLD_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
 
 function threadCtxOf(t) {
   if (!t || !t.channelType || t.channelType === 'web') return null;
@@ -65,6 +68,39 @@ function DmRow({ t }) {
   `;
 }
 
+function renderRow(t) {
+  return t.kind === 'dm'
+    ? html`<${DmRow} key=${t.threadId} t=${t} />`
+    : html`<${ThreadRow} key=${t.threadId} t=${t} />`;
+}
+
+function ChannelSection({ label, items }) {
+  const [showOlder, setShowOlder] = useState(false);
+  const cutoff = Date.now() - OLD_THRESHOLD_MS;
+  const recent = [];
+  const old = [];
+  for (const t of items) {
+    const ts = tsKey(t.lastActivityAt);
+    if (ts && ts >= cutoff) recent.push(t);
+    else old.push(t);
+  }
+  // If the active thread is in the old bucket, surface it alongside
+  // recent so the user sees what's selected without expanding.
+  const activeOld = old.find((t) => t.threadId === threadId.value);
+  const visible = activeOld && !showOlder ? [...recent, activeOld] : recent;
+  const hidden = activeOld && !showOlder ? old.filter((t) => t !== activeOld) : old;
+  const visibleList = showOlder ? items : visible;
+  return html`
+    <div class="thread-section">${label}</div>
+    ${visibleList.map(renderRow)}
+    ${!showOlder && hidden.length > 0
+      ? html`<button type="button" class="thread-show-older" onClick=${() => setShowOlder(true)}>
+          Show ${hidden.length} older
+        </button>`
+      : null}
+  `;
+}
+
 export function ThreadsRail() {
   const list = threads.value;
   const onNewChat = () => {
@@ -108,12 +144,7 @@ export function ThreadsRail() {
       <div class="list" id="threads-list">
         ${list.length === 0
           ? html`<div class="empty">No threads yet</div>`
-          : sections.map((s) => html`
-            <div class="thread-section">${s.label}</div>
-            ${s.items.map((t) => t.kind === 'dm'
-              ? html`<${DmRow} key=${t.threadId} t=${t} />`
-              : html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
-          `)}
+          : sections.map((s) => html`<${ChannelSection} key=${s.ct} label=${s.label} items=${s.items} />`)}
       </div>
     <//>
   `;

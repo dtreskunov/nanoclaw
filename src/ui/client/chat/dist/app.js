@@ -17735,6 +17735,7 @@ function RelativeTime({ ts, className }) {
 }
 
 // src/components/ThreadsRail.js
+var OLD_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1e3;
 function threadCtxOf2(t5) {
   if (!t5 || !t5.channelType || t5.channelType === "web") return null;
   return { channelType: t5.channelType, messagingGroupId: t5.messagingGroupId, canSend: !!t5.canSend };
@@ -17790,6 +17791,31 @@ function DmRow({ t: t5 }) {
     </div>
   `;
 }
+function renderRow(t5) {
+  return t5.kind === "dm" ? html`<${DmRow} key=${t5.threadId} t=${t5} />` : html`<${ThreadRow} key=${t5.threadId} t=${t5} />`;
+}
+function ChannelSection({ label, items }) {
+  const [showOlder, setShowOlder] = h2(false);
+  const cutoff = Date.now() - OLD_THRESHOLD_MS;
+  const recent = [];
+  const old = [];
+  for (const t5 of items) {
+    const ts = tsKey(t5.lastActivityAt);
+    if (ts && ts >= cutoff) recent.push(t5);
+    else old.push(t5);
+  }
+  const activeOld = old.find((t5) => t5.threadId === threadId.value);
+  const visible = activeOld && !showOlder ? [...recent, activeOld] : recent;
+  const hidden = activeOld && !showOlder ? old.filter((t5) => t5 !== activeOld) : old;
+  const visibleList = showOlder ? items : visible;
+  return html`
+    <div class="thread-section">${label}</div>
+    ${visibleList.map(renderRow)}
+    ${!showOlder && hidden.length > 0 ? html`<button type="button" class="thread-show-older" onClick=${() => setShowOlder(true)}>
+          Show ${hidden.length} older
+        </button>` : null}
+  `;
+}
 function ThreadsRail() {
   const list = threads.value;
   const onNewChat = () => {
@@ -17823,10 +17849,7 @@ function ThreadsRail() {
         </button>
       </div>
       <div class="list" id="threads-list">
-        ${list.length === 0 ? html`<div class="empty">No threads yet</div>` : sections.map((s5) => html`
-            <div class="thread-section">${s5.label}</div>
-            ${s5.items.map((t5) => t5.kind === "dm" ? html`<${DmRow} key=${t5.threadId} t=${t5} />` : html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
-          `)}
+        ${list.length === 0 ? html`<div class="empty">No threads yet</div>` : sections.map((s5) => html`<${ChannelSection} key=${s5.ct} label=${s5.label} items=${s5.items} />`)}
       </div>
     <//>
   `;
