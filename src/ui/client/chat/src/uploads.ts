@@ -1,5 +1,5 @@
 // Admin write operations + upload progress strip.
-import { groupId, isAdmin, uploadItems, threadId, treePath } from './state';
+import { groupId, isAdmin, uploadItems, threadId, treePath, pinnedContext } from './state';
 import { postJson } from './api';
 import { loadTree } from './actions';
 import { requestInput, requestConfirm } from './components/PromptModal';
@@ -14,6 +14,11 @@ function joinPath(dir: string, name: string): string {
 
 interface ApiError {
   error?: string;
+}
+
+function dropPinned(paths: string[]): void {
+  if (paths.length === 0) return;
+  pinnedContext.value = pinnedContext.value.filter((p) => !paths.some((d) => p === d || p.startsWith(d + '/')));
 }
 
 export async function mkdirPrompt(): Promise<void> {
@@ -59,6 +64,9 @@ export async function renameEntry(entry: TreeEntry): Promise<void> {
     alert('rename failed: ' + (r.data.error || r.status));
     return;
   }
+  pinnedContext.value = pinnedContext.value.map((p) =>
+    p === entry.path ? toPath : p.startsWith(entry.path + '/') ? toPath + p.slice(entry.path.length) : p,
+  );
   await loadTree(treePath.value);
 }
 
@@ -76,6 +84,7 @@ export async function deleteEntry(entry: TreeEntry): Promise<void> {
     alert('delete failed: ' + (r.data.error || r.status));
     return;
   }
+  dropPinned([entry.path]);
   await loadTree(treePath.value);
 }
 
@@ -89,11 +98,14 @@ export async function deletePaths(paths: string[]): Promise<void> {
   });
   if (!ok) return;
   const errors: string[] = [];
+  const succeeded: string[] = [];
   for (const p of paths) {
     const r = await postJson<ApiError>(`api/groups/${groupId.value}/delete`, { path: p });
     if (!r.ok) errors.push(`${p}: ${r.data.error || r.status}`);
+    else succeeded.push(p);
   }
   if (errors.length) alert('Some deletes failed:\n' + errors.join('\n'));
+  dropPinned(succeeded);
   await loadTree(treePath.value);
 }
 

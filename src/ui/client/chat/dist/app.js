@@ -18292,6 +18292,12 @@ function curDir() {
 function joinPath(dir, name) {
   return dir ? dir + "/" + name : name;
 }
+function dropPinned(paths) {
+  if (paths.length === 0) return;
+  pinnedContext.value = pinnedContext.value.filter(
+    (p5) => !paths.some((d5) => p5 === d5 || p5.startsWith(d5 + "/"))
+  );
+}
 async function mkdirPrompt() {
   if (!groupId.value || !isAdmin.value) return;
   const name = await requestInput({ title: "New folder", placeholder: "folder name", okLabel: "Create" });
@@ -18319,6 +18325,9 @@ async function renameEntry(entry) {
     alert("rename failed: " + (r4.data.error || r4.status));
     return;
   }
+  pinnedContext.value = pinnedContext.value.map(
+    (p5) => p5 === entry.path ? toPath : p5.startsWith(entry.path + "/") ? toPath + p5.slice(entry.path.length) : p5
+  );
   await loadTree(treePath.value);
 }
 async function deleteEntry(entry) {
@@ -18335,6 +18344,7 @@ async function deleteEntry(entry) {
     alert("delete failed: " + (r4.data.error || r4.status));
     return;
   }
+  dropPinned([entry.path]);
   await loadTree(treePath.value);
 }
 async function deletePaths(paths) {
@@ -18347,11 +18357,14 @@ async function deletePaths(paths) {
   });
   if (!ok) return;
   const errors = [];
+  const succeeded = [];
   for (const p5 of paths) {
     const r4 = await postJson(`api/groups/${groupId.value}/delete`, { path: p5 });
     if (!r4.ok) errors.push(`${p5}: ${r4.data.error || r4.status}`);
+    else succeeded.push(p5);
   }
   if (errors.length) alert("Some deletes failed:\n" + errors.join("\n"));
+  dropPinned(succeeded);
   await loadTree(treePath.value);
 }
 function downloadPaths(paths, entries) {
