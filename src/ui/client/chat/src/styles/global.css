@@ -43,6 +43,10 @@
   /* Pane shell sizing (consumed by Pane.css and rail/files siblings). */
   --handle-h: 40px;
   --collapsed-w: 40px;
+  /* Visual height for the strip pinned to the bottom of each
+     column (chat composer / files drop-hint / collapsed channel
+     section). Mirrors --handle-h's role at the top. */
+  --bottom-row-h: 49px;
 }
 
 * { box-sizing: border-box; }

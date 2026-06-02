@@ -34,7 +34,7 @@
 .threads-rail .thread-section.open { flex: 1 1 0; }
 .threads-rail .thread-section.collapsed { flex: 0 0 auto; }
 .threads-rail .thread-section-header {
-  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px; justify-content: center;
   width: 100%;
   padding: 8px 10px;
   background: var(--wash-subtle);
@@ -43,6 +43,15 @@
   font: inherit; color: var(--fg);
   text-align: left;
   cursor: pointer;
+}
+.threads-rail .thread-section.collapsed > .thread-section-header {
+  min-height: var(--bottom-row-h);
+}
+/* Collapsed sections at the bottom of the rail show a single compact
+   row so they align with the chat composer and files drop-hint. The
+   handle (e.g. email address) only appears when the section is open. */
+.threads-rail .thread-section.collapsed > .thread-section-header > .handle {
+  display: none;
 }
 .threads-rail .thread-section-header:hover { background: var(--wash-soft); }
 .threads-rail .thread-section-header .row {
