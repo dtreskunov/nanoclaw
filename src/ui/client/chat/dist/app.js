@@ -16527,7 +16527,10 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
     }
   };
   const normalizeRel = (p5) => String(p5 || "").replace(/^\.?\/+/, "").replace(/^workspace\/+/, "");
-  const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+  const toFileUrl = (rel) => {
+    const segs = rel.split("/").filter(Boolean).map(encodeURIComponent);
+    return `api/groups/${gid}/files/${segs.join("/")}`;
+  };
   const attachPreviewClick = (a4, rel) => {
     a4.addEventListener("click", (ev) => {
       if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
@@ -16564,9 +16567,47 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
 }
 
 // src/hash.js
+function safeDecode(s5) {
+  try {
+    return decodeURIComponent(s5);
+  } catch {
+    return s5;
+  }
+}
 function parseHash() {
   const raw = location.hash.replace(/^#/, "");
   if (!raw) return null;
+  return raw.startsWith("g/") || raw === "g" ? parseNewFormat(raw) : parseLegacyFormat(raw);
+}
+function parseNewFormat(raw) {
+  const segs = raw.split("/");
+  if (segs[0] !== "g" || !segs[1]) return null;
+  const gid = safeDecode(segs[1]);
+  let i4 = 2;
+  let tid = null;
+  if (segs[i4] === "t" && segs[i4 + 1]) {
+    tid = safeDecode(segs[i4 + 1]);
+    i4 += 2;
+  }
+  let isDir = true;
+  let path = "";
+  if (segs[i4] === "f" || segs[i4] === "d") {
+    const kind = segs[i4];
+    const rest = segs.slice(i4 + 1).map(safeDecode).filter((s5) => s5 !== "");
+    path = rest.join("/");
+    isDir = kind === "d";
+  }
+  return {
+    groupId: gid,
+    path,
+    isDir,
+    threadId: tid,
+    channelType: null,
+    messagingGroupId: null,
+    _format: "new"
+  };
+}
+function parseLegacyFormat(raw) {
   const qIdx = raw.indexOf("?");
   const pathPart = qIdx < 0 ? raw : raw.slice(0, qIdx);
   const params = new URLSearchParams(qIdx < 0 ? "" : raw.slice(qIdx + 1));
@@ -16574,7 +16615,7 @@ function parseHash() {
   const ct = params.get("c") || null;
   const mg = params.get("mg") || null;
   const h5 = decodeURI(pathPart);
-  const base = { threadId: tid, channelType: ct, messagingGroupId: mg };
+  const base = { threadId: tid, channelType: ct, messagingGroupId: mg, _format: "legacy" };
   if (!h5) return tid ? { groupId: "", path: "", isDir: true, ...base } : null;
   const slash = h5.indexOf("/");
   if (slash < 0) return { groupId: h5, path: "", isDir: true, ...base };
@@ -16586,16 +16627,11 @@ function parseHash() {
 }
 function buildHash() {
   if (!groupId.value) return "";
-  let h5 = "#" + encodeURI(groupId.value);
-  if (filePath.value) h5 += "/" + encodeURI(filePath.value);
-  else if (treePath.value) h5 += "/" + encodeURI(treePath.value) + "/";
-  if (threadId.value) {
-    h5 += "?t=" + encodeURIComponent(threadId.value);
-    if (channelType.value && channelType.value !== "web") {
-      h5 += "&c=" + encodeURIComponent(channelType.value);
-      if (messagingGroupId.value) h5 += "&mg=" + encodeURIComponent(messagingGroupId.value);
-    }
-  }
+  const encSeg = (s5) => String(s5).split("/").filter(Boolean).map(encodeURIComponent).join("/");
+  let h5 = "#g/" + encodeURIComponent(groupId.value);
+  if (threadId.value) h5 += "/t/" + encodeURIComponent(threadId.value);
+  if (filePath.value) h5 += "/f/" + encSeg(filePath.value);
+  else if (treePath.value) h5 += "/d/" + encSeg(treePath.value) + "/";
   return h5;
 }
 function writeHash() {
@@ -16649,6 +16685,7 @@ async function applyHash(router2) {
     const name = parent ? parsed.path.slice(parent.length + 1) : parsed.path;
     await router2.selectFile({ path: parsed.path, name });
   }
+  if (parsed._format === "legacy") writeHash();
 }
 
 // src/notify.js
@@ -17098,7 +17135,9 @@ async function loadTree(p5) {
     treeEntries.value = [];
   });
   try {
-    const { entries } = await api(`api/groups/${encodeURIComponent(groupId.value)}/tree?path=${encodeURIComponent(p5)}`);
+    const segs = String(p5 || "").split("/").filter(Boolean).map(encodeURIComponent);
+    const url = `api/groups/${encodeURIComponent(groupId.value)}/dirs/${segs.length ? segs.join("/") + "/" : ""}`;
+    const { entries } = await api(url);
     treeEntries.value = entries || [];
   } catch (err) {
     const msg = /HTTP 404/.test(String(err && err.message)) ? "Not found. It may have been renamed or deleted." : String(err && err.message || err);
@@ -17119,7 +17158,8 @@ async function navFile(entry) {
 }
 async function selectFile(entry) {
   filePath.value = entry.path;
-  const url = `api/groups/${encodeURIComponent(groupId.value)}/file?path=${encodeURIComponent(entry.path)}`;
+  const segs = String(entry.path || "").split("/").filter(Boolean).map(encodeURIComponent);
+  const url = `api/groups/${encodeURIComponent(groupId.value)}/files/${segs.join("/")}`;
   let size = entry.size, mtime = entry.mtime;
   try {
     const h5 = await fetch(url, { method: "HEAD", credentials: "same-origin" });
@@ -17171,7 +17211,8 @@ async function selectFile(entry) {
 }
 async function fetchAndAttachMeta(p5) {
   const gid = groupId.value;
-  const u4 = `api/groups/${encodeURIComponent(gid)}/meta?path=${encodeURIComponent(p5)}`;
+  const segs = String(p5 || "").split("/").filter(Boolean).map(encodeURIComponent);
+  const u4 = `api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}?meta=1`;
   const r4 = await fetch(u4, { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
   const data = await r4.json();
@@ -17726,7 +17767,8 @@ function downloadPaths(paths, entries) {
     const single = paths[0];
     const entry = entries?.find((e4) => e4.path === single);
     if (entry && entry.type !== "dir") {
-      const url = `api/groups/${groupId.value}/file?path=${encodeURIComponent(single)}`;
+      const segs = String(single || "").split("/").filter(Boolean).map(encodeURIComponent);
+      const url = `api/groups/${encodeURIComponent(groupId.value)}/files/${segs.join("/")}`;
       triggerDownload(url, entry.name);
       return;
     }
@@ -17826,7 +17868,7 @@ async function notifyAgent(paths) {
 // src/components/ActionsMenu.js
 function rawFileUrl(groupId2, relPath) {
   const segs = String(relPath || "").split("/").filter(Boolean).map(encodeURIComponent);
-  return `api/groups/${encodeURIComponent(groupId2)}/raw/${segs.join("/")}`;
+  return `api/groups/${encodeURIComponent(groupId2)}/files/${segs.join("/")}`;
 }
 function openInNewTab(groupId2, relPath) {
   if (!groupId2 || !relPath) return;
@@ -18397,7 +18439,7 @@ function FilesPane() {
             aria-label="Open ${fp} in new tab"
             onClick=${() => {
     const segs = String(fp).split("/").filter(Boolean).map(encodeURIComponent);
-    const url = `api/groups/${encodeURIComponent(gid)}/raw/${segs.join("/")}`;
+    const url = `api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}`;
     window.open(url, "_blank", "noopener");
   }}>\u2197</button>
   ` : null;

@@ -82,7 +82,10 @@ export function rewriteFileLinks(root, groupId, onNavFile) {
   // path before normalizing/re-encoding for the API endpoint.
   const decodeHref = (h) => { try { return decodeURIComponent(h); } catch { return h; } };
   const normalizeRel = (p) => String(p || '').replace(/^\.?\/+/, '').replace(/^workspace\/+/, '');
-  const toFileUrl = (rel) => `api/groups/${gid}/file?path=${encodeURIComponent(rel)}`;
+  const toFileUrl = (rel) => {
+    const segs = rel.split('/').filter(Boolean).map(encodeURIComponent);
+    return `api/groups/${gid}/files/${segs.join('/')}`;
+  };
   const attachPreviewClick = (a, rel) => {
     a.addEventListener('click', (ev) => {
       if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;

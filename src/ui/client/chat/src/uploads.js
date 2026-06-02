@@ -71,7 +71,8 @@ export function downloadPaths(paths, entries) {
     const single = paths[0];
     const entry = entries?.find((e) => e.path === single);
     if (entry && entry.type !== 'dir') {
-      const url = `api/groups/${groupId.value}/file?path=${encodeURIComponent(single)}`;
+      const segs = String(single || '').split('/').filter(Boolean).map(encodeURIComponent);
+      const url = `api/groups/${encodeURIComponent(groupId.value)}/files/${segs.join('/')}`;
       triggerDownload(url, entry.name);
       return;
     }

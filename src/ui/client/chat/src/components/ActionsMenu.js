@@ -21,7 +21,7 @@ import {
 // route, which `handleFile` happily serves.
 function rawFileUrl(groupId, relPath) {
   const segs = String(relPath || '').split('/').filter(Boolean).map(encodeURIComponent);
-  return `api/groups/${encodeURIComponent(groupId)}/raw/${segs.join('/')}`;
+  return `api/groups/${encodeURIComponent(groupId)}/files/${segs.join('/')}`;
 }
 
 function openInNewTab(groupId, relPath) {

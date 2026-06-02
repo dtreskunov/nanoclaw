@@ -244,7 +244,7 @@ export function FilesPane() {
             aria-label="Open ${fp} in new tab"
             onClick=${() => {
               const segs = String(fp).split('/').filter(Boolean).map(encodeURIComponent);
-              const url = `api/groups/${encodeURIComponent(gid)}/raw/${segs.join('/')}`;
+              const url = `api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}`;
               window.open(url, '_blank', 'noopener');
             }}>\u2197</button>
   ` : null;

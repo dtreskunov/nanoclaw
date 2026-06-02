@@ -1,5 +1,17 @@
 // URL hash routing.
-// Format: #<groupId>[/<path>[/]][?t=<threadId>&c=<channelType>&mg=<mgId>]
+//
+// Format (new, path-segmented; per-segment percent-encoded):
+//   #g/<gid>
+//   #g/<gid>/t/<tid>
+//   #g/<gid>/d/<dir>/
+//   #g/<gid>/f/<file/path>
+//   #g/<gid>/t/<tid>/{d/<dir>/|f/<file/path>}
+//
+// Channel + messaging-group context for non-web threads is resolved from
+// the thread record by openChat — no longer carried in the URL.
+//
+// Legacy format (still parsed for back-compat; auto-rewritten on apply):
+//   #<gid>[/<path>[/]][?t=<tid>&c=<channel>&mg=<mgId>]
 import { batch } from '@preact/signals';
 import {
   groups, groupId, isAdmin, treePath, filePath, threads,
@@ -7,9 +19,43 @@ import {
 } from './state.js';
 import { parentPath } from './utils.js';
 
+function safeDecode(s) {
+  try { return decodeURIComponent(s); } catch { return s; }
+}
+
 export function parseHash() {
   const raw = location.hash.replace(/^#/, '');
   if (!raw) return null;
+  return raw.startsWith('g/') || raw === 'g'
+    ? parseNewFormat(raw)
+    : parseLegacyFormat(raw);
+}
+
+function parseNewFormat(raw) {
+  const segs = raw.split('/');
+  if (segs[0] !== 'g' || !segs[1]) return null;
+  const gid = safeDecode(segs[1]);
+  let i = 2;
+  let tid = null;
+  if (segs[i] === 't' && segs[i + 1]) {
+    tid = safeDecode(segs[i + 1]);
+    i += 2;
+  }
+  let isDir = true;
+  let path = '';
+  if (segs[i] === 'f' || segs[i] === 'd') {
+    const kind = segs[i];
+    const rest = segs.slice(i + 1).map(safeDecode).filter((s) => s !== '');
+    path = rest.join('/');
+    isDir = kind === 'd';
+  }
+  return {
+    groupId: gid, path, isDir, threadId: tid,
+    channelType: null, messagingGroupId: null, _format: 'new',
+  };
+}
+
+function parseLegacyFormat(raw) {
   const qIdx = raw.indexOf('?');
   const pathPart = qIdx < 0 ? raw : raw.slice(0, qIdx);
   const params = new URLSearchParams(qIdx < 0 ? '' : raw.slice(qIdx + 1));
@@ -17,7 +63,7 @@ export function parseHash() {
   const ct = params.get('c') || null;
   const mg = params.get('mg') || null;
   const h = decodeURI(pathPart);
-  const base = { threadId: tid, channelType: ct, messagingGroupId: mg };
+  const base = { threadId: tid, channelType: ct, messagingGroupId: mg, _format: 'legacy' };
   if (!h) return tid ? { groupId: '', path: '', isDir: true, ...base } : null;
   const slash = h.indexOf('/');
   if (slash < 0) return { groupId: h, path: '', isDir: true, ...base };
@@ -31,16 +77,12 @@ export function parseHash() {
 // Build the hash string from current signals. Caller writes location.hash.
 export function buildHash() {
   if (!groupId.value) return '';
-  let h = '#' + encodeURI(groupId.value);
-  if (filePath.value) h += '/' + encodeURI(filePath.value);
-  else if (treePath.value) h += '/' + encodeURI(treePath.value) + '/';
-  if (threadId.value) {
-    h += '?t=' + encodeURIComponent(threadId.value);
-    if (channelType.value && channelType.value !== 'web') {
-      h += '&c=' + encodeURIComponent(channelType.value);
-      if (messagingGroupId.value) h += '&mg=' + encodeURIComponent(messagingGroupId.value);
-    }
-  }
+  const encSeg = (s) =>
+    String(s).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  let h = '#g/' + encodeURIComponent(groupId.value);
+  if (threadId.value) h += '/t/' + encodeURIComponent(threadId.value);
+  if (filePath.value) h += '/f/' + encSeg(filePath.value);
+  else if (treePath.value) h += '/d/' + encSeg(treePath.value) + '/';
   return h;
 }
 
@@ -107,6 +149,10 @@ export async function applyHash(router) {
     const name = parent ? parsed.path.slice(parent.length + 1) : parsed.path;
     await router.selectFile({ path: parsed.path, name });
   }
+
+  // Self-heal: legacy hashes get rewritten to the new format once state
+  // has settled, so bookmarks update on first visit.
+  if (parsed._format === 'legacy') writeHash();
 }
 
 export { applyAdminFlag };

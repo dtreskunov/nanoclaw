@@ -75,9 +75,32 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
 
-    const groupMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file|meta|zip)$/);
-    if ((req.method === 'GET' || req.method === 'HEAD') && groupMatch) {
-      const [, groupId, kind] = groupMatch;
+    // Primary file/dir resource shape: path-in-URL, single endpoint per kind.
+    //   GET|HEAD /api/groups/<gid>/files/<rel/path>           → file bytes
+    //   GET      /api/groups/<gid>/files/<rel/path>?meta=1    → file metadata JSON
+    //   GET      /api/groups/<gid>/dirs/[<rel/path>/]         → directory listing JSON
+    const filesMatch = pathname.match(/^\/api\/groups\/([^/]+)\/files\/(.+)$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && filesMatch) {
+      const [, groupId, encodedPath] = filesMatch;
+      const relPath = safeDecode(encodedPath);
+      if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
+      if (req.method === 'GET' && url.searchParams.has('meta'))
+        return await handleMeta(ctx, session.userId, groupId, relPath);
+      return handleFile(ctx, session.userId, groupId, relPath);
+    }
+    const dirsMatch = pathname.match(/^\/api\/groups\/([^/]+)\/dirs(?:\/(.*))?$/);
+    if (req.method === 'GET' && dirsMatch) {
+      const [, groupId, encodedPath = ''] = dirsMatch;
+      const relPath = encodedPath ? safeDecode(encodedPath.replace(/\/$/, '')) : '';
+      if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
+      return handleTree(ctx, session.userId, groupId, relPath);
+    }
+
+    // Legacy aliases — kept so previously-issued links (email, chat history,
+    // bookmarks) keep working. New code should emit the shapes above.
+    const legacyMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file|meta|zip)$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && legacyMatch) {
+      const [, groupId, kind] = legacyMatch;
       const relPath = url.searchParams.get('path') ?? '';
       if (kind === 'tree' && req.method === 'GET') return handleTree(ctx, session.userId, groupId, relPath);
       if (kind === 'file') return handleFile(ctx, session.userId, groupId, relPath);
@@ -85,20 +108,11 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
       if (kind === 'zip' && req.method === 'GET')
         return handleZip(ctx, session.userId, groupId, url.searchParams.getAll('path'));
     }
-
-    // Path-based raw serving: /api/groups/<gid>/raw/<rel/path>. Unlike the
-    // query-string `file` endpoint, the file's path becomes the URL path so
-    // an HTML document opened in a new tab can resolve sibling assets via
-    // relative links (./img.png, style.css, etc.).
     const rawMatch = pathname.match(/^\/api\/groups\/([^/]+)\/raw\/(.+)$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && rawMatch) {
       const [, groupId, encodedPath] = rawMatch;
-      let relPath: string;
-      try {
-        relPath = decodeURIComponent(encodedPath);
-      } catch {
-        return json(ctx, 400, { error: 'invalid_path' });
-      }
+      const relPath = safeDecode(encodedPath);
+      if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
       return handleFile(ctx, session.userId, groupId, relPath);
     }
 
@@ -640,6 +654,14 @@ function json(ctx: Ctx, status: number, body: unknown): void {
 function text(ctx: Ctx, status: number, body: string): void {
   ctx.res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
   ctx.res.end(body);
+}
+
+function safeDecode(s: string): string | null {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return null;
+  }
 }
 
 function serveStatic(ctx: Ctx, relName: string): void {

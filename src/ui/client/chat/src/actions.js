@@ -384,7 +384,9 @@ export async function loadTree(p) {
     treeEntries.value = [];
   });
   try {
-    const { entries } = await api(`api/groups/${encodeURIComponent(groupId.value)}/tree?path=${encodeURIComponent(p)}`);
+    const segs = String(p || '').split('/').filter(Boolean).map(encodeURIComponent);
+    const url = `api/groups/${encodeURIComponent(groupId.value)}/dirs/${segs.length ? segs.join('/') + '/' : ''}`;
+    const { entries } = await api(url);
     treeEntries.value = entries || [];
   } catch (err) {
     const msg = /HTTP 404/.test(String(err && err.message)) ? 'Not found. It may have been renamed or deleted.' : String(err && err.message || err);
@@ -410,7 +412,8 @@ export async function navFile(entry) {
 
 export async function selectFile(entry) {
   filePath.value = entry.path;
-  const url = `api/groups/${encodeURIComponent(groupId.value)}/file?path=${encodeURIComponent(entry.path)}`;
+  const segs = String(entry.path || '').split('/').filter(Boolean).map(encodeURIComponent);
+  const url = `api/groups/${encodeURIComponent(groupId.value)}/files/${segs.join('/')}`;
   let size = entry.size, mtime = entry.mtime;
   try {
     const h = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
@@ -457,7 +460,8 @@ export async function selectFile(entry) {
 
 async function fetchAndAttachMeta(p) {
   const gid = groupId.value;
-  const u = `api/groups/${encodeURIComponent(gid)}/meta?path=${encodeURIComponent(p)}`;
+  const segs = String(p || '').split('/').filter(Boolean).map(encodeURIComponent);
+  const u = `api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}?meta=1`;
   const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store' });
   if (!r.ok) return;
   const data = await r.json();
