@@ -197,12 +197,12 @@ export function Settings() {
 
           <section>
             <h3>Linked identities</h3>
-            <p class="muted">Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user.</p>
+            <p class="muted">Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The <em>primary</em> identity is where NanoClaw reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from.</p>
             {identities.length === 0
               ? <p class="muted">No identities yet.</p>
               : (
                 <table class="settings-table">
-                  <thead><tr><th>Channel</th><th>Handle</th><th>Primary</th><th></th></tr></thead>
+                  <thead><tr><th>Channel</th><th>Handle</th><th title="Where the bot reaches you when it initiates a DM (approvals, pairing, host notifications). Replies follow whichever channel you wrote from.">Primary</th><th></th></tr></thead>
                   <tbody>
                     {identities.map((i) => (
                       <tr key={i.channel + ':' + i.handle}>

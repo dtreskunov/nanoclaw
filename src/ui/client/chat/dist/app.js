@@ -19363,12 +19363,16 @@ function Settings() {
       ] }),
       /* @__PURE__ */ u4("section", { children: [
         /* @__PURE__ */ u4("h3", { children: "Linked identities" }),
-        /* @__PURE__ */ u4("p", { class: "muted", children: "Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user." }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: [
+          "Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The ",
+          /* @__PURE__ */ u4("em", { children: "primary" }),
+          " identity is where NanoClaw reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from."
+        ] }),
         identities.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No identities yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
           /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
             /* @__PURE__ */ u4("th", { children: "Channel" }),
             /* @__PURE__ */ u4("th", { children: "Handle" }),
-            /* @__PURE__ */ u4("th", { children: "Primary" }),
+            /* @__PURE__ */ u4("th", { title: "Where the bot reaches you when it initiates a DM (approvals, pairing, host notifications). Replies follow whichever channel you wrote from.", children: "Primary" }),
             /* @__PURE__ */ u4("th", {})
           ] }) }),
           /* @__PURE__ */ u4("tbody", { children: identities.map((i5) => /* @__PURE__ */ u4("tr", { children: [
