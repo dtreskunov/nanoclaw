@@ -16577,9 +16577,6 @@ function safeDecode(s5) {
 function parseHash() {
   const raw = location.hash.replace(/^#/, "");
   if (!raw) return null;
-  return raw.startsWith("g/") || raw === "g" ? parseNewFormat(raw) : parseLegacyFormat(raw);
-}
-function parseNewFormat(raw) {
   const segs = raw.split("/");
   if (segs[0] !== "g" || !segs[1]) return null;
   const gid = safeDecode(segs[1]);
@@ -16597,33 +16594,7 @@ function parseNewFormat(raw) {
     path = rest.join("/");
     isDir = kind === "d";
   }
-  return {
-    groupId: gid,
-    path,
-    isDir,
-    threadId: tid,
-    channelType: null,
-    messagingGroupId: null,
-    _format: "new"
-  };
-}
-function parseLegacyFormat(raw) {
-  const qIdx = raw.indexOf("?");
-  const pathPart = qIdx < 0 ? raw : raw.slice(0, qIdx);
-  const params = new URLSearchParams(qIdx < 0 ? "" : raw.slice(qIdx + 1));
-  const tid = params.get("t") || null;
-  const ct = params.get("c") || null;
-  const mg = params.get("mg") || null;
-  const h5 = decodeURI(pathPart);
-  const base = { threadId: tid, channelType: ct, messagingGroupId: mg, _format: "legacy" };
-  if (!h5) return tid ? { groupId: "", path: "", isDir: true, ...base } : null;
-  const slash = h5.indexOf("/");
-  if (slash < 0) return { groupId: h5, path: "", isDir: true, ...base };
-  const gid = h5.slice(0, slash);
-  const rest = h5.slice(slash + 1);
-  const isDir = rest === "" || rest.endsWith("/");
-  const path = isDir ? rest.replace(/\/$/, "") : rest;
-  return { groupId: gid, path, isDir, ...base };
+  return { groupId: gid, path, isDir, threadId: tid };
 }
 function buildHash() {
   if (!groupId.value) return "";
@@ -16670,8 +16641,7 @@ async function applyHash(router2) {
   applyAdminFlag();
   if (groupChanged) await router2.loadThreads(parsed.groupId);
   if (parsed.threadId) {
-    const ctx = parsed.channelType && parsed.channelType !== "web" && parsed.messagingGroupId ? { channelType: parsed.channelType, messagingGroupId: parsed.messagingGroupId, canSend: true } : null;
-    router2.openChat(parsed.groupId, parsed.threadId, ctx).catch((err) => console.error("chat open failed", err));
+    router2.openChat(parsed.groupId, parsed.threadId, null).catch((err) => console.error("chat open failed", err));
   } else if (groupChanged) {
     const latest = threads.value.length > 0 ? threads.value[0] : null;
     if (latest) router2.openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error("chat open failed", err));
@@ -16685,7 +16655,6 @@ async function applyHash(router2) {
     const name = parent ? parsed.path.slice(parent.length + 1) : parsed.path;
     await router2.selectFile({ path: parsed.path, name });
   }
-  if (parsed._format === "legacy") writeHash();
 }
 
 // src/notify.js
@@ -17866,17 +17835,17 @@ async function notifyAgent(paths) {
 }
 
 // src/components/ActionsMenu.js
-function rawFileUrl(groupId2, relPath) {
+function fileUrl(groupId2, relPath) {
   const segs = String(relPath || "").split("/").filter(Boolean).map(encodeURIComponent);
   return `api/groups/${encodeURIComponent(groupId2)}/files/${segs.join("/")}`;
 }
 function openInNewTab(groupId2, relPath) {
   if (!groupId2 || !relPath) return;
-  window.open(rawFileUrl(groupId2, relPath), "_blank", "noopener");
+  window.open(fileUrl(groupId2, relPath), "_blank", "noopener");
 }
 async function shareFile(groupId2, entry) {
   if (!groupId2 || !entry?.path) return;
-  const url = new URL(rawFileUrl(groupId2, entry.path), window.location.href).toString();
+  const url = new URL(fileUrl(groupId2, entry.path), window.location.href).toString();
   const title = entry.name || entry.path.slice(entry.path.lastIndexOf("/") + 1);
   if (navigator.share) {
     try {

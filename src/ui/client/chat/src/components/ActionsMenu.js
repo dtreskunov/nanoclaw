@@ -17,21 +17,20 @@ import {
 // (not a query string). This is what makes relative asset URLs inside
 // an HTML document resolve to siblings in the same directory — the
 // browser uses the document URL as the base for `./img.png`, `style.css`,
-// etc., and each of those resolves to another /raw/<sibling> on the same
-// route, which `handleFile` happily serves.
-function rawFileUrl(groupId, relPath) {
+// etc., and each resolves to another /files/<sibling> on the same route.
+function fileUrl(groupId, relPath) {
   const segs = String(relPath || '').split('/').filter(Boolean).map(encodeURIComponent);
   return `api/groups/${encodeURIComponent(groupId)}/files/${segs.join('/')}`;
 }
 
 function openInNewTab(groupId, relPath) {
   if (!groupId || !relPath) return;
-  window.open(rawFileUrl(groupId, relPath), '_blank', 'noopener');
+  window.open(fileUrl(groupId, relPath), '_blank', 'noopener');
 }
 
 async function shareFile(groupId, entry) {
   if (!groupId || !entry?.path) return;
-  const url = new URL(rawFileUrl(groupId, entry.path), window.location.href).toString();
+  const url = new URL(fileUrl(groupId, entry.path), window.location.href).toString();
   const title = entry.name || entry.path.slice(entry.path.lastIndexOf('/') + 1);
   // Prefer the Web Share API when available (Android, iOS, some desktops).
   // Fall back to copying the URL to the clipboard.

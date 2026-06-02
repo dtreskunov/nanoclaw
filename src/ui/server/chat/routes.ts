@@ -75,10 +75,11 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
 
-    // Primary file/dir resource shape: path-in-URL, single endpoint per kind.
+    // File/dir resources: path-in-URL, single endpoint per kind.
     //   GET|HEAD /api/groups/<gid>/files/<rel/path>           → file bytes
     //   GET      /api/groups/<gid>/files/<rel/path>?meta=1    → file metadata JSON
     //   GET      /api/groups/<gid>/dirs/[<rel/path>/]         → directory listing JSON
+    //   GET      /api/groups/<gid>/zip?path=&path=...         → multi-path zip
     const filesMatch = pathname.match(/^\/api\/groups\/([^/]+)\/files\/(.+)$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && filesMatch) {
       const [, groupId, encodedPath] = filesMatch;
@@ -95,25 +96,10 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
       if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
       return handleTree(ctx, session.userId, groupId, relPath);
     }
-
-    // Legacy aliases — kept so previously-issued links (email, chat history,
-    // bookmarks) keep working. New code should emit the shapes above.
-    const legacyMatch = pathname.match(/^\/api\/groups\/([^/]+)\/(tree|file|meta|zip)$/);
-    if ((req.method === 'GET' || req.method === 'HEAD') && legacyMatch) {
-      const [, groupId, kind] = legacyMatch;
-      const relPath = url.searchParams.get('path') ?? '';
-      if (kind === 'tree' && req.method === 'GET') return handleTree(ctx, session.userId, groupId, relPath);
-      if (kind === 'file') return handleFile(ctx, session.userId, groupId, relPath);
-      if (kind === 'meta' && req.method === 'GET') return await handleMeta(ctx, session.userId, groupId, relPath);
-      if (kind === 'zip' && req.method === 'GET')
-        return handleZip(ctx, session.userId, groupId, url.searchParams.getAll('path'));
-    }
-    const rawMatch = pathname.match(/^\/api\/groups\/([^/]+)\/raw\/(.+)$/);
-    if ((req.method === 'GET' || req.method === 'HEAD') && rawMatch) {
-      const [, groupId, encodedPath] = rawMatch;
-      const relPath = safeDecode(encodedPath);
-      if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
-      return handleFile(ctx, session.userId, groupId, relPath);
+    const zipMatch = pathname.match(/^\/api\/groups\/([^/]+)\/zip$/);
+    if (req.method === 'GET' && zipMatch) {
+      const [, groupId] = zipMatch;
+      return handleZip(ctx, session.userId, groupId, url.searchParams.getAll('path'));
     }
 
     return json(ctx, 404, { error: 'not_found' });
