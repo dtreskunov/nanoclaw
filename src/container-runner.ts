@@ -519,6 +519,11 @@ async function buildContainerArgs(
   if (!onecliApplied) {
     throw new Error('OneCLI gateway not applied — refusing to spawn container without credentials');
   }
+  // The SDK sets SSL_CERT_FILE (OpenSSL/Node) but git/curl read their CA
+  // bundle from CURL_CA_BUNDLE / GIT_SSL_CAINFO. Without these, `git clone`
+  // through the OneCLI HTTPS proxy fails with "server certificate verification failed".
+  args.push('-e', 'CURL_CA_BUNDLE=/tmp/onecli-combined-ca.pem');
+  args.push('-e', 'GIT_SSL_CAINFO=/tmp/onecli-combined-ca.pem');
   log.info('OneCLI gateway applied', { containerName });
 
   // Host gateway
