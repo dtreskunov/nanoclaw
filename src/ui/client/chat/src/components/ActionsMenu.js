@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   pinnedContext, isAdmin, treeEntries, filePath, previewBlock, groupId,
 } from '../state.js';
-import { clearPinnedContext, closePreview } from '../actions.js';
+import { clearPinnedContext } from '../actions.js';
 import {
   mkdirPrompt, touchPrompt, renameEntry, deleteEntry,
   deletePaths, downloadPaths,
@@ -28,7 +28,7 @@ function openInNewTab(groupId, relPath) {
   window.open(fileUrl(groupId, relPath), '_blank', 'noopener');
 }
 
-async function shareFile(groupId, entry) {
+export async function shareFile(groupId, entry) {
   if (!groupId || !entry?.path) return;
   const url = new URL(fileUrl(groupId, entry.path), window.location.href).toString();
   const title = entry.name || entry.path.slice(entry.path.lastIndexOf('/') + 1);
@@ -115,14 +115,11 @@ function buildItems(mode, entry, onUpload) {
     const entryForPath = treeEntries.value.find((e) => e.path === fp) || (fp ? { path: fp, name: p.name, type: 'file' } : null);
     const items = [];
     items.push({ ico: '\u2B07', label: 'Download', onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
-    items.push({ ico: '\u21AA', label: 'Share', onClick: () => shareFile(gid, entryForPath), disabled: !fp });
     if (admin && entryForPath) {
       items.push('---');
       items.push({ ico: '\u270E', label: 'Rename', onClick: () => renameEntry(entryForPath) });
       items.push({ ico: '\uD83D\uDDD1', label: 'Delete', danger: true, onClick: () => deleteEntry(entryForPath) });
     }
-    items.push('---');
-    items.push({ ico: '\u00D7', label: 'Close preview', onClick: closePreview });
     return items;
   }
 

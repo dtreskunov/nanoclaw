@@ -13,7 +13,7 @@ import {
 import { fmtBytes, renderMarkdown, parentPath } from '../utils.js';
 import { Pane } from './Pane.js';
 import { RelativeTime } from './RelativeTime.js';
-import { ActionsMenu } from './ActionsMenu.js';
+import { ActionsMenu, shareFile } from './ActionsMenu.js';
 import { MediaPlayer } from './MediaPlayer.js';
 import { LyricsPanel } from './LyricsPanel.js';
 import { highlightCode } from '../highlight.js';
@@ -136,6 +136,10 @@ function Preview() {
     const segs = String(fp).split('/').filter(Boolean).map(encodeURIComponent);
     window.open(`api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}`, '_blank', 'noopener');
   };
+  const onShare = () => {
+    if (!fp || !gid) return;
+    shareFile(gid, { path: fp, name: p.name || fp.slice(fp.lastIndexOf('/') + 1) });
+  };
   const toolbar = html`
     <div class="preview-toolbar">
       <button class=${'text-btn clippy' + (pinned ? ' active' : '')}
@@ -145,10 +149,16 @@ function Preview() {
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
       <span class="preview-spacer"></span>
       <span class="preview-actions">
+        <button type="button" class="text-btn share-btn"
+                onClick=${onShare} disabled=${!fp || !gid}
+                title="Share" aria-label="Share">\u21AA</button>
         <button type="button" class="text-btn open-tab"
                 onClick=${openInNewTab} disabled=${!fp || !gid}
                 title="Open in new tab" aria-label="Open in new tab">\u2197</button>
         <${ActionsMenu} mode="preview" />
+        <button type="button" class="text-btn close-preview"
+                onClick=${closePreview}
+                title="Close preview" aria-label="Close preview">\u00D7</button>
       </span>
     </div>
   `;

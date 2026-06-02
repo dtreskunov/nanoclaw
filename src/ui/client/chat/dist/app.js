@@ -18314,14 +18314,11 @@ function buildItems(mode, entry, onUpload) {
     const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name, type: "file" } : null);
     const items2 = [];
     items2.push({ ico: "\u2B07", label: "Download", onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
-    items2.push({ ico: "\u21AA", label: "Share", onClick: () => shareFile(gid, entryForPath), disabled: !fp });
     if (admin && entryForPath) {
       items2.push("---");
       items2.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(entryForPath) });
       items2.push({ ico: "\u{1F5D1}", label: "Delete", danger: true, onClick: () => deleteEntry(entryForPath) });
     }
-    items2.push("---");
-    items2.push({ ico: "\xD7", label: "Close preview", onClick: closePreview });
     return items2;
   }
   const sel = pinnedContext.value;
@@ -18681,6 +18678,10 @@ function Preview() {
     const segs = String(fp).split("/").filter(Boolean).map(encodeURIComponent);
     window.open(`api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}`, "_blank", "noopener");
   };
+  const onShare = () => {
+    if (!fp || !gid) return;
+    shareFile(gid, { path: fp, name: p5.name || fp.slice(fp.lastIndexOf("/") + 1) });
+  };
   const toolbar = html`
     <div class="preview-toolbar">
       <button class=${"text-btn clippy" + (pinned ? " active" : "")}
@@ -18690,10 +18691,16 @@ function Preview() {
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
       <span class="preview-spacer"></span>
       <span class="preview-actions">
+        <button type="button" class="text-btn share-btn"
+                onClick=${onShare} disabled=${!fp || !gid}
+                title="Share" aria-label="Share">\u21AA</button>
         <button type="button" class="text-btn open-tab"
                 onClick=${openInNewTab2} disabled=${!fp || !gid}
                 title="Open in new tab" aria-label="Open in new tab">\u2197</button>
         <${ActionsMenu} mode="preview" />
+        <button type="button" class="text-btn close-preview"
+                onClick=${closePreview}
+                title="Close preview" aria-label="Close preview">\u00D7</button>
       </span>
     </div>
   `;
