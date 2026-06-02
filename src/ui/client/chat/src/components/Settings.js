@@ -56,12 +56,14 @@ export function Settings() {
     setDeepLinkChannels(r.data.deepLinkChannels || []);
     // Restrict to channels with an active adapter on the server (i.e.
     // credentials configured at boot). Falls back to CHANNEL_META if the
-    // server didn't return availableChannels (older builds).
+    // server didn't return availableChannels (older builds). 'cli' is a
+    // local agent-runner channel that isn't a legitimate identity-link
+    // target from the web UI, so filter it out alongside 'web'.
     const linked = new Set((r.data.identities || []).map((i) => i.channel));
     const available = Array.isArray(r.data.availableChannels)
       ? r.data.availableChannels
       : Object.keys(CHANNEL_META);
-    const opts = available.filter((c) => c !== 'web' && !linked.has(c));
+    const opts = available.filter((c) => c !== 'web' && c !== 'cli' && !linked.has(c));
     setChannels(opts);
     if (opts.length && !opts.includes(chan)) setChan(opts[0]);
   }
