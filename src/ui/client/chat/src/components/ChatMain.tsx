@@ -164,12 +164,13 @@ function Composer() {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    // scrollHeight excludes border; with box-sizing:border-box we'd be 1px short
-    // and trigger a phantom scrollbar. Add the border back in.
-    const cs = getComputedStyle(el);
-    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-    el.style.height = Math.min(el.scrollHeight + border, 200) + 'px';
+    const h = Math.min(el.scrollHeight, 200);
+    el.style.height = h + 'px';
+    // overflow:auto with subpixel borders triggers a phantom scrollbar even
+    // below the cap; only show it when actually capped.
+    el.style.overflowY = h >= 200 ? 'auto' : 'hidden';
   };
+  useEffect(() => { autosize(); }, []);
   const onSubmit = (ev: JSX.TargetedEvent<HTMLFormElement>): void => {
     ev.preventDefault();
     const text = (inputRef.current?.value || '').trim();

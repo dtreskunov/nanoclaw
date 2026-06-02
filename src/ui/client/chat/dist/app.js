@@ -18170,10 +18170,13 @@ function Composer() {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
-    const cs = getComputedStyle(el);
-    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-    el.style.height = Math.min(el.scrollHeight + border, 200) + "px";
+    const h5 = Math.min(el.scrollHeight, 200);
+    el.style.height = h5 + "px";
+    el.style.overflowY = h5 >= 200 ? "auto" : "hidden";
   };
+  y2(() => {
+    autosize();
+  }, []);
   const onSubmit = (ev) => {
     ev.preventDefault();
     const text = (inputRef.current?.value || "").trim();
