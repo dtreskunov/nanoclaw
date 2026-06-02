@@ -5,13 +5,43 @@
 import { html } from '../html.js';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  pinnedContext, isAdmin, treeEntries, filePath, previewBlock,
+  pinnedContext, isAdmin, treeEntries, filePath, previewBlock, groupId,
 } from '../state.js';
 import { clearPinnedContext, closePreview } from '../actions.js';
 import {
   mkdirPrompt, touchPrompt, renameEntry, deleteEntry,
   deletePaths, downloadPaths,
 } from '../uploads.js';
+
+// URL to fetch a single file with its path encoded into the URL path
+// (not a query string). This is what makes relative asset URLs inside
+// an HTML document resolve to siblings in the same directory — the
+// browser uses the document URL as the base for `./img.png`, `style.css`,
+// etc., and each of those resolves to another /raw/<sibling> on the same
+// route, which `handleFile` happily serves.
+function rawFileUrl(groupId, relPath) {
+  const segs = String(relPath || '').split('/').filter(Boolean).map(encodeURIComponent);
+  return `api/groups/${encodeURIComponent(groupId)}/raw/${segs.join('/')}`;
+}
+
+function openInNewTab(groupId, relPath) {
+  if (!groupId || !relPath) return;
+  window.open(rawFileUrl(groupId, relPath), '_blank', 'noopener');
+}
+
+async function shareFile(groupId, entry) {
+  if (!groupId || !entry?.path) return;
+  const url = new URL(rawFileUrl(groupId, entry.path), window.location.href).toString();
+  const title = entry.name || entry.path.slice(entry.path.lastIndexOf('/') + 1);
+  // Prefer the Web Share API when available (Android, iOS, some desktops).
+  // Fall back to copying the URL to the clipboard.
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+}
 
 function entriesByPath(paths) {
   const set = new Set(paths);
@@ -63,9 +93,14 @@ export function ActionsMenu({ mode, entry, onUpload }) {
 
 function buildItems(mode, entry, onUpload) {
   const admin = isAdmin.value;
+  const gid = groupId.value;
   if (mode === 'row' && entry) {
     const items = [];
     items.push({ ico: '\u2B07', label: 'Download', onClick: () => downloadPaths([entry.path], [entry]) });
+    if (entry.type !== 'dir') {
+      items.push({ ico: '\u2197', label: 'Open in new tab', onClick: () => openInNewTab(gid, entry.path) });
+      items.push({ ico: '\u21AA', label: 'Share', onClick: () => shareFile(gid, entry) });
+    }
     if (admin) {
       items.push('---');
       items.push({ ico: '\u270E', label: 'Rename', onClick: () => renameEntry(entry) });
@@ -81,6 +116,8 @@ function buildItems(mode, entry, onUpload) {
     const entryForPath = treeEntries.value.find((e) => e.path === fp) || (fp ? { path: fp, name: p.name, type: 'file' } : null);
     const items = [];
     items.push({ ico: '\u2B07', label: 'Download', onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
+    items.push({ ico: '\u2197', label: 'Open in new tab', onClick: () => openInNewTab(gid, fp), disabled: !fp });
+    items.push({ ico: '\u21AA', label: 'Share', onClick: () => shareFile(gid, entryForPath), disabled: !fp });
     if (admin && entryForPath) {
       items.push('---');
       items.push({ ico: '\u270E', label: 'Rename', onClick: () => renameEntry(entryForPath) });

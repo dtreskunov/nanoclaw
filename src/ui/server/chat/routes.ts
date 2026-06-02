@@ -86,6 +86,22 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
         return handleZip(ctx, session.userId, groupId, url.searchParams.getAll('path'));
     }
 
+    // Path-based raw serving: /api/groups/<gid>/raw/<rel/path>. Unlike the
+    // query-string `file` endpoint, the file's path becomes the URL path so
+    // an HTML document opened in a new tab can resolve sibling assets via
+    // relative links (./img.png, style.css, etc.).
+    const rawMatch = pathname.match(/^\/api\/groups\/([^/]+)\/raw\/(.+)$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && rawMatch) {
+      const [, groupId, encodedPath] = rawMatch;
+      let relPath: string;
+      try {
+        relPath = decodeURIComponent(encodedPath);
+      } catch {
+        return json(ctx, 400, { error: 'invalid_path' });
+      }
+      return handleFile(ctx, session.userId, groupId, relPath);
+    }
+
     return json(ctx, 404, { error: 'not_found' });
   } catch (err) {
     log.error('File browser handler threw', { url: req.url, err });
@@ -217,6 +233,18 @@ function handleFile(ctx: Ctx, userId: string, groupId: string, relPath: string):
     'Cache-Control': 'private, max-age=0, must-revalidate',
   };
   headers['Content-Disposition'] = `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(filename)}"`;
+
+  // HTML rendered inline is same-origin to the UI, so a malicious page
+  // could read the auth cookie via JS or fetch the UI's APIs. Sandbox it
+  // so the document gets an opaque origin (no document.cookie / no
+  // same-origin fetch) while still allowing scripts, forms, and the
+  // browser to load sibling assets via the same /raw route. Asset GETs
+  // are still cookie-authenticated because cookies attach by URL, not
+  // origin — so relative <img src>, <link href>, etc. work normally.
+  if (mime.type === 'text/html; charset=utf-8') {
+    headers['Content-Security-Policy'] =
+      'sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+  }
 
   recordAccess({ userId, groupId: group.id, path: relPath, action: 'file', req: ctx.req });
   ctx.res.writeHead(200, headers);
@@ -573,6 +601,9 @@ function mimeFor(ext: string): { type: string; inlineSafe: boolean } {
   if (ext in AUDIO_EXTS) return { type: AUDIO_EXTS[ext], inlineSafe: true };
   if (ext in VIDEO_EXTS) return { type: VIDEO_EXTS[ext], inlineSafe: true };
   if (ext === '.pdf') return { type: PDF_MIME, inlineSafe: true };
+  if (ext === '.html' || ext === '.htm') return { type: 'text/html; charset=utf-8', inlineSafe: true };
+  if (ext === '.css') return { type: 'text/css; charset=utf-8', inlineSafe: true };
+  if (ext === '.js' || ext === '.mjs') return { type: 'text/javascript; charset=utf-8', inlineSafe: true };
   if (TEXT_EXTS.has(ext)) return { type: 'text/plain; charset=utf-8', inlineSafe: true };
   return { type: 'application/octet-stream', inlineSafe: false };
 }

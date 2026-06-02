@@ -17824,6 +17824,31 @@ async function notifyAgent(paths) {
 }
 
 // src/components/ActionsMenu.js
+function rawFileUrl(groupId2, relPath) {
+  const segs = String(relPath || "").split("/").filter(Boolean).map(encodeURIComponent);
+  return `api/groups/${encodeURIComponent(groupId2)}/raw/${segs.join("/")}`;
+}
+function openInNewTab(groupId2, relPath) {
+  if (!groupId2 || !relPath) return;
+  window.open(rawFileUrl(groupId2, relPath), "_blank", "noopener");
+}
+async function shareFile(groupId2, entry) {
+  if (!groupId2 || !entry?.path) return;
+  const url = new URL(rawFileUrl(groupId2, entry.path), window.location.href).toString();
+  const title = entry.name || entry.path.slice(entry.path.lastIndexOf("/") + 1);
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url });
+      return;
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+  }
+}
 function entriesByPath(paths) {
   const set = new Set(paths);
   return treeEntries.value.filter((e4) => set.has(e4.path));
@@ -17876,9 +17901,14 @@ function ActionsMenu({ mode, entry, onUpload }) {
 }
 function buildItems(mode, entry, onUpload) {
   const admin = isAdmin.value;
+  const gid = groupId.value;
   if (mode === "row" && entry) {
     const items2 = [];
     items2.push({ ico: "\u2B07", label: "Download", onClick: () => downloadPaths([entry.path], [entry]) });
+    if (entry.type !== "dir") {
+      items2.push({ ico: "\u2197", label: "Open in new tab", onClick: () => openInNewTab(gid, entry.path) });
+      items2.push({ ico: "\u21AA", label: "Share", onClick: () => shareFile(gid, entry) });
+    }
     if (admin) {
       items2.push("---");
       items2.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(entry) });
@@ -17893,6 +17923,8 @@ function buildItems(mode, entry, onUpload) {
     const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name, type: "file" } : null);
     const items2 = [];
     items2.push({ ico: "\u2B07", label: "Download", onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
+    items2.push({ ico: "\u2197", label: "Open in new tab", onClick: () => openInNewTab(gid, fp), disabled: !fp });
+    items2.push({ ico: "\u21AA", label: "Share", onClick: () => shareFile(gid, entryForPath), disabled: !fp });
     if (admin && entryForPath) {
       items2.push("---");
       items2.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(entryForPath) });
