@@ -322,6 +322,16 @@ function transcriptStartMs(transcriptPath: string): number | null {
 const CLAUDE_CODE_AUTO_COMPACT_WINDOW = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW || '165000';
 
 /**
+ * MCP timeouts read by Claude Code (parseInt(process.env.MCP_TIMEOUT) and
+ * parseInt(process.env.MCP_TOOL_TIMEOUT) inside the bundled CLI). The
+ * built-in default for connect is 30s and for tool calls is ~60s, which
+ * trips on Tavily search/extract/crawl, Context7, and other slow remote
+ * tools. Match the 120s cap used in mcpServersToOpenCodeConfig.
+ */
+const MCP_TIMEOUT_MS = process.env.MCP_TIMEOUT || '120000';
+const MCP_TOOL_TIMEOUT_MS = process.env.MCP_TOOL_TIMEOUT || '120000';
+
+/**
  * Stale-session detection. Matches Claude Code's error text when a
  * resumed session can't be found — missing transcript .jsonl, unknown
  * session ID, etc.
@@ -347,6 +357,8 @@ export class ClaudeProvider implements AgentProvider {
     this.env = {
       ...(options.env ?? {}),
       CLAUDE_CODE_AUTO_COMPACT_WINDOW,
+      MCP_TIMEOUT: MCP_TIMEOUT_MS,
+      MCP_TOOL_TIMEOUT: MCP_TOOL_TIMEOUT_MS,
     };
   }
 
