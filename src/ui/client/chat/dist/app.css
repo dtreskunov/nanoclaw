@@ -609,30 +609,40 @@ header .mobile-only {
   background: transparent;
 }
 .chat-main .thought-group {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 92%;
   gap: 4px;
-  align-self: stretch;
+}
+.chat-main .thought-group > .msg {
+  max-width: 100%;
+  padding-right: 60px;
 }
 .chat-main .thought-group .thoughts-toggle {
-  align-self: flex-start;
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  background: var(--wash);
-  border: 0;
-  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--wash-strong, var(--wash));
+  border: 1px solid var(--border);
+  border-radius: 999px;
   color: var(--muted);
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-style: italic;
   cursor: pointer;
   line-height: 1.2;
+  opacity: 0.75;
+  z-index: 1;
 }
 .chat-main .thought-group .thoughts-toggle:hover {
-  background: var(--wash-strong, var(--wash));
+  opacity: 1;
   color: var(--fg);
 }
 .chat-main .msg .files {

@@ -80,16 +80,16 @@ function ThoughtGroup({ thoughts, answer }: { thoughts: ChatMessage[]; answer: C
   const label = showThoughts ? 'answer' : (n > 1 ? `thoughts (${n})` : 'thoughts');
   const title = showThoughts ? 'Show final answer' : 'Show agent thoughts leading to this answer';
   return (
-    <div class="thought-group">
+    <div class={'thought-group' + (showThoughts ? ' showing-thoughts' : ' showing-answer')}>
+      {showThoughts
+        ? thoughts.map((t, i) => <Message key={'t' + i} m={t} />)
+        : <Message m={answer} />}
       <button
         type="button"
         class="thoughts-toggle"
         title={title}
         onClick={() => setShowThoughts((v) => !v)}
       >{label}</button>
-      {showThoughts
-        ? thoughts.map((t, i) => <Message key={'t' + i} m={t} />)
-        : <Message m={answer} />}
     </div>
   );
 }

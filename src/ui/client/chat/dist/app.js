@@ -17961,7 +17961,8 @@ function ThoughtGroup({ thoughts, answer }) {
   const n3 = thoughts.length;
   const label = showThoughts ? "answer" : n3 > 1 ? `thoughts (${n3})` : "thoughts";
   const title = showThoughts ? "Show final answer" : "Show agent thoughts leading to this answer";
-  return /* @__PURE__ */ u4("div", { class: "thought-group", children: [
+  return /* @__PURE__ */ u4("div", { class: "thought-group" + (showThoughts ? " showing-thoughts" : " showing-answer"), children: [
+    showThoughts ? thoughts.map((t4, i5) => /* @__PURE__ */ u4(Message, { m: t4 }, "t" + i5)) : /* @__PURE__ */ u4(Message, { m: answer }),
     /* @__PURE__ */ u4(
       "button",
       {
@@ -17971,8 +17972,7 @@ function ThoughtGroup({ thoughts, answer }) {
         onClick: () => setShowThoughts((v5) => !v5),
         children: label
       }
-    ),
-    showThoughts ? thoughts.map((t4, i5) => /* @__PURE__ */ u4(Message, { m: t4 }, "t" + i5)) : /* @__PURE__ */ u4(Message, { m: answer })
+    )
   ] });
 }
 function MessageLog() {
