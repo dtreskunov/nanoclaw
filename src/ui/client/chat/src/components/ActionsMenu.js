@@ -114,6 +114,8 @@ function buildItems(mode, entry, onUpload) {
     if (!p) return [];
     const entryForPath = treeEntries.value.find((e) => e.path === fp) || (fp ? { path: fp, name: p.name, type: 'file' } : null);
     const items = [];
+    items.push({ ico: '\u21AA', label: 'Share', onClick: () => shareFile(gid, entryForPath), disabled: !fp || !gid });
+    items.push({ ico: '\u2197', label: 'Open in new tab', onClick: () => openInNewTab(gid, fp), disabled: !fp || !gid });
     items.push({ ico: '\u2B07', label: 'Download', onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
     if (admin && entryForPath) {
       items.push('---');

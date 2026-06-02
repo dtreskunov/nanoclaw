@@ -1,6 +1,6 @@
 // Files pane: head + breadcrumb + upload strip + listing + drop hint +
 // preview body.
-import { useRef, useEffect, useState, useLayoutEffect } from 'preact/hooks';
+import { useRef, useEffect } from 'preact/hooks';
 import { html } from '../html.js';
 import {
   treePath, treeEntries, treeError, filePath, isAdmin,
@@ -9,12 +9,11 @@ import {
 import { navTree, navFile, closePreview, togglePinnedFile } from '../actions.js';
 import {
   uploadFiles, clearUploadStrip, resolveConflict, notifyAgent,
-  renameEntry, deleteEntry, downloadPaths,
 } from '../uploads.js';
 import { fmtBytes, renderMarkdown, parentPath } from '../utils.js';
 import { Pane } from './Pane.js';
 import { RelativeTime } from './RelativeTime.js';
-import { ActionsMenu, shareFile } from './ActionsMenu.js';
+import { ActionsMenu } from './ActionsMenu.js';
 import { MediaPlayer } from './MediaPlayer.js';
 import { LyricsPanel } from './LyricsPanel.js';
 import { highlightCode } from '../highlight.js';
@@ -124,112 +123,15 @@ function UploadStrip() {
   `;
 }
 
-function OverflowMenu({ items }) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDoc = (ev) => { if (wrapRef.current && !wrapRef.current.contains(ev.target)) setOpen(false); };
-    const onKey = (ev) => { if (ev.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-  const empty = items.length === 0;
-  // When empty, keep the trigger in the DOM with visibility:hidden so the
-  // overflow measurement reserves a stable slot for it — otherwise the
-  // toolbar would oscillate as the menu appears/disappears at the
-  // overflow threshold.
-  return html`
-    <div class=${'action-menu' + (open ? ' open' : '')} ref=${wrapRef}
-         style=${empty ? 'visibility:hidden' : null}>
-      <button type="button" class="text-btn action-trigger" aria-haspopup="menu" aria-expanded=${open}
-              title="More actions" tabIndex=${empty ? -1 : 0} aria-hidden=${empty}
-              onClick=${(ev) => { ev.stopPropagation(); if (!empty) setOpen((o) => !o); }}>\u22EF</button>
-      ${open && !empty ? html`
-        <div class="action-panel" role="menu">
-          ${items.map((it) => html`
-            <button type="button" class=${'action-item' + (it.danger ? ' danger' : '')}
-                    role="menuitem" key=${it.id} disabled=${it.disabled}
-                    onClick=${(ev) => { ev.stopPropagation(); setOpen(false); it.onClick(); }}>
-              <span class="ico">${it.ico}</span>
-              <span class="lbl">${it.label}</span>
-            </button>
-          `)}
-        </div>
-      ` : null}
-    </div>
-  `;
-}
-
 function Preview() {
   const ref = useRef(null);
-  const toolbarRef = useRef(null);
-  const [overflow, setOverflow] = useState(0);
   const p = previewBlock.value;
-
-  // useLayoutEffect runs on every render. It synchronously measures the
-  // toolbar and hides action buttons from the right until the row fits.
-  // setOverflow with a no-op guard prevents render loops.
-  useLayoutEffect(() => {
-    const tb = toolbarRef.current;
-    if (!tb) return undefined;
-    const measure = () => {
-      const btns = Array.from(tb.querySelectorAll('button[data-action]'));
-      btns.forEach((b) => { b.style.display = ''; });
-      let hidden = 0;
-      while (hidden < btns.length && tb.scrollWidth > tb.clientWidth + 1) {
-        hidden++;
-        btns[btns.length - hidden].style.display = 'none';
-      }
-      setOverflow((prev) => (prev === hidden ? prev : hidden));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(tb);
-    return () => ro.disconnect();
-  });
-
   if (!p) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const fp = filePath.value;
-  const gid = groupId.value;
   const pinned = !!fp && pinnedContext.value.includes(fp);
   const clippyTitle = pinned ? 'Detach from next message' : 'Attach to next message';
-  const admin = isAdmin.value;
-  const entryForPath = fp
-    ? (treeEntries.value.find((e) => e.path === fp) || { path: fp, name: p.name, type: 'file' })
-    : null;
-  const openInNewTab = () => {
-    if (!fp || !gid) return;
-    const segs = String(fp).split('/').filter(Boolean).map(encodeURIComponent);
-    window.open(`api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}`, '_blank', 'noopener');
-  };
-  const onShare = () => {
-    if (!fp || !gid) return;
-    shareFile(gid, { path: fp, name: p.name || fp.slice(fp.lastIndexOf('/') + 1) });
-  };
-  // Actions in display order (left to right on the toolbar). Overflow
-  // collapses from the right end into the ⋯ menu.
-  const actions = [
-    { id: 'share', ico: '\u21AA', label: 'Share', title: 'Share', cls: 'share-btn',
-      onClick: onShare, disabled: !fp || !gid },
-    { id: 'open', ico: '\u2197', label: 'Open in new tab', title: 'Open in new tab', cls: 'open-tab',
-      onClick: openInNewTab, disabled: !fp || !gid },
-    { id: 'download', ico: '\u2B07', label: 'Download', title: 'Download', cls: 'download-btn',
-      onClick: () => { if (fp) downloadPaths([fp], [entryForPath]); }, disabled: !fp },
-  ];
-  if (admin && entryForPath) {
-    actions.push({ id: 'rename', ico: '\u270E', label: 'Rename', title: 'Rename', cls: 'rename-btn',
-      onClick: () => renameEntry(entryForPath) });
-    actions.push({ id: 'delete', ico: '\uD83D\uDDD1', label: 'Delete', title: 'Delete', cls: 'delete-btn',
-      danger: true, onClick: () => deleteEntry(entryForPath) });
-  }
-  const overflowed = overflow > 0 ? actions.slice(actions.length - overflow) : [];
   const toolbar = html`
-    <div class="preview-toolbar" ref=${toolbarRef}>
+    <div class="preview-toolbar">
       <button class=${'text-btn clippy' + (pinned ? ' active' : '')}
               onClick=${() => togglePinnedFile(fp)}
               disabled=${!fp}
@@ -237,13 +139,7 @@ function Preview() {
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
       <span class="preview-spacer"></span>
       <span class="preview-actions">
-        ${actions.map((a) => html`
-          <button type="button" class=${'text-btn ' + a.cls + (a.danger ? ' danger' : '')}
-                  data-action=${a.id} key=${a.id}
-                  onClick=${a.onClick} disabled=${a.disabled}
-                  title=${a.title} aria-label=${a.title}>${a.ico}</button>
-        `)}
-        <${OverflowMenu} items=${overflowed} />
+        <${ActionsMenu} mode="preview" />
         <button type="button" class="text-btn close-preview"
                 onClick=${closePreview}
                 title="Close preview" aria-label="Close preview">\u00D7</button>
