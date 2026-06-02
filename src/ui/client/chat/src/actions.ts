@@ -768,16 +768,37 @@ export async function respondApproval(approvalId: string, value: string): Promis
   const next = new Set(respondingApprovalIds.value);
   next.add(approvalId);
   respondingApprovalIds.value = next;
+  // Optimistically remove the row so the banner updates immediately. The
+  // server-side apply (e.g. install_packages → image rebuild) can take many
+  // seconds; keeping the row visible the whole time is misleading. If the
+  // POST fails we re-fetch the canonical list.
+  const before = pendingApprovals.value;
+  pendingApprovals.value = before.filter((a) => a.approvalId !== approvalId);
+  const verb = value === 'approve' ? 'Approving' : value === 'reject' ? 'Rejecting' : 'Submitting';
+  chatStatus.value = verb + '\u2026';
   try {
     const res = await postJson<{ ok?: boolean; error?: string }>(
       `api/approvals/${encodeURIComponent(approvalId)}/respond`,
       { value },
     );
     if (!res.ok) throw new Error(res.data?.error || 'HTTP ' + res.status);
-    pendingApprovals.value = pendingApprovals.value.filter((a) => a.approvalId !== approvalId);
+    chatStatus.value = verb.replace(/ing$/, 'ed') + ' \u2014 applied';
+    setTimeout(() => {
+      if (
+        chatStatus.value.startsWith('Approved') ||
+        chatStatus.value.startsWith('Rejected') ||
+        chatStatus.value.startsWith('Submitted')
+      ) {
+        chatStatus.value = '';
+      }
+    }, 4000);
   } catch (err) {
     console.error('approval respond failed', err);
     chatStatus.value = 'approval failed: ' + (err instanceof Error ? err.message : String(err));
+    // Restore canonical state from the server.
+    loadApprovals().catch(() => {
+      /* ignore */
+    });
   } finally {
     const cleared = new Set(respondingApprovalIds.value);
     cleared.delete(approvalId);
