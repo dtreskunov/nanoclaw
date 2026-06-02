@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { shareModalRequest } from '../state.js';
 import { postJson } from '../api.js';
+import { showToast } from './Toast.js';
 
 const DURATIONS = [
   { label: '15 minutes', minutes: 15 },
@@ -66,14 +67,17 @@ export function ShareLinkModal() {
 
   async function copy() {
     if (!result?.url) return;
+    let ok = false;
     try {
       await navigator.clipboard.writeText(result.url);
+      ok = true;
     } catch {
       if (urlRef.current) {
         urlRef.current.select();
-        try { document.execCommand('copy'); } catch { /* ignore */ }
+        try { ok = document.execCommand('copy'); } catch { /* ignore */ }
       }
     }
+    showToast(ok ? 'Link copied' : 'Copy failed', ok ? 'ok' : 'err');
   }
 
   async function shareSystem() {

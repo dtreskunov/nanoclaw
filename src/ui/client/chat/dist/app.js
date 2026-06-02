@@ -15545,6 +15545,7 @@ var me = y3("");
 var notifMutedSig = y3(false);
 var settingsOpen = y3(false);
 var shareModalRequest = y3(null);
+var toastMessage = y3(null);
 var previewBlock = y3(null);
 var nowTick = y3(Date.now());
 var pinnedContext = y3([]);
@@ -18215,6 +18216,30 @@ async function notifyAgent(paths) {
   clearUploadStrip();
 }
 
+// src/components/Toast.js
+var nextId = 1;
+var hideTimer = null;
+function showToast(text, kind = "ok", ms = 1800) {
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  const id = nextId++;
+  toastMessage.value = { id, text, kind };
+  hideTimer = setTimeout(() => {
+    if (toastMessage.value && toastMessage.value.id === id) toastMessage.value = null;
+    hideTimer = null;
+  }, ms);
+}
+function Toast() {
+  const t5 = toastMessage.value;
+  y2(() => void 0, [t5?.id]);
+  if (!t5) return null;
+  return html`
+    <div class=${"toast toast-" + (t5.kind || "ok")} role="status" aria-live="polite" key=${t5.id}>${t5.text}</div>
+  `;
+}
+
 // src/components/ActionsMenu.js
 function fileUrl(groupId2, relPath) {
   const segs = String(relPath || "").split("/").filter(Boolean).map(encodeURIComponent);
@@ -18238,7 +18263,9 @@ async function sharePrivate(groupId2, entry) {
   }
   try {
     await navigator.clipboard.writeText(url);
+    showToast("Link copied");
   } catch {
+    showToast("Copy failed", "err");
   }
 }
 function shareWithToken(groupId2, entry) {
@@ -19093,17 +19120,20 @@ function ShareLinkModal() {
   }
   async function copy() {
     if (!result?.url) return;
+    let ok = false;
     try {
       await navigator.clipboard.writeText(result.url);
+      ok = true;
     } catch {
       if (urlRef.current) {
         urlRef.current.select();
         try {
-          document.execCommand("copy");
+          ok = document.execCommand("copy");
         } catch {
         }
       }
     }
+    showToast(ok ? "Link copied" : "Copy failed", ok ? "ok" : "err");
   }
   async function shareSystem() {
     if (!result?.url || !navigator.share) return;
@@ -19264,6 +19294,7 @@ function App() {
     <div class=${"backdrop" + (backdropShown ? " show" : "")} id="backdrop" onClick=${onBackdrop}></div>
     <${Settings} />
     <${ShareLinkModal} />
+    <${Toast} />
   `;
 }
 

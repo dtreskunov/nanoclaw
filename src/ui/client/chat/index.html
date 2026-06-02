@@ -648,6 +648,36 @@
       .settings-status.ok { background: rgba(108, 198, 108, 0.15); color: var(--success); }
       .settings-status.err { background: rgba(228, 68, 68, 0.15); color: var(--error); }
 
+      /* Transient corner toast (e.g. "Link copied"). Mounts/unmounts via
+         the Toast component, which keys on a per-message id so the
+         animation re-plays for each new toast. */
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: max(24px, env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        z-index: 100;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        background: rgba(20, 20, 20, 0.92);
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        pointer-events: none;
+        animation: toast-in 160ms ease-out, toast-out 220ms ease-in 1.45s forwards;
+      }
+      .toast-err { background: rgba(170, 36, 36, 0.94); }
+      @keyframes toast-in {
+        from { opacity: 0; transform: translate(-50%, 8px); }
+        to   { opacity: 1; transform: translate(-50%, 0); }
+      }
+      @keyframes toast-out {
+        to { opacity: 0; transform: translate(-50%, 4px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .toast { animation: none; }
+      }
+
       /* Mobile layout */
       @media (max-width: 720px) {
         header {

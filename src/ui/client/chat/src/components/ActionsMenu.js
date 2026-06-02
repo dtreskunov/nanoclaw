@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   pinnedContext, isAdmin, treeEntries, filePath, previewBlock, groupId, shareModalRequest,
 } from '../state.js';
+import { showToast } from './Toast.js';
 import { clearPinnedContext } from '../actions.js';
 import {
   mkdirPrompt, touchPrompt, renameEntry, deleteEntry,
@@ -41,7 +42,12 @@ export async function sharePrivate(groupId, entry) {
       if (err && err.name === 'AbortError') return;
     }
   }
-  try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Link copied');
+  } catch {
+    showToast('Copy failed', 'err');
+  }
 }
 
 // Backwards-compat alias.
