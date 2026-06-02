@@ -1118,7 +1118,7 @@ header .mobile-only {
 }
 .chat-main .approval-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -1132,15 +1132,28 @@ header .mobile-only {
 .chat-main .approval-title {
   font-size: 13px;
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.chat-main .approval-title .approval-group {
+  color: var(--accent, #4a9eff);
+}
+.chat-main .approval-title .approval-name {
+  font-weight: 500;
+  opacity: 0.9;
+}
+.chat-main .approval-title .dot {
+  opacity: 0.5;
+  font-weight: 400;
 }
 .chat-main .approval-details {
   font-size: 12px;
   color: var(--fg);
-  margin-top: 2px;
+  margin-top: 4px;
   word-break: break-word;
+  opacity: 0.85;
 }
 .chat-main .approval-meta {
   font-size: 11px;
@@ -1148,7 +1161,7 @@ header .mobile-only {
   display: flex;
   gap: 4px;
   align-items: center;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 .chat-main .approval-meta .dot {
   opacity: 0.6;

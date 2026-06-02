@@ -86,11 +86,14 @@
 .chat-main .approvals-banner { border-bottom: 1px solid var(--border); background: var(--wash); padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
 .chat-main .approvals-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .chat-main .approvals-header .approvals-count { font-weight: 600; color: var(--fg); }
-.chat-main .approval-row { display: flex; align-items: center; gap: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.chat-main .approval-row { display: flex; align-items: flex-start; gap: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
 .chat-main .approval-text { flex: 1; min-width: 0; }
-.chat-main .approval-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-main .approval-details { font-size: 12px; color: var(--fg); margin-top: 2px; word-break: break-word; }
-.chat-main .approval-meta { font-size: 11px; color: var(--muted); display: flex; gap: 4px; align-items: center; margin-top: 2px; }
+.chat-main .approval-title { font-size: 13px; font-weight: 600; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.chat-main .approval-title .approval-group { color: var(--accent, #4a9eff); }
+.chat-main .approval-title .approval-name { font-weight: 500; opacity: 0.9; }
+.chat-main .approval-title .dot { opacity: 0.5; font-weight: 400; }
+.chat-main .approval-details { font-size: 12px; color: var(--fg); margin-top: 4px; word-break: break-word; opacity: 0.85; }
+.chat-main .approval-meta { font-size: 11px; color: var(--muted); display: flex; gap: 4px; align-items: center; margin-top: 4px; }
 .chat-main .approval-meta .dot { opacity: 0.6; }
 .chat-main .approval-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .chat-main .approval-btn { height: 28px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: inherit; cursor: pointer; font-size: 12px; }
