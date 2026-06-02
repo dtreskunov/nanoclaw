@@ -17670,6 +17670,7 @@ function Header() {
   const onChange = (e4) => {
     selectGroup(e4.currentTarget.value).catch(console.error);
   };
+  const readOnlyHint = "\u{1F512} Read-only \u2014 you don\u2019t have admin rights in this group, so you can\u2019t upload, rename or delete files.";
   return /* @__PURE__ */ u4("header", { children: [
     /* @__PURE__ */ u4(
       "button",
@@ -17686,9 +17687,13 @@ function Header() {
     ),
     /* @__PURE__ */ u4("span", { class: "brand", children: "NanoClaw" }),
     /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: groups.value.map((g5) => /* @__PURE__ */ u4("option", { value: g5.id, children: [
-      g5.name,
-      g5.isAdmin ? " [admin]" : ""
+      g5.isAdmin ? "" : "\u{1F512} ",
+      g5.name
     ] }, g5.id)) }),
+    !isAdmin.value && groupId.value ? /* @__PURE__ */ u4("span", { class: "readonly-badge", title: readOnlyHint, "aria-label": readOnlyHint, children: [
+      /* @__PURE__ */ u4("span", { "aria-hidden": "true", children: "\u{1F512}" }),
+      /* @__PURE__ */ u4("span", { class: "desktop-only", children: "Read-only" })
+    ] }) : null,
     /* @__PURE__ */ u4("div", { class: "spacer" }),
     /* @__PURE__ */ u4("span", { class: "user", id: "me", children: me.value }),
     /* @__PURE__ */ u4(
