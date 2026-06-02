@@ -8,6 +8,8 @@ import http from 'http';
 import path from 'path';
 import { URL } from 'url';
 
+import Router from 'find-my-way';
+
 import { GROUPS_DIR } from '../../../config.js';
 import { getAgentGroup } from '../../../db/agent-groups.js';
 import { getDb } from '../../../db/connection.js';
@@ -42,7 +44,7 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const ctx: Ctx = { req, res, url };
 
-  // Strip the mount prefix so internal route matching stays local.
+  // Strip the mount prefix so route patterns stay local.
   let pathname = url.pathname;
   if (pathname === CHAT_MOUNT_PREFIX) {
     // /ui/chat (no trailing slash) → redirect to /ui/chat/ so relative URLs resolve.
@@ -55,59 +57,105 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
   }
 
   try {
-    // Public static routes.
-    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return serveStatic(ctx, 'index.html');
-    if (req.method === 'GET' && pathname === '/manifest.webmanifest') return serveStatic(ctx, 'manifest.webmanifest');
-    if (req.method === 'GET' && pathname.startsWith('/dist/')) return serveStatic(ctx, pathname.slice(1));
-    if (req.method === 'GET' && pathname === '/icon.svg') return serveStatic(ctx, 'icon.svg');
-
-    // Public token-based download (no cookie required). Always sent as
-    // attachment; never sets a session.
-    if (req.method === 'GET' && pathname === '/dl') return handleTokenDownload(ctx);
-
-    // Authenticated routes.
+    const found = router.find(req.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'PATCH', pathname);
+    if (found) {
+      await (found.handler as unknown as RouteHandler)(ctx, found.params as Record<string, string>);
+      return;
+    }
+    // Fall-through: chat + write modules still own their own internal
+    // dispatch. Try them before returning 404.
     const session = authenticate(req);
     if (!session) return json(ctx, 401, { error: 'unauthorized' });
-
-    if (req.method === 'GET' && pathname === '/api/me') return handleMe(ctx, session.userId);
-    if (req.method === 'GET' && pathname === '/api/groups') return handleGroups(ctx, session.userId);
-
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
-
-    // File/dir resources: path-in-URL, single endpoint per kind.
-    //   GET|HEAD /api/groups/<gid>/files/<rel/path>           → file bytes
-    //   GET      /api/groups/<gid>/files/<rel/path>?meta=1    → file metadata JSON
-    //   GET      /api/groups/<gid>/dirs/[<rel/path>/]         → directory listing JSON
-    //   GET      /api/groups/<gid>/zip?path=&path=...         → multi-path zip
-    const filesMatch = pathname.match(/^\/api\/groups\/([^/]+)\/files\/(.+)$/);
-    if ((req.method === 'GET' || req.method === 'HEAD') && filesMatch) {
-      const [, groupId, encodedPath] = filesMatch;
-      const relPath = safeDecode(encodedPath);
-      if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
-      if (req.method === 'GET' && url.searchParams.has('meta'))
-        return await handleMeta(ctx, session.userId, groupId, relPath);
-      return handleFile(ctx, session.userId, groupId, relPath);
-    }
-    const dirsMatch = pathname.match(/^\/api\/groups\/([^/]+)\/dirs(?:\/(.*))?$/);
-    if (req.method === 'GET' && dirsMatch) {
-      const [, groupId, encodedPath = ''] = dirsMatch;
-      const relPath = encodedPath ? safeDecode(encodedPath.replace(/\/$/, '')) : '';
-      if (relPath == null) return json(ctx, 400, { error: 'invalid_path' });
-      return handleTree(ctx, session.userId, groupId, relPath);
-    }
-    const zipMatch = pathname.match(/^\/api\/groups\/([^/]+)\/zip$/);
-    if (req.method === 'GET' && zipMatch) {
-      const [, groupId] = zipMatch;
-      return handleZip(ctx, session.userId, groupId, url.searchParams.getAll('path'));
-    }
-
     return json(ctx, 404, { error: 'not_found' });
   } catch (err) {
     log.error('File browser handler threw', { url: req.url, err });
     return json(ctx, 500, { error: 'internal_error' });
   }
 }
+
+// ── router ────────────────────────────────────────────────────────────────
+
+type RouteHandler = (ctx: Ctx, params: Record<string, string>) => void | Promise<void>;
+type FmwMethod = Parameters<ReturnType<typeof Router>['on']>[0];
+
+const router = Router({
+  caseSensitive: true,
+  ignoreTrailingSlash: false,
+  // Never invoked — we dispatch via router.find() — but the option is required.
+  defaultRoute: (_req, res) => {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end('{"error":"not_found"}');
+  },
+});
+
+/** Register a RouteHandler with find-my-way. The cast hides the fact
+ * that we don't use FMW's (req, res, params) calling convention — we
+ * call handlers ourselves from find() with a Ctx. */
+function on(method: FmwMethod, route: string, handler: RouteHandler): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  router.on(method, route, handler as any);
+}
+
+/** Wrap a handler that requires an authenticated session; injects userId. */
+function authed(fn: (ctx: Ctx, userId: string, params: Record<string, string>) => void | Promise<void>): RouteHandler {
+  return async (ctx, params) => {
+    const session = authenticate(ctx.req);
+    if (!session) return json(ctx, 401, { error: 'unauthorized' });
+    return fn(ctx, session.userId, params);
+  };
+}
+
+// Static + public.
+on('GET', '/', (ctx) => serveStatic(ctx, 'index.html'));
+on('GET', '/index.html', (ctx) => serveStatic(ctx, 'index.html'));
+on('GET', '/manifest.webmanifest', (ctx) => serveStatic(ctx, 'manifest.webmanifest'));
+on('GET', '/icon.svg', (ctx) => serveStatic(ctx, 'icon.svg'));
+on('GET', '/dist/*', (ctx, params) => serveStatic(ctx, 'dist/' + params['*']));
+on('GET', '/dl', (ctx) => handleTokenDownload(ctx));
+
+// Authenticated.
+on(
+  'GET',
+  '/api/me',
+  authed((ctx, userId) => handleMe(ctx, userId)),
+);
+on(
+  'GET',
+  '/api/groups',
+  authed((ctx, userId) => handleGroups(ctx, userId)),
+);
+
+// File/dir resources: path-in-URL, single endpoint per kind.
+//   GET|HEAD /api/groups/:gid/files/<rel/path>           → file bytes
+//   GET      /api/groups/:gid/files/<rel/path>?meta=1    → file metadata JSON
+//   GET      /api/groups/:gid/dirs[/<rel/path>/]         → directory listing JSON
+//   GET      /api/groups/:gid/zip?path=&path=...         → multi-path zip
+const filesHandler = authed((ctx, userId, params) => {
+  const rel = safeDecode(params['*']);
+  if (rel == null) return json(ctx, 400, { error: 'invalid_path' });
+  if (ctx.req.method === 'GET' && ctx.url.searchParams.has('meta')) return handleMeta(ctx, userId, params.gid, rel);
+  return handleFile(ctx, userId, params.gid, rel);
+});
+on('GET', '/api/groups/:gid/files/*', filesHandler);
+on('HEAD', '/api/groups/:gid/files/*', filesHandler);
+
+const dirsHandler = authed((ctx, userId, params) => {
+  const raw = params['*'] ?? '';
+  const stripped = raw.replace(/\/$/, '');
+  const rel = stripped ? safeDecode(stripped) : '';
+  if (rel == null) return json(ctx, 400, { error: 'invalid_path' });
+  return handleTree(ctx, userId, params.gid, rel);
+});
+on('GET', '/api/groups/:gid/dirs', dirsHandler);
+on('GET', '/api/groups/:gid/dirs/*', dirsHandler);
+
+on(
+  'GET',
+  '/api/groups/:gid/zip',
+  authed((ctx, userId, params) => handleZip(ctx, userId, params.gid, ctx.url.searchParams.getAll('path'))),
+);
 
 // ── handlers ──────────────────────────────────────────────────────────────
 

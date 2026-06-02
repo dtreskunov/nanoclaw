@@ -24,6 +24,375 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// node_modules/path-to-regexp/dist/index.js
+var require_dist = __commonJS({
+  "node_modules/path-to-regexp/dist/index.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.PathError = exports.TokenData = void 0;
+    exports.parse = parse;
+    exports.compile = compile2;
+    exports.match = match2;
+    exports.pathToRegexp = pathToRegexp;
+    exports.stringify = stringify;
+    var DEFAULT_DELIMITER = "/";
+    var NOOP_VALUE = (value) => value;
+    var ID_START = /^[$_\p{ID_Start}]$/u;
+    var ID_CONTINUE = /^[$\u200c\u200d\p{ID_Continue}]$/u;
+    var ID = /^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u;
+    function escapeText(str) {
+      return str.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
+    }
+    function escape(str) {
+      return str.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
+    }
+    var TokenData = class {
+      constructor(tokens, originalPath) {
+        this.tokens = tokens;
+        this.originalPath = originalPath;
+      }
+    };
+    exports.TokenData = TokenData;
+    var PathError = class extends TypeError {
+      constructor(message, originalPath) {
+        let text = message;
+        if (originalPath)
+          text += `: ${originalPath}`;
+        text += `; visit https://git.new/pathToRegexpError for info`;
+        super(text);
+        this.originalPath = originalPath;
+      }
+    };
+    exports.PathError = PathError;
+    function parse(str, options = {}) {
+      const { encodePath = NOOP_VALUE } = options;
+      const chars = [...str];
+      let index = 0;
+      function consumeUntil(end) {
+        const output = [];
+        let path = "";
+        function writePath() {
+          if (!path)
+            return;
+          output.push({
+            type: "text",
+            value: encodePath(path)
+          });
+          path = "";
+        }
+        while (index < chars.length) {
+          const value = chars[index++];
+          if (value === end) {
+            writePath();
+            return output;
+          }
+          if (value === "\\") {
+            if (index === chars.length) {
+              throw new PathError(`Unexpected end after \\ at index ${index}`, str);
+            }
+            path += chars[index++];
+            continue;
+          }
+          if (value === ":" || value === "*") {
+            const type = value === ":" ? "param" : "wildcard";
+            let name = "";
+            if (ID_START.test(chars[index])) {
+              do {
+                name += chars[index++];
+              } while (ID_CONTINUE.test(chars[index]));
+            } else if (chars[index] === '"') {
+              let quoteStart = index;
+              while (index < chars.length) {
+                if (chars[++index] === '"') {
+                  index++;
+                  quoteStart = 0;
+                  break;
+                }
+                if (chars[index] === "\\")
+                  index++;
+                name += chars[index];
+              }
+              if (quoteStart) {
+                throw new PathError(`Unterminated quote at index ${quoteStart}`, str);
+              }
+            }
+            if (!name) {
+              throw new PathError(`Missing parameter name at index ${index}`, str);
+            }
+            writePath();
+            output.push({ type, name });
+            continue;
+          }
+          if (value === "{") {
+            writePath();
+            output.push({
+              type: "group",
+              tokens: consumeUntil("}")
+            });
+            continue;
+          }
+          if (value === "}" || value === "(" || value === ")" || value === "[" || value === "]" || value === "+" || value === "?" || value === "!") {
+            throw new PathError(`Unexpected ${value} at index ${index - 1}`, str);
+          }
+          path += value;
+        }
+        if (end) {
+          throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str);
+        }
+        writePath();
+        return output;
+      }
+      return new TokenData(consumeUntil(""), str);
+    }
+    function compile2(path, options = {}) {
+      const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
+      const data = typeof path === "object" ? path : parse(path, options);
+      const fn = tokensToFunction(data.tokens, delimiter, encode);
+      return function path2(params = {}) {
+        const missing = [];
+        const path3 = fn(params, missing);
+        if (missing.length) {
+          throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
+        }
+        return path3;
+      };
+    }
+    function tokensToFunction(tokens, delimiter, encode) {
+      const encoders = tokens.map((token) => tokenToFunction(token, delimiter, encode));
+      return (data, missing) => {
+        let result = "";
+        for (const encoder of encoders) {
+          result += encoder(data, missing);
+        }
+        return result;
+      };
+    }
+    function tokenToFunction(token, delimiter, encode) {
+      if (token.type === "text")
+        return () => token.value;
+      if (token.type === "group") {
+        const fn = tokensToFunction(token.tokens, delimiter, encode);
+        return (data, missing) => {
+          const len = missing.length;
+          const value = fn(data, missing);
+          if (missing.length === len)
+            return value;
+          missing.length = len;
+          return "";
+        };
+      }
+      const encodeValue = encode || NOOP_VALUE;
+      if (token.type === "wildcard" && encode !== false) {
+        return (data, missing) => {
+          const value = data[token.name];
+          if (value == null) {
+            missing.push(token.name);
+            return "";
+          }
+          if (!Array.isArray(value) || value.length === 0) {
+            throw new TypeError(`Expected "${token.name}" to be a non-empty array`);
+          }
+          let result = "";
+          for (let i4 = 0; i4 < value.length; i4++) {
+            if (typeof value[i4] !== "string") {
+              throw new TypeError(`Expected "${token.name}/${i4}" to be a string`);
+            }
+            if (i4 > 0)
+              result += delimiter;
+            result += encodeValue(value[i4]);
+          }
+          return result;
+        };
+      }
+      return (data, missing) => {
+        const value = data[token.name];
+        if (value == null) {
+          missing.push(token.name);
+          return "";
+        }
+        if (typeof value !== "string") {
+          throw new TypeError(`Expected "${token.name}" to be a string`);
+        }
+        return encodeValue(value);
+      };
+    }
+    function match2(path, options = {}) {
+      const { decode = decodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
+      const { regexp, keys } = pathToRegexp(path, options);
+      const decoders = keys.map((key) => {
+        if (decode === false)
+          return NOOP_VALUE;
+        if (key.type === "param")
+          return decode;
+        return (value) => value.split(delimiter).map(decode);
+      });
+      return function match3(input) {
+        const m6 = regexp.exec(input);
+        if (!m6)
+          return false;
+        const path2 = m6[0];
+        const params = /* @__PURE__ */ Object.create(null);
+        for (let i4 = 1; i4 < m6.length; i4++) {
+          if (m6[i4] === void 0)
+            continue;
+          const key = keys[i4 - 1];
+          const decoder = decoders[i4 - 1];
+          params[key.name] = decoder(m6[i4]);
+        }
+        return { path: path2, params };
+      };
+    }
+    function pathToRegexp(path, options = {}) {
+      const { delimiter = DEFAULT_DELIMITER, end = true, sensitive = false, trailing = true } = options;
+      const keys = [];
+      let source = "";
+      let combinations = 0;
+      function process(path2) {
+        if (Array.isArray(path2)) {
+          for (const p5 of path2)
+            process(p5);
+          return;
+        }
+        const data = typeof path2 === "object" ? path2 : parse(path2, options);
+        flatten(data.tokens, 0, [], (tokens) => {
+          if (combinations >= 256) {
+            throw new PathError("Too many path combinations", data.originalPath);
+          }
+          if (combinations > 0)
+            source += "|";
+          source += toRegExpSource(tokens, delimiter, keys, data.originalPath);
+          combinations++;
+        });
+      }
+      process(path);
+      let pattern = `^(?:${source})`;
+      if (trailing)
+        pattern += "(?:" + escape(delimiter) + "$)?";
+      pattern += end ? "$" : "(?=" + escape(delimiter) + "|$)";
+      return { regexp: new RegExp(pattern, sensitive ? "" : "i"), keys };
+    }
+    function flatten(tokens, index, result, callback) {
+      while (index < tokens.length) {
+        const token = tokens[index++];
+        if (token.type === "group") {
+          const len = result.length;
+          flatten(token.tokens, 0, result, (seq) => flatten(tokens, index, seq, callback));
+          result.length = len;
+          continue;
+        }
+        result.push(token);
+      }
+      callback(result);
+    }
+    function toRegExpSource(tokens, delimiter, keys, originalPath) {
+      let result = "";
+      let backtrack = "";
+      let wildcardBacktrack = "";
+      let prevCaptureType = 0;
+      let hasSegmentCapture = 0;
+      let index = 0;
+      function hasInSegment(index2, type) {
+        while (index2 < tokens.length) {
+          const token = tokens[index2++];
+          if (token.type === type)
+            return true;
+          if (token.type === "text") {
+            if (token.value.includes(delimiter))
+              break;
+          }
+        }
+        return false;
+      }
+      function peekText(index2) {
+        let result2 = "";
+        while (index2 < tokens.length) {
+          const token = tokens[index2++];
+          if (token.type !== "text")
+            break;
+          result2 += token.value;
+        }
+        return result2;
+      }
+      while (index < tokens.length) {
+        const token = tokens[index++];
+        if (token.type === "text") {
+          result += escape(token.value);
+          backtrack += token.value;
+          if (prevCaptureType === 2)
+            wildcardBacktrack += token.value;
+          if (token.value.includes(delimiter))
+            hasSegmentCapture = 0;
+          continue;
+        }
+        if (token.type === "param" || token.type === "wildcard") {
+          if (prevCaptureType && !backtrack) {
+            throw new PathError(`Missing text before "${token.name}" ${token.type}`, originalPath);
+          }
+          if (token.type === "param") {
+            result += hasSegmentCapture & 2 ? `(${negate(delimiter, backtrack)}+)` : hasInSegment(index, "wildcard") ? `(${negate(delimiter, peekText(index))}+)` : hasSegmentCapture & 1 ? `(${negate(delimiter, backtrack)}+|${escape(backtrack)})` : `(${negate(delimiter, "")}+)`;
+            hasSegmentCapture |= prevCaptureType = 1;
+          } else {
+            result += hasSegmentCapture & 2 ? `(${negate(backtrack, "")}+)` : wildcardBacktrack ? `(${negate(wildcardBacktrack, "")}+|${negate(delimiter, "")}+)` : `([^]+)`;
+            wildcardBacktrack = "";
+            hasSegmentCapture |= prevCaptureType = 2;
+          }
+          keys.push(token);
+          backtrack = "";
+          continue;
+        }
+        throw new TypeError(`Unknown token type: ${token.type}`);
+      }
+      return result;
+    }
+    function negate(a4, b4) {
+      if (b4.length > a4.length)
+        return negate(b4, a4);
+      if (a4 === b4)
+        b4 = "";
+      if (b4.length > 1)
+        return `(?:(?!${escape(a4)}|${escape(b4)})[^])`;
+      if (a4.length > 1)
+        return `(?:(?!${escape(a4)})[^${escape(b4)}])`;
+      return `[^${escape(a4 + b4)}]`;
+    }
+    function stringifyTokens(tokens, index) {
+      let value = "";
+      while (index < tokens.length) {
+        const token = tokens[index++];
+        if (token.type === "text") {
+          value += escapeText(token.value);
+          continue;
+        }
+        if (token.type === "group") {
+          value += "{" + stringifyTokens(token.tokens, 0) + "}";
+          continue;
+        }
+        if (token.type === "param") {
+          value += ":" + stringifyName(token.name, tokens[index]);
+          continue;
+        }
+        if (token.type === "wildcard") {
+          value += "*" + stringifyName(token.name, tokens[index]);
+          continue;
+        }
+        throw new TypeError(`Unknown token type: ${token.type}`);
+      }
+      return value;
+    }
+    function stringify(data) {
+      return stringifyTokens(data.tokens, 0);
+    }
+    function stringifyName(name, next) {
+      if (!ID.test(name))
+        return JSON.stringify(name);
+      if ((next === null || next === void 0 ? void 0 : next.type) === "text" && ID_CONTINUE.test(next.value[0])) {
+        return JSON.stringify(name);
+      }
+      return name;
+    }
+  }
+});
+
 // node_modules/highlight.js/lib/core.js
 var require_core = __commonJS({
   "node_modules/highlight.js/lib/core.js"(exports, module) {
@@ -301,8 +670,8 @@ var require_core = __commonJS({
       return new RegExp(re.toString() + "|").exec("").length - 1;
     }
     function startsWith(re, lexeme) {
-      const match = re && re.exec(lexeme);
-      return match && match.index === 0;
+      const match2 = re && re.exec(lexeme);
+      return match2 && match2.index === 0;
     }
     var BACKREF_RE = /\[(?:[^\\\]]|\\.)*\]|\(\??|\\([1-9][0-9]*)|\\./;
     function _rewriteBackreferences(regexps, { joinWith }) {
@@ -313,18 +682,18 @@ var require_core = __commonJS({
         let re = source(regex);
         let out = "";
         while (re.length > 0) {
-          const match = BACKREF_RE.exec(re);
-          if (!match) {
+          const match2 = BACKREF_RE.exec(re);
+          if (!match2) {
             out += re;
             break;
           }
-          out += re.substring(0, match.index);
-          re = re.substring(match.index + match[0].length);
-          if (match[0][0] === "\\" && match[1]) {
-            out += "\\" + String(Number(match[1]) + offset);
+          out += re.substring(0, match2.index);
+          re = re.substring(match2.index + match2[0].length);
+          if (match2[0][0] === "\\" && match2[1]) {
+            out += "\\" + String(Number(match2[1]) + offset);
           } else {
-            out += match[0];
-            if (match[0] === "(") {
+            out += match2[0];
+            if (match2[0] === "(") {
               numCaptures++;
             }
           }
@@ -538,8 +907,8 @@ var require_core = __commonJS({
       UNDERSCORE_IDENT_RE,
       UNDERSCORE_TITLE_MODE
     });
-    function skipIfHasPrecedingDot(match, response) {
-      const before = match.input[match.index - 1];
+    function skipIfHasPrecedingDot(match2, response) {
+      const before = match2.input[match2.index - 1];
       if (before === ".") {
         response.ignoreMatch();
       }
@@ -743,14 +1112,14 @@ var require_core = __commonJS({
         /** @param {string} s */
         exec(s5) {
           this.matcherRe.lastIndex = this.lastIndex;
-          const match = this.matcherRe.exec(s5);
-          if (!match) {
+          const match2 = this.matcherRe.exec(s5);
+          if (!match2) {
             return null;
           }
-          const i4 = match.findIndex((el, i5) => i5 > 0 && el !== void 0);
+          const i4 = match2.findIndex((el, i5) => i5 > 0 && el !== void 0);
           const matchData = this.matchIndexes[i4];
-          match.splice(0, i4);
-          return Object.assign(match, matchData);
+          match2.splice(0, i4);
+          return Object.assign(match2, matchData);
         }
       }
       class ResumableMultiRegex {
@@ -949,14 +1318,14 @@ var require_core = __commonJS({
       function blockLanguage(block) {
         let classes = block.className + " ";
         classes += block.parentNode ? block.parentNode.className : "";
-        const match = options.languageDetectRe.exec(classes);
-        if (match) {
-          const language = getLanguage(match[1]);
+        const match2 = options.languageDetectRe.exec(classes);
+        if (match2) {
+          const language = getLanguage(match2[1]);
           if (!language) {
-            warn(LANGUAGE_NOT_FOUND.replace("{}", match[1]));
+            warn(LANGUAGE_NOT_FOUND.replace("{}", match2[1]));
             warn("Falling back to no-highlight mode for this block.", block);
           }
-          return language ? match[1] : "no-highlight";
+          return language ? match2[1] : "no-highlight";
         }
         return classes.split(/\s+/).find((_class) => shouldNotHighlight(_class) || getLanguage(_class));
       }
@@ -998,11 +1367,11 @@ var require_core = __commonJS({
           }
           let lastIndex = 0;
           top.keywordPatternRe.lastIndex = 0;
-          let match = top.keywordPatternRe.exec(modeBuffer);
+          let match2 = top.keywordPatternRe.exec(modeBuffer);
           let buf = "";
-          while (match) {
-            buf += modeBuffer.substring(lastIndex, match.index);
-            const word = language.case_insensitive ? match[0].toLowerCase() : match[0];
+          while (match2) {
+            buf += modeBuffer.substring(lastIndex, match2.index);
+            const word = language.case_insensitive ? match2[0].toLowerCase() : match2[0];
             const data = keywordData(top, word);
             if (data) {
               const [kind, keywordRelevance] = data;
@@ -1011,16 +1380,16 @@ var require_core = __commonJS({
               keywordHits[word] = (keywordHits[word] || 0) + 1;
               if (keywordHits[word] <= MAX_KEYWORD_HITS) relevance += keywordRelevance;
               if (kind.startsWith("_")) {
-                buf += match[0];
+                buf += match2[0];
               } else {
                 const cssClass = language.classNameAliases[kind] || kind;
-                emitKeyword(match[0], cssClass);
+                emitKeyword(match2[0], cssClass);
               }
             } else {
-              buf += match[0];
+              buf += match2[0];
             }
             lastIndex = top.keywordPatternRe.lastIndex;
-            match = top.keywordPatternRe.exec(modeBuffer);
+            match2 = top.keywordPatternRe.exec(modeBuffer);
           }
           buf += modeBuffer.substring(lastIndex);
           emitter.addText(buf);
@@ -1058,16 +1427,16 @@ var require_core = __commonJS({
           emitter.addText(keyword);
           emitter.endScope();
         }
-        function emitMultiClass(scope, match) {
+        function emitMultiClass(scope, match2) {
           let i4 = 1;
-          const max = match.length - 1;
+          const max = match2.length - 1;
           while (i4 <= max) {
             if (!scope._emit[i4]) {
               i4++;
               continue;
             }
             const klass = language.classNameAliases[scope[i4]] || scope[i4];
-            const text = match[i4];
+            const text = match2[i4];
             if (klass) {
               emitKeyword(text, klass);
             } else {
@@ -1078,7 +1447,7 @@ var require_core = __commonJS({
             i4++;
           }
         }
-        function startNewMode(mode, match) {
+        function startNewMode(mode, match2) {
           if (mode.scope && typeof mode.scope === "string") {
             emitter.openNode(language.classNameAliases[mode.scope] || mode.scope);
           }
@@ -1087,19 +1456,19 @@ var require_core = __commonJS({
               emitKeyword(modeBuffer, language.classNameAliases[mode.beginScope._wrap] || mode.beginScope._wrap);
               modeBuffer = "";
             } else if (mode.beginScope._multi) {
-              emitMultiClass(mode.beginScope, match);
+              emitMultiClass(mode.beginScope, match2);
               modeBuffer = "";
             }
           }
           top = Object.create(mode, { parent: { value: top } });
           return top;
         }
-        function endOfMode(mode, match, matchPlusRemainder) {
+        function endOfMode(mode, match2, matchPlusRemainder) {
           let matched = startsWith(mode.endRe, matchPlusRemainder);
           if (matched) {
             if (mode["on:end"]) {
               const resp = new Response(mode);
-              mode["on:end"](match, resp);
+              mode["on:end"](match2, resp);
               if (resp.isMatchIgnored) matched = false;
             }
             if (matched) {
@@ -1110,7 +1479,7 @@ var require_core = __commonJS({
             }
           }
           if (mode.endsWithParent) {
-            return endOfMode(mode.parent, match, matchPlusRemainder);
+            return endOfMode(mode.parent, match2, matchPlusRemainder);
           }
         }
         function doIgnore(lexeme) {
@@ -1122,14 +1491,14 @@ var require_core = __commonJS({
             return 0;
           }
         }
-        function doBeginMatch(match) {
-          const lexeme = match[0];
-          const newMode = match.rule;
+        function doBeginMatch(match2) {
+          const lexeme = match2[0];
+          const newMode = match2.rule;
           const resp = new Response(newMode);
           const beforeCallbacks = [newMode.__beforeBegin, newMode["on:begin"]];
           for (const cb of beforeCallbacks) {
             if (!cb) continue;
-            cb(match, resp);
+            cb(match2, resp);
             if (resp.isMatchIgnored) return doIgnore(lexeme);
           }
           if (newMode.skip) {
@@ -1143,13 +1512,13 @@ var require_core = __commonJS({
               modeBuffer = lexeme;
             }
           }
-          startNewMode(newMode, match);
+          startNewMode(newMode, match2);
           return newMode.returnBegin ? 0 : lexeme.length;
         }
-        function doEndMatch(match) {
-          const lexeme = match[0];
-          const matchPlusRemainder = codeToHighlight.substring(match.index);
-          const endMode = endOfMode(top, match, matchPlusRemainder);
+        function doEndMatch(match2) {
+          const lexeme = match2[0];
+          const matchPlusRemainder = codeToHighlight.substring(match2.index);
+          const endMode = endOfMode(top, match2, matchPlusRemainder);
           if (!endMode) {
             return NO_MATCH;
           }
@@ -1159,7 +1528,7 @@ var require_core = __commonJS({
             emitKeyword(lexeme, top.endScope._wrap);
           } else if (top.endScope && top.endScope._multi) {
             processBuffer();
-            emitMultiClass(top.endScope, match);
+            emitMultiClass(top.endScope, match2);
           } else if (origin.skip) {
             modeBuffer += lexeme;
           } else {
@@ -1181,7 +1550,7 @@ var require_core = __commonJS({
             top = top.parent;
           } while (top !== endMode.parent);
           if (endMode.starts) {
-            startNewMode(endMode.starts, match);
+            startNewMode(endMode.starts, match2);
           }
           return origin.returnEnd ? 0 : lexeme.length;
         }
@@ -1195,15 +1564,15 @@ var require_core = __commonJS({
           list.forEach((item) => emitter.openNode(item));
         }
         let lastMatch = {};
-        function processLexeme(textBeforeMatch, match) {
-          const lexeme = match && match[0];
+        function processLexeme(textBeforeMatch, match2) {
+          const lexeme = match2 && match2[0];
           modeBuffer += textBeforeMatch;
           if (lexeme == null) {
             processBuffer();
             return 0;
           }
-          if (lastMatch.type === "begin" && match.type === "end" && lastMatch.index === match.index && lexeme === "") {
-            modeBuffer += codeToHighlight.slice(match.index, match.index + 1);
+          if (lastMatch.type === "begin" && match2.type === "end" && lastMatch.index === match2.index && lexeme === "") {
+            modeBuffer += codeToHighlight.slice(match2.index, match2.index + 1);
             if (!SAFE_MODE) {
               const err = new Error(`0 width match regex (${languageName})`);
               err.languageName = languageName;
@@ -1212,24 +1581,24 @@ var require_core = __commonJS({
             }
             return 1;
           }
-          lastMatch = match;
-          if (match.type === "begin") {
-            return doBeginMatch(match);
-          } else if (match.type === "illegal" && !ignoreIllegals) {
+          lastMatch = match2;
+          if (match2.type === "begin") {
+            return doBeginMatch(match2);
+          } else if (match2.type === "illegal" && !ignoreIllegals) {
             const err = new Error('Illegal lexeme "' + lexeme + '" for mode "' + (top.scope || "<unnamed>") + '"');
             err.mode = top;
             throw err;
-          } else if (match.type === "end") {
-            const processed = doEndMatch(match);
+          } else if (match2.type === "end") {
+            const processed = doEndMatch(match2);
             if (processed !== NO_MATCH) {
               return processed;
             }
           }
-          if (match.type === "illegal" && lexeme === "") {
+          if (match2.type === "illegal" && lexeme === "") {
             modeBuffer += "\n";
             return 1;
           }
-          if (iterations > 1e5 && iterations > match.index * 3) {
+          if (iterations > 1e5 && iterations > match2.index * 3) {
             const err = new Error("potential infinite loop, way more iterations than matches");
             throw err;
           }
@@ -1263,11 +1632,11 @@ var require_core = __commonJS({
                 top.matcher.considerAll();
               }
               top.matcher.lastIndex = index;
-              const match = top.matcher.exec(codeToHighlight);
-              if (!match) break;
-              const beforeMatch = codeToHighlight.substring(index, match.index);
-              const processedCount = processLexeme(beforeMatch, match);
-              index = match.index + processedCount;
+              const match2 = top.matcher.exec(codeToHighlight);
+              if (!match2) break;
+              const beforeMatch = codeToHighlight.substring(index, match2.index);
+              const processedCount = processLexeme(beforeMatch, match2);
+              index = match2.index + processedCount;
             }
             processLexeme(codeToHighlight.substring(index));
           } else {
@@ -5871,9 +6240,9 @@ var require_javascript = __commonJS({
     );
     function javascript(hljs) {
       const regex = hljs.regex;
-      const hasClosingTag = (match, { after }) => {
-        const tag = "</" + match[0].slice(1);
-        const pos = match.input.indexOf(tag, after);
+      const hasClosingTag = (match2, { after }) => {
+        const tag = "</" + match2[0].slice(1);
+        const pos = match2.input.indexOf(tag, after);
         return pos !== -1;
       };
       const IDENT_RE$1 = IDENT_RE;
@@ -5889,9 +6258,9 @@ var require_javascript = __commonJS({
          * @param {RegExpMatchArray} match
          * @param {CallbackResponse} response
          */
-        isTrulyOpeningTag: (match, response) => {
-          const afterMatchIndex = match[0].length + match.index;
-          const nextChar = match.input[afterMatchIndex];
+        isTrulyOpeningTag: (match2, response) => {
+          const afterMatchIndex = match2[0].length + match2.index;
+          const nextChar = match2.input[afterMatchIndex];
           if (
             // HTML should not include another raw `<` inside a tag
             // nested type?
@@ -5904,12 +6273,12 @@ var require_javascript = __commonJS({
             return;
           }
           if (nextChar === ">") {
-            if (!hasClosingTag(match, { after: afterMatchIndex })) {
+            if (!hasClosingTag(match2, { after: afterMatchIndex })) {
               response.ignoreMatch();
             }
           }
           let m6;
-          const afterMatch = match.input.substring(afterMatchIndex);
+          const afterMatch = match2.input.substring(afterMatchIndex);
           if (m6 = afterMatch.match(/^\s*=/)) {
             response.ignoreMatch();
             return;
@@ -13132,9 +13501,9 @@ var require_typescript = __commonJS({
     );
     function javascript(hljs) {
       const regex = hljs.regex;
-      const hasClosingTag = (match, { after }) => {
-        const tag = "</" + match[0].slice(1);
-        const pos = match.input.indexOf(tag, after);
+      const hasClosingTag = (match2, { after }) => {
+        const tag = "</" + match2[0].slice(1);
+        const pos = match2.input.indexOf(tag, after);
         return pos !== -1;
       };
       const IDENT_RE$1 = IDENT_RE;
@@ -13150,9 +13519,9 @@ var require_typescript = __commonJS({
          * @param {RegExpMatchArray} match
          * @param {CallbackResponse} response
          */
-        isTrulyOpeningTag: (match, response) => {
-          const afterMatchIndex = match[0].length + match.index;
-          const nextChar = match.input[afterMatchIndex];
+        isTrulyOpeningTag: (match2, response) => {
+          const afterMatchIndex = match2[0].length + match2.index;
+          const nextChar = match2.input[afterMatchIndex];
           if (
             // HTML should not include another raw `<` inside a tag
             // nested type?
@@ -13165,12 +13534,12 @@ var require_typescript = __commonJS({
             return;
           }
           if (nextChar === ">") {
-            if (!hasClosingTag(match, { after: afterMatchIndex })) {
+            if (!hasClosingTag(match2, { after: afterMatchIndex })) {
               response.ignoreMatch();
             }
           }
           let m6;
-          const afterMatch = match.input.substring(afterMatchIndex);
+          const afterMatch = match2.input.substring(afterMatchIndex);
           if (m6 = afterMatch.match(/^\s*=/)) {
             response.ignoreMatch();
             return;
@@ -15215,6 +15584,9 @@ function channelMeta(ct) {
   return CHANNEL_META[ct] || { label: ct || "Channel", icon: "\u2022" };
 }
 
+// src/hash.js
+var import_path_to_regexp = __toESM(require_dist(), 1);
+
 // node_modules/marked/lib/marked.esm.js
 function M2() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
@@ -16499,12 +16871,12 @@ function parentPath(p5) {
 }
 function normalizeFileLinks(text) {
   const re = /\[([^\]\n]+)\]\(([^<>\n()]*(?:\([^()\n]*\)[^<>\n()]*)*)\)/g;
-  return text.replace(re, (match, label, dest) => {
+  return text.replace(re, (match2, label, dest) => {
     const d5 = dest.trim();
-    if (!d5) return match;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(d5)) return match;
-    if (d5.startsWith("#") || d5.startsWith("//") || d5.startsWith("mailto:")) return match;
-    if (!/[ ()]/.test(d5)) return match;
+    if (!d5) return match2;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(d5)) return match2;
+    if (d5.startsWith("#") || d5.startsWith("//") || d5.startsWith("mailto:")) return match2;
+    if (!/[ ()]/.test(d5)) return match2;
     return `[${label}](<${d5}>)`;
   });
 }
@@ -16567,43 +16939,51 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
 }
 
 // src/hash.js
-function safeDecode(s5) {
-  try {
-    return decodeURIComponent(s5);
-  } catch {
-    return s5;
-  }
-}
+var PATTERNS = [
+  "/g/:gid/t/:tid/:kind/*filepath",
+  "/g/:gid/t/:tid",
+  "/g/:gid/:kind/*filepath",
+  "/g/:gid"
+];
+var matchers = PATTERNS.map((p5) => (0, import_path_to_regexp.match)(p5));
+var builders = Object.fromEntries(PATTERNS.map((p5) => [p5, (0, import_path_to_regexp.compile)(p5)]));
 function parseHash() {
-  const raw = location.hash.replace(/^#/, "");
+  const raw = location.hash.replace(/^#/, "").replace(/\/$/, "");
   if (!raw) return null;
-  const segs = raw.split("/");
-  if (segs[0] !== "g" || !segs[1]) return null;
-  const gid = safeDecode(segs[1]);
-  let i4 = 2;
-  let tid = null;
-  if (segs[i4] === "t" && segs[i4 + 1]) {
-    tid = safeDecode(segs[i4 + 1]);
-    i4 += 2;
+  const test = "/" + raw;
+  for (const m6 of matchers) {
+    const r4 = m6(test);
+    if (!r4) continue;
+    const { gid, tid, kind, filepath } = r4.params;
+    if (kind && kind !== "f" && kind !== "d") continue;
+    return {
+      groupId: gid,
+      threadId: tid || null,
+      path: Array.isArray(filepath) ? filepath.join("/") : filepath || "",
+      isDir: !kind || kind === "d"
+    };
   }
-  let isDir = true;
-  let path = "";
-  if (segs[i4] === "f" || segs[i4] === "d") {
-    const kind = segs[i4];
-    const rest = segs.slice(i4 + 1).map(safeDecode).filter((s5) => s5 !== "");
-    path = rest.join("/");
-    isDir = kind === "d";
-  }
-  return { groupId: gid, path, isDir, threadId: tid };
+  return null;
 }
 function buildHash() {
   if (!groupId.value) return "";
-  const encSeg = (s5) => String(s5).split("/").filter(Boolean).map(encodeURIComponent).join("/");
-  let h5 = "#g/" + encodeURIComponent(groupId.value);
-  if (threadId.value) h5 += "/t/" + encodeURIComponent(threadId.value);
-  if (filePath.value) h5 += "/f/" + encSeg(filePath.value);
-  else if (treePath.value) h5 += "/d/" + encSeg(treePath.value) + "/";
-  return h5;
+  const hasThread = !!threadId.value;
+  const path = filePath.value || treePath.value;
+  const hasPath = !!path;
+  let pattern;
+  if (hasThread && hasPath) pattern = "/g/:gid/t/:tid/:kind/*filepath";
+  else if (hasThread) pattern = "/g/:gid/t/:tid";
+  else if (hasPath) pattern = "/g/:gid/:kind/*filepath";
+  else pattern = "/g/:gid";
+  const params = { gid: groupId.value };
+  if (hasThread) params.tid = threadId.value;
+  if (hasPath) {
+    params.kind = filePath.value ? "f" : "d";
+    params.filepath = String(path).split("/").filter(Boolean);
+  }
+  let s5 = builders[pattern](params);
+  if (hasPath && !filePath.value) s5 += "/";
+  return "#" + s5.slice(1);
 }
 function writeHash() {
   const h5 = buildHash();

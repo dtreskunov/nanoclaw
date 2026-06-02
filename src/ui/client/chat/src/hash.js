@@ -1,58 +1,70 @@
 // URL hash routing.
 //
-// Format (path-segmented; per-segment percent-encoded):
-//   #g/<gid>
+// Patterns (matched in order, longest-first; per-segment percent-encoded):
+//   #g/<gid>/t/<tid>/{f|d}/<path>
 //   #g/<gid>/t/<tid>
-//   #g/<gid>/d/<dir>/
-//   #g/<gid>/f/<file/path>
-//   #g/<gid>/t/<tid>/{d/<dir>/|f/<file/path>}
+//   #g/<gid>/{f|d}/<path>
+//   #g/<gid>
 //
+// Dir hashes carry a trailing `/`. File hashes do not.
 // Channel + messaging-group context for non-web threads is resolved from
 // the thread record by openChat — not carried in the URL.
 import { batch } from '@preact/signals';
+import { match, compile } from 'path-to-regexp';
 import {
   groups, groupId, isAdmin, treePath, filePath, threads,
   threadId, refs,
 } from './state.js';
 import { parentPath } from './utils.js';
 
-function safeDecode(s) {
-  try { return decodeURIComponent(s); } catch { return s; }
-}
+const PATTERNS = [
+  '/g/:gid/t/:tid/:kind/*filepath',
+  '/g/:gid/t/:tid',
+  '/g/:gid/:kind/*filepath',
+  '/g/:gid',
+];
+const matchers = PATTERNS.map((p) => match(p));
+const builders = Object.fromEntries(PATTERNS.map((p) => [p, compile(p)]));
 
 export function parseHash() {
-  const raw = location.hash.replace(/^#/, '');
+  const raw = location.hash.replace(/^#/, '').replace(/\/$/, '');
   if (!raw) return null;
-  const segs = raw.split('/');
-  if (segs[0] !== 'g' || !segs[1]) return null;
-  const gid = safeDecode(segs[1]);
-  let i = 2;
-  let tid = null;
-  if (segs[i] === 't' && segs[i + 1]) {
-    tid = safeDecode(segs[i + 1]);
-    i += 2;
+  const test = '/' + raw;
+  for (const m of matchers) {
+    const r = m(test);
+    if (!r) continue;
+    const { gid, tid, kind, filepath } = r.params;
+    if (kind && kind !== 'f' && kind !== 'd') continue;
+    return {
+      groupId: gid,
+      threadId: tid || null,
+      path: Array.isArray(filepath) ? filepath.join('/') : (filepath || ''),
+      isDir: !kind || kind === 'd',
+    };
   }
-  let isDir = true;
-  let path = '';
-  if (segs[i] === 'f' || segs[i] === 'd') {
-    const kind = segs[i];
-    const rest = segs.slice(i + 1).map(safeDecode).filter((s) => s !== '');
-    path = rest.join('/');
-    isDir = kind === 'd';
-  }
-  return { groupId: gid, path, isDir, threadId: tid };
+  return null;
 }
 
 // Build the hash string from current signals. Caller writes location.hash.
 export function buildHash() {
   if (!groupId.value) return '';
-  const encSeg = (s) =>
-    String(s).split('/').filter(Boolean).map(encodeURIComponent).join('/');
-  let h = '#g/' + encodeURIComponent(groupId.value);
-  if (threadId.value) h += '/t/' + encodeURIComponent(threadId.value);
-  if (filePath.value) h += '/f/' + encSeg(filePath.value);
-  else if (treePath.value) h += '/d/' + encSeg(treePath.value) + '/';
-  return h;
+  const hasThread = !!threadId.value;
+  const path = filePath.value || treePath.value;
+  const hasPath = !!path;
+  let pattern;
+  if (hasThread && hasPath) pattern = '/g/:gid/t/:tid/:kind/*filepath';
+  else if (hasThread) pattern = '/g/:gid/t/:tid';
+  else if (hasPath) pattern = '/g/:gid/:kind/*filepath';
+  else pattern = '/g/:gid';
+  const params = { gid: groupId.value };
+  if (hasThread) params.tid = threadId.value;
+  if (hasPath) {
+    params.kind = filePath.value ? 'f' : 'd';
+    params.filepath = String(path).split('/').filter(Boolean);
+  }
+  let s = builders[pattern](params);
+  if (hasPath && !filePath.value) s += '/';
+  return '#' + s.slice(1);
 }
 
 // Sync hash → URL (incrementing suppress counter so the hashchange
