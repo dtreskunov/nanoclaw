@@ -2,6 +2,7 @@
 import { groupId, isAdmin, uploadItems, threadId, treePath } from './state';
 import { postJson } from './api';
 import { loadTree } from './actions';
+import { requestInput } from './components/PromptModal';
 import type { TreeEntry, UploadItem } from './types';
 
 function curDir(): string {
@@ -17,7 +18,7 @@ interface ApiError {
 
 export async function mkdirPrompt(): Promise<void> {
   if (!groupId.value || !isAdmin.value) return;
-  const name = prompt('New folder name:');
+  const name = await requestInput({ title: 'New folder', placeholder: 'folder name', okLabel: 'Create' });
   if (!name) return;
   const trimmed = name.trim();
   if (!trimmed) return;
@@ -32,7 +33,7 @@ export async function mkdirPrompt(): Promise<void> {
 
 export async function touchPrompt(): Promise<void> {
   if (!groupId.value || !isAdmin.value) return;
-  const name = prompt('New file name:');
+  const name = await requestInput({ title: 'New file', placeholder: 'file name', okLabel: 'Create' });
   if (!name) return;
   const trimmed = name.trim();
   if (!trimmed) return;

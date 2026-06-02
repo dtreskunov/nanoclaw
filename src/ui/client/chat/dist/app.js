@@ -18153,6 +18153,76 @@ function ChatMain() {
   ] });
 }
 
+// src/components/PromptModal.tsx
+var promptRequest = y3(null);
+function requestInput(opts) {
+  return new Promise((resolve) => {
+    promptRequest.value = { ...opts, resolve };
+  });
+}
+function PromptModal() {
+  const req = promptRequest.value;
+  const [value, setValue] = h2("");
+  const inputRef = A2(null);
+  y2(() => {
+    if (!req) return;
+    setValue(req.initialValue || "");
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [req]);
+  if (!req) return null;
+  function close(result) {
+    const r4 = promptRequest.value;
+    promptRequest.value = null;
+    r4?.resolve(result);
+  }
+  function onSubmit(e4) {
+    e4.preventDefault();
+    const trimmed = value.trim();
+    close(trimmed ? trimmed : null);
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close(null);
+  }
+  function onKey(e4) {
+    if (e4.key === "Escape") close(null);
+  }
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4(
+    "form",
+    {
+      class: "settings-modal",
+      role: "dialog",
+      "aria-label": req.title,
+      style: "max-width:420px",
+      onSubmit,
+      children: [
+        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+          /* @__PURE__ */ u4("span", { class: "title", children: req.title }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: () => close(null), children: "\u2715" })
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+          req.label ? /* @__PURE__ */ u4("label", { style: "display:block;margin-bottom:6px;font-size:12px;color:var(--muted)", children: req.label }) : null,
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              ref: inputRef,
+              type: "text",
+              value,
+              placeholder: req.placeholder || "",
+              onInput: (e4) => setValue(e4.currentTarget.value),
+              onKeyDown: onKey,
+              style: "width:100%"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("footer", { class: "settings-foot", style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)", children: [
+          /* @__PURE__ */ u4("button", { type: "button", onClick: () => close(null), children: "Cancel" }),
+          /* @__PURE__ */ u4("button", { type: "submit", class: "primary", children: req.okLabel || "OK" })
+        ] })
+      ]
+    }
+  ) });
+}
+
 // src/uploads.ts
 function curDir() {
   return treePath.value || "";
@@ -18162,7 +18232,7 @@ function joinPath(dir, name) {
 }
 async function mkdirPrompt() {
   if (!groupId.value || !isAdmin.value) return;
-  const name = prompt("New folder name:");
+  const name = await requestInput({ title: "New folder", placeholder: "folder name", okLabel: "Create" });
   if (!name) return;
   const trimmed = name.trim();
   if (!trimmed) return;
@@ -18170,20 +18240,6 @@ async function mkdirPrompt() {
   const r4 = await postJson(`api/groups/${groupId.value}/mkdir`, { path: target });
   if (!r4.ok) {
     alert("mkdir failed: " + (r4.data.error || r4.status));
-    return;
-  }
-  await loadTree(treePath.value);
-}
-async function touchPrompt() {
-  if (!groupId.value || !isAdmin.value) return;
-  const name = prompt("New file name:");
-  if (!name) return;
-  const trimmed = name.trim();
-  if (!trimmed) return;
-  const target = joinPath(curDir(), trimmed);
-  const r4 = await postJson(`api/groups/${groupId.value}/touch`, { path: target });
-  if (!r4.ok) {
-    alert("create file failed: " + (r4.data.error || r4.status));
     return;
   }
   await loadTree(treePath.value);
@@ -18500,7 +18556,6 @@ function buildItems(mode, entry, onUpload) {
   const selEntries = entriesByPath(sel);
   const items = [];
   if (admin) {
-    items.push({ ico: "\uFF0B", label: "New file", onClick: touchPrompt });
     items.push({ ico: "\u{1F4C1}", label: "New folder", onClick: mkdirPrompt });
     if (onUpload) items.push({ ico: "\u2B06", label: "Upload files\u2026", onClick: onUpload });
   }
@@ -19535,6 +19590,7 @@ function App() {
     /* @__PURE__ */ u4("div", { class: "backdrop" + (backdropShown ? " show" : ""), id: "backdrop", onClick: onBackdrop }),
     /* @__PURE__ */ u4(Settings, {}),
     /* @__PURE__ */ u4(ShareLinkModal, {}),
+    /* @__PURE__ */ u4(PromptModal, {}),
     /* @__PURE__ */ u4(Toast, {})
   ] });
 }

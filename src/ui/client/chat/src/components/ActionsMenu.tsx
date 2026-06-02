@@ -11,7 +11,7 @@ import {
 import { showToast } from './Toast';
 import { clearPinnedContext } from '../actions';
 import {
-  mkdirPrompt, touchPrompt, renameEntry, deleteEntry,
+  mkdirPrompt, renameEntry, deleteEntry,
   deletePaths, downloadPaths,
 } from '../uploads';
 import type { TreeEntry } from '../types';
@@ -170,7 +170,6 @@ function buildItems(mode: 'header' | 'row' | 'preview', entry: TreeEntry | undef
   const selEntries = entriesByPath(sel);
   const items: Item[] = [];
   if (admin) {
-    items.push({ ico: '\uFF0B', label: 'New file', onClick: touchPrompt });
     items.push({ ico: '\uD83D\uDCC1', label: 'New folder', onClick: mkdirPrompt });
     if (onUpload) items.push({ ico: '\u2B06', label: 'Upload files\u2026', onClick: onUpload });
   }

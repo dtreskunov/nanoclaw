@@ -7,6 +7,7 @@ import { ChatMain } from './ChatMain';
 import { FilesPane } from './FilesPane';
 import { Settings } from './Settings';
 import { ShareLinkModal } from './ShareLinkModal';
+import { PromptModal } from './PromptModal';
 import { Toast } from './Toast';
 import { persistPanelState, applyPanelClasses } from '../panels';
 import { applyHash } from '../hash';
@@ -47,6 +48,7 @@ export function App() {
       <div class={'backdrop' + (backdropShown ? ' show' : '')} id="backdrop" onClick={onBackdrop}></div>
       <Settings />
       <ShareLinkModal />
+      <PromptModal />
       <Toast />
     </>
   );
