@@ -18170,7 +18170,9 @@ function Composer() {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    const cs = getComputedStyle(el);
+    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    el.style.height = Math.min(el.scrollHeight + border, 200) + "px";
   };
   const onSubmit = (ev) => {
     ev.preventDefault();

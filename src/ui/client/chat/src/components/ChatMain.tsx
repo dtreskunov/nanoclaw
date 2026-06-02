@@ -164,7 +164,11 @@ function Composer() {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+    // scrollHeight excludes border; with box-sizing:border-box we'd be 1px short
+    // and trigger a phantom scrollbar. Add the border back in.
+    const cs = getComputedStyle(el);
+    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    el.style.height = Math.min(el.scrollHeight + border, 200) + 'px';
   };
   const onSubmit = (ev: JSX.TargetedEvent<HTMLFormElement>): void => {
     ev.preventDefault();
