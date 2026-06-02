@@ -28,7 +28,7 @@
 import http from 'http';
 import { URL } from 'url';
 
-import { getRegisteredChannelNames } from '../../channels/channel-registry.js';
+import { getActiveAdapters, getRegisteredChannelNames } from '../../channels/channel-registry.js';
 import { log } from '../../log.js';
 import {
   deleteIdentity,
@@ -103,6 +103,11 @@ async function handleApi(
 ): Promise<void> {
   if (req.method === 'GET' && pathname === '/identities') {
     const rows = getIdentitiesForUser(userId);
+    // Only channels with credentials configured at boot have an active
+    // adapter. Registered-but-inactive ones (e.g. Discord without a
+    // bot token) shouldn't show up as link options in the UI.
+    const availableChannels = getActiveAdapters().map((a) => a.channelType);
+    const availableSet = new Set(availableChannels);
     return json(res, 200, {
       identities: rows.map((r) => ({
         channel: r.channel,
@@ -110,7 +115,8 @@ async function handleApi(
         primary: r.primary_for_channel === 1,
         verified_at: r.verified_at,
       })),
-      deepLinkChannels: getRegisteredChannelNames().filter((c) => hasDeepLinkBuilder(c)),
+      availableChannels,
+      deepLinkChannels: availableChannels.filter((c) => hasDeepLinkBuilder(c)),
     });
   }
 

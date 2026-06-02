@@ -54,9 +54,14 @@ export function Settings() {
     }
     setIdentities(r.data.identities || []);
     setDeepLinkChannels(r.data.deepLinkChannels || []);
-    // Channels: derive what's NOT already linked from CHANNEL_META, minus web.
+    // Restrict to channels with an active adapter on the server (i.e.
+    // credentials configured at boot). Falls back to CHANNEL_META if the
+    // server didn't return availableChannels (older builds).
     const linked = new Set((r.data.identities || []).map((i) => i.channel));
-    const opts = Object.keys(CHANNEL_META).filter((c) => c !== 'web' && !linked.has(c));
+    const available = Array.isArray(r.data.availableChannels)
+      ? r.data.availableChannels
+      : Object.keys(CHANNEL_META);
+    const opts = available.filter((c) => c !== 'web' && !linked.has(c));
     setChannels(opts);
     if (opts.length && !opts.includes(chan)) setChan(opts[0]);
   }

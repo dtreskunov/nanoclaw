@@ -18850,7 +18850,8 @@ function Settings() {
     setIdentities(r4.data.identities || []);
     setDeepLinkChannels(r4.data.deepLinkChannels || []);
     const linked = new Set((r4.data.identities || []).map((i4) => i4.channel));
-    const opts = Object.keys(CHANNEL_META).filter((c4) => c4 !== "web" && !linked.has(c4));
+    const available = Array.isArray(r4.data.availableChannels) ? r4.data.availableChannels : Object.keys(CHANNEL_META);
+    const opts = available.filter((c4) => c4 !== "web" && !linked.has(c4));
     setChannels(opts);
     if (opts.length && !opts.includes(chan)) setChan(opts[0]);
   }
