@@ -19,7 +19,7 @@ header .mobile-only { display: none; }
   header .brand, header #me, header .spacer { display: none !important; }
   header select { flex: 1; min-width: 0; max-width: none; min-height: 44px; height: 44px; font-size: 15px; }
   header .icon-btn { min-width: 44px; min-height: 44px; font-size: 22px; padding: 4px 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
-  header form { flex-shrink: 0; margin: 0; }
+  header form { flex-shrink: 0; margin: 0; display: none; }
   header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; position: relative; font-size: 0; }
   header form button svg { width: 22px; height: 22px; vertical-align: middle; }
 }

@@ -27,12 +27,6 @@ export function Header() {
       <span class="user" id="me">{me.value}</span>
       <button
         type="button"
-        class="icon-btn mobile-only"
-        aria-label="Files"
-        onClick={() => { drawerOpen.files.value = !drawerOpen.files.value; drawerOpen.threads.value = false; }}
-      >{'\uD83D\uDCC1'}</button>
-      <button
-        type="button"
         class="icon-btn"
         aria-label="Settings"
         title="Settings"
@@ -57,6 +51,12 @@ export function Header() {
           <span id="logout-label" class="desktop-only">Log out</span>
         </button>
       </form>
+      <button
+        type="button"
+        class="icon-btn mobile-only"
+        aria-label="Files"
+        onClick={() => { drawerOpen.files.value = !drawerOpen.files.value; drawerOpen.threads.value = false; }}
+      >{'\uD83D\uDCC1'}</button>
     </header>
   );
 }

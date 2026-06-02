@@ -261,6 +261,12 @@ export function Settings() {
           </section>
 
           {status ? <div class={'settings-status ' + (status.err ? 'err' : 'ok')}>{status.err || status.ok}</div> : null}
+
+          <section class="settings-account">
+            <form method="POST" action="/ui/auth/logout" style="margin:0">
+              <button type="submit" class="link-btn">Log out</button>
+            </form>
+          </section>
         </div>
       </div>
     </div>

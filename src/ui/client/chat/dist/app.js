@@ -17695,19 +17695,6 @@ function Header() {
       "button",
       {
         type: "button",
-        class: "icon-btn mobile-only",
-        "aria-label": "Files",
-        onClick: () => {
-          drawerOpen.files.value = !drawerOpen.files.value;
-          drawerOpen.threads.value = false;
-        },
-        children: "\u{1F4C1}"
-      }
-    ),
-    /* @__PURE__ */ u4(
-      "button",
-      {
-        type: "button",
         class: "icon-btn",
         "aria-label": "Settings",
         title: "Settings",
@@ -17737,7 +17724,20 @@ function Header() {
         }
       ),
       /* @__PURE__ */ u4("span", { id: "logout-label", class: "desktop-only", children: "Log out" })
-    ] }) })
+    ] }) }),
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn mobile-only",
+        "aria-label": "Files",
+        onClick: () => {
+          drawerOpen.files.value = !drawerOpen.files.value;
+          drawerOpen.threads.value = false;
+        },
+        children: "\u{1F4C1}"
+      }
+    )
   ] });
 }
 
@@ -19426,7 +19426,8 @@ function Settings() {
           ] }) : null
         ] })
       ] }),
-      status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+      status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null,
+      /* @__PURE__ */ u4("section", { class: "settings-account", children: /* @__PURE__ */ u4("form", { method: "POST", action: "/ui/auth/logout", style: "margin:0", children: /* @__PURE__ */ u4("button", { type: "submit", class: "link-btn", children: "Log out" }) }) })
     ] })
   ] }) });
 }

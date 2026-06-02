@@ -189,6 +189,7 @@ header .mobile-only {
   header form {
     flex-shrink: 0;
     margin: 0;
+    display: none;
   }
   header form button {
     min-height: 44px;
@@ -619,6 +620,25 @@ header .mobile-only {
 .settings-status.err {
   background: rgba(228, 68, 68, 0.15);
   color: var(--error);
+}
+.settings-account {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+}
+.settings-account .link-btn {
+  background: transparent;
+  border: 0;
+  padding: 4px 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.settings-account .link-btn:hover {
+  color: var(--danger);
 }
 @media (max-width: 720px) {
   .settings-backdrop {
