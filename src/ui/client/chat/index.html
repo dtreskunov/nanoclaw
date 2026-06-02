@@ -250,19 +250,6 @@
       .files-pane .breadcrumb .crumb.current:hover { background: transparent; }
       .files-pane .breadcrumb .crumb.root { padding: 3px 6px; font-size: 14px; line-height: 1; }
       .files-pane .breadcrumb .sep { color: var(--muted); opacity: 0.5; padding: 0 1px; user-select: none; }
-      .files-pane .files-fab {
-        position: absolute; right: 20px;
-        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-        width: 44px; height: 44px; border-radius: 50%;
-        background: var(--accent); color: #fff;
-        border: 1px solid var(--border);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-        font-size: 20px; line-height: 1; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        z-index: 10; transition: transform 0.1s ease, box-shadow 0.1s ease;
-      }
-      .files-pane .files-fab:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); }
-      .files-pane .files-fab:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
       .files-pane .listing { flex: 1; overflow: auto; }
       .files-pane .row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
       .files-pane .row:hover { background: var(--wash); }
@@ -338,11 +325,23 @@
         padding-bottom: 8px; margin-bottom: 10px;
         border-bottom: 1px solid var(--border);
       }
-      .files-pane .preview-toolbar .meta { font-size: 11px; color: var(--muted); }
-      .files-pane .preview-toolbar a.text-btn { text-decoration: none; display: inline-block; }
+      .files-pane .preview-toolbar .preview-meta {
+        flex: 1; min-width: 0;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 11px; color: var(--muted);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .files-pane .preview-toolbar .preview-meta > * + *::before {
+        content: '\00B7'; margin-right: 8px; opacity: 0.6;
+      }
+      .files-pane .preview-toolbar .preview-actions {
+        display: flex; align-items: center; gap: 4px;
+      }
+      .files-pane .preview-toolbar .open-tab { font-size: 14px; padding: 2px 6px; }
       .files-pane .preview-toolbar .clippy { font-size: 13px; padding: 2px 6px; }
       .files-pane .preview-toolbar .clippy.active { color: inherit; background: var(--accent); }
-      .files-pane .preview-toolbar .clippy:disabled { opacity: 0.4; cursor: default; background: transparent; }
+      .files-pane .preview-toolbar .clippy:disabled,
+      .files-pane .preview-toolbar .open-tab:disabled { opacity: 0.4; cursor: default; background: transparent; }
 
       /* Reusable media player widget — sticks to the top of the preview
          body while the metadata / transcript / etc scrolls underneath. */

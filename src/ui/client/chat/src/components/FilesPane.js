@@ -128,10 +128,14 @@ function Preview() {
   const p = previewBlock.value;
   if (!p) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const fp = filePath.value;
+  const gid = groupId.value;
   const pinned = !!fp && pinnedContext.value.includes(fp);
-  const clippyTitle = pinned
-    ? 'Detach from next message'
-    : 'Attach to next message';
+  const clippyTitle = pinned ? 'Detach from next message' : 'Attach to next message';
+  const openInNewTab = () => {
+    if (!fp || !gid) return;
+    const segs = String(fp).split('/').filter(Boolean).map(encodeURIComponent);
+    window.open(`api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}`, '_blank', 'noopener');
+  };
   const toolbar = html`
     <div class="preview-toolbar">
       <button class=${'text-btn clippy' + (pinned ? ' active' : '')}
@@ -139,18 +143,21 @@ function Preview() {
               disabled=${!fp}
               title=${clippyTitle}
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
-      ${p.size != null ? html`<span class="meta">${fmtBytes(p.size)}</span>` : null}
-      ${p.mtime ? html`<${RelativeTime} ts=${p.mtime} className="meta ts" />` : null}
-      <span style="margin-left:auto"><${ActionsMenu} mode="preview" /></span>
+      <span class="preview-meta">
+        ${p.size != null ? html`<span>${fmtBytes(p.size)}</span>` : null}
+        ${p.mtime ? html`<${RelativeTime} ts=${p.mtime} /> ` : null}
+      </span>
+      <span class="preview-actions">
+        <button type="button" class="text-btn open-tab"
+                onClick=${openInNewTab} disabled=${!fp || !gid}
+                title="Open in new tab" aria-label="Open in new tab">\u2197</button>
+        <${ActionsMenu} mode="preview" />
+      </span>
     </div>
   `;
-  // Metadata panels above the body. File panel (size/type/modified) is
-  // always shown for media kinds; tags panel only when embedded tags are
-  // present; lyrics get their own scrollable panel below tags.
-  const fileRows = [];
-  if (p.mime) fileRows.push(['Type', p.mime]);
-  if (p.size != null) fileRows.push(['Size', fmtBytes(p.size)]);
-  if (p.mtime) fileRows.push(['Modified', new Date(p.mtime).toLocaleString()]);
+  // Embedded media tags (ID3/EXIF) + lyrics still get their own panels —
+  // those carry info the toolbar can't fit. Size/type/modified for the
+  // file itself is in the toolbar; no separate <details> panel.
   const tagRows = p.tags ? Object.entries(p.tags).map(([k, v]) => [k, String(v)]) : [];
   const isMedia = p.kind === 'image' || p.kind === 'audio' || p.kind === 'video' || p.kind === 'pdf';
   const player = (p.kind === 'audio' || p.kind === 'video')
@@ -169,7 +176,6 @@ function Preview() {
       </details>
     `;
   };
-  const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, 'preview-meta-file') : null;
   const tagMeta = (isMedia && tagRows.length > 0) ? renderMetaPanel(tagRows, 'preview-meta-tags') : null;
   const lyrics = p.lyrics ? html`<${LyricsPanel} text=${p.lyrics} />` : null;
   let body = null;
@@ -188,7 +194,7 @@ function Preview() {
   }
   else if (p.kind === 'binary') body = html`<div class="empty">Binary file (${p.mime}).</div>`;
   else if (p.kind === 'error') body = html`<div class="empty">${p.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${fileMeta}${tagMeta}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${tagMeta}${body}</div>`;
 }
 
 export function FilesPane() {
@@ -234,20 +240,6 @@ export function FilesPane() {
       <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
     </div>
   `;
-  // Floating action: only visible while previewing an actual file.
-  // Opens the previewed file in a new tab via the path-based /raw route
-  // so HTML documents can resolve relative asset URLs to siblings.
-  const fp = filePath.value;
-  const gid = groupId.value;
-  const fab = (previewing && fp && gid) ? html`
-    <button type="button" class="files-fab" title="Open in new tab"
-            aria-label="Open ${fp} in new tab"
-            onClick=${() => {
-              const segs = String(fp).split('/').filter(Boolean).map(encodeURIComponent);
-              const url = `api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}`;
-              window.open(url, '_blank', 'noopener');
-            }}>\u2197</button>
-  ` : null;
   return html`
     <${Pane} paneKey="files" name="files-pane" label="Files"
              extraClass=${previewing ? 'previewing' : ''}
@@ -261,7 +253,6 @@ export function FilesPane() {
         </div>
         <${Preview} />
       </div>
-      ${fab}
     <//>
   `;
 }

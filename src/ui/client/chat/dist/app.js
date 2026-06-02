@@ -18314,7 +18314,6 @@ function buildItems(mode, entry, onUpload) {
     const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name, type: "file" } : null);
     const items2 = [];
     items2.push({ ico: "\u2B07", label: "Download", onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
-    items2.push({ ico: "\u2197", label: "Open in new tab", onClick: () => openInNewTab(gid, fp), disabled: !fp });
     items2.push({ ico: "\u21AA", label: "Share", onClick: () => shareFile(gid, entryForPath), disabled: !fp });
     if (admin && entryForPath) {
       items2.push("---");
@@ -18674,8 +18673,14 @@ function Preview() {
   const p5 = previewBlock.value;
   if (!p5) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
   const fp = filePath.value;
+  const gid = groupId.value;
   const pinned = !!fp && pinnedContext.value.includes(fp);
   const clippyTitle = pinned ? "Detach from next message" : "Attach to next message";
+  const openInNewTab2 = () => {
+    if (!fp || !gid) return;
+    const segs = String(fp).split("/").filter(Boolean).map(encodeURIComponent);
+    window.open(`api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}`, "_blank", "noopener");
+  };
   const toolbar = html`
     <div class="preview-toolbar">
       <button class=${"text-btn clippy" + (pinned ? " active" : "")}
@@ -18683,15 +18688,18 @@ function Preview() {
               disabled=${!fp}
               title=${clippyTitle}
               aria-pressed=${pinned}>\uD83D\uDCCE</button>
-      ${p5.size != null ? html`<span class="meta">${fmtBytes(p5.size)}</span>` : null}
-      ${p5.mtime ? html`<${RelativeTime} ts=${p5.mtime} className="meta ts" />` : null}
-      <span style="margin-left:auto"><${ActionsMenu} mode="preview" /></span>
+      <span class="preview-meta">
+        ${p5.size != null ? html`<span>${fmtBytes(p5.size)}</span>` : null}
+        ${p5.mtime ? html`<${RelativeTime} ts=${p5.mtime} /> ` : null}
+      </span>
+      <span class="preview-actions">
+        <button type="button" class="text-btn open-tab"
+                onClick=${openInNewTab2} disabled=${!fp || !gid}
+                title="Open in new tab" aria-label="Open in new tab">\u2197</button>
+        <${ActionsMenu} mode="preview" />
+      </span>
     </div>
   `;
-  const fileRows = [];
-  if (p5.mime) fileRows.push(["Type", p5.mime]);
-  if (p5.size != null) fileRows.push(["Size", fmtBytes(p5.size)]);
-  if (p5.mtime) fileRows.push(["Modified", new Date(p5.mtime).toLocaleString()]);
   const tagRows = p5.tags ? Object.entries(p5.tags).map(([k4, v5]) => [k4, String(v5)]) : [];
   const isMedia = p5.kind === "image" || p5.kind === "audio" || p5.kind === "video" || p5.kind === "pdf";
   const player = p5.kind === "audio" || p5.kind === "video" ? html`<${MediaPlayer} kind=${p5.kind} url=${p5.url} name=${p5.name} />` : null;
@@ -18706,7 +18714,6 @@ function Preview() {
       </details>
     `;
   };
-  const fileMeta = fileRows.length > 0 ? renderMetaPanel(fileRows, "preview-meta-file") : null;
   const tagMeta = isMedia && tagRows.length > 0 ? renderMetaPanel(tagRows, "preview-meta-tags") : null;
   const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;
   let body = null;
@@ -18720,7 +18727,7 @@ function Preview() {
     body = hi ? html`<pre class="hljs" data-lang=${hi.language}><code dangerouslySetInnerHTML=${{ __html: hi.html }} /></pre>` : html`<pre>${p5.text}</pre>`;
   } else if (p5.kind === "binary") body = html`<div class="empty">Binary file (${p5.mime}).</div>`;
   else if (p5.kind === "error") body = html`<div class="empty">${p5.text}</div>`;
-  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${fileMeta}${tagMeta}${body}</div>`;
+  return html`<div class="preview-body" id="preview" ref=${ref}>${toolbar}${player}${lyrics}${tagMeta}${body}</div>`;
 }
 function FilesPane() {
   const previewing = !!previewBlock.value;
@@ -18781,17 +18788,6 @@ function FilesPane() {
       <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
     </div>
   `;
-  const fp = filePath.value;
-  const gid = groupId.value;
-  const fab = previewing && fp && gid ? html`
-    <button type="button" class="files-fab" title="Open in new tab"
-            aria-label="Open ${fp} in new tab"
-            onClick=${() => {
-    const segs = String(fp).split("/").filter(Boolean).map(encodeURIComponent);
-    const url = `api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}`;
-    window.open(url, "_blank", "noopener");
-  }}>\u2197</button>
-  ` : null;
   return html`
     <${Pane} paneKey="files" name="files-pane" label="Files"
              extraClass=${previewing ? "previewing" : ""}
@@ -18805,7 +18801,6 @@ function FilesPane() {
         </div>
         <${Preview} />
       </div>
-      ${fab}
     <//>
   `;
 }
