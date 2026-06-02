@@ -11,8 +11,6 @@ import { Pane } from './Pane';
 import { RelativeTime } from './RelativeTime';
 import type { Thread, ThreadCtx } from '../types';
 
-const OLD_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
-
 function threadCtxOf(t: Thread | null | undefined): ThreadCtx | null {
   if (!t || !t.channelType || t.channelType === 'web') return null;
   return { channelType: t.channelType, messagingGroupId: t.messagingGroupId ?? null, canSend: !!t.canSend };
@@ -77,30 +75,33 @@ function renderRow(t: Thread) {
     : <ThreadRow key={t.threadId} t={t} />;
 }
 
-function ChannelSection({ label, items }: { label: string; items: Thread[] }) {
-  const [showOlder, setShowOlder] = useState(false);
-  const cutoff = Date.now() - OLD_THRESHOLD_MS;
-  const recent: Thread[] = [];
-  const old: Thread[] = [];
-  for (const t of items) {
-    const ts = tsKey(t.lastActivityAt);
-    if (ts && ts >= cutoff) recent.push(t);
-    else old.push(t);
-  }
-  const activeOld = old.find((t) => t.threadId === threadId.value);
-  const visible = activeOld && !showOlder ? [...recent, activeOld] : recent;
-  const hidden = activeOld && !showOlder ? old.filter((t) => t !== activeOld) : old;
-  const visibleList = showOlder ? items : visible;
+function ChannelSection({ ct, items, defaultOpen }: { ct: string; items: Thread[]; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const meta = channelMeta(ct);
+  const totalMsgs = items.reduce((sum, t) => sum + (t.messageCount || 0), 0);
+  const handles = Array.from(new Set(items.map((t) => t.counterparty).filter((h): h is string => !!h)));
+  const handleStr = handles.length === 0
+    ? ''
+    : handles.length === 1 ? handles[0]
+      : `${handles[0]} +${handles.length - 1}`;
   return (
-    <>
-      <div class="thread-section">{label}</div>
-      {visibleList.map(renderRow)}
-      {!showOlder && hidden.length > 0
-        ? <button type="button" class="thread-show-older" onClick={() => setShowOlder(true)}>
-            Show {hidden.length} older
-          </button>
-        : null}
-    </>
+    <div class={'thread-section' + (open ? ' open' : ' collapsed')}>
+      <button
+        type="button"
+        class="thread-section-header"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span class="chev" aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span>
+        <span class="ch-pill" aria-hidden="true">{meta.icon}</span>
+        <span class="label">{meta.label}</span>
+        <span class="info">
+          {handleStr ? <span class="handle" title={handles.join(', ')}>{handleStr}</span> : null}
+          <span class="count">{items.length} {'\u00b7'} {totalMsgs} msg</span>
+        </span>
+      </button>
+      {open ? <div class="thread-section-body">{items.map(renderRow)}</div> : null}
+    </div>
   );
 }
 
@@ -143,7 +144,9 @@ export function ThreadsRail() {
       <div class="list" id="threads-list">
         {list.length === 0
           ? <div class="empty">No threads yet</div>
-          : sections.map((s) => <ChannelSection key={s.ct} label={s.label} items={s.items} />)}
+          : sections.map((s) => (
+            <ChannelSection key={s.ct} ct={s.ct} items={s.items} defaultOpen={s.ct === 'web'} />
+          ))}
       </div>
     </Pane>
   );

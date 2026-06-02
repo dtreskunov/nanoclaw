@@ -17780,7 +17780,6 @@ function RelativeTime({ ts, className }) {
 }
 
 // src/components/ThreadsRail.tsx
-var OLD_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1e3;
 function threadCtxOf2(t4) {
   if (!t4 || !t4.channelType || t4.channelType === "web") return null;
   return { channelType: t4.channelType, messagingGroupId: t4.messagingGroupId ?? null, canSend: !!t4.canSend };
@@ -17838,28 +17837,39 @@ function DmRow({ t: t4 }) {
 function renderRow(t4) {
   return t4.kind === "dm" ? /* @__PURE__ */ u4(DmRow, { t: t4 }, t4.threadId) : /* @__PURE__ */ u4(ThreadRow, { t: t4 }, t4.threadId);
 }
-function ChannelSection({ label, items }) {
-  const [showOlder, setShowOlder] = h2(false);
-  const cutoff = Date.now() - OLD_THRESHOLD_MS;
-  const recent = [];
-  const old = [];
-  for (const t4 of items) {
-    const ts = tsKey(t4.lastActivityAt);
-    if (ts && ts >= cutoff) recent.push(t4);
-    else old.push(t4);
-  }
-  const activeOld = old.find((t4) => t4.threadId === threadId.value);
-  const visible = activeOld && !showOlder ? [...recent, activeOld] : recent;
-  const hidden = activeOld && !showOlder ? old.filter((t4) => t4 !== activeOld) : old;
-  const visibleList = showOlder ? items : visible;
-  return /* @__PURE__ */ u4(k, { children: [
-    /* @__PURE__ */ u4("div", { class: "thread-section", children: label }),
-    visibleList.map(renderRow),
-    !showOlder && hidden.length > 0 ? /* @__PURE__ */ u4("button", { type: "button", class: "thread-show-older", onClick: () => setShowOlder(true), children: [
-      "Show ",
-      hidden.length,
-      " older"
-    ] }) : null
+function ChannelSection({ ct, items, defaultOpen }) {
+  const [open, setOpen] = h2(defaultOpen);
+  const meta = channelMeta(ct);
+  const totalMsgs = items.reduce((sum, t4) => sum + (t4.messageCount || 0), 0);
+  const handles = Array.from(new Set(items.map((t4) => t4.counterparty).filter((h5) => !!h5)));
+  const handleStr = handles.length === 0 ? "" : handles.length === 1 ? handles[0] : `${handles[0]} +${handles.length - 1}`;
+  return /* @__PURE__ */ u4("div", { class: "thread-section" + (open ? " open" : " collapsed"), children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "thread-section-header",
+        onClick: () => setOpen((o4) => !o4),
+        "aria-expanded": open,
+        children: [
+          /* @__PURE__ */ u4("span", { class: "chev", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
+          /* @__PURE__ */ u4("span", { class: "ch-pill", "aria-hidden": "true", children: meta.icon }),
+          /* @__PURE__ */ u4("span", { class: "label", children: meta.label }),
+          /* @__PURE__ */ u4("span", { class: "info", children: [
+            handleStr ? /* @__PURE__ */ u4("span", { class: "handle", title: handles.join(", "), children: handleStr }) : null,
+            /* @__PURE__ */ u4("span", { class: "count", children: [
+              items.length,
+              " ",
+              "\xB7",
+              " ",
+              totalMsgs,
+              " msg"
+            ] })
+          ] })
+        ]
+      }
+    ),
+    open ? /* @__PURE__ */ u4("div", { class: "thread-section-body", children: items.map(renderRow) }) : null
   ] });
 }
 function ThreadsRail() {
@@ -17893,7 +17903,7 @@ function ThreadsRail() {
       " ",
       /* @__PURE__ */ u4("span", { class: "label", children: "New thread" })
     ] }) }),
-    /* @__PURE__ */ u4("div", { class: "list", id: "threads-list", children: list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No threads yet" }) : sections.map((s5) => /* @__PURE__ */ u4(ChannelSection, { label: s5.label, items: s5.items }, s5.ct)) })
+    /* @__PURE__ */ u4("div", { class: "list", id: "threads-list", children: list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No threads yet" }) : sections.map((s5) => /* @__PURE__ */ u4(ChannelSection, { ct: s5.ct, items: s5.items, defaultOpen: s5.ct === "web" }, s5.ct)) })
   ] });
 }
 

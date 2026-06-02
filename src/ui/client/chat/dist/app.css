@@ -226,7 +226,9 @@ header .mobile-only {
   right: 0;
   bottom: 0;
   top: calc(var(--handle-h) + 49px);
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .rail-label {
   display: none;
@@ -296,30 +298,72 @@ header .mobile-only {
   color: var(--error);
 }
 .threads-rail .thread-section {
-  padding: 8px 10px 4px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
 }
-.threads-rail .thread-show-older {
-  display: block;
-  width: calc(100% - 16px);
-  margin: 4px 8px 8px;
-  padding: 6px 10px;
-  background: transparent;
-  color: var(--muted);
-  border: 1px dashed var(--border);
-  border-radius: 4px;
+.threads-rail .thread-section.open {
+  flex: 1 1 0;
+}
+.threads-rail .thread-section.collapsed {
+  flex: 0 0 auto;
+}
+.threads-rail .thread-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--wash-subtle);
+  border: 0;
+  border-top: 1px solid var(--border);
   font: inherit;
-  font-size: 11px;
+  color: var(--fg);
   text-align: left;
   cursor: pointer;
 }
-.threads-rail .thread-show-older:hover {
+.threads-rail .thread-section-header:hover {
   background: var(--wash-soft);
-  color: var(--fg);
+}
+.threads-rail .thread-section-header .chev {
+  width: 10px;
+  font-size: 10px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.threads-rail .thread-section-header .ch-pill {
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+.threads-rail .thread-section-header .label {
+  font-size: 12px;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.threads-rail .thread-section-header .info {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.threads-rail .thread-section-header .handle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14ch;
+}
+.threads-rail .thread-section-header .count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.threads-rail .thread-section-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .threads-rail .thread.dm .title {
   font-size: 14px;
