@@ -1071,6 +1071,10 @@ header .mobile-only {
   min-height: var(--bottom-row-h);
   align-items: flex-end;
 }
+.chat-main form > button {
+  height: 32px;
+  flex-shrink: 0;
+}
 .chat-main textarea {
   flex: 1;
   min-width: 0;
