@@ -1,0 +1,53 @@
+// Top-level App component.
+import { useEffect } from 'preact/hooks';
+import { paneOpen, drawerOpen, MOBILE_MQ, refs } from '../state';
+import { Header } from './Header';
+import { ThreadsRail } from './ThreadsRail';
+import { ChatMain } from './ChatMain';
+import { FilesPane } from './FilesPane';
+import { Settings } from './Settings';
+import { ShareLinkModal } from './ShareLinkModal';
+import { Toast } from './Toast';
+import { persistPanelState, applyPanelClasses } from '../panels';
+import { applyHash } from '../hash';
+import { router } from '../router';
+
+export function App() {
+  useEffect(() => {
+    const onChange = (): void => applyPanelClasses();
+    MOBILE_MQ.addEventListener('change', onChange);
+    const onHashChange = (): void => {
+      if (refs.suppressHashCount > 0) { refs.suppressHashCount--; return; }
+      applyHash(router).catch(console.error);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      MOBILE_MQ.removeEventListener('change', onChange);
+      window.removeEventListener('hashchange', onHashChange);
+    };
+  }, []);
+
+  const threadsOpen = paneOpen.threads.value;
+  const filesOpen = paneOpen.files.value;
+  useEffect(() => { persistPanelState(); }, [threadsOpen, filesOpen]);
+
+  const mainCls = ''
+    + (threadsOpen ? '' : ' threads-collapsed')
+    + (filesOpen ? '' : ' files-collapsed');
+  const backdropShown = drawerOpen.threads.value || drawerOpen.files.value;
+  const onBackdrop = (): void => { drawerOpen.threads.value = false; drawerOpen.files.value = false; };
+  return (
+    <>
+      <Header />
+      <main id="main" class={mainCls.trim()}>
+        <ThreadsRail />
+        <ChatMain />
+        <FilesPane />
+      </main>
+      <div class={'backdrop' + (backdropShown ? ' show' : '')} id="backdrop" onClick={onBackdrop}></div>
+      <Settings />
+      <ShareLinkModal />
+      <Toast />
+    </>
+  );
+}

@@ -1,0 +1,54 @@
+// Reusable collapsible/drawer pane.
+import type { ComponentChildren, JSX } from 'preact';
+import { paneOpen, drawerOpen, isMobile } from '../state';
+
+interface Props {
+  paneKey: 'threads' | 'files';
+  name: string;
+  label: string;
+  extraClass?: string;
+  headActions?: ComponentChildren;
+  children?: ComponentChildren;
+}
+
+export function Pane({ paneKey, name, label, extraClass, headActions, children }: Props) {
+  const mobile = isMobile.value;
+  const collapsed = !mobile && !paneOpen[paneKey].value;
+  const drawer = drawerOpen[paneKey].value;
+  const cls = 'nc-pane ' + name
+    + (collapsed ? ' collapsed' : '')
+    + (drawer ? ' open' : '')
+    + (extraClass ? ' ' + extraClass : '');
+
+  const toggle = (): void => { paneOpen[paneKey].value = !paneOpen[paneKey].value; };
+
+  const onPaneClick = (ev: JSX.TargetedMouseEvent<HTMLElement>): void => {
+    if (!collapsed) return;
+    if ((ev.target as HTMLElement).closest('button, a')) return;
+    paneOpen[paneKey].value = true;
+  };
+
+  const onHeadClick = (ev: JSX.TargetedMouseEvent<HTMLElement>): void => {
+    if (mobile) return;
+    if ((ev.target as HTMLElement).closest('button, a')) return;
+    ev.stopPropagation();
+    toggle();
+  };
+
+  return (
+    <aside class={cls} id={name} onClick={onPaneClick}>
+      <div class="head" onClick={onHeadClick}>
+        <button
+          type="button"
+          class="icon-btn desktop-only"
+          id={'btn-' + paneKey + '-toggle'}
+          aria-label={collapsed ? 'Expand ' + label : 'Collapse ' + label}
+          onClick={(e: JSX.TargetedMouseEvent<HTMLButtonElement>) => { e.stopPropagation(); toggle(); }}
+        ></button>
+        <span class="title">{label}</span>
+      </div>
+      {headActions || null}
+      {children}
+    </aside>
+  );
+}

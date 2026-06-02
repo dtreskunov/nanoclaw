@@ -1,13 +1,11 @@
-// Tiny corner-toast for transient feedback (e.g. "Copied"). Driven by
-// the toastMessage signal — call showToast(text, kind?) from anywhere.
+// Tiny corner-toast for transient feedback (e.g. "Copied").
 import { useEffect } from 'preact/hooks';
-import { html } from '../html.js';
-import { toastMessage } from '../state.js';
+import { toastMessage } from '../state';
 
 let nextId = 1;
-let hideTimer = null;
+let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function showToast(text, kind = 'ok', ms = 1800) {
+export function showToast(text: string, kind: 'ok' | 'err' = 'ok', ms = 1800): void {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
   const id = nextId++;
   toastMessage.value = { id, text, kind };
@@ -22,7 +20,7 @@ export function Toast() {
   // Re-mount on each new id so the CSS animation re-plays.
   useEffect(() => undefined, [t?.id]);
   if (!t) return null;
-  return html`
-    <div class=${'toast toast-' + (t.kind || 'ok')} role="status" aria-live="polite" key=${t.id}>${t.text}</div>
-  `;
+  return (
+    <div class={'toast toast-' + (t.kind || 'ok')} role="status" aria-live="polite" key={t.id}>{t.text}</div>
+  );
 }

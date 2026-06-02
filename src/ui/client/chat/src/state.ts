@@ -1,0 +1,119 @@
+// Reactive state (signals) + constants + non-reactive refs.
+import { signal, type Signal } from '@preact/signals';
+import type {
+  Group,
+  Thread,
+  ChannelType,
+  ChatMessage,
+  TreeEntry,
+  PreviewBlock,
+  UploadItem,
+  ShareModalRequest,
+  ToastMessage,
+  PendingFile,
+  ChannelMetaEntry,
+} from './types';
+
+// ── reactive state ──────────────────────────────────────────────────
+export const groups: Signal<Group[]> = signal<Group[]>([]);
+export const groupId: Signal<string | null> = signal<string | null>(null);
+export const isAdmin: Signal<boolean> = signal(false);
+
+// File browser
+export const treePath: Signal<string> = signal('');
+export const filePath: Signal<string | null> = signal<string | null>(null);
+export const treeEntries: Signal<TreeEntry[]> = signal<TreeEntry[]>([]);
+export const treeError: Signal<string> = signal('');
+
+// Current playback position of the preview media player (seconds).
+export const mediaCurrentTime: Signal<number> = signal(0);
+
+// Chat thread
+export const threads: Signal<Thread[]> = signal<Thread[]>([]);
+export const threadId: Signal<string | null> = signal<string | null>(null);
+export const channelType: Signal<ChannelType> = signal<ChannelType>('web');
+export const messagingGroupId: Signal<string | null> = signal<string | null>(null);
+export const canSend: Signal<boolean> = signal(true);
+export const chatMessages: Signal<ChatMessage[]> = signal<ChatMessage[]>([]);
+export const chatStatus: Signal<string> = signal('');
+export const chatLoading: Signal<boolean> = signal(false);
+export const isTyping: Signal<boolean> = signal(false);
+export const typingHint: Signal<string> = signal('');
+export const pending: Signal<PendingFile[]> = signal<PendingFile[]>([]);
+
+// Panels / drawers
+export const paneOpen: Record<'threads' | 'files', Signal<boolean>> = {
+  threads: signal(true),
+  files: signal(true),
+};
+export const drawerOpen: Record<'threads' | 'files', Signal<boolean>> = {
+  threads: signal(false),
+  files: signal(false),
+};
+export const isMobile: Signal<boolean> = signal(false);
+
+// Uploads
+export const uploadItems: Signal<UploadItem[]> = signal<UploadItem[]>([]);
+
+// Misc
+export const me: Signal<string> = signal('');
+export const notifMutedSig: Signal<boolean> = signal(false);
+export const settingsOpen: Signal<boolean> = signal(false);
+export const shareModalRequest: Signal<ShareModalRequest | null> = signal<ShareModalRequest | null>(null);
+export const toastMessage: Signal<ToastMessage | null> = signal<ToastMessage | null>(null);
+export const previewBlock: Signal<PreviewBlock | null> = signal<PreviewBlock | null>(null);
+export const nowTick: Signal<number> = signal(Date.now());
+export const pinnedContext: Signal<string[]> = signal<string[]>([]);
+
+// ── non-reactive refs (mutated outside render) ──────────────────────
+export interface Refs {
+  ws: WebSocket | null;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  reconnectAttempt: number;
+  pollTimer: ReturnType<typeof setInterval> | null;
+  threadsPollTimer: ReturnType<typeof setInterval> | null;
+  seenIds: Set<string>;
+  suppressHashCount: number;
+  uploadDragDepth: number;
+}
+
+export const refs: Refs = {
+  ws: null,
+  reconnectTimer: null,
+  reconnectAttempt: 0,
+  pollTimer: null,
+  threadsPollTimer: null,
+  seenIds: new Set<string>(),
+  suppressHashCount: 0,
+  uploadDragDepth: 0,
+};
+
+// ── constants ───────────────────────────────────────────────────────
+export const PANES: { key: 'threads' | 'files'; mainClass: string }[] = [
+  { key: 'threads', mainClass: 'threads-collapsed' },
+  { key: 'files', mainClass: 'files-collapsed' },
+];
+export const POLL_INTERVAL_MS = 10000;
+export const THREADS_POLL_MS = 20000;
+export const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
+export const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
+export const UPLOAD_MAX_FILES = 10;
+export const MOBILE_MQ = window.matchMedia('(max-width: 720px)');
+export const NOTIF_MUTE_KEY = 'nanoclaw:notif:muted';
+
+export const CHANNEL_META: Record<string, ChannelMetaEntry> = {
+  web: { label: 'Web', icon: '\uD83D\uDCAC' },
+  resend: { label: 'Email', icon: '\uD83D\uDCE7' },
+  discord: { label: 'Discord', icon: '\uD83D\uDC7E' },
+  telegram: { label: 'Telegram', icon: '\u2708\uFE0F' },
+  whatsapp: { label: 'WhatsApp', icon: '\uD83D\uDCDE' },
+  imessage: { label: 'iMessage', icon: '\uD83D\uDCAC' },
+  signal: { label: 'Signal', icon: '\uD83D\uDD12' },
+  slack: { label: 'Slack', icon: '#' },
+  matrix: { label: 'Matrix', icon: 'M' },
+  gchat: { label: 'Chat', icon: 'G' },
+};
+
+export function channelMeta(ct: string | null | undefined): ChannelMetaEntry {
+  return (ct && CHANNEL_META[ct]) || { label: ct || 'Channel', icon: '\u2022' };
+}

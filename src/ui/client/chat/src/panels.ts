@@ -1,11 +1,9 @@
-// Pane state persistence + body/main class side-effects. The actual UI
-// rendering of panes lives in their components; this module handles
-// localStorage + the body/main classes used by global CSS.
-import { paneOpen, drawerOpen, isMobile, MOBILE_MQ } from './state.js';
+// Pane state persistence + body/main class side-effects.
+import { paneOpen, drawerOpen, isMobile, MOBILE_MQ } from './state';
 
-const KEYS = { threads: 'nc:pane:threads', files: 'nc:pane:files' };
+const KEYS = { threads: 'nc:pane:threads', files: 'nc:pane:files' } as const;
 
-export function restorePanelState() {
+export function restorePanelState(): void {
   try {
     const t = localStorage.getItem(KEYS.threads);
     const f = localStorage.getItem(KEYS.files);
@@ -13,20 +11,21 @@ export function restorePanelState() {
     if (t === '1') paneOpen.threads.value = true;
     if (f === '0') paneOpen.files.value = false;
     if (f === '1') paneOpen.files.value = true;
-  } catch (_) {}
+  } catch {
+    /* ignore */
+  }
 }
 
-export function persistPanelState() {
+export function persistPanelState(): void {
   try {
     localStorage.setItem(KEYS.threads, paneOpen.threads.value ? '1' : '0');
     localStorage.setItem(KEYS.files, paneOpen.files.value ? '1' : '0');
-  } catch (_) {}
+  } catch {
+    /* ignore */
+  }
 }
 
-// Toggle the `no-animate` class off after the first frame so the initial
-// page paint doesn't animate the panes sliding in. On mobile, also ensure
-// the drawers are closed by default.
-export function applyPanelClasses() {
+export function applyPanelClasses(): void {
   const mobile = MOBILE_MQ.matches;
   isMobile.value = mobile;
   if (mobile) {

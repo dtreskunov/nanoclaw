@@ -1,75 +1,70 @@
 // URL hash routing.
-//
-// Patterns (matched in order, longest-first; per-segment percent-encoded):
-//   #g/<gid>/t/<tid>/{f|d}/<path>
-//   #g/<gid>/t/<tid>
-//   #g/<gid>/{f|d}/<path>
-//   #g/<gid>
-//
-// Dir hashes carry a trailing `/`. File hashes do not.
-// Channel + messaging-group context for non-web threads is resolved from
-// the thread record by openChat — not carried in the URL.
 import { batch } from '@preact/signals';
 import { match, compile } from 'path-to-regexp';
-import {
-  groups, groupId, isAdmin, treePath, filePath, threads,
-  threadId, refs,
-} from './state.js';
-import { parentPath } from './utils.js';
+import { groups, groupId, isAdmin, treePath, filePath, threads, threadId, refs } from './state';
+import { parentPath } from './utils';
+import type { Thread, ThreadCtx, RouterApi } from './types';
 
-const PATTERNS = [
-  '/g/:gid/t/:tid/:kind/*filepath',
-  '/g/:gid/t/:tid',
-  '/g/:gid/:kind/*filepath',
-  '/g/:gid',
-];
+const PATTERNS = ['/g/:gid/t/:tid/:kind/*filepath', '/g/:gid/t/:tid', '/g/:gid/:kind/*filepath', '/g/:gid'] as const;
+
 const matchers = PATTERNS.map((p) => match(p));
-const builders = Object.fromEntries(PATTERNS.map((p) => [p, compile(p)]));
+const builders: Record<string, (params: Partial<Record<string, string | string[]>>) => string> = Object.fromEntries(
+  PATTERNS.map((p) => [p, compile(p)]),
+);
 
-export function parseHash() {
+export interface ParsedHash {
+  groupId: string;
+  threadId: string | null;
+  path: string;
+  isDir: boolean;
+}
+
+export function parseHash(): ParsedHash | null {
   const raw = location.hash.replace(/^#/, '').replace(/\/$/, '');
   if (!raw) return null;
   const test = '/' + raw;
   for (const m of matchers) {
     const r = m(test);
     if (!r) continue;
-    const { gid, tid, kind, filepath } = r.params;
+    const params = (r as { params: Record<string, unknown> }).params;
+    const gid = String(params.gid || '');
+    const tid = params.tid ? String(params.tid) : null;
+    const kind = params.kind ? String(params.kind) : '';
+    const filepath = params.filepath;
     if (kind && kind !== 'f' && kind !== 'd') continue;
+    const path = Array.isArray(filepath) ? (filepath as string[]).join('/') : filepath ? String(filepath) : '';
     return {
       groupId: gid,
-      threadId: tid || null,
-      path: Array.isArray(filepath) ? filepath.join('/') : (filepath || ''),
+      threadId: tid,
+      path,
       isDir: !kind || kind === 'd',
     };
   }
   return null;
 }
 
-// Build the hash string from current signals. Caller writes location.hash.
-export function buildHash() {
+export function buildHash(): string {
   if (!groupId.value) return '';
   const hasThread = !!threadId.value;
   const path = filePath.value || treePath.value;
   const hasPath = !!path;
-  let pattern;
+  let pattern: string;
   if (hasThread && hasPath) pattern = '/g/:gid/t/:tid/:kind/*filepath';
   else if (hasThread) pattern = '/g/:gid/t/:tid';
   else if (hasPath) pattern = '/g/:gid/:kind/*filepath';
   else pattern = '/g/:gid';
-  const params = { gid: groupId.value };
-  if (hasThread) params.tid = threadId.value;
+  const params: Partial<Record<string, string | string[]>> = { gid: groupId.value };
+  if (hasThread) params.tid = threadId.value!;
   if (hasPath) {
     params.kind = filePath.value ? 'f' : 'd';
     params.filepath = String(path).split('/').filter(Boolean);
   }
-  let s = builders[pattern](params);
+  let s = builders[pattern]!(params);
   if (hasPath && !filePath.value) s += '/';
   return '#' + s.slice(1);
 }
 
-// Sync hash → URL (incrementing suppress counter so the hashchange
-// listener doesn't re-apply it).
-export function writeHash() {
+export function writeHash(): void {
   const h = buildHash();
   if (!h) return;
   if (location.hash !== h) {
@@ -78,26 +73,22 @@ export function writeHash() {
   }
 }
 
-function applyAdminFlag() {
+export function applyAdminFlag(): void {
   const g = groups.value.find((x) => x.id === groupId.value);
   isAdmin.value = !!(g && g.isAdmin);
   document.body.classList.toggle('is-admin', isAdmin.value);
 }
 
-// Resolve a thread → channel routing tuple. Returns null for web threads.
-export function threadCtx(t) {
+export function threadCtx(t: Thread | null | undefined): ThreadCtx | null {
   if (!t) return null;
   if (!t.channelType || t.channelType === 'web') return null;
-  return { channelType: t.channelType, messagingGroupId: t.messagingGroupId, canSend: !!t.canSend };
+  return { channelType: t.channelType, messagingGroupId: t.messagingGroupId ?? null, canSend: !!t.canSend };
 }
 
-// Resolve the URL hash against current state. Imports are deferred
-// (passed in as a router object) to keep this module free of cycles
-// against chat/files.
-export async function applyHash(router) {
+export async function applyHash(router: RouterApi): Promise<void> {
   const parsed = parseHash();
   if (!parsed) {
-    if (groups.value.length) await router.selectGroup(groups.value[0].id);
+    if (groups.value.length) await router.selectGroup(groups.value[0]!.id);
     return;
   }
   if (!groups.value.find((g) => g.id === parsed.groupId)) {
@@ -115,8 +106,11 @@ export async function applyHash(router) {
   if (parsed.threadId) {
     router.openChat(parsed.groupId, parsed.threadId, null).catch((err) => console.error('chat open failed', err));
   } else if (groupChanged) {
-    const latest = threads.value.length > 0 ? threads.value[0] : null;
-    if (latest) router.openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error('chat open failed', err));
+    const latest = threads.value.length > 0 ? threads.value[0]! : null;
+    if (latest)
+      router
+        .openChat(parsed.groupId, latest.threadId, threadCtx(latest))
+        .catch((err) => console.error('chat open failed', err));
     else router.clearChat();
   }
   if (parsed.isDir) {
@@ -128,5 +122,3 @@ export async function applyHash(router) {
     await router.selectFile({ path: parsed.path, name });
   }
 }
-
-export { applyAdminFlag };

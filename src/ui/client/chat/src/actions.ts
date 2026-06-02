@@ -1,21 +1,60 @@
-// Action orchestrators. Mutate signals + perform IO. Components dispatch
-// these from event handlers; effects use them on dependency change.
+// Action orchestrators. Mutate signals + perform IO.
 import { batch } from '@preact/signals';
 import {
-  groupId, threads, threadId, channelType, messagingGroupId, canSend,
-  chatMessages, chatStatus, chatLoading, isTyping, typingHint, refs, treePath, filePath, treeEntries,
-  treeError, pending, previewBlock, paneOpen, drawerOpen,
-  isMobile, nowTick, pinnedContext, POLL_INTERVAL_MS, THREADS_POLL_MS,
-} from './state.js';
-import { api } from './api.js';
-import { writeHash } from './hash.js';
-import { maybeNotify } from './notify.js';
-import { parentPath } from './utils.js';
+  groupId,
+  threads,
+  threadId,
+  channelType,
+  messagingGroupId,
+  canSend,
+  chatMessages,
+  chatStatus,
+  chatLoading,
+  isTyping,
+  typingHint,
+  refs,
+  treePath,
+  filePath,
+  treeEntries,
+  treeError,
+  pending,
+  previewBlock,
+  paneOpen,
+  drawerOpen,
+  isMobile,
+  nowTick,
+  pinnedContext,
+  POLL_INTERVAL_MS,
+  THREADS_POLL_MS,
+} from './state';
+import { api } from './api';
+import { writeHash } from './hash';
+import { maybeNotify } from './notify';
+import { parentPath } from './utils';
+import type {
+  Thread,
+  ThreadCtx,
+  Direction,
+  ChatMessage,
+  ChatMessageFile,
+  TreeEntry,
+  PreviewBlock,
+  PendingFile,
+  WsPayload,
+} from './types';
+
+interface ServerMessage {
+  id?: string;
+  direction: string;
+  text: string;
+  files?: ChatMessageFile[] | null;
+  timestamp: string;
+}
 
 // ── threads ─────────────────────────────────────────────────────────
-export async function loadThreads(gid) {
+export async function loadThreads(gid: string): Promise<void> {
   try {
-    const { threads: t } = await api(`api/groups/${encodeURIComponent(gid)}/chat/threads`);
+    const { threads: t } = await api<{ threads: Thread[] }>(`api/groups/${encodeURIComponent(gid)}/chat/threads`);
     threads.value = t || [];
   } catch (err) {
     console.error('threads load failed', err);
@@ -23,37 +62,45 @@ export async function loadThreads(gid) {
   }
 }
 
-export async function deleteThread(tid) {
+export async function deleteThread(tid: string): Promise<void> {
+  if (!groupId.value) return;
   try {
     const r = await fetch(`api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(tid)}`, {
       method: 'DELETE',
       credentials: 'same-origin',
     });
-    if (!r.ok) { chatStatus.value = 'delete failed (HTTP ' + r.status + ')'; return; }
+    if (!r.ok) {
+      chatStatus.value = 'delete failed (HTTP ' + r.status + ')';
+      return;
+    }
   } catch (err) {
     console.error('delete failed', err);
-    chatStatus.value = 'delete failed: ' + (err.message || 'network error');
+    const m = err instanceof Error ? err.message : 'network error';
+    chatStatus.value = 'delete failed: ' + m;
     return;
   }
   threads.value = threads.value.filter((x) => x.threadId !== tid);
   if (threadId.value === tid) {
-    const latest = threads.value.length > 0 ? threads.value[0] : null;
+    const latest = threads.value.length > 0 ? threads.value[0]! : null;
     if (latest) openChat(groupId.value, latest.threadId, threadCtxOf(latest)).catch(console.error);
     else clearChat();
   }
 }
 
-function threadCtxOf(t) {
+function threadCtxOf(t: Thread | null | undefined): ThreadCtx | null {
   if (!t || !t.channelType || t.channelType === 'web') return null;
-  return { channelType: t.channelType, messagingGroupId: t.messagingGroupId, canSend: !!t.canSend };
+  return { channelType: t.channelType, messagingGroupId: t.messagingGroupId ?? null, canSend: !!t.canSend };
 }
 
-function bumpActiveThread(maxTs) {
+function bumpActiveThread(maxTs?: string): void {
   if (!threadId.value) return;
   const list = threads.value.slice();
   const idx = list.findIndex((x) => x.threadId === threadId.value);
-  if (idx < 0) { loadThreads(groupId.value); return; }
-  const t = { ...list[idx] };
+  if (idx < 0) {
+    if (groupId.value) loadThreads(groupId.value);
+    return;
+  }
+  const t: Thread = { ...list[idx]! };
   t.lastActivityAt = maxTs || new Date().toISOString();
   t.messageCount = (t.messageCount || 0) + 1;
   list.splice(idx, 1);
@@ -61,21 +108,24 @@ function bumpActiveThread(maxTs) {
   threads.value = list;
 }
 
-function updateActiveThreadTitleFromFirstMessage(text) {
+function updateActiveThreadTitleFromFirstMessage(text: string): void {
   if (!threadId.value) return;
   const list = threads.value.slice();
   const idx = list.findIndex((x) => x.threadId === threadId.value);
   if (idx < 0) return;
-  const t = list[idx];
+  const t = list[idx]!;
   if (t.title !== '(new thread)') return;
-  const clean = String(text || '').replace(/^>\s*Context[^\n]*\n+/i, '').replace(/\s+/g, ' ').trim();
+  const clean = String(text || '')
+    .replace(/^>\s*Context[^\n]*\n+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!clean) return;
   list[idx] = { ...t, title: clean.slice(0, 60) };
   threads.value = list;
 }
 
 // ── chat ────────────────────────────────────────────────────────────
-export function clearChat() {
+export function clearChat(): void {
   batch(() => {
     chatMessages.value = [];
     chatStatus.value = '';
@@ -86,24 +136,44 @@ export function clearChat() {
     canSend.value = true;
   });
   stopChatPoll();
-  if (refs.ws) { try { refs.ws.close(); } catch (_) {} refs.ws = null; }
-  if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
+  if (refs.ws) {
+    try {
+      refs.ws.close();
+    } catch {
+      /* ignore */
+    }
+    refs.ws = null;
+  }
+  if (refs.reconnectTimer) {
+    clearTimeout(refs.reconnectTimer);
+    refs.reconnectTimer = null;
+  }
   refs.seenIds.clear();
 }
 
-export function stopChatPoll() {
-  if (refs.pollTimer) { clearInterval(refs.pollTimer); refs.pollTimer = null; }
+export function stopChatPoll(): void {
+  if (refs.pollTimer) {
+    clearInterval(refs.pollTimer);
+    refs.pollTimer = null;
+  }
 }
 
-export function startChatPoll() {
+export function startChatPoll(): void {
   stopChatPoll();
   refs.pollTimer = setInterval(async () => {
-    if (!threadId.value || channelType.value === 'web') { stopChatPoll(); return; }
-    try { await refetchThreadHistory(true); } catch (err) { console.error('poll failed', err); }
+    if (!threadId.value || channelType.value === 'web') {
+      stopChatPoll();
+      return;
+    }
+    try {
+      await refetchThreadHistory(true);
+    } catch (err) {
+      console.error('poll failed', err);
+    }
   }, POLL_INTERVAL_MS);
 }
 
-function historyUrl(gid, tid) {
+function historyUrl(gid: string, tid: string): string {
   let u = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   if (channelType.value && channelType.value !== 'web' && messagingGroupId.value) {
     u += `?channel=${encodeURIComponent(channelType.value)}&mg=${encodeURIComponent(messagingGroupId.value)}`;
@@ -111,26 +181,30 @@ function historyUrl(gid, tid) {
   return u;
 }
 
-function appendMsg(direction, text, files, ts, id) {
-  // Dedup against history refetch by stable per-row id. Live WS pushes
-  // carry `id` (messages_in.id / messages_out.id); optimistic local
-  // bubbles for non-web sends pass no id and rely on the post-send full
-  // refetch (refetchThreadHistory(false)) to reconcile.
+function appendMsg(
+  direction: Direction,
+  text: string,
+  files: ChatMessageFile[] | null | undefined,
+  ts: string,
+  id?: string,
+): void {
   const key = id ? `${direction}:${id}` : null;
   if (key && refs.seenIds.has(key)) return;
   if (key) refs.seenIds.add(key);
   chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
 }
 
-function normDirection(d) {
+function normDirection(d: string): Direction {
   return d === 'in' ? 'in' : d === 'internal' ? 'internal' : 'out';
 }
 
-async function refetchThreadHistory(appendNewOnly) {
-  const gid = groupId.value, tid = threadId.value;
+async function refetchThreadHistory(appendNewOnly: boolean): Promise<void> {
+  const gid = groupId.value,
+    tid = threadId.value;
+  if (!gid || !tid) return;
   const r = await fetch(historyUrl(gid, tid), { credentials: 'same-origin', cache: 'no-store' });
   if (!r.ok) return;
-  const { messages } = await r.json();
+  const { messages } = (await r.json()) as { messages: ServerMessage[] };
   if (!Array.isArray(messages)) return;
   if (!appendNewOnly) {
     chatMessages.value = messages.map((m) => ({
@@ -143,7 +217,7 @@ async function refetchThreadHistory(appendNewOnly) {
     return;
   }
   let maxTs = '';
-  const additions = [];
+  const additions: ChatMessage[] = [];
   for (const m of messages) {
     const direction = normDirection(m.direction);
     const key = m.id ? `${direction}:${m.id}` : null;
@@ -160,20 +234,44 @@ async function refetchThreadHistory(appendNewOnly) {
   }
 }
 
-export async function openChat(gid, resumeTid, opts) {
-  // Idempotent: re-opening the same thread is a no-op.
+interface ChatStartResponse {
+  threadId: string;
+  sessionId?: string | null;
+  messagingGroupId?: string | null;
+  sessionMode?: string;
+}
+
+export async function openChat(gid: string, resumeTid: string | null, opts: ThreadCtx | null): Promise<void> {
   if (resumeTid && groupId.value === gid && threadId.value === resumeTid) return;
-  if (refs.ws) { try { refs.ws.close(); } catch (_) {} refs.ws = null; }
-  if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
+  if (refs.ws) {
+    try {
+      refs.ws.close();
+    } catch {
+      /* ignore */
+    }
+    refs.ws = null;
+  }
+  if (refs.reconnectTimer) {
+    clearTimeout(refs.reconnectTimer);
+    refs.reconnectTimer = null;
+  }
   stopChatPoll();
   refs.reconnectAttempt = 0;
 
-  let ct = 'web', mg = null, cs = true;
+  let ct: string = 'web';
+  let mg: string | null = null;
+  let cs = true;
   if (opts && opts.channelType) {
-    ct = opts.channelType; mg = opts.messagingGroupId || null; cs = !!opts.canSend;
+    ct = opts.channelType;
+    mg = opts.messagingGroupId || null;
+    cs = !!opts.canSend;
   } else if (resumeTid) {
     const t = threads.value.find((x) => x.threadId === resumeTid);
-    if (t && t.channelType && t.channelType !== 'web') { ct = t.channelType; mg = t.messagingGroupId || null; cs = !!t.canSend; }
+    if (t && t.channelType && t.channelType !== 'web') {
+      ct = t.channelType;
+      mg = t.messagingGroupId || null;
+      cs = !!t.canSend;
+    }
   }
 
   batch(() => {
@@ -192,13 +290,11 @@ export async function openChat(gid, resumeTid, opts) {
   });
 
   if (resumeTid) {
-    // threadId + loading flag landed in the batch above so MessageLog
-    // doesn't paint "No messages yet" between threadId set and history.
     writeHash();
     try {
       const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin', cache: 'no-store' });
       if (r.ok) {
-        const { messages } = await r.json();
+        const { messages } = (await r.json()) as { messages: ServerMessage[] };
         batch(() => {
           chatMessages.value = (messages || []).map((m) => ({
             direction: normDirection(m.direction),
@@ -214,39 +310,60 @@ export async function openChat(gid, resumeTid, opts) {
       } else {
         chatLoading.value = false;
       }
-    } catch (err) { console.error('history load failed', err); chatLoading.value = false; }
+    } catch (err) {
+      console.error('history load failed', err);
+      chatLoading.value = false;
+    }
     if (ct === 'web') connectChatWs();
-    else { chatStatus.value = ''; startChatPoll(); }
+    else {
+      chatStatus.value = '';
+      startChatPoll();
+    }
     return;
   }
 
   // New web chat.
-  batch(() => { channelType.value = 'web'; messagingGroupId.value = null; canSend.value = true; });
+  batch(() => {
+    channelType.value = 'web';
+    messagingGroupId.value = null;
+    canSend.value = true;
+  });
   chatStatus.value = 'starting\u2026';
-  let started;
+  let started: ChatStartResponse;
   try {
-    const r = await fetch(`api/groups/${encodeURIComponent(gid)}/chat/start`, { method: 'POST', credentials: 'same-origin' });
+    const r = await fetch(`api/groups/${encodeURIComponent(gid)}/chat/start`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    started = await r.json();
-  } catch (err) { chatStatus.value = 'failed to start chat: ' + err.message; return; }
+    started = (await r.json()) as ChatStartResponse;
+  } catch (err) {
+    const m = err instanceof Error ? err.message : String(err);
+    chatStatus.value = 'failed to start chat: ' + m;
+    return;
+  }
   threadId.value = started.threadId;
-  threads.value = [{
-    threadId: started.threadId,
-    sessionId: started.sessionId || null,
-    channelType: 'web',
-    messagingGroupId: started.messagingGroupId || null,
-    sessionMode: started.sessionMode || 'per-thread',
-    title: '(new thread)',
-    lastActivityAt: new Date().toISOString(),
-    messageCount: 0,
-  }, ...threads.value];
+  threads.value = [
+    {
+      threadId: started.threadId,
+      sessionId: started.sessionId || null,
+      channelType: 'web',
+      messagingGroupId: started.messagingGroupId || null,
+      sessionMode: started.sessionMode || 'per-thread',
+      title: '(new thread)',
+      lastActivityAt: new Date().toISOString(),
+      messageCount: 0,
+    },
+    ...threads.value,
+  ];
   writeHash();
   connectChatWs();
 }
 
-function connectChatWs() {
+function connectChatWs(): void {
   if (!groupId.value || !threadId.value) return;
-  const gid = groupId.value, tid = threadId.value;
+  const gid = groupId.value,
+    tid = threadId.value;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${proto}//${location.host}/ui/chat/api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/ws`;
   const ws = new WebSocket(wsUrl);
@@ -255,9 +372,6 @@ function connectChatWs() {
     const wasReconnect = refs.reconnectAttempt > 0;
     refs.reconnectAttempt = 0;
     chatStatus.value = 'connected';
-    // Catch up on any messages that arrived while we were disconnected
-    // (phone asleep, network blip, server restart). Safe on initial
-    // connect too — it's a no-op when no new rows exist.
     if (wasReconnect) {
       refetchThreadHistory(true).catch((err) => console.error('reconnect catchup failed', err));
     }
@@ -276,22 +390,33 @@ function connectChatWs() {
       if (groupId.value === gid && threadId.value === tid) connectChatWs();
     }, delay);
   };
-  ws.onerror = () => { chatStatus.value = 'connection error'; };
-  ws.onmessage = (ev) => {
-    let payload; try { payload = JSON.parse(ev.data); } catch (_) { return; }
+  ws.onerror = () => {
+    chatStatus.value = 'connection error';
+  };
+  ws.onmessage = (ev: MessageEvent) => {
+    let payload: WsPayload;
+    try {
+      payload = JSON.parse(ev.data) as WsPayload;
+    } catch {
+      return;
+    }
     if (payload.kind === 'ready') return;
-    if (payload.kind === 'typing') { isTyping.value = !!payload.on; typingHint.value = payload.hint || ''; return; }
+    if (payload.kind === 'typing') {
+      isTyping.value = !!payload.on;
+      typingHint.value = payload.hint || '';
+      return;
+    }
     if (payload.kind === 'inbound') {
-      appendMsg('in', payload.text, payload.files || null, payload.timestamp, payload.id);
-      updateActiveThreadTitleFromFirstMessage(payload.text);
+      appendMsg('in', payload.text || '', payload.files || null, payload.timestamp || '', payload.id);
+      updateActiveThreadTitleFromFirstMessage(payload.text || '');
       bumpActiveThread();
       return;
     }
     if (payload.kind === 'outbound') {
       const c = payload.content || {};
-      const text = typeof c === 'string' ? c : (c.text || c.markdown || '');
-      const dir = payload.messageKind === 'internal' ? 'internal' : 'out';
-      appendMsg(dir, text, payload.files || [], payload.timestamp, payload.id);
+      const text = typeof c === 'string' ? c : c.text || c.markdown || '';
+      const dir: Direction = payload.messageKind === 'internal' ? 'internal' : 'out';
+      appendMsg(dir, text, payload.files || [], payload.timestamp || '', payload.id);
       bumpActiveThread();
       if (dir === 'out') maybeNotify(text, payload.files || []);
       return;
@@ -299,19 +424,15 @@ function connectChatWs() {
   };
 }
 
-export async function sendChat(text, files) {
+export async function sendChat(text: string, files: PendingFile[] | null | undefined): Promise<void> {
   if (!groupId.value || !threadId.value) return;
   const isWeb = !channelType.value || channelType.value === 'web';
   const hasFiles = Array.isArray(files) && files.length > 0;
-  // Cross-channel sends have no live tail — paint the user's bubble
-  // immediately, then reconcile via a full refetch after success.
   if (!isWeb) {
     const now = new Date().toISOString();
-    const fileMetas = hasFiles ? files.map((f) => ({ filename: f.name, size: f.size })) : null;
-    // 'in' = viewer's own bubble (see chat-main CSS); 'out' is the agent.
-    // No id — the server-truth row arrives via the post-send full refetch
-    // (refetchThreadHistory(false)) which wipes optimistic bubbles and
-    // rebuilds seenIds from scratch.
+    const fileMetas: ChatMessageFile[] | null = hasFiles
+      ? files!.map((f) => ({ filename: f.name, size: f.size }))
+      : null;
     appendMsg('in', text || '', fileMetas, now);
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
@@ -319,45 +440,64 @@ export async function sendChat(text, files) {
     url += `?channel=${encodeURIComponent(channelType.value)}&mg=${encodeURIComponent(messagingGroupId.value)}`;
   }
   try {
-    let res;
+    let res: Response;
     if (hasFiles) {
       const fd = new FormData();
       fd.append('text', text || '');
-      for (const f of files) fd.append('file', f, f.name);
+      for (const f of files!) {
+        if (f.file) fd.append('file', f.file, f.name);
+      }
       res = await fetch(url, { method: 'POST', credentials: 'same-origin', body: fd });
     } else {
       res = await fetch(url, {
-        method: 'POST', credentials: 'same-origin',
+        method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
     }
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
-      try { const j = await res.json(); if (j && j.error) detail = j.error + (j.detail ? ` (${j.detail})` : ''); } catch (_) {}
+      try {
+        const j = (await res.json()) as { error?: string; detail?: string };
+        if (j && j.error) detail = j.error + (j.detail ? ` (${j.detail})` : '');
+      } catch {
+        /* ignore */
+      }
       chatStatus.value = `send failed: ${detail}`;
     } else if (!isWeb) {
-      // Reconcile the optimistic bubble against server truth: the server
-      // logs the relayed message in inbound with its own clock. If server
-      // ts > client ts (any skew), the next poll would append a duplicate.
-      try { await refetchThreadHistory(false); } catch (_) {}
+      try {
+        await refetchThreadHistory(false);
+      } catch {
+        /* ignore */
+      }
     }
   } catch (err) {
     console.error('send failed', err);
-    chatStatus.value = `send failed: ${err && err.message ? err.message : 'network error'}`;
+    const m = err instanceof Error ? err.message : 'network error';
+    chatStatus.value = `send failed: ${m}`;
   }
 }
 
 // ── files ───────────────────────────────────────────────────────────
-function startThreadsPoll(gid) {
-  if (refs.threadsPollTimer) { clearInterval(refs.threadsPollTimer); refs.threadsPollTimer = null; }
+function startThreadsPoll(gid: string): void {
+  if (refs.threadsPollTimer) {
+    clearInterval(refs.threadsPollTimer);
+    refs.threadsPollTimer = null;
+  }
   refs.threadsPollTimer = setInterval(() => {
-    if (groupId.value === gid) loadThreads(gid).catch(() => {});
-    else { clearInterval(refs.threadsPollTimer); refs.threadsPollTimer = null; }
+    if (groupId.value === gid)
+      loadThreads(gid).catch(() => {
+        /* ignore */
+      });
+    else if (refs.threadsPollTimer) {
+      clearInterval(refs.threadsPollTimer);
+      refs.threadsPollTimer = null;
+    }
   }, THREADS_POLL_MS);
 }
 
-export async function selectGroup(gid) {
+export async function selectGroup(gid: string): Promise<void> {
   batch(() => {
     groupId.value = gid;
     treePath.value = '';
@@ -366,7 +506,7 @@ export async function selectGroup(gid) {
   await loadThreads(gid);
   startThreadsPoll(gid);
   await loadTree('');
-  const latest = threads.value.length > 0 ? threads.value[0] : null;
+  const latest = threads.value.length > 0 ? threads.value[0]! : null;
   if (latest) {
     openChat(gid, latest.threadId, threadCtxOf(latest)).catch((err) => console.error('chat open failed', err));
   } else {
@@ -375,7 +515,7 @@ export async function selectGroup(gid) {
   }
 }
 
-export async function loadTree(p) {
+export async function loadTree(p: string): Promise<void> {
   batch(() => {
     treePath.value = p;
     filePath.value = null;
@@ -384,37 +524,46 @@ export async function loadTree(p) {
     treeEntries.value = [];
   });
   try {
-    const segs = String(p || '').split('/').filter(Boolean).map(encodeURIComponent);
+    if (!groupId.value) return;
+    const segs = String(p || '')
+      .split('/')
+      .filter(Boolean)
+      .map(encodeURIComponent);
     const url = `api/groups/${encodeURIComponent(groupId.value)}/dirs/${segs.length ? segs.join('/') + '/' : ''}`;
-    const { entries } = await api(url);
+    const { entries } = await api<{ entries: TreeEntry[] }>(url);
     treeEntries.value = entries || [];
   } catch (err) {
-    const msg = /HTTP 404/.test(String(err && err.message)) ? 'Not found. It may have been renamed or deleted.' : String(err && err.message || err);
+    const msg = /HTTP 404/.test(String(err && (err as Error).message))
+      ? 'Not found. It may have been renamed or deleted.'
+      : String((err as Error)?.message || err);
     treeError.value = msg;
   }
 }
 
-export async function navTree(p) { await loadTree(p); writeHash(); }
+export async function navTree(p: string): Promise<void> {
+  await loadTree(p);
+  writeHash();
+}
 
-export async function navFile(entry) {
-  // Make sure the files pane is visible so the preview is actually seen.
+export async function navFile(entry: Pick<TreeEntry, 'path' | 'name'> & Partial<TreeEntry>): Promise<void> {
   if (isMobile.value) drawerOpen.files.value = true;
   else paneOpen.files.value = true;
-  // Sync the tree to the file's directory so the breadcrumb reflects
-  // where the previewed file lives (and the listing matches once the
-  // user closes the preview). loadTree clears filePath/previewBlock, so
-  // it has to run before selectFile.
   const parent = parentPath(entry.path);
   if (treePath.value !== parent) await loadTree(parent);
   await selectFile(entry);
   writeHash();
 }
 
-export async function selectFile(entry) {
+export async function selectFile(entry: Pick<TreeEntry, 'path' | 'name'> & Partial<TreeEntry>): Promise<void> {
   filePath.value = entry.path;
-  const segs = String(entry.path || '').split('/').filter(Boolean).map(encodeURIComponent);
+  if (!groupId.value) return;
+  const segs = String(entry.path || '')
+    .split('/')
+    .filter(Boolean)
+    .map(encodeURIComponent);
   const url = `api/groups/${encodeURIComponent(groupId.value)}/files/${segs.join('/')}`;
-  let size = entry.size, mtime = entry.mtime;
+  let size = entry.size;
+  let mtime = entry.mtime;
   try {
     const h = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
     if (h.status >= 400) {
@@ -422,22 +571,34 @@ export async function selectFile(entry) {
       previewBlock.value = { kind: 'error', text: msg, name: entry.name, url };
       return;
     }
-    if (size == null) { const cl = h.headers.get('content-length'); if (cl) size = Number(cl); }
+    if (size == null) {
+      const cl = h.headers.get('content-length');
+      if (cl) size = Number(cl);
+    }
     if (!mtime) {
       const lm = h.headers.get('last-modified');
-      if (lm) { const t = Date.parse(lm); if (t) mtime = new Date(t).toISOString(); }
+      if (lm) {
+        const t = Date.parse(lm);
+        if (t) mtime = new Date(t).toISOString();
+      }
     }
-  } catch (_) {}
-  const ext = entry.name.toLowerCase().split('.').pop();
-  const meta = { name: entry.name, size, mtime, url, path: entry.path };
+  } catch {
+    /* ignore */
+  }
+  const ext = entry.name.toLowerCase().split('.').pop() || '';
+  const meta = { name: entry.name, size: size ?? null, mtime: mtime ?? null, url, path: entry.path };
   if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) previewBlock.value = { kind: 'image', ...meta };
-  else if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext)) previewBlock.value = { kind: 'audio', ...meta };
+  else if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext))
+    previewBlock.value = { kind: 'audio', ...meta };
   else if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].includes(ext)) previewBlock.value = { kind: 'video', ...meta };
   else if (ext === 'pdf') previewBlock.value = { kind: 'pdf', ...meta };
   else {
     try {
       const r = await fetch(url, { credentials: 'same-origin' });
-      if (!r.ok) { previewBlock.value = { kind: 'error', text: `HTTP ${r.status}`, ...meta }; return; }
+      if (!r.ok) {
+        previewBlock.value = { kind: 'error', text: `HTTP ${r.status}`, ...meta };
+        return;
+      }
       const ctType = r.headers.get('content-type') || '';
       if (ctType.startsWith('text/') || ctType.includes('json') || ctType.includes('xml')) {
         const txt = await r.text();
@@ -447,28 +608,36 @@ export async function selectFile(entry) {
         previewBlock.value = { kind: 'binary', mime: ctType, ...meta };
       }
     } catch (err) {
-      previewBlock.value = { kind: 'error', text: String(err && err.message || err), ...meta };
+      previewBlock.value = { kind: 'error', text: String((err as Error)?.message || err), ...meta };
     }
   }
-  // Fire embedded-metadata fetch for every previewable kind. Cheap on
-  // the server for non-media (readMediaTags exits immediately when the
-  // ext isn't audio/video/image). Fills in authoritative size/mtime/mime
-  // from the server so the file-meta panel is populated even when the
-  // tree entry didn't carry them.
-  fetchAndAttachMeta(entry.path).catch(() => {});
+  fetchAndAttachMeta(entry.path).catch(() => {
+    /* ignore */
+  });
 }
 
-async function fetchAndAttachMeta(p) {
+interface FileMetaResponse {
+  tags?: Record<string, unknown> | null;
+  lyrics?: string | null;
+  mime?: string;
+  size?: number;
+  mtime?: string;
+}
+
+async function fetchAndAttachMeta(p: string): Promise<void> {
   const gid = groupId.value;
-  const segs = String(p || '').split('/').filter(Boolean).map(encodeURIComponent);
+  if (!gid) return;
+  const segs = String(p || '')
+    .split('/')
+    .filter(Boolean)
+    .map(encodeURIComponent);
   const u = `api/groups/${encodeURIComponent(gid)}/files/${segs.join('/')}?meta=1`;
   const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store' });
   if (!r.ok) return;
-  const data = await r.json();
-  // Race guard: user may have navigated to a different file in the meantime.
+  const data = (await r.json()) as FileMetaResponse;
   const cur = previewBlock.value;
   if (!cur || cur.path !== p) return;
-  previewBlock.value = {
+  const next: PreviewBlock = {
     ...cur,
     tags: data.tags || null,
     lyrics: data.lyrics || null,
@@ -476,70 +645,90 @@ async function fetchAndAttachMeta(p) {
     size: data.size ?? cur.size,
     mtime: data.mtime || cur.mtime,
   };
+  previewBlock.value = next;
 }
 
-export function closePreview() {
-  batch(() => { filePath.value = null; previewBlock.value = null; });
+export function closePreview(): void {
+  batch(() => {
+    filePath.value = null;
+    previewBlock.value = null;
+  });
   writeHash();
 }
 
 // ── pinned file-browser context ────────────────────────────────────
-export function togglePinnedFile(path) {
+export function togglePinnedFile(path: string | null | undefined): void {
   if (!path) return;
   const cur = pinnedContext.value;
   pinnedContext.value = cur.includes(path) ? cur.filter((p) => p !== path) : cur.concat(path);
 }
-export function removePinnedPath(path) {
+
+export function removePinnedPath(path: string): void {
   pinnedContext.value = pinnedContext.value.filter((p) => p !== path);
 }
-export function clearPinnedContext() { pinnedContext.value = []; }
+
+export function clearPinnedContext(): void {
+  pinnedContext.value = [];
+}
 
 // ── pending uploads in composer ─────────────────────────────────────
-export function addPendingFiles(fileList, max, maxSize, maxTotal) {
+export function addPendingFiles(
+  fileList: File[] | FileList | null | undefined,
+  max: number,
+  maxSize: number,
+  maxTotal: number,
+): void {
   if (!fileList || fileList.length === 0) return;
-  const next = pending.value.slice();
+  const next: PendingFile[] = pending.value.slice();
   let totalBytes = next.reduce((n, f) => n + f.size, 0);
-  for (const f of fileList) {
-    if (next.length >= max) { chatStatus.value = `max ${max} files per message`; break; }
-    if (f.size > maxSize) { chatStatus.value = `${f.name} too large (max ${(maxSize / 1024 / 1024).toFixed(0)} MB)`; continue; }
-    if (totalBytes + f.size > maxTotal) { chatStatus.value = `total upload too large (max ${(maxTotal / 1024 / 1024).toFixed(0)} MB)`; break; }
-    next.push(f);
+  for (const f of Array.from(fileList)) {
+    if (next.length >= max) {
+      chatStatus.value = `max ${max} files per message`;
+      break;
+    }
+    if (f.size > maxSize) {
+      chatStatus.value = `${f.name} too large (max ${(maxSize / 1024 / 1024).toFixed(0)} MB)`;
+      continue;
+    }
+    if (totalBytes + f.size > maxTotal) {
+      chatStatus.value = `total upload too large (max ${(maxTotal / 1024 / 1024).toFixed(0)} MB)`;
+      break;
+    }
+    next.push({ name: f.name, size: f.size, file: f });
     totalBytes += f.size;
   }
   pending.value = next;
 }
 
-export function removePending(i) {
+export function removePending(i: number): void {
   const next = pending.value.slice();
   next.splice(i, 1);
   pending.value = next;
 }
 
-export function clearPending() { pending.value = []; }
+export function clearPending(): void {
+  pending.value = [];
+}
 
 // ── liveness / catchup ──────────────────────────────────────────────
-// Keep relative-time labels fresh and recover messages missed while the
-// tab/phone was asleep. Two triggers:
-//   - 30s interval bumps nowTick so <RelativeTime> re-renders.
-//   - visibilitychange → visible: bump nowTick immediately, refetch
-//     any new messages (dedup'd by row id against refs.seenIds), and
-//     force the WS to reconnect if it's not currently open (mobile
-//     OSes routinely silently kill sockets on resume without firing
-//     onclose).
 const NOW_TICK_MS = 30000;
-export function installLivenessHandlers() {
-  setInterval(() => { if (!document.hidden) nowTick.value = Date.now(); }, NOW_TICK_MS);
+export function installLivenessHandlers(): void {
+  setInterval(() => {
+    if (!document.hidden) nowTick.value = Date.now();
+  }, NOW_TICK_MS);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     nowTick.value = Date.now();
     if (!threadId.value) return;
     refetchThreadHistory(true).catch((err) => console.error('resume catchup failed', err));
     const ws = refs.ws;
-    const open = ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
+    const open = !!ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
     if (channelType.value === 'web' && !open) {
-      if (refs.reconnectTimer) { clearTimeout(refs.reconnectTimer); refs.reconnectTimer = null; }
+      if (refs.reconnectTimer) {
+        clearTimeout(refs.reconnectTimer);
+        refs.reconnectTimer = null;
+      }
       connectChatWs();
     }
   });
 }
-

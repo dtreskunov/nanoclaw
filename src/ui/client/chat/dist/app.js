@@ -193,13 +193,13 @@ var require_dist = __commonJS({
             throw new TypeError(`Expected "${token.name}" to be a non-empty array`);
           }
           let result = "";
-          for (let i4 = 0; i4 < value.length; i4++) {
-            if (typeof value[i4] !== "string") {
-              throw new TypeError(`Expected "${token.name}/${i4}" to be a string`);
+          for (let i5 = 0; i5 < value.length; i5++) {
+            if (typeof value[i5] !== "string") {
+              throw new TypeError(`Expected "${token.name}/${i5}" to be a string`);
             }
-            if (i4 > 0)
+            if (i5 > 0)
               result += delimiter;
-            result += encodeValue(value[i4]);
+            result += encodeValue(value[i5]);
           }
           return result;
         };
@@ -232,12 +232,12 @@ var require_dist = __commonJS({
           return false;
         const path2 = m6[0];
         const params = /* @__PURE__ */ Object.create(null);
-        for (let i4 = 1; i4 < m6.length; i4++) {
-          if (m6[i4] === void 0)
+        for (let i5 = 1; i5 < m6.length; i5++) {
+          if (m6[i5] === void 0)
             continue;
-          const key = keys[i4 - 1];
-          const decoder = decoders[i4 - 1];
-          params[key.name] = decoder(m6[i4]);
+          const key = keys[i5 - 1];
+          const decoder = decoders[i5 - 1];
+          params[key.name] = decoder(m6[i5]);
         }
         return { path: path2, params };
       };
@@ -459,7 +459,7 @@ var require_core = __commonJS({
         const pieces = name.split(".");
         return [
           `${prefix}${pieces.shift()}`,
-          ...pieces.map((x5, i4) => `${x5}${"_".repeat(i4 + 1)}`)
+          ...pieces.map((x5, i5) => `${x5}${"_".repeat(i5 + 1)}`)
         ].join(" ");
       }
       return `${prefix}${name}`;
@@ -1028,10 +1028,10 @@ var require_core = __commonJS({
       const scopeNames = mode[key];
       const emit = {};
       const positions = {};
-      for (let i4 = 1; i4 <= regexes.length; i4++) {
-        positions[i4 + offset] = scopeNames[i4];
-        emit[i4 + offset] = true;
-        offset += countMatchGroups(regexes[i4 - 1]);
+      for (let i5 = 1; i5 <= regexes.length; i5++) {
+        positions[i5 + offset] = scopeNames[i5];
+        emit[i5 + offset] = true;
+        offset += countMatchGroups(regexes[i5 - 1]);
       }
       mode[key] = positions;
       mode[key]._emit = emit;
@@ -1116,9 +1116,9 @@ var require_core = __commonJS({
           if (!match2) {
             return null;
           }
-          const i4 = match2.findIndex((el, i5) => i5 > 0 && el !== void 0);
-          const matchData = this.matchIndexes[i4];
-          match2.splice(0, i4);
+          const i5 = match2.findIndex((el, i6) => i6 > 0 && el !== void 0);
+          const matchData = this.matchIndexes[i5];
+          match2.splice(0, i5);
           return Object.assign(match2, matchData);
         }
       }
@@ -1283,10 +1283,10 @@ var require_core = __commonJS({
     }
     var version = "11.11.1";
     var HTMLInjectionError = class extends Error {
-      constructor(reason, html2) {
+      constructor(reason, html) {
         super(reason);
         this.name = "HTMLInjectionError";
-        this.html = html2;
+        this.html = html;
       }
     };
     var escape = escapeHTML;
@@ -1428,15 +1428,15 @@ var require_core = __commonJS({
           emitter.endScope();
         }
         function emitMultiClass(scope, match2) {
-          let i4 = 1;
+          let i5 = 1;
           const max = match2.length - 1;
-          while (i4 <= max) {
-            if (!scope._emit[i4]) {
-              i4++;
+          while (i5 <= max) {
+            if (!scope._emit[i5]) {
+              i5++;
               continue;
             }
-            const klass = language.classNameAliases[scope[i4]] || scope[i4];
-            const text = match2[i4];
+            const klass = language.classNameAliases[scope[i5]] || scope[i5];
+            const text = match2[i5];
             if (klass) {
               emitKeyword(text, klass);
             } else {
@@ -1444,7 +1444,7 @@ var require_core = __commonJS({
               processKeywords();
               modeBuffer = "";
             }
-            i4++;
+            i5++;
           }
         }
         function startNewMode(mode, match2) {
@@ -14490,131 +14490,131 @@ var p = {};
 var v = [];
 var y = /acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i;
 var d = Array.isArray;
-function w(n4, l7) {
-  for (var u4 in l7) n4[u4] = l7[u4];
-  return n4;
+function w(n3, l7) {
+  for (var u5 in l7) n3[u5] = l7[u5];
+  return n3;
 }
-function _(n4) {
-  n4 && n4.parentNode && n4.parentNode.removeChild(n4);
+function _(n3) {
+  n3 && n3.parentNode && n3.parentNode.removeChild(n3);
 }
-function g(l7, u4, t5) {
-  var i4, r4, o4, e4 = {};
-  for (o4 in u4) "key" == o4 ? i4 = u4[o4] : "ref" == o4 ? r4 = u4[o4] : e4[o4] = u4[o4];
-  if (arguments.length > 2 && (e4.children = arguments.length > 3 ? n.call(arguments, 2) : t5), "function" == typeof l7 && null != l7.defaultProps) for (o4 in l7.defaultProps) void 0 === e4[o4] && (e4[o4] = l7.defaultProps[o4]);
-  return m(l7, e4, i4, r4, null);
+function g(l7, u5, t4) {
+  var i5, r4, o4, e4 = {};
+  for (o4 in u5) "key" == o4 ? i5 = u5[o4] : "ref" == o4 ? r4 = u5[o4] : e4[o4] = u5[o4];
+  if (arguments.length > 2 && (e4.children = arguments.length > 3 ? n.call(arguments, 2) : t4), "function" == typeof l7 && null != l7.defaultProps) for (o4 in l7.defaultProps) void 0 === e4[o4] && (e4[o4] = l7.defaultProps[o4]);
+  return m(l7, e4, i5, r4, null);
 }
-function m(n4, t5, i4, r4, o4) {
-  var e4 = { type: n4, props: t5, key: i4, ref: r4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: null == o4 ? ++u : o4, __i: -1, __u: 0 };
+function m(n3, t4, i5, r4, o4) {
+  var e4 = { type: n3, props: t4, key: i5, ref: r4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: null == o4 ? ++u : o4, __i: -1, __u: 0 };
   return null == o4 && null != l.vnode && l.vnode(e4), e4;
 }
-function k(n4) {
-  return n4.children;
+function k(n3) {
+  return n3.children;
 }
-function x(n4, l7) {
-  this.props = n4, this.context = l7;
+function x(n3, l7) {
+  this.props = n3, this.context = l7;
 }
-function C(n4, l7) {
-  if (null == l7) return n4.__ ? C(n4.__, n4.__i + 1) : null;
-  for (var u4; l7 < n4.__k.length; l7++) if (null != (u4 = n4.__k[l7]) && null != u4.__e) return u4.__e;
-  return "function" == typeof n4.type ? C(n4) : null;
+function C(n3, l7) {
+  if (null == l7) return n3.__ ? C(n3.__, n3.__i + 1) : null;
+  for (var u5; l7 < n3.__k.length; l7++) if (null != (u5 = n3.__k[l7]) && null != u5.__e) return u5.__e;
+  return "function" == typeof n3.type ? C(n3) : null;
 }
-function S(n4) {
-  var l7, u4;
-  if (null != (n4 = n4.__) && null != n4.__c) {
-    for (n4.__e = n4.__c.base = null, l7 = 0; l7 < n4.__k.length; l7++) if (null != (u4 = n4.__k[l7]) && null != u4.__e) {
-      n4.__e = n4.__c.base = u4.__e;
+function S(n3) {
+  var l7, u5;
+  if (null != (n3 = n3.__) && null != n3.__c) {
+    for (n3.__e = n3.__c.base = null, l7 = 0; l7 < n3.__k.length; l7++) if (null != (u5 = n3.__k[l7]) && null != u5.__e) {
+      n3.__e = n3.__c.base = u5.__e;
       break;
     }
-    return S(n4);
+    return S(n3);
   }
 }
-function M(n4) {
-  (!n4.__d && (n4.__d = true) && i.push(n4) && !P.__r++ || r !== l.debounceRendering) && ((r = l.debounceRendering) || o)(P);
+function M(n3) {
+  (!n3.__d && (n3.__d = true) && i.push(n3) && !P.__r++ || r !== l.debounceRendering) && ((r = l.debounceRendering) || o)(P);
 }
 function P() {
-  var n4, u4, t5, r4, o4, f4, c4, s5;
-  for (i.sort(e); n4 = i.shift(); ) n4.__d && (u4 = i.length, r4 = void 0, f4 = (o4 = (t5 = n4).__v).__e, c4 = [], s5 = [], t5.__P && ((r4 = w({}, o4)).__v = o4.__v + 1, l.vnode && l.vnode(r4), j(t5.__P, r4, o4, t5.__n, t5.__P.namespaceURI, 32 & o4.__u ? [f4] : null, c4, null == f4 ? C(o4) : f4, !!(32 & o4.__u), s5), r4.__v = o4.__v, r4.__.__k[r4.__i] = r4, z(c4, r4, s5), r4.__e != f4 && S(r4)), i.length > u4 && i.sort(e));
+  var n3, u5, t4, r4, o4, f5, c4, s5;
+  for (i.sort(e); n3 = i.shift(); ) n3.__d && (u5 = i.length, r4 = void 0, f5 = (o4 = (t4 = n3).__v).__e, c4 = [], s5 = [], t4.__P && ((r4 = w({}, o4)).__v = o4.__v + 1, l.vnode && l.vnode(r4), j(t4.__P, r4, o4, t4.__n, t4.__P.namespaceURI, 32 & o4.__u ? [f5] : null, c4, null == f5 ? C(o4) : f5, !!(32 & o4.__u), s5), r4.__v = o4.__v, r4.__.__k[r4.__i] = r4, z(c4, r4, s5), r4.__e != f5 && S(r4)), i.length > u5 && i.sort(e));
   P.__r = 0;
 }
-function $(n4, l7, u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h5, y5, d5, w5, _5, g5 = t5 && t5.__k || v, m6 = l7.length;
-  for (f4 = I(u4, l7, g5, f4, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u4.__k[a4]) && (h5 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _5 = j(n4, y5, h5, i4, r4, o4, e4, f4, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f4 = A(y5, f4, n4) : "function" == typeof y5.type && void 0 !== _5 ? f4 = _5 : d5 && (f4 = d5.nextSibling), y5.__u &= -7);
-  return u4.__e = w5, f4;
+function $(n3, l7, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
+  var a4, h5, y5, d5, w5, _5, g5 = t4 && t4.__k || v, m6 = l7.length;
+  for (f5 = I(u5, l7, g5, f5, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u5.__k[a4]) && (h5 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _5 = j(n3, y5, h5, i5, r4, o4, e4, f5, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f5 = A(y5, f5, n3) : "function" == typeof y5.type && void 0 !== _5 ? f5 = _5 : d5 && (f5 = d5.nextSibling), y5.__u &= -7);
+  return u5.__e = w5, f5;
 }
-function I(n4, l7, u4, t5, i4) {
-  var r4, o4, e4, f4, c4, s5 = u4.length, a4 = s5, h5 = 0;
-  for (n4.__k = new Array(i4), r4 = 0; r4 < i4; r4++) null != (o4 = l7[r4]) && "boolean" != typeof o4 && "function" != typeof o4 ? (f4 = r4 + h5, (o4 = n4.__k[r4] = "string" == typeof o4 || "number" == typeof o4 || "bigint" == typeof o4 || o4.constructor == String ? m(null, o4, null, null, null) : d(o4) ? m(k, { children: o4 }, null, null, null) : void 0 === o4.constructor && o4.__b > 0 ? m(o4.type, o4.props, o4.key, o4.ref ? o4.ref : null, o4.__v) : o4).__ = n4, o4.__b = n4.__b + 1, e4 = null, -1 !== (c4 = o4.__i = L(o4, u4, f4, a4)) && (a4--, (e4 = u4[c4]) && (e4.__u |= 2)), null == e4 || null === e4.__v ? (-1 == c4 && h5--, "function" != typeof o4.type && (o4.__u |= 4)) : c4 != f4 && (c4 == f4 - 1 ? h5-- : c4 == f4 + 1 ? h5++ : (c4 > f4 ? h5-- : h5++, o4.__u |= 4))) : n4.__k[r4] = null;
-  if (a4) for (r4 = 0; r4 < s5; r4++) null != (e4 = u4[r4]) && 0 == (2 & e4.__u) && (e4.__e == t5 && (t5 = C(e4)), q(e4, e4));
-  return t5;
+function I(n3, l7, u5, t4, i5) {
+  var r4, o4, e4, f5, c4, s5 = u5.length, a4 = s5, h5 = 0;
+  for (n3.__k = new Array(i5), r4 = 0; r4 < i5; r4++) null != (o4 = l7[r4]) && "boolean" != typeof o4 && "function" != typeof o4 ? (f5 = r4 + h5, (o4 = n3.__k[r4] = "string" == typeof o4 || "number" == typeof o4 || "bigint" == typeof o4 || o4.constructor == String ? m(null, o4, null, null, null) : d(o4) ? m(k, { children: o4 }, null, null, null) : void 0 === o4.constructor && o4.__b > 0 ? m(o4.type, o4.props, o4.key, o4.ref ? o4.ref : null, o4.__v) : o4).__ = n3, o4.__b = n3.__b + 1, e4 = null, -1 !== (c4 = o4.__i = L(o4, u5, f5, a4)) && (a4--, (e4 = u5[c4]) && (e4.__u |= 2)), null == e4 || null === e4.__v ? (-1 == c4 && h5--, "function" != typeof o4.type && (o4.__u |= 4)) : c4 != f5 && (c4 == f5 - 1 ? h5-- : c4 == f5 + 1 ? h5++ : (c4 > f5 ? h5-- : h5++, o4.__u |= 4))) : n3.__k[r4] = null;
+  if (a4) for (r4 = 0; r4 < s5; r4++) null != (e4 = u5[r4]) && 0 == (2 & e4.__u) && (e4.__e == t4 && (t4 = C(e4)), q(e4, e4));
+  return t4;
 }
-function A(n4, l7, u4) {
-  var t5, i4;
-  if ("function" == typeof n4.type) {
-    for (t5 = n4.__k, i4 = 0; t5 && i4 < t5.length; i4++) t5[i4] && (t5[i4].__ = n4, l7 = A(t5[i4], l7, u4));
+function A(n3, l7, u5) {
+  var t4, i5;
+  if ("function" == typeof n3.type) {
+    for (t4 = n3.__k, i5 = 0; t4 && i5 < t4.length; i5++) t4[i5] && (t4[i5].__ = n3, l7 = A(t4[i5], l7, u5));
     return l7;
   }
-  n4.__e != l7 && (l7 && n4.type && !u4.contains(l7) && (l7 = C(n4)), u4.insertBefore(n4.__e, l7 || null), l7 = n4.__e);
+  n3.__e != l7 && (l7 && n3.type && !u5.contains(l7) && (l7 = C(n3)), u5.insertBefore(n3.__e, l7 || null), l7 = n3.__e);
   do {
     l7 = l7 && l7.nextSibling;
   } while (null != l7 && 8 == l7.nodeType);
   return l7;
 }
-function L(n4, l7, u4, t5) {
-  var i4, r4, o4 = n4.key, e4 = n4.type, f4 = l7[u4];
-  if (null === f4 || f4 && o4 == f4.key && e4 === f4.type && 0 == (2 & f4.__u)) return u4;
-  if (t5 > (null != f4 && 0 == (2 & f4.__u) ? 1 : 0)) for (i4 = u4 - 1, r4 = u4 + 1; i4 >= 0 || r4 < l7.length; ) {
-    if (i4 >= 0) {
-      if ((f4 = l7[i4]) && 0 == (2 & f4.__u) && o4 == f4.key && e4 === f4.type) return i4;
-      i4--;
+function L(n3, l7, u5, t4) {
+  var i5, r4, o4 = n3.key, e4 = n3.type, f5 = l7[u5];
+  if (null === f5 || f5 && o4 == f5.key && e4 === f5.type && 0 == (2 & f5.__u)) return u5;
+  if (t4 > (null != f5 && 0 == (2 & f5.__u) ? 1 : 0)) for (i5 = u5 - 1, r4 = u5 + 1; i5 >= 0 || r4 < l7.length; ) {
+    if (i5 >= 0) {
+      if ((f5 = l7[i5]) && 0 == (2 & f5.__u) && o4 == f5.key && e4 === f5.type) return i5;
+      i5--;
     }
     if (r4 < l7.length) {
-      if ((f4 = l7[r4]) && 0 == (2 & f4.__u) && o4 == f4.key && e4 === f4.type) return r4;
+      if ((f5 = l7[r4]) && 0 == (2 & f5.__u) && o4 == f5.key && e4 === f5.type) return r4;
       r4++;
     }
   }
   return -1;
 }
-function T(n4, l7, u4) {
-  "-" == l7[0] ? n4.setProperty(l7, null == u4 ? "" : u4) : n4[l7] = null == u4 ? "" : "number" != typeof u4 || y.test(l7) ? u4 : u4 + "px";
+function T(n3, l7, u5) {
+  "-" == l7[0] ? n3.setProperty(l7, null == u5 ? "" : u5) : n3[l7] = null == u5 ? "" : "number" != typeof u5 || y.test(l7) ? u5 : u5 + "px";
 }
-function F(n4, l7, u4, t5, i4) {
+function F(n3, l7, u5, t4, i5) {
   var r4;
-  n: if ("style" == l7) if ("string" == typeof u4) n4.style.cssText = u4;
+  n: if ("style" == l7) if ("string" == typeof u5) n3.style.cssText = u5;
   else {
-    if ("string" == typeof t5 && (n4.style.cssText = t5 = ""), t5) for (l7 in t5) u4 && l7 in u4 || T(n4.style, l7, "");
-    if (u4) for (l7 in u4) t5 && u4[l7] === t5[l7] || T(n4.style, l7, u4[l7]);
+    if ("string" == typeof t4 && (n3.style.cssText = t4 = ""), t4) for (l7 in t4) u5 && l7 in u5 || T(n3.style, l7, "");
+    if (u5) for (l7 in u5) t4 && u5[l7] === t4[l7] || T(n3.style, l7, u5[l7]);
   }
-  else if ("o" == l7[0] && "n" == l7[1]) r4 = l7 != (l7 = l7.replace(f, "$1")), l7 = l7.toLowerCase() in n4 || "onFocusOut" == l7 || "onFocusIn" == l7 ? l7.toLowerCase().slice(2) : l7.slice(2), n4.l || (n4.l = {}), n4.l[l7 + r4] = u4, u4 ? t5 ? u4.u = t5.u : (u4.u = c, n4.addEventListener(l7, r4 ? a : s, r4)) : n4.removeEventListener(l7, r4 ? a : s, r4);
+  else if ("o" == l7[0] && "n" == l7[1]) r4 = l7 != (l7 = l7.replace(f, "$1")), l7 = l7.toLowerCase() in n3 || "onFocusOut" == l7 || "onFocusIn" == l7 ? l7.toLowerCase().slice(2) : l7.slice(2), n3.l || (n3.l = {}), n3.l[l7 + r4] = u5, u5 ? t4 ? u5.u = t4.u : (u5.u = c, n3.addEventListener(l7, r4 ? a : s, r4)) : n3.removeEventListener(l7, r4 ? a : s, r4);
   else {
-    if ("http://www.w3.org/2000/svg" == i4) l7 = l7.replace(/xlink(H|:h)/, "h").replace(/sName$/, "s");
-    else if ("width" != l7 && "height" != l7 && "href" != l7 && "list" != l7 && "form" != l7 && "tabIndex" != l7 && "download" != l7 && "rowSpan" != l7 && "colSpan" != l7 && "role" != l7 && "popover" != l7 && l7 in n4) try {
-      n4[l7] = null == u4 ? "" : u4;
+    if ("http://www.w3.org/2000/svg" == i5) l7 = l7.replace(/xlink(H|:h)/, "h").replace(/sName$/, "s");
+    else if ("width" != l7 && "height" != l7 && "href" != l7 && "list" != l7 && "form" != l7 && "tabIndex" != l7 && "download" != l7 && "rowSpan" != l7 && "colSpan" != l7 && "role" != l7 && "popover" != l7 && l7 in n3) try {
+      n3[l7] = null == u5 ? "" : u5;
       break n;
-    } catch (n5) {
+    } catch (n4) {
     }
-    "function" == typeof u4 || (null == u4 || false === u4 && "-" != l7[4] ? n4.removeAttribute(l7) : n4.setAttribute(l7, "popover" == l7 && 1 == u4 ? "" : u4));
+    "function" == typeof u5 || (null == u5 || false === u5 && "-" != l7[4] ? n3.removeAttribute(l7) : n3.setAttribute(l7, "popover" == l7 && 1 == u5 ? "" : u5));
   }
 }
-function O(n4) {
-  return function(u4) {
+function O(n3) {
+  return function(u5) {
     if (this.l) {
-      var t5 = this.l[u4.type + n4];
-      if (null == u4.t) u4.t = c++;
-      else if (u4.t < t5.u) return;
-      return t5(l.event ? l.event(u4) : u4);
+      var t4 = this.l[u5.type + n3];
+      if (null == u5.t) u5.t = c++;
+      else if (u5.t < t4.u) return;
+      return t4(l.event ? l.event(u5) : u5);
     }
   };
 }
-function j(n4, u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h5, p5, v5, y5, g5, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u4.type;
-  if (void 0 !== u4.constructor) return null;
-  128 & t5.__u && (c4 = !!(32 & t5.__u), o4 = [f4 = u4.__e = t5.__e]), (a4 = l.__b) && a4(u4);
+function j(n3, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
+  var a4, h5, p5, v5, y5, g5, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u5.type;
+  if (void 0 !== u5.constructor) return null;
+  128 & t4.__u && (c4 = !!(32 & t4.__u), o4 = [f5 = u5.__e = t4.__e]), (a4 = l.__b) && a4(u5);
   n: if ("function" == typeof F3) try {
-    if (b4 = u4.props, C3 = "prototype" in F3 && F3.prototype.render, S3 = (a4 = F3.contextType) && i4[a4.__c], M3 = a4 ? S3 ? S3.props.value : a4.__ : i4, t5.__c ? m6 = (h5 = u4.__c = t5.__c).__ = h5.__E : (C3 ? u4.__c = h5 = new F3(b4, M3) : (u4.__c = h5 = new x(b4, M3), h5.constructor = F3, h5.render = B), S3 && S3.sub(h5), h5.props = b4, h5.state || (h5.state = {}), h5.context = M3, h5.__n = i4, p5 = h5.__d = true, h5.__h = [], h5._sb = []), C3 && null == h5.__s && (h5.__s = h5.state), C3 && null != F3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = w({}, h5.__s)), w(h5.__s, F3.getDerivedStateFromProps(b4, h5.__s))), v5 = h5.props, y5 = h5.state, h5.__v = u4, p5) C3 && null == F3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), C3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
+    if (b4 = u5.props, C3 = "prototype" in F3 && F3.prototype.render, S3 = (a4 = F3.contextType) && i5[a4.__c], M3 = a4 ? S3 ? S3.props.value : a4.__ : i5, t4.__c ? m6 = (h5 = u5.__c = t4.__c).__ = h5.__E : (C3 ? u5.__c = h5 = new F3(b4, M3) : (u5.__c = h5 = new x(b4, M3), h5.constructor = F3, h5.render = B), S3 && S3.sub(h5), h5.props = b4, h5.state || (h5.state = {}), h5.context = M3, h5.__n = i5, p5 = h5.__d = true, h5.__h = [], h5._sb = []), C3 && null == h5.__s && (h5.__s = h5.state), C3 && null != F3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = w({}, h5.__s)), w(h5.__s, F3.getDerivedStateFromProps(b4, h5.__s))), v5 = h5.props, y5 = h5.state, h5.__v = u5, p5) C3 && null == F3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), C3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
     else {
-      if (C3 && null == F3.getDerivedStateFromProps && b4 !== v5 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(b4, M3), !h5.__e && (null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(b4, h5.__s, M3) || u4.__v == t5.__v)) {
-        for (u4.__v != t5.__v && (h5.props = b4, h5.state = h5.__s, h5.__d = false), u4.__e = t5.__e, u4.__k = t5.__k, u4.__k.some(function(n5) {
-          n5 && (n5.__ = u4);
+      if (C3 && null == F3.getDerivedStateFromProps && b4 !== v5 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(b4, M3), !h5.__e && (null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(b4, h5.__s, M3) || u5.__v == t4.__v)) {
+        for (u5.__v != t4.__v && (h5.props = b4, h5.state = h5.__s, h5.__d = false), u5.__e = t4.__e, u5.__k = t4.__k, u5.__k.some(function(n4) {
+          n4 && (n4.__ = u5);
         }), P3 = 0; P3 < h5._sb.length; P3++) h5.__h.push(h5._sb[P3]);
         h5._sb = [], h5.__h.length && e4.push(h5);
         break n;
@@ -14623,110 +14623,110 @@ function j(n4, u4, t5, i4, r4, o4, e4, f4, c4, s5) {
         h5.componentDidUpdate(v5, y5, g5);
       });
     }
-    if (h5.context = M3, h5.props = b4, h5.__P = n4, h5.__e = false, I3 = l.__r, A5 = 0, C3) {
-      for (h5.state = h5.__s, h5.__d = false, I3 && I3(u4), a4 = h5.render(h5.props, h5.state, h5.context), H2 = 0; H2 < h5._sb.length; H2++) h5.__h.push(h5._sb[H2]);
+    if (h5.context = M3, h5.props = b4, h5.__P = n3, h5.__e = false, I3 = l.__r, A5 = 0, C3) {
+      for (h5.state = h5.__s, h5.__d = false, I3 && I3(u5), a4 = h5.render(h5.props, h5.state, h5.context), H2 = 0; H2 < h5._sb.length; H2++) h5.__h.push(h5._sb[H2]);
       h5._sb = [];
     } else do {
-      h5.__d = false, I3 && I3(u4), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
+      h5.__d = false, I3 && I3(u5), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
     } while (h5.__d && ++A5 < 25);
-    h5.state = h5.__s, null != h5.getChildContext && (i4 = w(w({}, i4), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g5 = h5.getSnapshotBeforeUpdate(v5, y5)), f4 = $(n4, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u4, t5, i4, r4, o4, e4, f4, c4, s5), h5.base = u4.__e, u4.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
-  } catch (n5) {
-    if (u4.__v = null, c4 || null != o4) if (n5.then) {
-      for (u4.__u |= c4 ? 160 : 128; f4 && 8 == f4.nodeType && f4.nextSibling; ) f4 = f4.nextSibling;
-      o4[o4.indexOf(f4)] = null, u4.__e = f4;
+    h5.state = h5.__s, null != h5.getChildContext && (i5 = w(w({}, i5), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g5 = h5.getSnapshotBeforeUpdate(v5, y5)), f5 = $(n3, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u5, t4, i5, r4, o4, e4, f5, c4, s5), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
+  } catch (n4) {
+    if (u5.__v = null, c4 || null != o4) if (n4.then) {
+      for (u5.__u |= c4 ? 160 : 128; f5 && 8 == f5.nodeType && f5.nextSibling; ) f5 = f5.nextSibling;
+      o4[o4.indexOf(f5)] = null, u5.__e = f5;
     } else for (T4 = o4.length; T4--; ) _(o4[T4]);
-    else u4.__e = t5.__e, u4.__k = t5.__k;
-    l.__e(n5, u4, t5);
+    else u5.__e = t4.__e, u5.__k = t4.__k;
+    l.__e(n4, u5, t4);
   }
-  else null == o4 && u4.__v == t5.__v ? (u4.__k = t5.__k, u4.__e = t5.__e) : f4 = u4.__e = N(t5.__e, u4, t5, i4, r4, o4, e4, c4, s5);
-  return (a4 = l.diffed) && a4(u4), 128 & u4.__u ? void 0 : f4;
+  else null == o4 && u5.__v == t4.__v ? (u5.__k = t4.__k, u5.__e = t4.__e) : f5 = u5.__e = N(t4.__e, u5, t4, i5, r4, o4, e4, c4, s5);
+  return (a4 = l.diffed) && a4(u5), 128 & u5.__u ? void 0 : f5;
 }
-function z(n4, u4, t5) {
-  for (var i4 = 0; i4 < t5.length; i4++) V(t5[i4], t5[++i4], t5[++i4]);
-  l.__c && l.__c(u4, n4), n4.some(function(u5) {
+function z(n3, u5, t4) {
+  for (var i5 = 0; i5 < t4.length; i5++) V(t4[i5], t4[++i5], t4[++i5]);
+  l.__c && l.__c(u5, n3), n3.some(function(u6) {
     try {
-      n4 = u5.__h, u5.__h = [], n4.some(function(n5) {
-        n5.call(u5);
+      n3 = u6.__h, u6.__h = [], n3.some(function(n4) {
+        n4.call(u6);
       });
-    } catch (n5) {
-      l.__e(n5, u5.__v);
+    } catch (n4) {
+      l.__e(n4, u6.__v);
     }
   });
 }
-function N(u4, t5, i4, r4, o4, e4, f4, c4, s5) {
-  var a4, h5, v5, y5, w5, g5, m6, b4 = i4.props, k4 = t5.props, x5 = t5.type;
+function N(u5, t4, i5, r4, o4, e4, f5, c4, s5) {
+  var a4, h5, v5, y5, w5, g5, m6, b4 = i5.props, k4 = t4.props, x5 = t4.type;
   if ("svg" == x5 ? o4 = "http://www.w3.org/2000/svg" : "math" == x5 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
     for (a4 = 0; a4 < e4.length; a4++) if ((w5 = e4[a4]) && "setAttribute" in w5 == !!x5 && (x5 ? w5.localName == x5 : 3 == w5.nodeType)) {
-      u4 = w5, e4[a4] = null;
+      u5 = w5, e4[a4] = null;
       break;
     }
   }
-  if (null == u4) {
+  if (null == u5) {
     if (null == x5) return document.createTextNode(k4);
-    u4 = document.createElementNS(o4, x5, k4.is && k4), c4 && (l.__m && l.__m(t5, e4), c4 = false), e4 = null;
+    u5 = document.createElementNS(o4, x5, k4.is && k4), c4 && (l.__m && l.__m(t4, e4), c4 = false), e4 = null;
   }
-  if (null === x5) b4 === k4 || c4 && u4.data === k4 || (u4.data = k4);
+  if (null === x5) b4 === k4 || c4 && u5.data === k4 || (u5.data = k4);
   else {
-    if (e4 = e4 && n.call(u4.childNodes), b4 = i4.props || p, !c4 && null != e4) for (b4 = {}, a4 = 0; a4 < u4.attributes.length; a4++) b4[(w5 = u4.attributes[a4]).name] = w5.value;
+    if (e4 = e4 && n.call(u5.childNodes), b4 = i5.props || p, !c4 && null != e4) for (b4 = {}, a4 = 0; a4 < u5.attributes.length; a4++) b4[(w5 = u5.attributes[a4]).name] = w5.value;
     for (a4 in b4) if (w5 = b4[a4], "children" == a4) ;
     else if ("dangerouslySetInnerHTML" == a4) v5 = w5;
     else if (!(a4 in k4)) {
       if ("value" == a4 && "defaultValue" in k4 || "checked" == a4 && "defaultChecked" in k4) continue;
-      F(u4, a4, null, w5, o4);
+      F(u5, a4, null, w5, o4);
     }
-    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g5 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u4, a4, w5, b4[a4], o4);
-    if (h5) c4 || v5 && (h5.__html === v5.__html || h5.__html === u4.innerHTML) || (u4.innerHTML = h5.__html), t5.__k = [];
-    else if (v5 && (u4.innerHTML = ""), $(u4, d(y5) ? y5 : [y5], t5, i4, r4, "foreignObject" == x5 ? "http://www.w3.org/1999/xhtml" : o4, e4, f4, e4 ? e4[0] : i4.__k && C(i4, 0), c4, s5), null != e4) for (a4 = e4.length; a4--; ) _(e4[a4]);
-    c4 || (a4 = "value", "progress" == x5 && null == g5 ? u4.removeAttribute("value") : void 0 !== g5 && (g5 !== u4[a4] || "progress" == x5 && !g5 || "option" == x5 && g5 !== b4[a4]) && F(u4, a4, g5, b4[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u4[a4] && F(u4, a4, m6, b4[a4], o4));
+    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g5 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u5, a4, w5, b4[a4], o4);
+    if (h5) c4 || v5 && (h5.__html === v5.__html || h5.__html === u5.innerHTML) || (u5.innerHTML = h5.__html), t4.__k = [];
+    else if (v5 && (u5.innerHTML = ""), $(u5, d(y5) ? y5 : [y5], t4, i5, r4, "foreignObject" == x5 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && C(i5, 0), c4, s5), null != e4) for (a4 = e4.length; a4--; ) _(e4[a4]);
+    c4 || (a4 = "value", "progress" == x5 && null == g5 ? u5.removeAttribute("value") : void 0 !== g5 && (g5 !== u5[a4] || "progress" == x5 && !g5 || "option" == x5 && g5 !== b4[a4]) && F(u5, a4, g5, b4[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u5[a4] && F(u5, a4, m6, b4[a4], o4));
   }
-  return u4;
+  return u5;
 }
-function V(n4, u4, t5) {
+function V(n3, u5, t4) {
   try {
-    if ("function" == typeof n4) {
-      var i4 = "function" == typeof n4.__u;
-      i4 && n4.__u(), i4 && null == u4 || (n4.__u = n4(u4));
-    } else n4.current = u4;
-  } catch (n5) {
-    l.__e(n5, t5);
+    if ("function" == typeof n3) {
+      var i5 = "function" == typeof n3.__u;
+      i5 && n3.__u(), i5 && null == u5 || (n3.__u = n3(u5));
+    } else n3.current = u5;
+  } catch (n4) {
+    l.__e(n4, t4);
   }
 }
-function q(n4, u4, t5) {
-  var i4, r4;
-  if (l.unmount && l.unmount(n4), (i4 = n4.ref) && (i4.current && i4.current !== n4.__e || V(i4, null, u4)), null != (i4 = n4.__c)) {
-    if (i4.componentWillUnmount) try {
-      i4.componentWillUnmount();
-    } catch (n5) {
-      l.__e(n5, u4);
+function q(n3, u5, t4) {
+  var i5, r4;
+  if (l.unmount && l.unmount(n3), (i5 = n3.ref) && (i5.current && i5.current !== n3.__e || V(i5, null, u5)), null != (i5 = n3.__c)) {
+    if (i5.componentWillUnmount) try {
+      i5.componentWillUnmount();
+    } catch (n4) {
+      l.__e(n4, u5);
     }
-    i4.base = i4.__P = null;
+    i5.base = i5.__P = null;
   }
-  if (i4 = n4.__k) for (r4 = 0; r4 < i4.length; r4++) i4[r4] && q(i4[r4], u4, t5 || "function" != typeof n4.type);
-  t5 || _(n4.__e), n4.__c = n4.__ = n4.__e = void 0;
+  if (i5 = n3.__k) for (r4 = 0; r4 < i5.length; r4++) i5[r4] && q(i5[r4], u5, t4 || "function" != typeof n3.type);
+  t4 || _(n3.__e), n3.__c = n3.__ = n3.__e = void 0;
 }
-function B(n4, l7, u4) {
-  return this.constructor(n4, u4);
+function B(n3, l7, u5) {
+  return this.constructor(n3, u5);
 }
-function D(u4, t5, i4) {
-  var r4, o4, e4, f4;
-  t5 == document && (t5 = document.documentElement), l.__ && l.__(u4, t5), o4 = (r4 = "function" == typeof i4) ? null : i4 && i4.__k || t5.__k, e4 = [], f4 = [], j(t5, u4 = (!r4 && i4 || t5).__k = g(k, null, [u4]), o4 || p, p, t5.namespaceURI, !r4 && i4 ? [i4] : o4 ? null : t5.firstChild ? n.call(t5.childNodes) : null, e4, !r4 && i4 ? i4 : o4 ? o4.__e : t5.firstChild, r4, f4), z(e4, u4, f4);
+function D(u5, t4, i5) {
+  var r4, o4, e4, f5;
+  t4 == document && (t4 = document.documentElement), l.__ && l.__(u5, t4), o4 = (r4 = "function" == typeof i5) ? null : i5 && i5.__k || t4.__k, e4 = [], f5 = [], j(t4, u5 = (!r4 && i5 || t4).__k = g(k, null, [u5]), o4 || p, p, t4.namespaceURI, !r4 && i5 ? [i5] : o4 ? null : t4.firstChild ? n.call(t4.childNodes) : null, e4, !r4 && i5 ? i5 : o4 ? o4.__e : t4.firstChild, r4, f5), z(e4, u5, f5);
 }
-n = v.slice, l = { __e: function(n4, l7, u4, t5) {
-  for (var i4, r4, o4; l7 = l7.__; ) if ((i4 = l7.__c) && !i4.__) try {
-    if ((r4 = i4.constructor) && null != r4.getDerivedStateFromError && (i4.setState(r4.getDerivedStateFromError(n4)), o4 = i4.__d), null != i4.componentDidCatch && (i4.componentDidCatch(n4, t5 || {}), o4 = i4.__d), o4) return i4.__E = i4;
+n = v.slice, l = { __e: function(n3, l7, u5, t4) {
+  for (var i5, r4, o4; l7 = l7.__; ) if ((i5 = l7.__c) && !i5.__) try {
+    if ((r4 = i5.constructor) && null != r4.getDerivedStateFromError && (i5.setState(r4.getDerivedStateFromError(n3)), o4 = i5.__d), null != i5.componentDidCatch && (i5.componentDidCatch(n3, t4 || {}), o4 = i5.__d), o4) return i5.__E = i5;
   } catch (l8) {
-    n4 = l8;
+    n3 = l8;
   }
-  throw n4;
-} }, u = 0, t = function(n4) {
-  return null != n4 && null == n4.constructor;
-}, x.prototype.setState = function(n4, l7) {
-  var u4;
-  u4 = null != this.__s && this.__s !== this.state ? this.__s : this.__s = w({}, this.state), "function" == typeof n4 && (n4 = n4(w({}, u4), this.props)), n4 && w(u4, n4), null != n4 && this.__v && (l7 && this._sb.push(l7), M(this));
-}, x.prototype.forceUpdate = function(n4) {
-  this.__v && (this.__e = true, n4 && this.__h.push(n4), M(this));
-}, x.prototype.render = k, i = [], o = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, e = function(n4, l7) {
-  return n4.__v.__b - l7.__v.__b;
+  throw n3;
+} }, u = 0, t = function(n3) {
+  return null != n3 && null == n3.constructor;
+}, x.prototype.setState = function(n3, l7) {
+  var u5;
+  u5 = null != this.__s && this.__s !== this.state ? this.__s : this.__s = w({}, this.state), "function" == typeof n3 && (n3 = n3(w({}, u5), this.props)), n3 && w(u5, n3), null != n3 && this.__v && (l7 && this._sb.push(l7), M(this));
+}, x.prototype.forceUpdate = function(n3) {
+  this.__v && (this.__e = true, n3 && this.__h.push(n3), M(this));
+}, x.prototype.render = k, i = [], o = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, e = function(n3, l7) {
+  return n3.__v.__b - l7.__v.__b;
 }, P.__r = 0, f = /(PointerCapture)$|Capture$/i, c = 0, s = O(false), a = O(true), h = 0;
 
 // node_modules/preact/hooks/dist/hooks.module.js
@@ -14743,186 +14743,186 @@ var v2 = c2.diffed;
 var l2 = c2.__c;
 var m2 = c2.unmount;
 var s2 = c2.__;
-function d2(n4, t5) {
-  c2.__h && c2.__h(r2, n4, o2 || t5), o2 = 0;
-  var u4 = r2.__H || (r2.__H = { __: [], __h: [] });
-  return n4 >= u4.__.length && u4.__.push({}), u4.__[n4];
+function d2(n3, t4) {
+  c2.__h && c2.__h(r2, n3, o2 || t4), o2 = 0;
+  var u5 = r2.__H || (r2.__H = { __: [], __h: [] });
+  return n3 >= u5.__.length && u5.__.push({}), u5.__[n3];
 }
-function h2(n4) {
-  return o2 = 1, p2(D2, n4);
+function h2(n3) {
+  return o2 = 1, p2(D2, n3);
 }
-function p2(n4, u4, i4) {
+function p2(n3, u5, i5) {
   var o4 = d2(t2++, 2);
-  if (o4.t = n4, !o4.__c && (o4.__ = [i4 ? i4(u4) : D2(void 0, u4), function(n5) {
-    var t5 = o4.__N ? o4.__N[0] : o4.__[0], r4 = o4.t(t5, n5);
-    t5 !== r4 && (o4.__N = [r4, o4.__[1]], o4.__c.setState({}));
+  if (o4.t = n3, !o4.__c && (o4.__ = [i5 ? i5(u5) : D2(void 0, u5), function(n4) {
+    var t4 = o4.__N ? o4.__N[0] : o4.__[0], r4 = o4.t(t4, n4);
+    t4 !== r4 && (o4.__N = [r4, o4.__[1]], o4.__c.setState({}));
   }], o4.__c = r2, !r2.u)) {
-    var f4 = function(n5, t5, r4) {
+    var f5 = function(n4, t4, r4) {
       if (!o4.__c.__H) return true;
-      var u5 = o4.__c.__H.__.filter(function(n6) {
-        return !!n6.__c;
+      var u6 = o4.__c.__H.__.filter(function(n5) {
+        return !!n5.__c;
       });
-      if (u5.every(function(n6) {
-        return !n6.__N;
-      })) return !c4 || c4.call(this, n5, t5, r4);
-      var i5 = o4.__c.props !== n5;
-      return u5.forEach(function(n6) {
-        if (n6.__N) {
-          var t6 = n6.__[0];
-          n6.__ = n6.__N, n6.__N = void 0, t6 !== n6.__[0] && (i5 = true);
+      if (u6.every(function(n5) {
+        return !n5.__N;
+      })) return !c4 || c4.call(this, n4, t4, r4);
+      var i6 = o4.__c.props !== n4;
+      return u6.forEach(function(n5) {
+        if (n5.__N) {
+          var t5 = n5.__[0];
+          n5.__ = n5.__N, n5.__N = void 0, t5 !== n5.__[0] && (i6 = true);
         }
-      }), c4 && c4.call(this, n5, t5, r4) || i5;
+      }), c4 && c4.call(this, n4, t4, r4) || i6;
     };
     r2.u = true;
     var c4 = r2.shouldComponentUpdate, e4 = r2.componentWillUpdate;
-    r2.componentWillUpdate = function(n5, t5, r4) {
+    r2.componentWillUpdate = function(n4, t4, r4) {
       if (this.__e) {
-        var u5 = c4;
-        c4 = void 0, f4(n5, t5, r4), c4 = u5;
+        var u6 = c4;
+        c4 = void 0, f5(n4, t4, r4), c4 = u6;
       }
-      e4 && e4.call(this, n5, t5, r4);
-    }, r2.shouldComponentUpdate = f4;
+      e4 && e4.call(this, n4, t4, r4);
+    }, r2.shouldComponentUpdate = f5;
   }
   return o4.__N || o4.__;
 }
-function y2(n4, u4) {
-  var i4 = d2(t2++, 3);
-  !c2.__s && C2(i4.__H, u4) && (i4.__ = n4, i4.i = u4, r2.__H.__h.push(i4));
+function y2(n3, u5) {
+  var i5 = d2(t2++, 3);
+  !c2.__s && C2(i5.__H, u5) && (i5.__ = n3, i5.i = u5, r2.__H.__h.push(i5));
 }
-function A2(n4) {
+function A2(n3) {
   return o2 = 5, T2(function() {
-    return { current: n4 };
+    return { current: n3 };
   }, []);
 }
-function T2(n4, r4) {
-  var u4 = d2(t2++, 7);
-  return C2(u4.__H, r4) && (u4.__ = n4(), u4.__H = r4, u4.__h = n4), u4.__;
+function T2(n3, r4) {
+  var u5 = d2(t2++, 7);
+  return C2(u5.__H, r4) && (u5.__ = n3(), u5.__H = r4, u5.__h = n3), u5.__;
 }
 function j2() {
-  for (var n4; n4 = f2.shift(); ) if (n4.__P && n4.__H) try {
-    n4.__H.__h.forEach(z2), n4.__H.__h.forEach(B2), n4.__H.__h = [];
-  } catch (t5) {
-    n4.__H.__h = [], c2.__e(t5, n4.__v);
+  for (var n3; n3 = f2.shift(); ) if (n3.__P && n3.__H) try {
+    n3.__H.__h.forEach(z2), n3.__H.__h.forEach(B2), n3.__H.__h = [];
+  } catch (t4) {
+    n3.__H.__h = [], c2.__e(t4, n3.__v);
   }
 }
-c2.__b = function(n4) {
-  r2 = null, e2 && e2(n4);
-}, c2.__ = function(n4, t5) {
-  n4 && t5.__k && t5.__k.__m && (n4.__m = t5.__k.__m), s2 && s2(n4, t5);
-}, c2.__r = function(n4) {
-  a2 && a2(n4), t2 = 0;
-  var i4 = (r2 = n4.__c).__H;
-  i4 && (u2 === r2 ? (i4.__h = [], r2.__h = [], i4.__.forEach(function(n5) {
-    n5.__N && (n5.__ = n5.__N), n5.i = n5.__N = void 0;
-  })) : (i4.__h.forEach(z2), i4.__h.forEach(B2), i4.__h = [], t2 = 0)), u2 = r2;
-}, c2.diffed = function(n4) {
-  v2 && v2(n4);
-  var t5 = n4.__c;
-  t5 && t5.__H && (t5.__H.__h.length && (1 !== f2.push(t5) && i2 === c2.requestAnimationFrame || ((i2 = c2.requestAnimationFrame) || w2)(j2)), t5.__H.__.forEach(function(n5) {
-    n5.i && (n5.__H = n5.i), n5.i = void 0;
+c2.__b = function(n3) {
+  r2 = null, e2 && e2(n3);
+}, c2.__ = function(n3, t4) {
+  n3 && t4.__k && t4.__k.__m && (n3.__m = t4.__k.__m), s2 && s2(n3, t4);
+}, c2.__r = function(n3) {
+  a2 && a2(n3), t2 = 0;
+  var i5 = (r2 = n3.__c).__H;
+  i5 && (u2 === r2 ? (i5.__h = [], r2.__h = [], i5.__.forEach(function(n4) {
+    n4.__N && (n4.__ = n4.__N), n4.i = n4.__N = void 0;
+  })) : (i5.__h.forEach(z2), i5.__h.forEach(B2), i5.__h = [], t2 = 0)), u2 = r2;
+}, c2.diffed = function(n3) {
+  v2 && v2(n3);
+  var t4 = n3.__c;
+  t4 && t4.__H && (t4.__H.__h.length && (1 !== f2.push(t4) && i2 === c2.requestAnimationFrame || ((i2 = c2.requestAnimationFrame) || w2)(j2)), t4.__H.__.forEach(function(n4) {
+    n4.i && (n4.__H = n4.i), n4.i = void 0;
   })), u2 = r2 = null;
-}, c2.__c = function(n4, t5) {
-  t5.some(function(n5) {
+}, c2.__c = function(n3, t4) {
+  t4.some(function(n4) {
     try {
-      n5.__h.forEach(z2), n5.__h = n5.__h.filter(function(n6) {
-        return !n6.__ || B2(n6);
+      n4.__h.forEach(z2), n4.__h = n4.__h.filter(function(n5) {
+        return !n5.__ || B2(n5);
       });
     } catch (r4) {
-      t5.some(function(n6) {
-        n6.__h && (n6.__h = []);
-      }), t5 = [], c2.__e(r4, n5.__v);
+      t4.some(function(n5) {
+        n5.__h && (n5.__h = []);
+      }), t4 = [], c2.__e(r4, n4.__v);
     }
-  }), l2 && l2(n4, t5);
-}, c2.unmount = function(n4) {
-  m2 && m2(n4);
-  var t5, r4 = n4.__c;
-  r4 && r4.__H && (r4.__H.__.forEach(function(n5) {
+  }), l2 && l2(n3, t4);
+}, c2.unmount = function(n3) {
+  m2 && m2(n3);
+  var t4, r4 = n3.__c;
+  r4 && r4.__H && (r4.__H.__.forEach(function(n4) {
     try {
-      z2(n5);
-    } catch (n6) {
-      t5 = n6;
+      z2(n4);
+    } catch (n5) {
+      t4 = n5;
     }
-  }), r4.__H = void 0, t5 && c2.__e(t5, r4.__v));
+  }), r4.__H = void 0, t4 && c2.__e(t4, r4.__v));
 };
 var k2 = "function" == typeof requestAnimationFrame;
-function w2(n4) {
-  var t5, r4 = function() {
-    clearTimeout(u4), k2 && cancelAnimationFrame(t5), setTimeout(n4);
-  }, u4 = setTimeout(r4, 100);
-  k2 && (t5 = requestAnimationFrame(r4));
+function w2(n3) {
+  var t4, r4 = function() {
+    clearTimeout(u5), k2 && cancelAnimationFrame(t4), setTimeout(n3);
+  }, u5 = setTimeout(r4, 100);
+  k2 && (t4 = requestAnimationFrame(r4));
 }
-function z2(n4) {
-  var t5 = r2, u4 = n4.__c;
-  "function" == typeof u4 && (n4.__c = void 0, u4()), r2 = t5;
+function z2(n3) {
+  var t4 = r2, u5 = n3.__c;
+  "function" == typeof u5 && (n3.__c = void 0, u5()), r2 = t4;
 }
-function B2(n4) {
-  var t5 = r2;
-  n4.__c = n4.__(), r2 = t5;
+function B2(n3) {
+  var t4 = r2;
+  n3.__c = n3.__(), r2 = t4;
 }
-function C2(n4, t5) {
-  return !n4 || n4.length !== t5.length || t5.some(function(t6, r4) {
-    return t6 !== n4[r4];
+function C2(n3, t4) {
+  return !n3 || n3.length !== t4.length || t4.some(function(t5, r4) {
+    return t5 !== n3[r4];
   });
 }
-function D2(n4, t5) {
-  return "function" == typeof t5 ? t5(n4) : t5;
+function D2(n3, t4) {
+  return "function" == typeof t4 ? t4(n3) : t4;
 }
 
 // node_modules/@preact/signals-core/dist/signals-core.module.js
 var i3 = Symbol.for("preact-signals");
 function t3() {
   if (!(s3 > 1)) {
-    var i4, t5 = false;
+    var i5, t4 = false;
     !function() {
-      var i5 = c3;
+      var i6 = c3;
       c3 = void 0;
-      while (void 0 !== i5) {
-        if (i5.S.v === i5.v) i5.S.i = i5.i;
-        i5 = i5.o;
+      while (void 0 !== i6) {
+        if (i6.S.v === i6.v) i6.S.i = i6.i;
+        i6 = i6.o;
       }
     }();
     while (void 0 !== h3) {
-      var n4 = h3;
+      var n3 = h3;
       h3 = void 0;
       v3++;
-      while (void 0 !== n4) {
-        var r4 = n4.u;
-        n4.u = void 0;
-        n4.f &= -3;
-        if (!(8 & n4.f) && w3(n4)) try {
-          n4.c();
-        } catch (n5) {
-          if (!t5) {
-            i4 = n5;
-            t5 = true;
+      while (void 0 !== n3) {
+        var r4 = n3.u;
+        n3.u = void 0;
+        n3.f &= -3;
+        if (!(8 & n3.f) && w3(n3)) try {
+          n3.c();
+        } catch (n4) {
+          if (!t4) {
+            i5 = n4;
+            t4 = true;
           }
         }
-        n4 = r4;
+        n3 = r4;
       }
     }
     v3 = 0;
     s3--;
-    if (t5) throw i4;
+    if (t4) throw i5;
   } else s3--;
 }
-function n2(i4) {
-  if (s3 > 0) return i4();
+function n2(i5) {
+  if (s3 > 0) return i5();
   e3 = ++u3;
   s3++;
   try {
-    return i4();
+    return i5();
   } finally {
     t3();
   }
 }
 var r3 = void 0;
-function o3(i4) {
-  var t5 = r3;
+function o3(i5) {
+  var t4 = r3;
   r3 = void 0;
   try {
-    return i4();
+    return i5();
   } finally {
-    r3 = t5;
+    r3 = t4;
   }
 }
 var f3;
@@ -14933,84 +14933,84 @@ var u3 = 0;
 var e3 = 0;
 var c3 = void 0;
 var d3 = 0;
-function a3(i4) {
+function a3(i5) {
   if (void 0 !== r3) {
-    var t5 = i4.n;
-    if (void 0 === t5 || t5.t !== r3) {
-      t5 = { i: 0, S: i4, p: r3.s, n: void 0, t: r3, e: void 0, x: void 0, r: t5 };
-      if (void 0 !== r3.s) r3.s.n = t5;
-      r3.s = t5;
-      i4.n = t5;
-      if (32 & r3.f) i4.S(t5);
-      return t5;
-    } else if (-1 === t5.i) {
-      t5.i = 0;
-      if (void 0 !== t5.n) {
-        t5.n.p = t5.p;
-        if (void 0 !== t5.p) t5.p.n = t5.n;
-        t5.p = r3.s;
-        t5.n = void 0;
-        r3.s.n = t5;
-        r3.s = t5;
+    var t4 = i5.n;
+    if (void 0 === t4 || t4.t !== r3) {
+      t4 = { i: 0, S: i5, p: r3.s, n: void 0, t: r3, e: void 0, x: void 0, r: t4 };
+      if (void 0 !== r3.s) r3.s.n = t4;
+      r3.s = t4;
+      i5.n = t4;
+      if (32 & r3.f) i5.S(t4);
+      return t4;
+    } else if (-1 === t4.i) {
+      t4.i = 0;
+      if (void 0 !== t4.n) {
+        t4.n.p = t4.p;
+        if (void 0 !== t4.p) t4.p.n = t4.n;
+        t4.p = r3.s;
+        t4.n = void 0;
+        r3.s.n = t4;
+        r3.s = t4;
       }
-      return t5;
+      return t4;
     }
   }
 }
-function l3(i4, t5) {
-  this.v = i4;
+function l3(i5, t4) {
+  this.v = i5;
   this.i = 0;
   this.n = void 0;
   this.t = void 0;
   this.l = 0;
-  this.W = null == t5 ? void 0 : t5.watched;
-  this.Z = null == t5 ? void 0 : t5.unwatched;
-  this.name = null == t5 ? void 0 : t5.name;
+  this.W = null == t4 ? void 0 : t4.watched;
+  this.Z = null == t4 ? void 0 : t4.unwatched;
+  this.name = null == t4 ? void 0 : t4.name;
 }
 l3.prototype.brand = i3;
 l3.prototype.h = function() {
   return true;
 };
-l3.prototype.S = function(i4) {
-  var t5 = this, n4 = this.t;
-  if (n4 !== i4 && void 0 === i4.e) {
-    i4.x = n4;
-    this.t = i4;
-    if (void 0 !== n4) n4.e = i4;
+l3.prototype.S = function(i5) {
+  var t4 = this, n3 = this.t;
+  if (n3 !== i5 && void 0 === i5.e) {
+    i5.x = n3;
+    this.t = i5;
+    if (void 0 !== n3) n3.e = i5;
     else o3(function() {
-      var i5;
-      null == (i5 = t5.W) || i5.call(t5);
+      var i6;
+      null == (i6 = t4.W) || i6.call(t4);
     });
   }
 };
-l3.prototype.U = function(i4) {
-  var t5 = this;
+l3.prototype.U = function(i5) {
+  var t4 = this;
   if (void 0 !== this.t) {
-    var n4 = i4.e, r4 = i4.x;
-    if (void 0 !== n4) {
-      n4.x = r4;
-      i4.e = void 0;
+    var n3 = i5.e, r4 = i5.x;
+    if (void 0 !== n3) {
+      n3.x = r4;
+      i5.e = void 0;
     }
     if (void 0 !== r4) {
-      r4.e = n4;
-      i4.x = void 0;
+      r4.e = n3;
+      i5.x = void 0;
     }
-    if (i4 === this.t) {
+    if (i5 === this.t) {
       this.t = r4;
       if (void 0 === r4) o3(function() {
-        var i5;
-        null == (i5 = t5.Z) || i5.call(t5);
+        var i6;
+        null == (i6 = t4.Z) || i6.call(t4);
       });
     }
   }
 };
-l3.prototype.subscribe = function(i4) {
-  var t5 = this;
+l3.prototype.subscribe = function(i5) {
+  var t4 = this;
   return j3(function() {
-    var n4 = t5.value, o4 = r3;
+    var n3 = t4.value, o4 = r3;
     r3 = void 0;
     try {
-      i4(n4);
+      i5(n3);
     } finally {
       r3 = o4;
     }
@@ -15026,80 +15026,80 @@ l3.prototype.toJSON = function() {
   return this.value;
 };
 l3.prototype.peek = function() {
-  var i4 = this;
+  var i5 = this;
   return o3(function() {
-    return i4.value;
+    return i5.value;
   });
 };
 Object.defineProperty(l3.prototype, "value", { get: function() {
-  var i4 = a3(this);
-  if (void 0 !== i4) i4.i = this.i;
+  var i5 = a3(this);
+  if (void 0 !== i5) i5.i = this.i;
   return this.v;
-}, set: function(i4) {
-  if (i4 !== this.v) {
+}, set: function(i5) {
+  if (i5 !== this.v) {
     if (v3 > 100) throw new Error("Cycle detected");
-    !function(i5) {
+    !function(i6) {
       if (0 !== s3 && 0 === v3) {
-        if (i5.l !== e3) {
-          i5.l = e3;
-          c3 = { S: i5, v: i5.v, i: i5.i, o: c3 };
+        if (i6.l !== e3) {
+          i6.l = e3;
+          c3 = { S: i6, v: i6.v, i: i6.i, o: c3 };
         }
       }
     }(this);
-    this.v = i4;
+    this.v = i5;
     this.i++;
     d3++;
     s3++;
     try {
-      for (var n4 = this.t; void 0 !== n4; n4 = n4.x) n4.t.N();
+      for (var n3 = this.t; void 0 !== n3; n3 = n3.x) n3.t.N();
     } finally {
       t3();
     }
   }
 } });
-function y3(i4, t5) {
-  return new l3(i4, t5);
+function y3(i5, t4) {
+  return new l3(i5, t4);
 }
-function w3(i4) {
-  for (var t5 = i4.s; void 0 !== t5; t5 = t5.n) if (t5.S.i !== t5.i || !t5.S.h() || t5.S.i !== t5.i) return true;
+function w3(i5) {
+  for (var t4 = i5.s; void 0 !== t4; t4 = t4.n) if (t4.S.i !== t4.i || !t4.S.h() || t4.S.i !== t4.i) return true;
   return false;
 }
-function _2(i4) {
-  for (var t5 = i4.s; void 0 !== t5; t5 = t5.n) {
-    var n4 = t5.S.n;
-    if (void 0 !== n4) t5.r = n4;
-    t5.S.n = t5;
-    t5.i = -1;
-    if (void 0 === t5.n) {
-      i4.s = t5;
+function _2(i5) {
+  for (var t4 = i5.s; void 0 !== t4; t4 = t4.n) {
+    var n3 = t4.S.n;
+    if (void 0 !== n3) t4.r = n3;
+    t4.S.n = t4;
+    t4.i = -1;
+    if (void 0 === t4.n) {
+      i5.s = t4;
       break;
     }
   }
 }
-function b(i4) {
-  var t5 = i4.s, n4 = void 0;
-  while (void 0 !== t5) {
-    var r4 = t5.p;
-    if (-1 === t5.i) {
-      t5.S.U(t5);
-      if (void 0 !== r4) r4.n = t5.n;
-      if (void 0 !== t5.n) t5.n.p = r4;
-    } else n4 = t5;
-    t5.S.n = t5.r;
-    if (void 0 !== t5.r) t5.r = void 0;
-    t5 = r4;
+function b(i5) {
+  var t4 = i5.s, n3 = void 0;
+  while (void 0 !== t4) {
+    var r4 = t4.p;
+    if (-1 === t4.i) {
+      t4.S.U(t4);
+      if (void 0 !== r4) r4.n = t4.n;
+      if (void 0 !== t4.n) t4.n.p = r4;
+    } else n3 = t4;
+    t4.S.n = t4.r;
+    if (void 0 !== t4.r) t4.r = void 0;
+    t4 = r4;
   }
-  i4.s = n4;
+  i5.s = n3;
 }
-function p3(i4, t5) {
+function p3(i5, t4) {
   l3.call(this, void 0);
-  this.x = i4;
+  this.x = i5;
   this.s = void 0;
   this.g = d3 - 1;
   this.f = 4;
-  this.W = null == t5 ? void 0 : t5.watched;
-  this.Z = null == t5 ? void 0 : t5.unwatched;
-  this.name = null == t5 ? void 0 : t5.name;
+  this.W = null == t4 ? void 0 : t4.watched;
+  this.Z = null == t4 ? void 0 : t4.unwatched;
+  this.name = null == t4 ? void 0 : t4.name;
 }
 p3.prototype = new l3();
 p3.prototype.h = function() {
@@ -15114,111 +15114,111 @@ p3.prototype.h = function() {
     this.f &= -2;
     return true;
   }
-  var i4 = r3;
+  var i5 = r3;
   try {
     _2(this);
     r3 = this;
-    var t5 = this.x();
-    if (16 & this.f || this.v !== t5 || 0 === this.i) {
-      this.v = t5;
+    var t4 = this.x();
+    if (16 & this.f || this.v !== t4 || 0 === this.i) {
+      this.v = t4;
       this.f &= -17;
       this.i++;
     }
-  } catch (i5) {
-    this.v = i5;
+  } catch (i6) {
+    this.v = i6;
     this.f |= 16;
     this.i++;
   }
-  r3 = i4;
+  r3 = i5;
   b(this);
   this.f &= -2;
   return true;
 };
-p3.prototype.S = function(i4) {
+p3.prototype.S = function(i5) {
   if (void 0 === this.t) {
     this.f |= 36;
-    for (var t5 = this.s; void 0 !== t5; t5 = t5.n) t5.S.S(t5);
+    for (var t4 = this.s; void 0 !== t4; t4 = t4.n) t4.S.S(t4);
   }
-  l3.prototype.S.call(this, i4);
+  l3.prototype.S.call(this, i5);
 };
-p3.prototype.U = function(i4) {
+p3.prototype.U = function(i5) {
   if (void 0 !== this.t) {
-    l3.prototype.U.call(this, i4);
+    l3.prototype.U.call(this, i5);
     if (void 0 === this.t) {
       this.f &= -33;
-      for (var t5 = this.s; void 0 !== t5; t5 = t5.n) t5.S.U(t5);
+      for (var t4 = this.s; void 0 !== t4; t4 = t4.n) t4.S.U(t4);
     }
   }
 };
 p3.prototype.N = function() {
   if (!(2 & this.f)) {
     this.f |= 6;
-    for (var i4 = this.t; void 0 !== i4; i4 = i4.x) i4.t.N();
+    for (var i5 = this.t; void 0 !== i5; i5 = i5.x) i5.t.N();
   }
 };
 Object.defineProperty(p3.prototype, "value", { get: function() {
   if (1 & this.f) throw new Error("Cycle detected");
-  var i4 = a3(this);
+  var i5 = a3(this);
   this.h();
-  if (void 0 !== i4) i4.i = this.i;
+  if (void 0 !== i5) i5.i = this.i;
   if (16 & this.f) throw this.v;
   return this.v;
 } });
-function g2(i4, t5) {
-  return new p3(i4, t5);
+function g2(i5, t4) {
+  return new p3(i5, t4);
 }
-function S2(i4) {
-  var n4 = i4.m;
-  i4.m = void 0;
-  if ("function" == typeof n4) {
+function S2(i5) {
+  var n3 = i5.m;
+  i5.m = void 0;
+  if ("function" == typeof n3) {
     s3++;
     var o4 = r3;
     r3 = void 0;
     try {
-      n4();
-    } catch (t5) {
-      i4.f &= -2;
-      i4.f |= 8;
-      m3(i4);
-      throw t5;
+      n3();
+    } catch (t4) {
+      i5.f &= -2;
+      i5.f |= 8;
+      m3(i5);
+      throw t4;
     } finally {
       r3 = o4;
       t3();
     }
   }
 }
-function m3(i4) {
-  for (var t5 = i4.s; void 0 !== t5; t5 = t5.n) t5.S.U(t5);
-  i4.x = void 0;
-  i4.s = void 0;
-  S2(i4);
+function m3(i5) {
+  for (var t4 = i5.s; void 0 !== t4; t4 = t4.n) t4.S.U(t4);
+  i5.x = void 0;
+  i5.s = void 0;
+  S2(i5);
 }
-function x2(i4) {
+function x2(i5) {
   if (r3 !== this) throw new Error("Out-of-order effect");
   b(this);
-  r3 = i4;
+  r3 = i5;
   this.f &= -2;
   if (8 & this.f) m3(this);
   t3();
 }
-function E(i4, t5) {
-  this.x = i4;
+function E(i5, t4) {
+  this.x = i5;
   this.m = void 0;
   this.s = void 0;
   this.u = void 0;
   this.f = 32;
-  this.name = null == t5 ? void 0 : t5.name;
+  this.name = null == t4 ? void 0 : t4.name;
   if (f3) f3.push(this);
 }
 E.prototype.c = function() {
-  var i4 = this.S();
+  var i5 = this.S();
   try {
     if (8 & this.f) return;
     if (void 0 === this.x) return;
-    var t5 = this.x();
-    if ("function" == typeof t5) this.m = t5;
+    var t4 = this.x();
+    if ("function" == typeof t4) this.m = t4;
   } finally {
-    i4();
+    i5();
   }
 };
 E.prototype.S = function() {
@@ -15228,9 +15228,9 @@ E.prototype.S = function() {
   S2(this);
   _2(this);
   s3++;
-  var i4 = r3;
+  var i5 = r3;
   r3 = this;
-  return x2.bind(this, i4);
+  return x2.bind(this, i5);
 };
 E.prototype.N = function() {
   if (!(2 & this.f)) {
@@ -15246,15 +15246,15 @@ E.prototype.d = function() {
 E.prototype.dispose = function() {
   this.d();
 };
-function j3(i4, t5) {
-  var n4 = new E(i4, t5);
+function j3(i5, t4) {
+  var n3 = new E(i5, t4);
   try {
-    n4.c();
-  } catch (i5) {
-    n4.d();
-    throw i5;
+    n3.c();
+  } catch (i6) {
+    n3.d();
+    throw i6;
   }
-  var r4 = n4.d.bind(n4);
+  var r4 = n3.d.bind(n3);
   r4[Symbol.dispose] = r4;
   return r4;
 }
@@ -15267,99 +15267,99 @@ var p4 = [];
 j3(function() {
   s4 = this.N;
 })();
-function _3(i4, r4) {
-  l[i4] = r4.bind(null, l[i4] || function() {
+function _3(i5, r4) {
+  l[i5] = r4.bind(null, l[i5] || function() {
   });
 }
-function m4(i4) {
+function m4(i5) {
   if (l4) l4();
-  l4 = i4 && i4.S();
+  l4 = i5 && i5.S();
 }
-function g3(i4) {
-  var n4 = this, f4 = i4.data, o4 = useSignal(f4);
-  o4.value = f4;
-  var u4 = T2(function() {
-    var i5 = n4, t5 = n4.__v;
-    while (t5 = t5.__) if (t5.__c) {
-      t5.__c.__$f |= 4;
+function g3(i5) {
+  var n3 = this, f5 = i5.data, o4 = useSignal(f5);
+  o4.value = f5;
+  var u5 = T2(function() {
+    var i6 = n3, t4 = n3.__v;
+    while (t4 = t4.__) if (t4.__c) {
+      t4.__c.__$f |= 4;
       break;
     }
-    var f5 = g2(function() {
-      var i6 = o4.value.value;
-      return 0 === i6 ? 0 : true === i6 ? "" : i6 || "";
-    }), u5 = g2(function() {
-      return !t(f5.value);
+    var f6 = g2(function() {
+      var i7 = o4.value.value;
+      return 0 === i7 ? 0 : true === i7 ? "" : i7 || "";
+    }), u6 = g2(function() {
+      return !t(f6.value);
     }), c5 = j3(function() {
       this.N = A3;
-      if (u5.value) {
-        var n5 = f5.value;
-        if (i5.base && 3 === i5.base.nodeType) i5.base.data = n5;
+      if (u6.value) {
+        var n4 = f6.value;
+        if (i6.base && 3 === i6.base.nodeType) i6.base.data = n4;
       }
-    }), v6 = n4.__$u.d;
-    n4.__$u.d = function() {
+    }), v6 = n3.__$u.d;
+    n3.__$u.d = function() {
       c5();
       v6.call(this);
     };
-    return [u5, f5];
-  }, []), c4 = u4[0], v5 = u4[1];
+    return [u6, f6];
+  }, []), c4 = u5[0], v5 = u5[1];
   return c4.value ? v5.peek() : v5.value;
 }
 g3.displayName = "_st";
 Object.defineProperties(l3.prototype, { constructor: { configurable: true, value: void 0 }, type: { configurable: true, value: g3 }, props: { configurable: true, get: function() {
   return { data: this };
 } }, __b: { configurable: true, value: 1 } });
-_3("__b", function(i4, n4) {
-  if ("string" == typeof n4.type) {
-    var r4, t5 = n4.props;
-    for (var f4 in t5) if ("children" !== f4) {
-      var o4 = t5[f4];
+_3("__b", function(i5, n3) {
+  if ("string" == typeof n3.type) {
+    var r4, t4 = n3.props;
+    for (var f5 in t4) if ("children" !== f5) {
+      var o4 = t4[f5];
       if (o4 instanceof l3) {
-        if (!r4) n4.__np = r4 = {};
-        r4[f4] = o4;
-        t5[f4] = o4.peek();
+        if (!r4) n3.__np = r4 = {};
+        r4[f5] = o4;
+        t4[f5] = o4.peek();
       }
     }
   }
-  i4(n4);
+  i5(n3);
 });
-_3("__r", function(i4, n4) {
+_3("__r", function(i5, n3) {
   m4();
-  var r4, t5 = n4.__c;
-  if (t5) {
-    t5.__$f &= -2;
-    if (void 0 === (r4 = t5.__$u)) t5.__$u = r4 = function(i5) {
-      var n5;
+  var r4, t4 = n3.__c;
+  if (t4) {
+    t4.__$f &= -2;
+    if (void 0 === (r4 = t4.__$u)) t4.__$u = r4 = function(i6) {
+      var n4;
       j3(function() {
-        n5 = this;
+        n4 = this;
       });
-      n5.c = function() {
-        t5.__$f |= 1;
-        t5.setState({});
+      n4.c = function() {
+        t4.__$f |= 1;
+        t4.setState({});
       };
-      return n5;
+      return n4;
     }();
   }
-  h4 = t5;
+  h4 = t4;
   m4(r4);
-  i4(n4);
+  i5(n3);
 });
-_3("__e", function(i4, n4, r4, t5) {
+_3("__e", function(i5, n3, r4, t4) {
   m4();
   h4 = void 0;
-  i4(n4, r4, t5);
+  i5(n3, r4, t4);
 });
-_3("diffed", function(i4, n4) {
+_3("diffed", function(i5, n3) {
   m4();
   h4 = void 0;
   var r4;
-  if ("string" == typeof n4.type && (r4 = n4.__e)) {
-    var t5 = n4.__np, f4 = n4.props;
-    if (t5) {
+  if ("string" == typeof n3.type && (r4 = n3.__e)) {
+    var t4 = n3.__np, f5 = n3.props;
+    if (t4) {
       var o4 = r4.U;
       if (o4) for (var e4 in o4) {
-        var u4 = o4[e4];
-        if (void 0 !== u4 && !(e4 in t5)) {
-          u4.d();
+        var u5 = o4[e4];
+        if (void 0 !== u5 && !(e4 in t4)) {
+          u5.d();
           o4[e4] = void 0;
         }
       }
@@ -15367,127 +15367,100 @@ _3("diffed", function(i4, n4) {
         o4 = {};
         r4.U = o4;
       }
-      for (var a4 in t5) {
-        var c4 = o4[a4], v5 = t5[a4];
+      for (var a4 in t4) {
+        var c4 = o4[a4], v5 = t4[a4];
         if (void 0 === c4) {
-          c4 = b2(r4, a4, v5, f4);
+          c4 = b2(r4, a4, v5, f5);
           o4[a4] = c4;
-        } else c4.o(v5, f4);
+        } else c4.o(v5, f5);
       }
     }
   }
-  i4(n4);
+  i5(n3);
 });
-function b2(i4, n4, r4, t5) {
-  var f4 = n4 in i4 && void 0 === i4.ownerSVGElement, o4 = y3(r4);
-  return { o: function(i5, n5) {
-    o4.value = i5;
-    t5 = n5;
+function b2(i5, n3, r4, t4) {
+  var f5 = n3 in i5 && void 0 === i5.ownerSVGElement, o4 = y3(r4);
+  return { o: function(i6, n4) {
+    o4.value = i6;
+    t4 = n4;
   }, d: j3(function() {
     this.N = A3;
     var r5 = o4.value.value;
-    if (t5[n4] !== r5) {
-      t5[n4] = r5;
-      if (f4) i4[n4] = r5;
-      else if (r5) i4.setAttribute(n4, r5);
-      else i4.removeAttribute(n4);
+    if (t4[n3] !== r5) {
+      t4[n3] = r5;
+      if (f5) i5[n3] = r5;
+      else if (r5) i5.setAttribute(n3, r5);
+      else i5.removeAttribute(n3);
     }
   }) };
 }
-_3("unmount", function(i4, n4) {
-  if ("string" == typeof n4.type) {
-    var r4 = n4.__e;
+_3("unmount", function(i5, n3) {
+  if ("string" == typeof n3.type) {
+    var r4 = n3.__e;
     if (r4) {
-      var t5 = r4.U;
-      if (t5) {
+      var t4 = r4.U;
+      if (t4) {
         r4.U = void 0;
-        for (var f4 in t5) {
-          var o4 = t5[f4];
+        for (var f5 in t4) {
+          var o4 = t4[f5];
           if (o4) o4.d();
         }
       }
     }
   } else {
-    var e4 = n4.__c;
+    var e4 = n3.__c;
     if (e4) {
-      var u4 = e4.__$u;
-      if (u4) {
+      var u5 = e4.__$u;
+      if (u5) {
         e4.__$u = void 0;
-        u4.d();
+        u5.d();
       }
     }
   }
-  i4(n4);
+  i5(n3);
 });
-_3("__h", function(i4, n4, r4, t5) {
-  if (t5 < 3 || 9 === t5) n4.__$f |= 2;
-  i4(n4, r4, t5);
+_3("__h", function(i5, n3, r4, t4) {
+  if (t4 < 3 || 9 === t4) n3.__$f |= 2;
+  i5(n3, r4, t4);
 });
-x.prototype.shouldComponentUpdate = function(i4, n4) {
-  var r4 = this.__$u, t5 = r4 && void 0 !== r4.s;
-  for (var f4 in n4) return true;
+x.prototype.shouldComponentUpdate = function(i5, n3) {
+  var r4 = this.__$u, t4 = r4 && void 0 !== r4.s;
+  for (var f5 in n3) return true;
   if (this.__f || "boolean" == typeof this.u && true === this.u) {
     var o4 = 2 & this.__$f;
-    if (!(t5 || o4 || 4 & this.__$f)) return true;
+    if (!(t4 || o4 || 4 & this.__$f)) return true;
     if (1 & this.__$f) return true;
   } else {
-    if (!(t5 || 4 & this.__$f)) return true;
+    if (!(t4 || 4 & this.__$f)) return true;
     if (3 & this.__$f) return true;
   }
-  for (var e4 in i4) if ("__source" !== e4 && i4[e4] !== this.props[e4]) return true;
-  for (var u4 in this.props) if (!(u4 in i4)) return true;
+  for (var e4 in i5) if ("__source" !== e4 && i5[e4] !== this.props[e4]) return true;
+  for (var u5 in this.props) if (!(u5 in i5)) return true;
   return false;
 };
-function useSignal(i4) {
+function useSignal(i5) {
   return T2(function() {
-    return y3(i4);
+    return y3(i5);
   }, []);
 }
-var k3 = function(i4) {
+var k3 = function(i5) {
   queueMicrotask(function() {
-    queueMicrotask(i4);
+    queueMicrotask(i5);
   });
 };
 function x3() {
   n2(function() {
-    var i4;
-    while (i4 = p4.shift()) s4.call(i4);
+    var i5;
+    while (i5 = p4.shift()) s4.call(i5);
   });
 }
 function A3() {
   if (1 === p4.push(this)) (l.requestAnimationFrame || k3)(x3);
 }
 
-// node_modules/htm/dist/htm.module.js
-var n3 = function(t5, s5, r4, e4) {
-  var u4;
-  s5[0] = 0;
-  for (var h5 = 1; h5 < s5.length; h5++) {
-    var p5 = s5[h5++], a4 = s5[h5] ? (s5[0] |= p5 ? 1 : 2, r4[s5[h5++]]) : s5[++h5];
-    3 === p5 ? e4[0] = a4 : 4 === p5 ? e4[1] = Object.assign(e4[1] || {}, a4) : 5 === p5 ? (e4[1] = e4[1] || {})[s5[++h5]] = a4 : 6 === p5 ? e4[1][s5[++h5]] += a4 + "" : p5 ? (u4 = t5.apply(a4, n3(t5, a4, r4, ["", null])), e4.push(u4), a4[0] ? s5[0] |= 2 : (s5[h5 - 2] = 0, s5[h5] = u4)) : e4.push(a4);
-  }
-  return e4;
-};
-var t4 = /* @__PURE__ */ new Map();
-function htm_module_default(s5) {
-  var r4 = t4.get(this);
-  return r4 || (r4 = /* @__PURE__ */ new Map(), t4.set(this, r4)), (r4 = n3(this, r4.get(s5) || (r4.set(s5, r4 = function(n4) {
-    for (var t5, s6, r5 = 1, e4 = "", u4 = "", h5 = [0], p5 = function(n5) {
-      1 === r5 && (n5 || (e4 = e4.replace(/^\s*\n\s*|\s*\n\s*$/g, ""))) ? h5.push(0, n5, e4) : 3 === r5 && (n5 || e4) ? (h5.push(3, n5, e4), r5 = 2) : 2 === r5 && "..." === e4 && n5 ? h5.push(4, n5, 0) : 2 === r5 && e4 && !n5 ? h5.push(5, 0, true, e4) : r5 >= 5 && ((e4 || !n5 && 5 === r5) && (h5.push(r5, 0, e4, s6), r5 = 6), n5 && (h5.push(r5, n5, 0, s6), r5 = 6)), e4 = "";
-    }, a4 = 0; a4 < n4.length; a4++) {
-      a4 && (1 === r5 && p5(), p5(a4));
-      for (var l7 = 0; l7 < n4[a4].length; l7++) t5 = n4[a4][l7], 1 === r5 ? "<" === t5 ? (p5(), h5 = [h5], r5 = 3) : e4 += t5 : 4 === r5 ? "--" === e4 && ">" === t5 ? (r5 = 1, e4 = "") : e4 = t5 + e4[0] : u4 ? t5 === u4 ? u4 = "" : e4 += t5 : '"' === t5 || "'" === t5 ? u4 = t5 : ">" === t5 ? (p5(), r5 = 1) : r5 && ("=" === t5 ? (r5 = 5, s6 = e4, e4 = "") : "/" === t5 && (r5 < 5 || ">" === n4[a4][l7 + 1]) ? (p5(), 3 === r5 && (h5 = h5[0]), r5 = h5, (h5 = h5[0]).push(2, 0, r5), r5 = 0) : " " === t5 || "	" === t5 || "\n" === t5 || "\r" === t5 ? (p5(), r5 = 2) : e4 += t5), 3 === r5 && "!--" === e4 && (r5 = 4, h5 = h5[0]);
-    }
-    return p5(), h5;
-  }(s5)), r4), arguments, [])).length > 1 ? r4 : r4[0];
-}
-
-// src/html.js
-var html = htm_module_default.bind(g);
-
-// src/api.js
+// src/api.ts
 async function api(url, opts) {
-  const r4 = await fetch(url, Object.assign({ credentials: "same-origin" }, opts || {}));
+  const r4 = await fetch(url, { credentials: "same-origin", ...opts });
   if (r4.status === 401) {
     const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
     window.location.replace(`/ui/login?next=${next}`);
@@ -15506,12 +15479,12 @@ async function postJson(path, body) {
   let data = {};
   try {
     data = await r4.json();
-  } catch (_5) {
+  } catch {
   }
   return { ok: r4.ok, status: r4.status, data };
 }
 
-// src/state.js
+// src/state.ts
 var groups = y3([]);
 var groupId = y3(null);
 var isAdmin = y3(false);
@@ -15555,10 +15528,6 @@ var refs = {
   reconnectAttempt: 0,
   pollTimer: null,
   threadsPollTimer: null,
-  // Set of `${direction}:${id}` for every row currently in chatMessages.
-  // Used to dedup WS pushes against history refetches. Cleared on
-  // openChat / clearChat. Initial-load and full-replace rebuild it
-  // from scratch; append-only refetch and appendMsg add to it.
   seenIds: /* @__PURE__ */ new Set(),
   suppressHashCount: 0,
   uploadDragDepth: 0
@@ -15583,10 +15552,10 @@ var CHANNEL_META = {
   gchat: { label: "Chat", icon: "G" }
 };
 function channelMeta(ct) {
-  return CHANNEL_META[ct] || { label: ct || "Channel", icon: "\u2022" };
+  return ct && CHANNEL_META[ct] || { label: ct || "Channel", icon: "\u2022" };
 }
 
-// src/hash.js
+// src/hash.ts
 var import_path_to_regexp = __toESM(require_dist(), 1);
 
 // node_modules/marked/lib/marked.esm.js
@@ -15600,17 +15569,17 @@ function N2(l7) {
 var _4 = { exec: () => null };
 function E2(l7) {
   let e4 = [];
-  return (t5) => {
-    let n4 = Math.max(0, Math.min(3, t5 - 1)), s5 = e4[n4];
-    return s5 || (s5 = l7(n4), e4[n4] = s5), s5;
+  return (t4) => {
+    let n3 = Math.max(0, Math.min(3, t4 - 1)), s5 = e4[n3];
+    return s5 || (s5 = l7(n3), e4[n3] = s5), s5;
   };
 }
 function d4(l7, e4 = "") {
-  let t5 = typeof l7 == "string" ? l7 : l7.source, n4 = { replace: (s5, r4) => {
-    let i4 = typeof r4 == "string" ? r4 : r4.source;
-    return i4 = i4.replace(m5.caret, "$1"), t5 = t5.replace(s5, i4), n4;
-  }, getRegex: () => new RegExp(t5, e4) };
-  return n4;
+  let t4 = typeof l7 == "string" ? l7 : l7.source, n3 = { replace: (s5, r4) => {
+    let i5 = typeof r4 == "string" ? r4 : r4.source;
+    return i5 = i5.replace(m5.caret, "$1"), t4 = t4.replace(s5, i5), n3;
+  }, getRegex: () => new RegExp(t4, e4) };
+  return n3;
 }
 var Te = ((l7 = "") => {
   try {
@@ -15699,66 +15668,66 @@ function V2(l7) {
   return l7;
 }
 function Y(l7, e4) {
-  let t5 = l7.replace(m5.findPipe, (r4, i4, o4) => {
-    let u4 = false, a4 = i4;
-    for (; --a4 >= 0 && o4[a4] === "\\"; ) u4 = !u4;
-    return u4 ? "|" : " |";
-  }), n4 = t5.split(m5.splitPipe), s5 = 0;
-  if (n4[0].trim() || n4.shift(), n4.length > 0 && !n4.at(-1)?.trim() && n4.pop(), e4) if (n4.length > e4) n4.splice(e4);
-  else for (; n4.length < e4; ) n4.push("");
-  for (; s5 < n4.length; s5++) n4[s5] = n4[s5].trim().replace(m5.slashPipe, "|");
-  return n4;
+  let t4 = l7.replace(m5.findPipe, (r4, i5, o4) => {
+    let u5 = false, a4 = i5;
+    for (; --a4 >= 0 && o4[a4] === "\\"; ) u5 = !u5;
+    return u5 ? "|" : " |";
+  }), n3 = t4.split(m5.splitPipe), s5 = 0;
+  if (n3[0].trim() || n3.shift(), n3.length > 0 && !n3.at(-1)?.trim() && n3.pop(), e4) if (n3.length > e4) n3.splice(e4);
+  else for (; n3.length < e4; ) n3.push("");
+  for (; s5 < n3.length; s5++) n3[s5] = n3[s5].trim().replace(m5.slashPipe, "|");
+  return n3;
 }
-function $2(l7, e4, t5) {
-  let n4 = l7.length;
-  if (n4 === 0) return "";
+function $2(l7, e4, t4) {
+  let n3 = l7.length;
+  if (n3 === 0) return "";
   let s5 = 0;
-  for (; s5 < n4; ) {
-    let r4 = l7.charAt(n4 - s5 - 1);
-    if (r4 === e4 && !t5) s5++;
-    else if (r4 !== e4 && t5) s5++;
+  for (; s5 < n3; ) {
+    let r4 = l7.charAt(n3 - s5 - 1);
+    if (r4 === e4 && !t4) s5++;
+    else if (r4 !== e4 && t4) s5++;
     else break;
   }
-  return l7.slice(0, n4 - s5);
+  return l7.slice(0, n3 - s5);
 }
 function ee(l7) {
   let e4 = l7.split(`
-`), t5 = e4.length - 1;
-  for (; t5 >= 0 && m5.blankLine.test(e4[t5]); ) t5--;
-  return e4.length - t5 <= 2 ? l7 : e4.slice(0, t5 + 1).join(`
+`), t4 = e4.length - 1;
+  for (; t4 >= 0 && m5.blankLine.test(e4[t4]); ) t4--;
+  return e4.length - t4 <= 2 ? l7 : e4.slice(0, t4 + 1).join(`
 `);
 }
 function fe(l7, e4) {
   if (l7.indexOf(e4[1]) === -1) return -1;
-  let t5 = 0;
-  for (let n4 = 0; n4 < l7.length; n4++) if (l7[n4] === "\\") n4++;
-  else if (l7[n4] === e4[0]) t5++;
-  else if (l7[n4] === e4[1] && (t5--, t5 < 0)) return n4;
-  return t5 > 0 ? -2 : -1;
+  let t4 = 0;
+  for (let n3 = 0; n3 < l7.length; n3++) if (l7[n3] === "\\") n3++;
+  else if (l7[n3] === e4[0]) t4++;
+  else if (l7[n3] === e4[1] && (t4--, t4 < 0)) return n3;
+  return t4 > 0 ? -2 : -1;
 }
 function me2(l7, e4 = 0) {
-  let t5 = e4, n4 = "";
+  let t4 = e4, n3 = "";
   for (let s5 of l7) if (s5 === "	") {
-    let r4 = 4 - t5 % 4;
-    n4 += " ".repeat(r4), t5 += r4;
-  } else n4 += s5, t5++;
-  return n4;
+    let r4 = 4 - t4 % 4;
+    n3 += " ".repeat(r4), t4 += r4;
+  } else n3 += s5, t4++;
+  return n3;
 }
-function xe(l7, e4, t5, n4, s5) {
-  let r4 = e4.href, i4 = e4.title || null, o4 = l7[1].replace(s5.other.outputLinkReplace, "$1");
-  n4.state.inLink = true;
-  let u4 = { type: l7[0].charAt(0) === "!" ? "image" : "link", raw: t5, href: r4, title: i4, text: o4, tokens: n4.inlineTokens(o4) };
-  return n4.state.inLink = false, u4;
+function xe(l7, e4, t4, n3, s5) {
+  let r4 = e4.href, i5 = e4.title || null, o4 = l7[1].replace(s5.other.outputLinkReplace, "$1");
+  n3.state.inLink = true;
+  let u5 = { type: l7[0].charAt(0) === "!" ? "image" : "link", raw: t4, href: r4, title: i5, text: o4, tokens: n3.inlineTokens(o4) };
+  return n3.state.inLink = false, u5;
 }
-function st(l7, e4, t5) {
-  let n4 = l7.match(t5.other.indentCodeCompensation);
-  if (n4 === null) return e4;
-  let s5 = n4[1];
+function st(l7, e4, t4) {
+  let n3 = l7.match(t4.other.indentCodeCompensation);
+  if (n3 === null) return e4;
+  let s5 = n3[1];
   return e4.split(`
 `).map((r4) => {
-    let i4 = r4.match(t5.other.beginningSpace);
-    if (i4 === null) return r4;
-    let [o4] = i4;
+    let i5 = r4.match(t4.other.beginningSpace);
+    if (i5 === null) return r4;
+    let [o4] = i5;
     return o4.length >= s5.length ? r4.slice(s5.length) : r4;
   }).join(`
 `);
@@ -15771,115 +15740,115 @@ var w4 = class {
     this.options = e4 || T3;
   }
   space(e4) {
-    let t5 = this.rules.block.newline.exec(e4);
-    if (t5 && t5[0].length > 0) return { type: "space", raw: t5[0] };
+    let t4 = this.rules.block.newline.exec(e4);
+    if (t4 && t4[0].length > 0) return { type: "space", raw: t4[0] };
   }
   code(e4) {
-    let t5 = this.rules.block.code.exec(e4);
-    if (t5) {
-      let n4 = this.options.pedantic ? t5[0] : ee(t5[0]), s5 = n4.replace(this.rules.other.codeRemoveIndent, "");
-      return { type: "code", raw: n4, codeBlockStyle: "indented", text: s5 };
+    let t4 = this.rules.block.code.exec(e4);
+    if (t4) {
+      let n3 = this.options.pedantic ? t4[0] : ee(t4[0]), s5 = n3.replace(this.rules.other.codeRemoveIndent, "");
+      return { type: "code", raw: n3, codeBlockStyle: "indented", text: s5 };
     }
   }
   fences(e4) {
-    let t5 = this.rules.block.fences.exec(e4);
-    if (t5) {
-      let n4 = t5[0], s5 = st(n4, t5[3] || "", this.rules);
-      return { type: "code", raw: n4, lang: t5[2] ? t5[2].trim().replace(this.rules.inline.anyPunctuation, "$1") : t5[2], text: s5 };
+    let t4 = this.rules.block.fences.exec(e4);
+    if (t4) {
+      let n3 = t4[0], s5 = st(n3, t4[3] || "", this.rules);
+      return { type: "code", raw: n3, lang: t4[2] ? t4[2].trim().replace(this.rules.inline.anyPunctuation, "$1") : t4[2], text: s5 };
     }
   }
   heading(e4) {
-    let t5 = this.rules.block.heading.exec(e4);
-    if (t5) {
-      let n4 = t5[2].trim();
-      if (this.rules.other.endingHash.test(n4)) {
-        let s5 = $2(n4, "#");
-        (this.options.pedantic || !s5 || this.rules.other.endingSpaceChar.test(s5)) && (n4 = s5.trim());
+    let t4 = this.rules.block.heading.exec(e4);
+    if (t4) {
+      let n3 = t4[2].trim();
+      if (this.rules.other.endingHash.test(n3)) {
+        let s5 = $2(n3, "#");
+        (this.options.pedantic || !s5 || this.rules.other.endingSpaceChar.test(s5)) && (n3 = s5.trim());
       }
-      return { type: "heading", raw: $2(t5[0], `
-`), depth: t5[1].length, text: n4, tokens: this.lexer.inline(n4) };
+      return { type: "heading", raw: $2(t4[0], `
+`), depth: t4[1].length, text: n3, tokens: this.lexer.inline(n3) };
     }
   }
   hr(e4) {
-    let t5 = this.rules.block.hr.exec(e4);
-    if (t5) return { type: "hr", raw: $2(t5[0], `
+    let t4 = this.rules.block.hr.exec(e4);
+    if (t4) return { type: "hr", raw: $2(t4[0], `
 `) };
   }
   blockquote(e4) {
-    let t5 = this.rules.block.blockquote.exec(e4);
-    if (t5) {
-      let n4 = $2(t5[0], `
+    let t4 = this.rules.block.blockquote.exec(e4);
+    if (t4) {
+      let n3 = $2(t4[0], `
 `).split(`
-`), s5 = "", r4 = "", i4 = [];
-      for (; n4.length > 0; ) {
-        let o4 = false, u4 = [], a4;
-        for (a4 = 0; a4 < n4.length; a4++) if (this.rules.other.blockquoteStart.test(n4[a4])) u4.push(n4[a4]), o4 = true;
-        else if (!o4) u4.push(n4[a4]);
+`), s5 = "", r4 = "", i5 = [];
+      for (; n3.length > 0; ) {
+        let o4 = false, u5 = [], a4;
+        for (a4 = 0; a4 < n3.length; a4++) if (this.rules.other.blockquoteStart.test(n3[a4])) u5.push(n3[a4]), o4 = true;
+        else if (!o4) u5.push(n3[a4]);
         else break;
-        n4 = n4.slice(a4);
-        let c4 = u4.join(`
+        n3 = n3.slice(a4);
+        let c4 = u5.join(`
 `), p5 = c4.replace(this.rules.other.blockquoteSetextReplace, `
     $1`).replace(this.rules.other.blockquoteSetextReplace2, "");
         s5 = s5 ? `${s5}
 ${c4}` : c4, r4 = r4 ? `${r4}
 ${p5}` : p5;
         let k4 = this.lexer.state.top;
-        if (this.lexer.state.top = true, this.lexer.blockTokens(p5, i4, true), this.lexer.state.top = k4, n4.length === 0) break;
-        let h5 = i4.at(-1);
+        if (this.lexer.state.top = true, this.lexer.blockTokens(p5, i5, true), this.lexer.state.top = k4, n3.length === 0) break;
+        let h5 = i5.at(-1);
         if (h5?.type === "code") break;
         if (h5?.type === "blockquote") {
-          let R = h5, f4 = R.raw + `
-` + n4.join(`
-`), S3 = this.blockquote(f4);
-          i4[i4.length - 1] = S3, s5 = s5.substring(0, s5.length - R.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.text.length) + S3.text;
+          let R = h5, f5 = R.raw + `
+` + n3.join(`
+`), S3 = this.blockquote(f5);
+          i5[i5.length - 1] = S3, s5 = s5.substring(0, s5.length - R.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.text.length) + S3.text;
           break;
         } else if (h5?.type === "list") {
-          let R = h5, f4 = R.raw + `
-` + n4.join(`
-`), S3 = this.list(f4);
-          i4[i4.length - 1] = S3, s5 = s5.substring(0, s5.length - h5.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.raw.length) + S3.raw, n4 = f4.substring(i4.at(-1).raw.length).split(`
+          let R = h5, f5 = R.raw + `
+` + n3.join(`
+`), S3 = this.list(f5);
+          i5[i5.length - 1] = S3, s5 = s5.substring(0, s5.length - h5.raw.length) + S3.raw, r4 = r4.substring(0, r4.length - R.raw.length) + S3.raw, n3 = f5.substring(i5.at(-1).raw.length).split(`
 `);
           continue;
         }
       }
-      return { type: "blockquote", raw: s5, tokens: i4, text: r4 };
+      return { type: "blockquote", raw: s5, tokens: i5, text: r4 };
     }
   }
   list(e4) {
-    let t5 = this.rules.block.list.exec(e4);
-    if (t5) {
-      let n4 = t5[1].trim(), s5 = n4.length > 1, r4 = { type: "list", raw: "", ordered: s5, start: s5 ? +n4.slice(0, -1) : "", loose: false, items: [] };
-      n4 = s5 ? `\\d{1,9}\\${n4.slice(-1)}` : `\\${n4}`, this.options.pedantic && (n4 = s5 ? n4 : "[*+-]");
-      let i4 = this.rules.other.listItemRegex(n4), o4 = false;
+    let t4 = this.rules.block.list.exec(e4);
+    if (t4) {
+      let n3 = t4[1].trim(), s5 = n3.length > 1, r4 = { type: "list", raw: "", ordered: s5, start: s5 ? +n3.slice(0, -1) : "", loose: false, items: [] };
+      n3 = s5 ? `\\d{1,9}\\${n3.slice(-1)}` : `\\${n3}`, this.options.pedantic && (n3 = s5 ? n3 : "[*+-]");
+      let i5 = this.rules.other.listItemRegex(n3), o4 = false;
       for (; e4; ) {
         let a4 = false, c4 = "", p5 = "";
-        if (!(t5 = i4.exec(e4)) || this.rules.block.hr.test(e4)) break;
-        c4 = t5[0], e4 = e4.substring(c4.length);
-        let k4 = me2(t5[2].split(`
-`, 1)[0], t5[1].length), h5 = e4.split(`
-`, 1)[0], R = !k4.trim(), f4 = 0;
-        if (this.options.pedantic ? (f4 = 2, p5 = k4.trimStart()) : R ? f4 = t5[1].length + 1 : (f4 = k4.search(this.rules.other.nonSpaceChar), f4 = f4 > 4 ? 1 : f4, p5 = k4.slice(f4), f4 += t5[1].length), R && this.rules.other.blankLine.test(h5) && (c4 += h5 + `
+        if (!(t4 = i5.exec(e4)) || this.rules.block.hr.test(e4)) break;
+        c4 = t4[0], e4 = e4.substring(c4.length);
+        let k4 = me2(t4[2].split(`
+`, 1)[0], t4[1].length), h5 = e4.split(`
+`, 1)[0], R = !k4.trim(), f5 = 0;
+        if (this.options.pedantic ? (f5 = 2, p5 = k4.trimStart()) : R ? f5 = t4[1].length + 1 : (f5 = k4.search(this.rules.other.nonSpaceChar), f5 = f5 > 4 ? 1 : f5, p5 = k4.slice(f5), f5 += t4[1].length), R && this.rules.other.blankLine.test(h5) && (c4 += h5 + `
 `, e4 = e4.substring(h5.length + 1), a4 = true), !a4) {
-          let S3 = this.rules.other.nextBulletRegex(f4), te = this.rules.other.hrRegex(f4), ne = this.rules.other.fencesBeginRegex(f4), re = this.rules.other.headingBeginRegex(f4), be = this.rules.other.htmlBeginRegex(f4), Re = this.rules.other.blockquoteBeginRegex(f4);
+          let S3 = this.rules.other.nextBulletRegex(f5), te = this.rules.other.hrRegex(f5), ne = this.rules.other.fencesBeginRegex(f5), re = this.rules.other.headingBeginRegex(f5), be = this.rules.other.htmlBeginRegex(f5), Re = this.rules.other.blockquoteBeginRegex(f5);
           for (; e4; ) {
             let G = e4.split(`
 `, 1)[0], C3;
             if (h5 = G, this.options.pedantic ? (h5 = h5.replace(this.rules.other.listReplaceNesting, "  "), C3 = h5) : C3 = h5.replace(this.rules.other.tabCharGlobal, "    "), ne.test(h5) || re.test(h5) || be.test(h5) || Re.test(h5) || S3.test(h5) || te.test(h5)) break;
-            if (C3.search(this.rules.other.nonSpaceChar) >= f4 || !h5.trim()) p5 += `
-` + C3.slice(f4);
+            if (C3.search(this.rules.other.nonSpaceChar) >= f5 || !h5.trim()) p5 += `
+` + C3.slice(f5);
             else {
               if (R || k4.replace(this.rules.other.tabCharGlobal, "    ").search(this.rules.other.nonSpaceChar) >= 4 || ne.test(k4) || re.test(k4) || te.test(k4)) break;
               p5 += `
 ` + h5;
             }
             R = !h5.trim(), c4 += G + `
-`, e4 = e4.substring(G.length + 1), k4 = C3.slice(f4);
+`, e4 = e4.substring(G.length + 1), k4 = C3.slice(f5);
           }
         }
         r4.loose || (o4 ? r4.loose = true : this.rules.other.doubleBlankLine.test(c4) && (o4 = true)), r4.items.push({ type: "list_item", raw: c4, task: !!this.options.gfm && this.rules.other.listIsTask.test(p5), loose: false, text: p5, tokens: [] }), r4.raw += c4;
       }
-      let u4 = r4.items.at(-1);
-      if (u4) u4.raw = u4.raw.trimEnd(), u4.text = u4.text.trimEnd();
+      let u5 = r4.items.at(-1);
+      if (u5) u5.raw = u5.raw.trimEnd(), u5.text = u5.text.trimEnd();
       else return;
       r4.raw = r4.raw.trimEnd();
       for (let a4 of r4.items) {
@@ -15910,116 +15879,116 @@ ${p5}` : p5;
     }
   }
   html(e4) {
-    let t5 = this.rules.block.html.exec(e4);
-    if (t5) {
-      let n4 = ee(t5[0]);
-      return { type: "html", block: true, raw: n4, pre: t5[1] === "pre" || t5[1] === "script" || t5[1] === "style", text: n4 };
+    let t4 = this.rules.block.html.exec(e4);
+    if (t4) {
+      let n3 = ee(t4[0]);
+      return { type: "html", block: true, raw: n3, pre: t4[1] === "pre" || t4[1] === "script" || t4[1] === "style", text: n3 };
     }
   }
   def(e4) {
-    let t5 = this.rules.block.def.exec(e4);
-    if (t5) {
-      let n4 = t5[1].toLowerCase().replace(this.rules.other.multipleSpaceGlobal, " "), s5 = t5[2] ? t5[2].replace(this.rules.other.hrefBrackets, "$1").replace(this.rules.inline.anyPunctuation, "$1") : "", r4 = t5[3] ? t5[3].substring(1, t5[3].length - 1).replace(this.rules.inline.anyPunctuation, "$1") : t5[3];
-      return { type: "def", tag: n4, raw: $2(t5[0], `
+    let t4 = this.rules.block.def.exec(e4);
+    if (t4) {
+      let n3 = t4[1].toLowerCase().replace(this.rules.other.multipleSpaceGlobal, " "), s5 = t4[2] ? t4[2].replace(this.rules.other.hrefBrackets, "$1").replace(this.rules.inline.anyPunctuation, "$1") : "", r4 = t4[3] ? t4[3].substring(1, t4[3].length - 1).replace(this.rules.inline.anyPunctuation, "$1") : t4[3];
+      return { type: "def", tag: n3, raw: $2(t4[0], `
 `), href: s5, title: r4 };
     }
   }
   table(e4) {
-    let t5 = this.rules.block.table.exec(e4);
-    if (!t5 || !this.rules.other.tableDelimiter.test(t5[2])) return;
-    let n4 = Y(t5[1]), s5 = t5[2].replace(this.rules.other.tableAlignChars, "").split("|"), r4 = t5[3]?.trim() ? t5[3].replace(this.rules.other.tableRowBlankLine, "").split(`
-`) : [], i4 = { type: "table", raw: $2(t5[0], `
+    let t4 = this.rules.block.table.exec(e4);
+    if (!t4 || !this.rules.other.tableDelimiter.test(t4[2])) return;
+    let n3 = Y(t4[1]), s5 = t4[2].replace(this.rules.other.tableAlignChars, "").split("|"), r4 = t4[3]?.trim() ? t4[3].replace(this.rules.other.tableRowBlankLine, "").split(`
+`) : [], i5 = { type: "table", raw: $2(t4[0], `
 `), header: [], align: [], rows: [] };
-    if (n4.length === s5.length) {
-      for (let o4 of s5) this.rules.other.tableAlignRight.test(o4) ? i4.align.push("right") : this.rules.other.tableAlignCenter.test(o4) ? i4.align.push("center") : this.rules.other.tableAlignLeft.test(o4) ? i4.align.push("left") : i4.align.push(null);
-      for (let o4 = 0; o4 < n4.length; o4++) i4.header.push({ text: n4[o4], tokens: this.lexer.inline(n4[o4]), header: true, align: i4.align[o4] });
-      for (let o4 of r4) i4.rows.push(Y(o4, i4.header.length).map((u4, a4) => ({ text: u4, tokens: this.lexer.inline(u4), header: false, align: i4.align[a4] })));
-      return i4;
+    if (n3.length === s5.length) {
+      for (let o4 of s5) this.rules.other.tableAlignRight.test(o4) ? i5.align.push("right") : this.rules.other.tableAlignCenter.test(o4) ? i5.align.push("center") : this.rules.other.tableAlignLeft.test(o4) ? i5.align.push("left") : i5.align.push(null);
+      for (let o4 = 0; o4 < n3.length; o4++) i5.header.push({ text: n3[o4], tokens: this.lexer.inline(n3[o4]), header: true, align: i5.align[o4] });
+      for (let o4 of r4) i5.rows.push(Y(o4, i5.header.length).map((u5, a4) => ({ text: u5, tokens: this.lexer.inline(u5), header: false, align: i5.align[a4] })));
+      return i5;
     }
   }
   lheading(e4) {
-    let t5 = this.rules.block.lheading.exec(e4);
-    if (t5) {
-      let n4 = t5[1].trim();
-      return { type: "heading", raw: $2(t5[0], `
-`), depth: t5[2].charAt(0) === "=" ? 1 : 2, text: n4, tokens: this.lexer.inline(n4) };
+    let t4 = this.rules.block.lheading.exec(e4);
+    if (t4) {
+      let n3 = t4[1].trim();
+      return { type: "heading", raw: $2(t4[0], `
+`), depth: t4[2].charAt(0) === "=" ? 1 : 2, text: n3, tokens: this.lexer.inline(n3) };
     }
   }
   paragraph(e4) {
-    let t5 = this.rules.block.paragraph.exec(e4);
-    if (t5) {
-      let n4 = t5[1].charAt(t5[1].length - 1) === `
-` ? t5[1].slice(0, -1) : t5[1];
-      return { type: "paragraph", raw: t5[0], text: n4, tokens: this.lexer.inline(n4) };
+    let t4 = this.rules.block.paragraph.exec(e4);
+    if (t4) {
+      let n3 = t4[1].charAt(t4[1].length - 1) === `
+` ? t4[1].slice(0, -1) : t4[1];
+      return { type: "paragraph", raw: t4[0], text: n3, tokens: this.lexer.inline(n3) };
     }
   }
   text(e4) {
-    let t5 = this.rules.block.text.exec(e4);
-    if (t5) return { type: "text", raw: t5[0], text: t5[0], tokens: this.lexer.inline(t5[0]) };
+    let t4 = this.rules.block.text.exec(e4);
+    if (t4) return { type: "text", raw: t4[0], text: t4[0], tokens: this.lexer.inline(t4[0]) };
   }
   escape(e4) {
-    let t5 = this.rules.inline.escape.exec(e4);
-    if (t5) return { type: "escape", raw: t5[0], text: t5[1] };
+    let t4 = this.rules.inline.escape.exec(e4);
+    if (t4) return { type: "escape", raw: t4[0], text: t4[1] };
   }
   tag(e4) {
-    let t5 = this.rules.inline.tag.exec(e4);
-    if (t5) return !this.lexer.state.inLink && this.rules.other.startATag.test(t5[0]) ? this.lexer.state.inLink = true : this.lexer.state.inLink && this.rules.other.endATag.test(t5[0]) && (this.lexer.state.inLink = false), !this.lexer.state.inRawBlock && this.rules.other.startPreScriptTag.test(t5[0]) ? this.lexer.state.inRawBlock = true : this.lexer.state.inRawBlock && this.rules.other.endPreScriptTag.test(t5[0]) && (this.lexer.state.inRawBlock = false), { type: "html", raw: t5[0], inLink: this.lexer.state.inLink, inRawBlock: this.lexer.state.inRawBlock, block: false, text: t5[0] };
+    let t4 = this.rules.inline.tag.exec(e4);
+    if (t4) return !this.lexer.state.inLink && this.rules.other.startATag.test(t4[0]) ? this.lexer.state.inLink = true : this.lexer.state.inLink && this.rules.other.endATag.test(t4[0]) && (this.lexer.state.inLink = false), !this.lexer.state.inRawBlock && this.rules.other.startPreScriptTag.test(t4[0]) ? this.lexer.state.inRawBlock = true : this.lexer.state.inRawBlock && this.rules.other.endPreScriptTag.test(t4[0]) && (this.lexer.state.inRawBlock = false), { type: "html", raw: t4[0], inLink: this.lexer.state.inLink, inRawBlock: this.lexer.state.inRawBlock, block: false, text: t4[0] };
   }
   link(e4) {
-    let t5 = this.rules.inline.link.exec(e4);
-    if (t5) {
-      let n4 = t5[2].trim();
-      if (!this.options.pedantic && this.rules.other.startAngleBracket.test(n4)) {
-        if (!this.rules.other.endAngleBracket.test(n4)) return;
-        let i4 = $2(n4.slice(0, -1), "\\");
-        if ((n4.length - i4.length) % 2 === 0) return;
+    let t4 = this.rules.inline.link.exec(e4);
+    if (t4) {
+      let n3 = t4[2].trim();
+      if (!this.options.pedantic && this.rules.other.startAngleBracket.test(n3)) {
+        if (!this.rules.other.endAngleBracket.test(n3)) return;
+        let i5 = $2(n3.slice(0, -1), "\\");
+        if ((n3.length - i5.length) % 2 === 0) return;
       } else {
-        let i4 = fe(t5[2], "()");
-        if (i4 === -2) return;
-        if (i4 > -1) {
-          let u4 = (t5[0].indexOf("!") === 0 ? 5 : 4) + t5[1].length + i4;
-          t5[2] = t5[2].substring(0, i4), t5[0] = t5[0].substring(0, u4).trim(), t5[3] = "";
+        let i5 = fe(t4[2], "()");
+        if (i5 === -2) return;
+        if (i5 > -1) {
+          let u5 = (t4[0].indexOf("!") === 0 ? 5 : 4) + t4[1].length + i5;
+          t4[2] = t4[2].substring(0, i5), t4[0] = t4[0].substring(0, u5).trim(), t4[3] = "";
         }
       }
-      let s5 = t5[2], r4 = "";
+      let s5 = t4[2], r4 = "";
       if (this.options.pedantic) {
-        let i4 = this.rules.other.pedanticHrefTitle.exec(s5);
-        i4 && (s5 = i4[1], r4 = i4[3]);
-      } else r4 = t5[3] ? t5[3].slice(1, -1) : "";
-      return s5 = s5.trim(), this.rules.other.startAngleBracket.test(s5) && (this.options.pedantic && !this.rules.other.endAngleBracket.test(n4) ? s5 = s5.slice(1) : s5 = s5.slice(1, -1)), xe(t5, { href: s5 && s5.replace(this.rules.inline.anyPunctuation, "$1"), title: r4 && r4.replace(this.rules.inline.anyPunctuation, "$1") }, t5[0], this.lexer, this.rules);
+        let i5 = this.rules.other.pedanticHrefTitle.exec(s5);
+        i5 && (s5 = i5[1], r4 = i5[3]);
+      } else r4 = t4[3] ? t4[3].slice(1, -1) : "";
+      return s5 = s5.trim(), this.rules.other.startAngleBracket.test(s5) && (this.options.pedantic && !this.rules.other.endAngleBracket.test(n3) ? s5 = s5.slice(1) : s5 = s5.slice(1, -1)), xe(t4, { href: s5 && s5.replace(this.rules.inline.anyPunctuation, "$1"), title: r4 && r4.replace(this.rules.inline.anyPunctuation, "$1") }, t4[0], this.lexer, this.rules);
     }
   }
-  reflink(e4, t5) {
-    let n4;
-    if ((n4 = this.rules.inline.reflink.exec(e4)) || (n4 = this.rules.inline.nolink.exec(e4))) {
-      let s5 = (n4[2] || n4[1]).replace(this.rules.other.multipleSpaceGlobal, " "), r4 = t5[s5.toLowerCase()];
+  reflink(e4, t4) {
+    let n3;
+    if ((n3 = this.rules.inline.reflink.exec(e4)) || (n3 = this.rules.inline.nolink.exec(e4))) {
+      let s5 = (n3[2] || n3[1]).replace(this.rules.other.multipleSpaceGlobal, " "), r4 = t4[s5.toLowerCase()];
       if (!r4) {
-        let i4 = n4[0].charAt(0);
-        return { type: "text", raw: i4, text: i4 };
+        let i5 = n3[0].charAt(0);
+        return { type: "text", raw: i5, text: i5 };
       }
-      return xe(n4, r4, n4[0], this.lexer, this.rules);
+      return xe(n3, r4, n3[0], this.lexer, this.rules);
     }
   }
-  emStrong(e4, t5, n4 = "") {
+  emStrong(e4, t4, n3 = "") {
     let s5 = this.rules.inline.emStrongLDelim.exec(e4);
-    if (!s5 || !s5[1] && !s5[2] && !s5[3] && !s5[4] || s5[4] && n4.match(this.rules.other.unicodeAlphaNumeric)) return;
-    if (!(s5[1] || s5[3] || "") || !n4 || this.rules.inline.punctuation.exec(n4)) {
-      let i4 = [...s5[0]].length - 1, o4, u4, a4 = i4, c4 = 0, p5 = s5[0][0] === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd;
-      for (p5.lastIndex = 0, t5 = t5.slice(-1 * e4.length + i4); (s5 = p5.exec(t5)) !== null; ) {
+    if (!s5 || !s5[1] && !s5[2] && !s5[3] && !s5[4] || s5[4] && n3.match(this.rules.other.unicodeAlphaNumeric)) return;
+    if (!(s5[1] || s5[3] || "") || !n3 || this.rules.inline.punctuation.exec(n3)) {
+      let i5 = [...s5[0]].length - 1, o4, u5, a4 = i5, c4 = 0, p5 = s5[0][0] === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd;
+      for (p5.lastIndex = 0, t4 = t4.slice(-1 * e4.length + i5); (s5 = p5.exec(t4)) !== null; ) {
         if (o4 = s5[1] || s5[2] || s5[3] || s5[4] || s5[5] || s5[6], !o4) continue;
-        if (u4 = [...o4].length, s5[3] || s5[4]) {
-          a4 += u4;
+        if (u5 = [...o4].length, s5[3] || s5[4]) {
+          a4 += u5;
           continue;
-        } else if ((s5[5] || s5[6]) && i4 % 3 && !((i4 + u4) % 3)) {
-          c4 += u4;
+        } else if ((s5[5] || s5[6]) && i5 % 3 && !((i5 + u5) % 3)) {
+          c4 += u5;
           continue;
         }
-        if (a4 -= u4, a4 > 0) continue;
-        u4 = Math.min(u4, u4 + a4 + c4);
-        let k4 = [...s5[0]][0].length, h5 = e4.slice(0, i4 + s5.index + k4 + u4);
-        if (Math.min(i4, u4) % 2) {
-          let f4 = h5.slice(1, -1);
-          return { type: "em", raw: h5, text: f4, tokens: this.lexer.inlineTokens(f4) };
+        if (a4 -= u5, a4 > 0) continue;
+        u5 = Math.min(u5, u5 + a4 + c4);
+        let k4 = [...s5[0]][0].length, h5 = e4.slice(0, i5 + s5.index + k4 + u5);
+        if (Math.min(i5, u5) % 2) {
+          let f5 = h5.slice(1, -1);
+          return { type: "em", raw: h5, text: f5, tokens: this.lexer.inlineTokens(f5) };
         }
         let R = h5.slice(2, -2);
         return { type: "strong", raw: h5, text: R, tokens: this.lexer.inlineTokens(R) };
@@ -16027,61 +15996,61 @@ ${p5}` : p5;
     }
   }
   codespan(e4) {
-    let t5 = this.rules.inline.code.exec(e4);
-    if (t5) {
-      let n4 = t5[2].replace(this.rules.other.newLineCharGlobal, " "), s5 = this.rules.other.nonSpaceChar.test(n4), r4 = this.rules.other.startingSpaceChar.test(n4) && this.rules.other.endingSpaceChar.test(n4);
-      return s5 && r4 && (n4 = n4.substring(1, n4.length - 1)), { type: "codespan", raw: t5[0], text: n4 };
+    let t4 = this.rules.inline.code.exec(e4);
+    if (t4) {
+      let n3 = t4[2].replace(this.rules.other.newLineCharGlobal, " "), s5 = this.rules.other.nonSpaceChar.test(n3), r4 = this.rules.other.startingSpaceChar.test(n3) && this.rules.other.endingSpaceChar.test(n3);
+      return s5 && r4 && (n3 = n3.substring(1, n3.length - 1)), { type: "codespan", raw: t4[0], text: n3 };
     }
   }
   br(e4) {
-    let t5 = this.rules.inline.br.exec(e4);
-    if (t5) return { type: "br", raw: t5[0] };
+    let t4 = this.rules.inline.br.exec(e4);
+    if (t4) return { type: "br", raw: t4[0] };
   }
-  del(e4, t5, n4 = "") {
+  del(e4, t4, n3 = "") {
     let s5 = this.rules.inline.delLDelim.exec(e4);
     if (!s5) return;
-    if (!(s5[1] || "") || !n4 || this.rules.inline.punctuation.exec(n4)) {
-      let i4 = [...s5[0]].length - 1, o4, u4, a4 = i4, c4 = this.rules.inline.delRDelim;
-      for (c4.lastIndex = 0, t5 = t5.slice(-1 * e4.length + i4); (s5 = c4.exec(t5)) !== null; ) {
-        if (o4 = s5[1] || s5[2] || s5[3] || s5[4] || s5[5] || s5[6], !o4 || (u4 = [...o4].length, u4 !== i4)) continue;
+    if (!(s5[1] || "") || !n3 || this.rules.inline.punctuation.exec(n3)) {
+      let i5 = [...s5[0]].length - 1, o4, u5, a4 = i5, c4 = this.rules.inline.delRDelim;
+      for (c4.lastIndex = 0, t4 = t4.slice(-1 * e4.length + i5); (s5 = c4.exec(t4)) !== null; ) {
+        if (o4 = s5[1] || s5[2] || s5[3] || s5[4] || s5[5] || s5[6], !o4 || (u5 = [...o4].length, u5 !== i5)) continue;
         if (s5[3] || s5[4]) {
-          a4 += u4;
+          a4 += u5;
           continue;
         }
-        if (a4 -= u4, a4 > 0) continue;
-        u4 = Math.min(u4, u4 + a4);
-        let p5 = [...s5[0]][0].length, k4 = e4.slice(0, i4 + s5.index + p5 + u4), h5 = k4.slice(i4, -i4);
+        if (a4 -= u5, a4 > 0) continue;
+        u5 = Math.min(u5, u5 + a4);
+        let p5 = [...s5[0]][0].length, k4 = e4.slice(0, i5 + s5.index + p5 + u5), h5 = k4.slice(i5, -i5);
         return { type: "del", raw: k4, text: h5, tokens: this.lexer.inlineTokens(h5) };
       }
     }
   }
   autolink(e4) {
-    let t5 = this.rules.inline.autolink.exec(e4);
-    if (t5) {
-      let n4, s5;
-      return t5[2] === "@" ? (n4 = t5[1], s5 = "mailto:" + n4) : (n4 = t5[1], s5 = n4), { type: "link", raw: t5[0], text: n4, href: s5, tokens: [{ type: "text", raw: n4, text: n4 }] };
+    let t4 = this.rules.inline.autolink.exec(e4);
+    if (t4) {
+      let n3, s5;
+      return t4[2] === "@" ? (n3 = t4[1], s5 = "mailto:" + n3) : (n3 = t4[1], s5 = n3), { type: "link", raw: t4[0], text: n3, href: s5, tokens: [{ type: "text", raw: n3, text: n3 }] };
     }
   }
   url(e4) {
-    let t5;
-    if (t5 = this.rules.inline.url.exec(e4)) {
-      let n4, s5;
-      if (t5[2] === "@") n4 = t5[0], s5 = "mailto:" + n4;
+    let t4;
+    if (t4 = this.rules.inline.url.exec(e4)) {
+      let n3, s5;
+      if (t4[2] === "@") n3 = t4[0], s5 = "mailto:" + n3;
       else {
         let r4;
         do
-          r4 = t5[0], t5[0] = this.rules.inline._backpedal.exec(t5[0])?.[0] ?? "";
-        while (r4 !== t5[0]);
-        n4 = t5[0], t5[1] === "www." ? s5 = "http://" + t5[0] : s5 = t5[0];
+          r4 = t4[0], t4[0] = this.rules.inline._backpedal.exec(t4[0])?.[0] ?? "";
+        while (r4 !== t4[0]);
+        n3 = t4[0], t4[1] === "www." ? s5 = "http://" + t4[0] : s5 = t4[0];
       }
-      return { type: "link", raw: t5[0], text: n4, href: s5, tokens: [{ type: "text", raw: n4, text: n4 }] };
+      return { type: "link", raw: t4[0], text: n3, href: s5, tokens: [{ type: "text", raw: n3, text: n3 }] };
     }
   }
   inlineText(e4) {
-    let t5 = this.rules.inline.text.exec(e4);
-    if (t5) {
-      let n4 = this.lexer.state.inRawBlock;
-      return { type: "text", raw: t5[0], text: t5[0], escaped: n4 };
+    let t4 = this.rules.inline.text.exec(e4);
+    if (t4) {
+      let n3 = this.lexer.state.inRawBlock;
+      return { type: "text", raw: t4[0], text: t4[0], escaped: n3 };
     }
   }
 };
@@ -16093,28 +16062,28 @@ var x4 = class l5 {
   tokenizer;
   constructor(e4) {
     this.tokens = [], this.tokens.links = /* @__PURE__ */ Object.create(null), this.options = e4 || T3, this.options.tokenizer = this.options.tokenizer || new w4(), this.tokenizer = this.options.tokenizer, this.tokenizer.options = this.options, this.tokenizer.lexer = this, this.inlineQueue = [], this.state = { inLink: false, inRawBlock: false, top: true };
-    let t5 = { other: m5, block: D3.normal, inline: A4.normal };
-    this.options.pedantic ? (t5.block = D3.pedantic, t5.inline = A4.pedantic) : this.options.gfm && (t5.block = D3.gfm, this.options.breaks ? t5.inline = A4.breaks : t5.inline = A4.gfm), this.tokenizer.rules = t5;
+    let t4 = { other: m5, block: D3.normal, inline: A4.normal };
+    this.options.pedantic ? (t4.block = D3.pedantic, t4.inline = A4.pedantic) : this.options.gfm && (t4.block = D3.gfm, this.options.breaks ? t4.inline = A4.breaks : t4.inline = A4.gfm), this.tokenizer.rules = t4;
   }
   static get rules() {
     return { block: D3, inline: A4 };
   }
-  static lex(e4, t5) {
-    return new l5(t5).lex(e4);
+  static lex(e4, t4) {
+    return new l5(t4).lex(e4);
   }
-  static lexInline(e4, t5) {
-    return new l5(t5).inlineTokens(e4);
+  static lexInline(e4, t4) {
+    return new l5(t4).inlineTokens(e4);
   }
   lex(e4) {
     e4 = e4.replace(m5.carriageReturn, `
 `), this.blockTokens(e4, this.tokens);
-    for (let t5 = 0; t5 < this.inlineQueue.length; t5++) {
-      let n4 = this.inlineQueue[t5];
-      this.inlineTokens(n4.src, n4.tokens);
+    for (let t4 = 0; t4 < this.inlineQueue.length; t4++) {
+      let n3 = this.inlineQueue[t4];
+      this.inlineTokens(n3.src, n3.tokens);
     }
     return this.inlineQueue = [], this.tokens;
   }
-  blockTokens(e4, t5 = [], n4 = false) {
+  blockTokens(e4, t4 = [], n3 = false) {
     this.tokenizer.lexer = this, this.options.pedantic && (e4 = e4.replace(m5.tabCharGlobal, "    ").replace(m5.spaceLine, ""));
     let s5 = 1 / 0;
     for (; e4; ) {
@@ -16124,86 +16093,86 @@ var x4 = class l5 {
         break;
       }
       let r4;
-      if (this.options.extensions?.block?.some((o4) => (r4 = o4.call({ lexer: this }, e4, t5)) ? (e4 = e4.substring(r4.raw.length), t5.push(r4), true) : false)) continue;
+      if (this.options.extensions?.block?.some((o4) => (r4 = o4.call({ lexer: this }, e4, t4)) ? (e4 = e4.substring(r4.raw.length), t4.push(r4), true) : false)) continue;
       if (r4 = this.tokenizer.space(e4)) {
         e4 = e4.substring(r4.raw.length);
-        let o4 = t5.at(-1);
+        let o4 = t4.at(-1);
         r4.raw.length === 1 && o4 !== void 0 ? o4.raw += `
-` : t5.push(r4);
+` : t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.code(e4)) {
         e4 = e4.substring(r4.raw.length);
-        let o4 = t5.at(-1);
+        let o4 = t4.at(-1);
         o4?.type === "paragraph" || o4?.type === "text" ? (o4.raw += (o4.raw.endsWith(`
 `) ? "" : `
 `) + r4.raw, o4.text += `
-` + r4.text, this.inlineQueue.at(-1).src = o4.text) : t5.push(r4);
+` + r4.text, this.inlineQueue.at(-1).src = o4.text) : t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.fences(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.heading(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.hr(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.blockquote(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.list(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.html(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.def(e4)) {
         e4 = e4.substring(r4.raw.length);
-        let o4 = t5.at(-1);
+        let o4 = t4.at(-1);
         o4?.type === "paragraph" || o4?.type === "text" ? (o4.raw += (o4.raw.endsWith(`
 `) ? "" : `
 `) + r4.raw, o4.text += `
-` + r4.raw, this.inlineQueue.at(-1).src = o4.text) : this.tokens.links[r4.tag] || (this.tokens.links[r4.tag] = { href: r4.href, title: r4.title }, t5.push(r4));
+` + r4.raw, this.inlineQueue.at(-1).src = o4.text) : this.tokens.links[r4.tag] || (this.tokens.links[r4.tag] = { href: r4.href, title: r4.title }, t4.push(r4));
         continue;
       }
       if (r4 = this.tokenizer.table(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
       if (r4 = this.tokenizer.lheading(e4)) {
-        e4 = e4.substring(r4.raw.length), t5.push(r4);
+        e4 = e4.substring(r4.raw.length), t4.push(r4);
         continue;
       }
-      let i4 = e4;
+      let i5 = e4;
       if (this.options.extensions?.startBlock) {
-        let o4 = 1 / 0, u4 = e4.slice(1), a4;
+        let o4 = 1 / 0, u5 = e4.slice(1), a4;
         this.options.extensions.startBlock.forEach((c4) => {
-          a4 = c4.call({ lexer: this }, u4), typeof a4 == "number" && a4 >= 0 && (o4 = Math.min(o4, a4));
-        }), o4 < 1 / 0 && o4 >= 0 && (i4 = e4.substring(0, o4 + 1));
+          a4 = c4.call({ lexer: this }, u5), typeof a4 == "number" && a4 >= 0 && (o4 = Math.min(o4, a4));
+        }), o4 < 1 / 0 && o4 >= 0 && (i5 = e4.substring(0, o4 + 1));
       }
-      if (this.state.top && (r4 = this.tokenizer.paragraph(i4))) {
-        let o4 = t5.at(-1);
-        n4 && o4?.type === "paragraph" ? (o4.raw += (o4.raw.endsWith(`
+      if (this.state.top && (r4 = this.tokenizer.paragraph(i5))) {
+        let o4 = t4.at(-1);
+        n3 && o4?.type === "paragraph" ? (o4.raw += (o4.raw.endsWith(`
 `) ? "" : `
 `) + r4.raw, o4.text += `
-` + r4.text, this.inlineQueue.pop(), this.inlineQueue.at(-1).src = o4.text) : t5.push(r4), n4 = i4.length !== e4.length, e4 = e4.substring(r4.raw.length);
+` + r4.text, this.inlineQueue.pop(), this.inlineQueue.at(-1).src = o4.text) : t4.push(r4), n3 = i5.length !== e4.length, e4 = e4.substring(r4.raw.length);
         continue;
       }
       if (r4 = this.tokenizer.text(e4)) {
         e4 = e4.substring(r4.raw.length);
-        let o4 = t5.at(-1);
+        let o4 = t4.at(-1);
         o4?.type === "text" ? (o4.raw += (o4.raw.endsWith(`
 `) ? "" : `
 `) + r4.raw, o4.text += `
-` + r4.text, this.inlineQueue.pop(), this.inlineQueue.at(-1).src = o4.text) : t5.push(r4);
+` + r4.text, this.inlineQueue.pop(), this.inlineQueue.at(-1).src = o4.text) : t4.push(r4);
         continue;
       }
       if (e4) {
@@ -16211,72 +16180,72 @@ var x4 = class l5 {
         break;
       }
     }
-    return this.state.top = true, t5;
+    return this.state.top = true, t4;
   }
-  inline(e4, t5 = []) {
-    return this.inlineQueue.push({ src: e4, tokens: t5 }), t5;
+  inline(e4, t4 = []) {
+    return this.inlineQueue.push({ src: e4, tokens: t4 }), t4;
   }
-  inlineTokens(e4, t5 = []) {
+  inlineTokens(e4, t4 = []) {
     this.tokenizer.lexer = this;
-    let n4 = e4, s5 = null;
+    let n3 = e4, s5 = null;
     if (this.tokens.links) {
       let a4 = Object.keys(this.tokens.links);
-      if (a4.length > 0) for (; (s5 = this.tokenizer.rules.inline.reflinkSearch.exec(n4)) !== null; ) a4.includes(s5[0].slice(s5[0].lastIndexOf("[") + 1, -1)) && (n4 = n4.slice(0, s5.index) + "[" + "a".repeat(s5[0].length - 2) + "]" + n4.slice(this.tokenizer.rules.inline.reflinkSearch.lastIndex));
+      if (a4.length > 0) for (; (s5 = this.tokenizer.rules.inline.reflinkSearch.exec(n3)) !== null; ) a4.includes(s5[0].slice(s5[0].lastIndexOf("[") + 1, -1)) && (n3 = n3.slice(0, s5.index) + "[" + "a".repeat(s5[0].length - 2) + "]" + n3.slice(this.tokenizer.rules.inline.reflinkSearch.lastIndex));
     }
-    for (; (s5 = this.tokenizer.rules.inline.anyPunctuation.exec(n4)) !== null; ) n4 = n4.slice(0, s5.index) + "++" + n4.slice(this.tokenizer.rules.inline.anyPunctuation.lastIndex);
+    for (; (s5 = this.tokenizer.rules.inline.anyPunctuation.exec(n3)) !== null; ) n3 = n3.slice(0, s5.index) + "++" + n3.slice(this.tokenizer.rules.inline.anyPunctuation.lastIndex);
     let r4;
-    for (; (s5 = this.tokenizer.rules.inline.blockSkip.exec(n4)) !== null; ) r4 = s5[2] ? s5[2].length : 0, n4 = n4.slice(0, s5.index + r4) + "[" + "a".repeat(s5[0].length - r4 - 2) + "]" + n4.slice(this.tokenizer.rules.inline.blockSkip.lastIndex);
-    n4 = this.options.hooks?.emStrongMask?.call({ lexer: this }, n4) ?? n4;
-    let i4 = false, o4 = "", u4 = 1 / 0;
+    for (; (s5 = this.tokenizer.rules.inline.blockSkip.exec(n3)) !== null; ) r4 = s5[2] ? s5[2].length : 0, n3 = n3.slice(0, s5.index + r4) + "[" + "a".repeat(s5[0].length - r4 - 2) + "]" + n3.slice(this.tokenizer.rules.inline.blockSkip.lastIndex);
+    n3 = this.options.hooks?.emStrongMask?.call({ lexer: this }, n3) ?? n3;
+    let i5 = false, o4 = "", u5 = 1 / 0;
     for (; e4; ) {
-      if (e4.length < u4) u4 = e4.length;
+      if (e4.length < u5) u5 = e4.length;
       else {
         this.infiniteLoopError(e4.charCodeAt(0));
         break;
       }
-      i4 || (o4 = ""), i4 = false;
+      i5 || (o4 = ""), i5 = false;
       let a4;
-      if (this.options.extensions?.inline?.some((p5) => (a4 = p5.call({ lexer: this }, e4, t5)) ? (e4 = e4.substring(a4.raw.length), t5.push(a4), true) : false)) continue;
+      if (this.options.extensions?.inline?.some((p5) => (a4 = p5.call({ lexer: this }, e4, t4)) ? (e4 = e4.substring(a4.raw.length), t4.push(a4), true) : false)) continue;
       if (a4 = this.tokenizer.escape(e4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.tag(e4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.link(e4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.reflink(e4, this.tokens.links)) {
         e4 = e4.substring(a4.raw.length);
-        let p5 = t5.at(-1);
-        a4.type === "text" && p5?.type === "text" ? (p5.raw += a4.raw, p5.text += a4.text) : t5.push(a4);
+        let p5 = t4.at(-1);
+        a4.type === "text" && p5?.type === "text" ? (p5.raw += a4.raw, p5.text += a4.text) : t4.push(a4);
         continue;
       }
-      if (a4 = this.tokenizer.emStrong(e4, n4, o4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+      if (a4 = this.tokenizer.emStrong(e4, n3, o4)) {
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.codespan(e4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.br(e4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
-      if (a4 = this.tokenizer.del(e4, n4, o4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+      if (a4 = this.tokenizer.del(e4, n3, o4)) {
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (a4 = this.tokenizer.autolink(e4)) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       if (!this.state.inLink && (a4 = this.tokenizer.url(e4))) {
-        e4 = e4.substring(a4.raw.length), t5.push(a4);
+        e4 = e4.substring(a4.raw.length), t4.push(a4);
         continue;
       }
       let c4 = e4;
@@ -16287,9 +16256,9 @@ var x4 = class l5 {
         }), p5 < 1 / 0 && p5 >= 0 && (c4 = e4.substring(0, p5 + 1));
       }
       if (a4 = this.tokenizer.inlineText(c4)) {
-        e4 = e4.substring(a4.raw.length), a4.raw.slice(-1) !== "_" && (o4 = a4.raw.slice(-1)), i4 = true;
-        let p5 = t5.at(-1);
-        p5?.type === "text" ? (p5.raw += a4.raw, p5.text += a4.text) : t5.push(a4);
+        e4 = e4.substring(a4.raw.length), a4.raw.slice(-1) !== "_" && (o4 = a4.raw.slice(-1)), i5 = true;
+        let p5 = t4.at(-1);
+        p5?.type === "text" ? (p5.raw += a4.raw, p5.text += a4.text) : t4.push(a4);
         continue;
       }
       if (e4) {
@@ -16297,12 +16266,12 @@ var x4 = class l5 {
         break;
       }
     }
-    return t5;
+    return t4;
   }
   infiniteLoopError(e4) {
-    let t5 = "Infinite loop on byte: " + e4;
-    if (this.options.silent) console.error(t5);
-    else throw new Error(t5);
+    let t4 = "Infinite loop on byte: " + e4;
+    if (this.options.silent) console.error(t4);
+    else throw new Error(t4);
   }
 };
 var y4 = class {
@@ -16314,11 +16283,11 @@ var y4 = class {
   space(e4) {
     return "";
   }
-  code({ text: e4, lang: t5, escaped: n4 }) {
-    let s5 = (t5 || "").match(m5.notSpaceStart)?.[0], r4 = e4.replace(m5.endingNewline, "") + `
+  code({ text: e4, lang: t4, escaped: n3 }) {
+    let s5 = (t4 || "").match(m5.notSpaceStart)?.[0], r4 = e4.replace(m5.endingNewline, "") + `
 `;
-    return s5 ? '<pre><code class="language-' + O2(s5) + '">' + (n4 ? r4 : O2(r4, true)) + `</code></pre>
-` : "<pre><code>" + (n4 ? r4 : O2(r4, true)) + `</code></pre>
+    return s5 ? '<pre><code class="language-' + O2(s5) + '">' + (n3 ? r4 : O2(r4, true)) + `</code></pre>
+` : "<pre><code>" + (n3 ? r4 : O2(r4, true)) + `</code></pre>
 `;
   }
   blockquote({ tokens: e4 }) {
@@ -16332,8 +16301,8 @@ ${this.parser.parse(e4)}</blockquote>
   def(e4) {
     return "";
   }
-  heading({ tokens: e4, depth: t5 }) {
-    return `<h${t5}>${this.parser.parseInline(e4)}</h${t5}>
+  heading({ tokens: e4, depth: t4 }) {
+    return `<h${t4}>${this.parser.parseInline(e4)}</h${t4}>
 `;
   }
   hr(e4) {
@@ -16341,13 +16310,13 @@ ${this.parser.parse(e4)}</blockquote>
 `;
   }
   list(e4) {
-    let t5 = e4.ordered, n4 = e4.start, s5 = "";
+    let t4 = e4.ordered, n3 = e4.start, s5 = "";
     for (let o4 = 0; o4 < e4.items.length; o4++) {
-      let u4 = e4.items[o4];
-      s5 += this.listitem(u4);
+      let u5 = e4.items[o4];
+      s5 += this.listitem(u5);
     }
-    let r4 = t5 ? "ol" : "ul", i4 = t5 && n4 !== 1 ? ' start="' + n4 + '"' : "";
-    return "<" + r4 + i4 + `>
+    let r4 = t4 ? "ol" : "ul", i5 = t4 && n3 !== 1 ? ' start="' + n3 + '"' : "";
+    return "<" + r4 + i5 + `>
 ` + s5 + "</" + r4 + `>
 `;
   }
@@ -16363,19 +16332,19 @@ ${this.parser.parse(e4)}</blockquote>
 `;
   }
   table(e4) {
-    let t5 = "", n4 = "";
-    for (let r4 = 0; r4 < e4.header.length; r4++) n4 += this.tablecell(e4.header[r4]);
-    t5 += this.tablerow({ text: n4 });
+    let t4 = "", n3 = "";
+    for (let r4 = 0; r4 < e4.header.length; r4++) n3 += this.tablecell(e4.header[r4]);
+    t4 += this.tablerow({ text: n3 });
     let s5 = "";
     for (let r4 = 0; r4 < e4.rows.length; r4++) {
-      let i4 = e4.rows[r4];
-      n4 = "";
-      for (let o4 = 0; o4 < i4.length; o4++) n4 += this.tablecell(i4[o4]);
-      s5 += this.tablerow({ text: n4 });
+      let i5 = e4.rows[r4];
+      n3 = "";
+      for (let o4 = 0; o4 < i5.length; o4++) n3 += this.tablecell(i5[o4]);
+      s5 += this.tablerow({ text: n3 });
     }
     return s5 && (s5 = `<tbody>${s5}</tbody>`), `<table>
 <thead>
-` + t5 + `</thead>
+` + t4 + `</thead>
 ` + s5 + `</table>
 `;
   }
@@ -16385,8 +16354,8 @@ ${e4}</tr>
 `;
   }
   tablecell(e4) {
-    let t5 = this.parser.parseInline(e4.tokens), n4 = e4.header ? "th" : "td";
-    return (e4.align ? `<${n4} align="${e4.align}">` : `<${n4}>`) + t5 + `</${n4}>
+    let t4 = this.parser.parseInline(e4.tokens), n3 = e4.header ? "th" : "td";
+    return (e4.align ? `<${n3} align="${e4.align}">` : `<${n3}>`) + t4 + `</${n3}>
 `;
   }
   strong({ tokens: e4 }) {
@@ -16404,20 +16373,20 @@ ${e4}</tr>
   del({ tokens: e4 }) {
     return `<del>${this.parser.parseInline(e4)}</del>`;
   }
-  link({ href: e4, title: t5, tokens: n4 }) {
-    let s5 = this.parser.parseInline(n4), r4 = V2(e4);
+  link({ href: e4, title: t4, tokens: n3 }) {
+    let s5 = this.parser.parseInline(n3), r4 = V2(e4);
     if (r4 === null) return s5;
     e4 = r4;
-    let i4 = '<a href="' + e4 + '"';
-    return t5 && (i4 += ' title="' + O2(t5) + '"'), i4 += ">" + s5 + "</a>", i4;
+    let i5 = '<a href="' + e4 + '"';
+    return t4 && (i5 += ' title="' + O2(t4) + '"'), i5 += ">" + s5 + "</a>", i5;
   }
-  image({ href: e4, title: t5, text: n4, tokens: s5 }) {
-    s5 && (n4 = this.parser.parseInline(s5, this.parser.textRenderer));
+  image({ href: e4, title: t4, text: n3, tokens: s5 }) {
+    s5 && (n3 = this.parser.parseInline(s5, this.parser.textRenderer));
     let r4 = V2(e4);
-    if (r4 === null) return O2(n4);
+    if (r4 === null) return O2(n3);
     e4 = r4;
-    let i4 = `<img src="${e4}" alt="${O2(n4)}"`;
-    return t5 && (i4 += ` title="${O2(t5)}"`), i4 += ">", i4;
+    let i5 = `<img src="${e4}" alt="${O2(n3)}"`;
+    return t4 && (i5 += ` title="${O2(t4)}"`), i5 += ">", i5;
   }
   text(e4) {
     return "tokens" in e4 && e4.tokens ? this.parser.parseInline(e4.tokens) : "escaped" in e4 && e4.escaped ? e4.text : O2(e4.text);
@@ -16462,149 +16431,149 @@ var b3 = class l6 {
   constructor(e4) {
     this.options = e4 || T3, this.options.renderer = this.options.renderer || new y4(), this.renderer = this.options.renderer, this.renderer.options = this.options, this.renderer.parser = this, this.textRenderer = new L2();
   }
-  static parse(e4, t5) {
-    return new l6(t5).parse(e4);
+  static parse(e4, t4) {
+    return new l6(t4).parse(e4);
   }
-  static parseInline(e4, t5) {
-    return new l6(t5).parseInline(e4);
+  static parseInline(e4, t4) {
+    return new l6(t4).parseInline(e4);
   }
   parse(e4) {
     this.renderer.parser = this;
-    let t5 = "";
-    for (let n4 = 0; n4 < e4.length; n4++) {
-      let s5 = e4[n4];
+    let t4 = "";
+    for (let n3 = 0; n3 < e4.length; n3++) {
+      let s5 = e4[n3];
       if (this.options.extensions?.renderers?.[s5.type]) {
-        let i4 = s5, o4 = this.options.extensions.renderers[i4.type].call({ parser: this }, i4);
-        if (o4 !== false || !["space", "hr", "heading", "code", "table", "blockquote", "list", "html", "def", "paragraph", "text"].includes(i4.type)) {
-          t5 += o4 || "";
+        let i5 = s5, o4 = this.options.extensions.renderers[i5.type].call({ parser: this }, i5);
+        if (o4 !== false || !["space", "hr", "heading", "code", "table", "blockquote", "list", "html", "def", "paragraph", "text"].includes(i5.type)) {
+          t4 += o4 || "";
           continue;
         }
       }
       let r4 = s5;
       switch (r4.type) {
         case "space": {
-          t5 += this.renderer.space(r4);
+          t4 += this.renderer.space(r4);
           break;
         }
         case "hr": {
-          t5 += this.renderer.hr(r4);
+          t4 += this.renderer.hr(r4);
           break;
         }
         case "heading": {
-          t5 += this.renderer.heading(r4);
+          t4 += this.renderer.heading(r4);
           break;
         }
         case "code": {
-          t5 += this.renderer.code(r4);
+          t4 += this.renderer.code(r4);
           break;
         }
         case "table": {
-          t5 += this.renderer.table(r4);
+          t4 += this.renderer.table(r4);
           break;
         }
         case "blockquote": {
-          t5 += this.renderer.blockquote(r4);
+          t4 += this.renderer.blockquote(r4);
           break;
         }
         case "list": {
-          t5 += this.renderer.list(r4);
+          t4 += this.renderer.list(r4);
           break;
         }
         case "checkbox": {
-          t5 += this.renderer.checkbox(r4);
+          t4 += this.renderer.checkbox(r4);
           break;
         }
         case "html": {
-          t5 += this.renderer.html(r4);
+          t4 += this.renderer.html(r4);
           break;
         }
         case "def": {
-          t5 += this.renderer.def(r4);
+          t4 += this.renderer.def(r4);
           break;
         }
         case "paragraph": {
-          t5 += this.renderer.paragraph(r4);
+          t4 += this.renderer.paragraph(r4);
           break;
         }
         case "text": {
-          t5 += this.renderer.text(r4);
+          t4 += this.renderer.text(r4);
           break;
         }
         default: {
-          let i4 = 'Token with "' + r4.type + '" type was not found.';
-          if (this.options.silent) return console.error(i4), "";
-          throw new Error(i4);
+          let i5 = 'Token with "' + r4.type + '" type was not found.';
+          if (this.options.silent) return console.error(i5), "";
+          throw new Error(i5);
         }
       }
     }
-    return t5;
+    return t4;
   }
-  parseInline(e4, t5 = this.renderer) {
+  parseInline(e4, t4 = this.renderer) {
     this.renderer.parser = this;
-    let n4 = "";
+    let n3 = "";
     for (let s5 = 0; s5 < e4.length; s5++) {
       let r4 = e4[s5];
       if (this.options.extensions?.renderers?.[r4.type]) {
         let o4 = this.options.extensions.renderers[r4.type].call({ parser: this }, r4);
         if (o4 !== false || !["escape", "html", "link", "image", "strong", "em", "codespan", "br", "del", "text"].includes(r4.type)) {
-          n4 += o4 || "";
+          n3 += o4 || "";
           continue;
         }
       }
-      let i4 = r4;
-      switch (i4.type) {
+      let i5 = r4;
+      switch (i5.type) {
         case "escape": {
-          n4 += t5.text(i4);
+          n3 += t4.text(i5);
           break;
         }
         case "html": {
-          n4 += t5.html(i4);
+          n3 += t4.html(i5);
           break;
         }
         case "link": {
-          n4 += t5.link(i4);
+          n3 += t4.link(i5);
           break;
         }
         case "image": {
-          n4 += t5.image(i4);
+          n3 += t4.image(i5);
           break;
         }
         case "checkbox": {
-          n4 += t5.checkbox(i4);
+          n3 += t4.checkbox(i5);
           break;
         }
         case "strong": {
-          n4 += t5.strong(i4);
+          n3 += t4.strong(i5);
           break;
         }
         case "em": {
-          n4 += t5.em(i4);
+          n3 += t4.em(i5);
           break;
         }
         case "codespan": {
-          n4 += t5.codespan(i4);
+          n3 += t4.codespan(i5);
           break;
         }
         case "br": {
-          n4 += t5.br(i4);
+          n3 += t4.br(i5);
           break;
         }
         case "del": {
-          n4 += t5.del(i4);
+          n3 += t4.del(i5);
           break;
         }
         case "text": {
-          n4 += t5.text(i4);
+          n3 += t4.text(i5);
           break;
         }
         default: {
-          let o4 = 'Token with "' + i4.type + '" type was not found.';
+          let o4 = 'Token with "' + i5.type + '" type was not found.';
           if (this.options.silent) return console.error(o4), "";
           throw new Error(o4);
         }
       }
     }
-    return n4;
+    return n3;
   }
 };
 var P2 = class {
@@ -16648,104 +16617,104 @@ var q2 = class {
   constructor(...e4) {
     this.use(...e4);
   }
-  walkTokens(e4, t5) {
-    let n4 = [];
-    for (let s5 of e4) switch (n4 = n4.concat(t5.call(this, s5)), s5.type) {
+  walkTokens(e4, t4) {
+    let n3 = [];
+    for (let s5 of e4) switch (n3 = n3.concat(t4.call(this, s5)), s5.type) {
       case "table": {
         let r4 = s5;
-        for (let i4 of r4.header) n4 = n4.concat(this.walkTokens(i4.tokens, t5));
-        for (let i4 of r4.rows) for (let o4 of i4) n4 = n4.concat(this.walkTokens(o4.tokens, t5));
+        for (let i5 of r4.header) n3 = n3.concat(this.walkTokens(i5.tokens, t4));
+        for (let i5 of r4.rows) for (let o4 of i5) n3 = n3.concat(this.walkTokens(o4.tokens, t4));
         break;
       }
       case "list": {
         let r4 = s5;
-        n4 = n4.concat(this.walkTokens(r4.items, t5));
+        n3 = n3.concat(this.walkTokens(r4.items, t4));
         break;
       }
       default: {
         let r4 = s5;
-        this.defaults.extensions?.childTokens?.[r4.type] ? this.defaults.extensions.childTokens[r4.type].forEach((i4) => {
-          let o4 = r4[i4].flat(1 / 0);
-          n4 = n4.concat(this.walkTokens(o4, t5));
-        }) : r4.tokens && (n4 = n4.concat(this.walkTokens(r4.tokens, t5)));
+        this.defaults.extensions?.childTokens?.[r4.type] ? this.defaults.extensions.childTokens[r4.type].forEach((i5) => {
+          let o4 = r4[i5].flat(1 / 0);
+          n3 = n3.concat(this.walkTokens(o4, t4));
+        }) : r4.tokens && (n3 = n3.concat(this.walkTokens(r4.tokens, t4)));
       }
     }
-    return n4;
+    return n3;
   }
   use(...e4) {
-    let t5 = this.defaults.extensions || { renderers: {}, childTokens: {} };
-    return e4.forEach((n4) => {
-      let s5 = { ...n4 };
-      if (s5.async = this.defaults.async || s5.async || false, n4.extensions && (n4.extensions.forEach((r4) => {
+    let t4 = this.defaults.extensions || { renderers: {}, childTokens: {} };
+    return e4.forEach((n3) => {
+      let s5 = { ...n3 };
+      if (s5.async = this.defaults.async || s5.async || false, n3.extensions && (n3.extensions.forEach((r4) => {
         if (!r4.name) throw new Error("extension name required");
         if ("renderer" in r4) {
-          let i4 = t5.renderers[r4.name];
-          i4 ? t5.renderers[r4.name] = function(...o4) {
-            let u4 = r4.renderer.apply(this, o4);
-            return u4 === false && (u4 = i4.apply(this, o4)), u4;
-          } : t5.renderers[r4.name] = r4.renderer;
+          let i5 = t4.renderers[r4.name];
+          i5 ? t4.renderers[r4.name] = function(...o4) {
+            let u5 = r4.renderer.apply(this, o4);
+            return u5 === false && (u5 = i5.apply(this, o4)), u5;
+          } : t4.renderers[r4.name] = r4.renderer;
         }
         if ("tokenizer" in r4) {
           if (!r4.level || r4.level !== "block" && r4.level !== "inline") throw new Error("extension level must be 'block' or 'inline'");
-          let i4 = t5[r4.level];
-          i4 ? i4.unshift(r4.tokenizer) : t5[r4.level] = [r4.tokenizer], r4.start && (r4.level === "block" ? t5.startBlock ? t5.startBlock.push(r4.start) : t5.startBlock = [r4.start] : r4.level === "inline" && (t5.startInline ? t5.startInline.push(r4.start) : t5.startInline = [r4.start]));
+          let i5 = t4[r4.level];
+          i5 ? i5.unshift(r4.tokenizer) : t4[r4.level] = [r4.tokenizer], r4.start && (r4.level === "block" ? t4.startBlock ? t4.startBlock.push(r4.start) : t4.startBlock = [r4.start] : r4.level === "inline" && (t4.startInline ? t4.startInline.push(r4.start) : t4.startInline = [r4.start]));
         }
-        "childTokens" in r4 && r4.childTokens && (t5.childTokens[r4.name] = r4.childTokens);
-      }), s5.extensions = t5), n4.renderer) {
+        "childTokens" in r4 && r4.childTokens && (t4.childTokens[r4.name] = r4.childTokens);
+      }), s5.extensions = t4), n3.renderer) {
         let r4 = this.defaults.renderer || new y4(this.defaults);
-        for (let i4 in n4.renderer) {
-          if (!(i4 in r4)) throw new Error(`renderer '${i4}' does not exist`);
-          if (["options", "parser"].includes(i4)) continue;
-          let o4 = i4, u4 = n4.renderer[o4], a4 = r4[o4];
+        for (let i5 in n3.renderer) {
+          if (!(i5 in r4)) throw new Error(`renderer '${i5}' does not exist`);
+          if (["options", "parser"].includes(i5)) continue;
+          let o4 = i5, u5 = n3.renderer[o4], a4 = r4[o4];
           r4[o4] = (...c4) => {
-            let p5 = u4.apply(r4, c4);
+            let p5 = u5.apply(r4, c4);
             return p5 === false && (p5 = a4.apply(r4, c4)), p5 || "";
           };
         }
         s5.renderer = r4;
       }
-      if (n4.tokenizer) {
+      if (n3.tokenizer) {
         let r4 = this.defaults.tokenizer || new w4(this.defaults);
-        for (let i4 in n4.tokenizer) {
-          if (!(i4 in r4)) throw new Error(`tokenizer '${i4}' does not exist`);
-          if (["options", "rules", "lexer"].includes(i4)) continue;
-          let o4 = i4, u4 = n4.tokenizer[o4], a4 = r4[o4];
+        for (let i5 in n3.tokenizer) {
+          if (!(i5 in r4)) throw new Error(`tokenizer '${i5}' does not exist`);
+          if (["options", "rules", "lexer"].includes(i5)) continue;
+          let o4 = i5, u5 = n3.tokenizer[o4], a4 = r4[o4];
           r4[o4] = (...c4) => {
-            let p5 = u4.apply(r4, c4);
+            let p5 = u5.apply(r4, c4);
             return p5 === false && (p5 = a4.apply(r4, c4)), p5;
           };
         }
         s5.tokenizer = r4;
       }
-      if (n4.hooks) {
+      if (n3.hooks) {
         let r4 = this.defaults.hooks || new P2();
-        for (let i4 in n4.hooks) {
-          if (!(i4 in r4)) throw new Error(`hook '${i4}' does not exist`);
-          if (["options", "block"].includes(i4)) continue;
-          let o4 = i4, u4 = n4.hooks[o4], a4 = r4[o4];
-          P2.passThroughHooks.has(i4) ? r4[o4] = (c4) => {
-            if (this.defaults.async && P2.passThroughHooksRespectAsync.has(i4)) return (async () => {
-              let k4 = await u4.call(r4, c4);
+        for (let i5 in n3.hooks) {
+          if (!(i5 in r4)) throw new Error(`hook '${i5}' does not exist`);
+          if (["options", "block"].includes(i5)) continue;
+          let o4 = i5, u5 = n3.hooks[o4], a4 = r4[o4];
+          P2.passThroughHooks.has(i5) ? r4[o4] = (c4) => {
+            if (this.defaults.async && P2.passThroughHooksRespectAsync.has(i5)) return (async () => {
+              let k4 = await u5.call(r4, c4);
               return a4.call(r4, k4);
             })();
-            let p5 = u4.call(r4, c4);
+            let p5 = u5.call(r4, c4);
             return a4.call(r4, p5);
           } : r4[o4] = (...c4) => {
             if (this.defaults.async) return (async () => {
-              let k4 = await u4.apply(r4, c4);
+              let k4 = await u5.apply(r4, c4);
               return k4 === false && (k4 = await a4.apply(r4, c4)), k4;
             })();
-            let p5 = u4.apply(r4, c4);
+            let p5 = u5.apply(r4, c4);
             return p5 === false && (p5 = a4.apply(r4, c4)), p5;
           };
         }
         s5.hooks = r4;
       }
-      if (n4.walkTokens) {
-        let r4 = this.defaults.walkTokens, i4 = n4.walkTokens;
+      if (n3.walkTokens) {
+        let r4 = this.defaults.walkTokens, i5 = n3.walkTokens;
         s5.walkTokens = function(o4) {
-          let u4 = [];
-          return u4.push(i4.call(this, o4)), r4 && (u4 = u4.concat(r4.call(this, o4))), u4;
+          let u5 = [];
+          return u5.push(i5.call(this, o4)), r4 && (u5 = u5.concat(r4.call(this, o4))), u5;
         };
       }
       this.defaults = { ...this.defaults, ...s5 };
@@ -16754,44 +16723,44 @@ var q2 = class {
   setOptions(e4) {
     return this.defaults = { ...this.defaults, ...e4 }, this;
   }
-  lexer(e4, t5) {
-    return x4.lex(e4, t5 ?? this.defaults);
+  lexer(e4, t4) {
+    return x4.lex(e4, t4 ?? this.defaults);
   }
-  parser(e4, t5) {
-    return b3.parse(e4, t5 ?? this.defaults);
+  parser(e4, t4) {
+    return b3.parse(e4, t4 ?? this.defaults);
   }
   parseMarkdown(e4) {
-    return (n4, s5) => {
-      let r4 = { ...s5 }, i4 = { ...this.defaults, ...r4 }, o4 = this.onError(!!i4.silent, !!i4.async);
+    return (n3, s5) => {
+      let r4 = { ...s5 }, i5 = { ...this.defaults, ...r4 }, o4 = this.onError(!!i5.silent, !!i5.async);
       if (this.defaults.async === true && r4.async === false) return o4(new Error("marked(): The async option was set to true by an extension. Remove async: false from the parse options object to return a Promise."));
-      if (typeof n4 > "u" || n4 === null) return o4(new Error("marked(): input parameter is undefined or null"));
-      if (typeof n4 != "string") return o4(new Error("marked(): input parameter is of type " + Object.prototype.toString.call(n4) + ", string expected"));
-      if (i4.hooks && (i4.hooks.options = i4, i4.hooks.block = e4), i4.async) return (async () => {
-        let u4 = i4.hooks ? await i4.hooks.preprocess(n4) : n4, c4 = await (i4.hooks ? await i4.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(u4, i4), p5 = i4.hooks ? await i4.hooks.processAllTokens(c4) : c4;
-        i4.walkTokens && await Promise.all(this.walkTokens(p5, i4.walkTokens));
-        let h5 = await (i4.hooks ? await i4.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(p5, i4);
-        return i4.hooks ? await i4.hooks.postprocess(h5) : h5;
+      if (typeof n3 > "u" || n3 === null) return o4(new Error("marked(): input parameter is undefined or null"));
+      if (typeof n3 != "string") return o4(new Error("marked(): input parameter is of type " + Object.prototype.toString.call(n3) + ", string expected"));
+      if (i5.hooks && (i5.hooks.options = i5, i5.hooks.block = e4), i5.async) return (async () => {
+        let u5 = i5.hooks ? await i5.hooks.preprocess(n3) : n3, c4 = await (i5.hooks ? await i5.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(u5, i5), p5 = i5.hooks ? await i5.hooks.processAllTokens(c4) : c4;
+        i5.walkTokens && await Promise.all(this.walkTokens(p5, i5.walkTokens));
+        let h5 = await (i5.hooks ? await i5.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(p5, i5);
+        return i5.hooks ? await i5.hooks.postprocess(h5) : h5;
       })().catch(o4);
       try {
-        i4.hooks && (n4 = i4.hooks.preprocess(n4));
-        let a4 = (i4.hooks ? i4.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(n4, i4);
-        i4.hooks && (a4 = i4.hooks.processAllTokens(a4)), i4.walkTokens && this.walkTokens(a4, i4.walkTokens);
-        let p5 = (i4.hooks ? i4.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(a4, i4);
-        return i4.hooks && (p5 = i4.hooks.postprocess(p5)), p5;
-      } catch (u4) {
-        return o4(u4);
+        i5.hooks && (n3 = i5.hooks.preprocess(n3));
+        let a4 = (i5.hooks ? i5.hooks.provideLexer(e4) : e4 ? x4.lex : x4.lexInline)(n3, i5);
+        i5.hooks && (a4 = i5.hooks.processAllTokens(a4)), i5.walkTokens && this.walkTokens(a4, i5.walkTokens);
+        let p5 = (i5.hooks ? i5.hooks.provideParser(e4) : e4 ? b3.parse : b3.parseInline)(a4, i5);
+        return i5.hooks && (p5 = i5.hooks.postprocess(p5)), p5;
+      } catch (u5) {
+        return o4(u5);
       }
     };
   }
-  onError(e4, t5) {
-    return (n4) => {
-      if (n4.message += `
+  onError(e4, t4) {
+    return (n3) => {
+      if (n3.message += `
 Please report this to https://github.com/markedjs/marked.`, e4) {
-        let s5 = "<p>An error occurred:</p><pre>" + O2(n4.message + "", true) + "</pre>";
-        return t5 ? Promise.resolve(s5) : s5;
+        let s5 = "<p>An error occurred:</p><pre>" + O2(n3.message + "", true) + "</pre>";
+        return t4 ? Promise.resolve(s5) : s5;
       }
-      if (t5) return Promise.reject(n4);
-      throw n4;
+      if (t4) return Promise.reject(n3);
+      throw n3;
     };
   }
 };
@@ -16828,48 +16797,48 @@ var Xt = g4.parseInline;
 var Vt = b3.parse;
 var Yt = x4.lex;
 
-// src/utils.js
-function fmtBytes(n4) {
-  if (n4 == null) return "";
-  if (n4 < 1024) return n4 + " B";
-  if (n4 < 1024 * 1024) return (n4 / 1024).toFixed(1) + " K";
-  if (n4 < 1024 * 1024 * 1024) return (n4 / 1024 / 1024).toFixed(1) + " M";
-  return (n4 / 1024 / 1024 / 1024).toFixed(1) + " G";
+// src/utils.ts
+function fmtBytes(n3) {
+  if (n3 == null) return "";
+  if (n3 < 1024) return n3 + " B";
+  if (n3 < 1024 * 1024) return (n3 / 1024).toFixed(1) + " K";
+  if (n3 < 1024 * 1024 * 1024) return (n3 / 1024 / 1024).toFixed(1) + " M";
+  return (n3 / 1024 / 1024 / 1024).toFixed(1) + " G";
 }
-function fmtBytesShort(n4) {
-  if (!n4 && n4 !== 0) return "";
-  if (n4 < 1024) return n4 + " B";
-  if (n4 < 1024 * 1024) return (n4 / 1024).toFixed(0) + " KB";
-  return (n4 / (1024 * 1024)).toFixed(1) + " MB";
+function fmtBytesShort(n3) {
+  if (n3 == null) return "";
+  if (n3 < 1024) return n3 + " B";
+  if (n3 < 1024 * 1024) return (n3 / 1024).toFixed(0) + " KB";
+  return (n3 / (1024 * 1024)).toFixed(1) + " MB";
 }
 function fmtRelative(ts) {
   if (!ts) return "";
   const norm = ts.includes("T") ? ts : ts.replace(" ", "T") + "Z";
-  const t5 = Date.parse(norm);
-  if (!t5) return "";
-  const sec = Math.max(0, (Date.now() - t5) / 1e3);
+  const t4 = Date.parse(norm);
+  if (!t4) return "";
+  const sec = Math.max(0, (Date.now() - t4) / 1e3);
   if (sec < 60) return "just now";
   if (sec < 3600) return Math.floor(sec / 60) + "m";
   if (sec < 86400) return Math.floor(sec / 3600) + "h";
   if (sec < 86400 * 7) return Math.floor(sec / 86400) + "d";
-  return new Date(t5).toLocaleDateString();
+  return new Date(t4).toLocaleDateString();
 }
 function fmtAbsolute(ts) {
   if (!ts) return "";
   const norm = ts.includes("T") ? ts : ts.replace(" ", "T") + "Z";
-  const t5 = Date.parse(norm);
-  if (!t5) return "";
-  return new Date(t5).toLocaleString();
+  const t4 = Date.parse(norm);
+  if (!t4) return "";
+  return new Date(t4).toLocaleString();
 }
 function tsKey(s5) {
   if (!s5) return 0;
   const norm = s5.includes("T") ? s5 : s5.replace(" ", "T") + "Z";
-  const n4 = Date.parse(norm);
-  return Number.isFinite(n4) ? n4 : 0;
+  const n3 = Date.parse(norm);
+  return Number.isFinite(n3) ? n3 : 0;
 }
 function parentPath(p5) {
-  const i4 = p5.lastIndexOf("/");
-  return i4 < 0 ? "" : p5.slice(0, i4);
+  const i5 = p5.lastIndexOf("/");
+  return i5 < 0 ? "" : p5.slice(0, i5);
 }
 function normalizeFileLinks(text) {
   const re = /\[([^\]\n]+)\]\(([^<>\n()]*(?:\([^()\n]*\)[^<>\n()]*)*)\)/g;
@@ -16885,7 +16854,7 @@ function normalizeFileLinks(text) {
 function renderMarkdown(text) {
   try {
     return g4.parse(normalizeFileLinks(text || ""), { breaks: true, gfm: true });
-  } catch (_5) {
+  } catch {
     return null;
   }
 }
@@ -16940,7 +16909,7 @@ function rewriteFileLinks(root, groupId2, onNavFile) {
   });
 }
 
-// src/hash.js
+// src/hash.ts
 var PATTERNS = [
   "/g/:gid/t/:tid/:kind/*filepath",
   "/g/:gid/t/:tid",
@@ -16948,7 +16917,9 @@ var PATTERNS = [
   "/g/:gid"
 ];
 var matchers = PATTERNS.map((p5) => (0, import_path_to_regexp.match)(p5));
-var builders = Object.fromEntries(PATTERNS.map((p5) => [p5, (0, import_path_to_regexp.compile)(p5)]));
+var builders = Object.fromEntries(
+  PATTERNS.map((p5) => [p5, (0, import_path_to_regexp.compile)(p5)])
+);
 function parseHash() {
   const raw = location.hash.replace(/^#/, "").replace(/\/$/, "");
   if (!raw) return null;
@@ -16956,12 +16927,17 @@ function parseHash() {
   for (const m6 of matchers) {
     const r4 = m6(test);
     if (!r4) continue;
-    const { gid, tid, kind, filepath } = r4.params;
+    const params = r4.params;
+    const gid = String(params.gid || "");
+    const tid = params.tid ? String(params.tid) : null;
+    const kind = params.kind ? String(params.kind) : "";
+    const filepath = params.filepath;
     if (kind && kind !== "f" && kind !== "d") continue;
+    const path = Array.isArray(filepath) ? filepath.join("/") : filepath ? String(filepath) : "";
     return {
       groupId: gid,
-      threadId: tid || null,
-      path: Array.isArray(filepath) ? filepath.join("/") : filepath || "",
+      threadId: tid,
+      path,
       isDir: !kind || kind === "d"
     };
   }
@@ -17000,10 +16976,10 @@ function applyAdminFlag() {
   isAdmin.value = !!(g5 && g5.isAdmin);
   document.body.classList.toggle("is-admin", isAdmin.value);
 }
-function threadCtx(t5) {
-  if (!t5) return null;
-  if (!t5.channelType || t5.channelType === "web") return null;
-  return { channelType: t5.channelType, messagingGroupId: t5.messagingGroupId, canSend: !!t5.canSend };
+function threadCtx(t4) {
+  if (!t4) return null;
+  if (!t4.channelType || t4.channelType === "web") return null;
+  return { channelType: t4.channelType, messagingGroupId: t4.messagingGroupId ?? null, canSend: !!t4.canSend };
 }
 async function applyHash(router2) {
   const parsed = parseHash();
@@ -17039,11 +17015,11 @@ async function applyHash(router2) {
   }
 }
 
-// src/notify.js
+// src/notify.ts
 function loadMuted() {
   try {
     return localStorage.getItem(NOTIF_MUTE_KEY) === "1";
-  } catch (_5) {
+  } catch {
     return false;
   }
 }
@@ -17052,7 +17028,7 @@ function initNotif() {
   j3(() => {
     try {
       localStorage.setItem(NOTIF_MUTE_KEY, notifMutedSig.value ? "1" : "0");
-    } catch (_5) {
+    } catch {
     }
   });
 }
@@ -17069,26 +17045,27 @@ function maybeNotify(text, files) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   try {
     const body = (text || "").slice(0, 200) + (files && files.length ? ` \xB7 ${files.length} file${files.length > 1 ? "s" : ""}` : "");
-    const n4 = new Notification("NanoClaw", { body, icon: "icon.svg", tag: "nanoclaw-chat" });
-    n4.onclick = () => {
+    const n3 = new Notification("NanoClaw", { body, icon: "icon.svg", tag: "nanoclaw-chat" });
+    n3.onclick = () => {
       window.focus();
-      n4.close();
+      n3.close();
     };
-  } catch (_5) {
+  } catch {
   }
 }
 
-// src/actions.js
+// src/actions.ts
 async function loadThreads(gid) {
   try {
-    const { threads: t5 } = await api(`api/groups/${encodeURIComponent(gid)}/chat/threads`);
-    threads.value = t5 || [];
+    const { threads: t4 } = await api(`api/groups/${encodeURIComponent(gid)}/chat/threads`);
+    threads.value = t4 || [];
   } catch (err) {
     console.error("threads load failed", err);
     threads.value = [];
   }
 }
 async function deleteThread(tid) {
+  if (!groupId.value) return;
   try {
     const r4 = await fetch(`api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(tid)}`, {
       method: "DELETE",
@@ -17100,7 +17077,8 @@ async function deleteThread(tid) {
     }
   } catch (err) {
     console.error("delete failed", err);
-    chatStatus.value = "delete failed: " + (err.message || "network error");
+    const m6 = err instanceof Error ? err.message : "network error";
+    chatStatus.value = "delete failed: " + m6;
     return;
   }
   threads.value = threads.value.filter((x5) => x5.threadId !== tid);
@@ -17110,23 +17088,23 @@ async function deleteThread(tid) {
     else clearChat();
   }
 }
-function threadCtxOf(t5) {
-  if (!t5 || !t5.channelType || t5.channelType === "web") return null;
-  return { channelType: t5.channelType, messagingGroupId: t5.messagingGroupId, canSend: !!t5.canSend };
+function threadCtxOf(t4) {
+  if (!t4 || !t4.channelType || t4.channelType === "web") return null;
+  return { channelType: t4.channelType, messagingGroupId: t4.messagingGroupId ?? null, canSend: !!t4.canSend };
 }
 function bumpActiveThread(maxTs) {
   if (!threadId.value) return;
   const list = threads.value.slice();
   const idx = list.findIndex((x5) => x5.threadId === threadId.value);
   if (idx < 0) {
-    loadThreads(groupId.value);
+    if (groupId.value) loadThreads(groupId.value);
     return;
   }
-  const t5 = { ...list[idx] };
-  t5.lastActivityAt = maxTs || (/* @__PURE__ */ new Date()).toISOString();
-  t5.messageCount = (t5.messageCount || 0) + 1;
+  const t4 = { ...list[idx] };
+  t4.lastActivityAt = maxTs || (/* @__PURE__ */ new Date()).toISOString();
+  t4.messageCount = (t4.messageCount || 0) + 1;
   list.splice(idx, 1);
-  list.unshift(t5);
+  list.unshift(t4);
   threads.value = list;
 }
 function updateActiveThreadTitleFromFirstMessage(text) {
@@ -17134,11 +17112,11 @@ function updateActiveThreadTitleFromFirstMessage(text) {
   const list = threads.value.slice();
   const idx = list.findIndex((x5) => x5.threadId === threadId.value);
   if (idx < 0) return;
-  const t5 = list[idx];
-  if (t5.title !== "(new thread)") return;
+  const t4 = list[idx];
+  if (t4.title !== "(new thread)") return;
   const clean = String(text || "").replace(/^>\s*Context[^\n]*\n+/i, "").replace(/\s+/g, " ").trim();
   if (!clean) return;
-  list[idx] = { ...t5, title: clean.slice(0, 60) };
+  list[idx] = { ...t4, title: clean.slice(0, 60) };
   threads.value = list;
 }
 function clearChat() {
@@ -17155,7 +17133,7 @@ function clearChat() {
   if (refs.ws) {
     try {
       refs.ws.close();
-    } catch (_5) {
+    } catch {
     }
     refs.ws = null;
   }
@@ -17186,11 +17164,11 @@ function startChatPoll() {
   }, POLL_INTERVAL_MS);
 }
 function historyUrl(gid, tid) {
-  let u4 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
+  let u5 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   if (channelType.value && channelType.value !== "web" && messagingGroupId.value) {
-    u4 += `?channel=${encodeURIComponent(channelType.value)}&mg=${encodeURIComponent(messagingGroupId.value)}`;
+    u5 += `?channel=${encodeURIComponent(channelType.value)}&mg=${encodeURIComponent(messagingGroupId.value)}`;
   }
-  return u4;
+  return u5;
 }
 function appendMsg(direction, text, files, ts, id) {
   const key = id ? `${direction}:${id}` : null;
@@ -17203,6 +17181,7 @@ function normDirection(d5) {
 }
 async function refetchThreadHistory(appendNewOnly) {
   const gid = groupId.value, tid = threadId.value;
+  if (!gid || !tid) return;
   const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
   const { messages } = await r4.json();
@@ -17239,7 +17218,7 @@ async function openChat(gid, resumeTid, opts) {
   if (refs.ws) {
     try {
       refs.ws.close();
-    } catch (_5) {
+    } catch {
     }
     refs.ws = null;
   }
@@ -17249,17 +17228,19 @@ async function openChat(gid, resumeTid, opts) {
   }
   stopChatPoll();
   refs.reconnectAttempt = 0;
-  let ct = "web", mg = null, cs = true;
+  let ct = "web";
+  let mg = null;
+  let cs = true;
   if (opts && opts.channelType) {
     ct = opts.channelType;
     mg = opts.messagingGroupId || null;
     cs = !!opts.canSend;
   } else if (resumeTid) {
-    const t5 = threads.value.find((x5) => x5.threadId === resumeTid);
-    if (t5 && t5.channelType && t5.channelType !== "web") {
-      ct = t5.channelType;
-      mg = t5.messagingGroupId || null;
-      cs = !!t5.canSend;
+    const t4 = threads.value.find((x5) => x5.threadId === resumeTid);
+    if (t4 && t4.channelType && t4.channelType !== "web") {
+      ct = t4.channelType;
+      mg = t4.messagingGroupId || null;
+      cs = !!t4.canSend;
     }
   }
   n2(() => {
@@ -17320,7 +17301,8 @@ async function openChat(gid, resumeTid, opts) {
     if (!r4.ok) throw new Error("HTTP " + r4.status);
     started = await r4.json();
   } catch (err) {
-    chatStatus.value = "failed to start chat: " + err.message;
+    const m6 = err instanceof Error ? err.message : String(err);
+    chatStatus.value = "failed to start chat: " + m6;
     return;
   }
   threadId.value = started.threadId;
@@ -17373,7 +17355,7 @@ function connectChatWs() {
     let payload;
     try {
       payload = JSON.parse(ev.data);
-    } catch (_5) {
+    } catch {
       return;
     }
     if (payload.kind === "ready") return;
@@ -17383,8 +17365,8 @@ function connectChatWs() {
       return;
     }
     if (payload.kind === "inbound") {
-      appendMsg("in", payload.text, payload.files || null, payload.timestamp, payload.id);
-      updateActiveThreadTitleFromFirstMessage(payload.text);
+      appendMsg("in", payload.text || "", payload.files || null, payload.timestamp || "", payload.id);
+      updateActiveThreadTitleFromFirstMessage(payload.text || "");
       bumpActiveThread();
       return;
     }
@@ -17392,7 +17374,7 @@ function connectChatWs() {
       const c4 = payload.content || {};
       const text = typeof c4 === "string" ? c4 : c4.text || c4.markdown || "";
       const dir = payload.messageKind === "internal" ? "internal" : "out";
-      appendMsg(dir, text, payload.files || [], payload.timestamp, payload.id);
+      appendMsg(dir, text, payload.files || [], payload.timestamp || "", payload.id);
       bumpActiveThread();
       if (dir === "out") maybeNotify(text, payload.files || []);
       return;
@@ -17405,7 +17387,7 @@ async function sendChat(text, files) {
   const hasFiles = Array.isArray(files) && files.length > 0;
   if (!isWeb) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    const fileMetas = hasFiles ? files.map((f4) => ({ filename: f4.name, size: f4.size })) : null;
+    const fileMetas = hasFiles ? files.map((f5) => ({ filename: f5.name, size: f5.size })) : null;
     appendMsg("in", text || "", fileMetas, now);
   }
   let url = `api/groups/${encodeURIComponent(groupId.value)}/chat/${encodeURIComponent(threadId.value)}/send`;
@@ -17417,7 +17399,9 @@ async function sendChat(text, files) {
     if (hasFiles) {
       const fd = new FormData();
       fd.append("text", text || "");
-      for (const f4 of files) fd.append("file", f4, f4.name);
+      for (const f5 of files) {
+        if (f5.file) fd.append("file", f5.file, f5.name);
+      }
       res = await fetch(url, { method: "POST", credentials: "same-origin", body: fd });
     } else {
       res = await fetch(url, {
@@ -17432,18 +17416,19 @@ async function sendChat(text, files) {
       try {
         const j5 = await res.json();
         if (j5 && j5.error) detail = j5.error + (j5.detail ? ` (${j5.detail})` : "");
-      } catch (_5) {
+      } catch {
       }
       chatStatus.value = `send failed: ${detail}`;
     } else if (!isWeb) {
       try {
         await refetchThreadHistory(false);
-      } catch (_5) {
+      } catch {
       }
     }
   } catch (err) {
     console.error("send failed", err);
-    chatStatus.value = `send failed: ${err && err.message ? err.message : "network error"}`;
+    const m6 = err instanceof Error ? err.message : "network error";
+    chatStatus.value = `send failed: ${m6}`;
   }
 }
 function startThreadsPoll(gid) {
@@ -17454,7 +17439,7 @@ function startThreadsPoll(gid) {
   refs.threadsPollTimer = setInterval(() => {
     if (groupId.value === gid) loadThreads(gid).catch(() => {
     });
-    else {
+    else if (refs.threadsPollTimer) {
       clearInterval(refs.threadsPollTimer);
       refs.threadsPollTimer = null;
     }
@@ -17486,12 +17471,13 @@ async function loadTree(p5) {
     treeEntries.value = [];
   });
   try {
+    if (!groupId.value) return;
     const segs = String(p5 || "").split("/").filter(Boolean).map(encodeURIComponent);
     const url = `api/groups/${encodeURIComponent(groupId.value)}/dirs/${segs.length ? segs.join("/") + "/" : ""}`;
     const { entries } = await api(url);
     treeEntries.value = entries || [];
   } catch (err) {
-    const msg = /HTTP 404/.test(String(err && err.message)) ? "Not found. It may have been renamed or deleted." : String(err && err.message || err);
+    const msg = /HTTP 404/.test(String(err && err.message)) ? "Not found. It may have been renamed or deleted." : String(err?.message || err);
     treeError.value = msg;
   }
 }
@@ -17509,9 +17495,11 @@ async function navFile(entry) {
 }
 async function selectFile(entry) {
   filePath.value = entry.path;
+  if (!groupId.value) return;
   const segs = String(entry.path || "").split("/").filter(Boolean).map(encodeURIComponent);
   const url = `api/groups/${encodeURIComponent(groupId.value)}/files/${segs.join("/")}`;
-  let size = entry.size, mtime = entry.mtime;
+  let size = entry.size;
+  let mtime = entry.mtime;
   try {
     const h5 = await fetch(url, { method: "HEAD", credentials: "same-origin" });
     if (h5.status >= 400) {
@@ -17526,14 +17514,14 @@ async function selectFile(entry) {
     if (!mtime) {
       const lm = h5.headers.get("last-modified");
       if (lm) {
-        const t5 = Date.parse(lm);
-        if (t5) mtime = new Date(t5).toISOString();
+        const t4 = Date.parse(lm);
+        if (t4) mtime = new Date(t4).toISOString();
       }
     }
-  } catch (_5) {
+  } catch {
   }
-  const ext = entry.name.toLowerCase().split(".").pop();
-  const meta = { name: entry.name, size, mtime, url, path: entry.path };
+  const ext = entry.name.toLowerCase().split(".").pop() || "";
+  const meta = { name: entry.name, size: size ?? null, mtime: mtime ?? null, url, path: entry.path };
   if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) previewBlock.value = { kind: "image", ...meta };
   else if (["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "weba"].includes(ext)) previewBlock.value = { kind: "audio", ...meta };
   else if (["mp4", "m4v", "mov", "webm", "ogv"].includes(ext)) previewBlock.value = { kind: "video", ...meta };
@@ -17554,7 +17542,7 @@ async function selectFile(entry) {
         previewBlock.value = { kind: "binary", mime: ctType, ...meta };
       }
     } catch (err) {
-      previewBlock.value = { kind: "error", text: String(err && err.message || err), ...meta };
+      previewBlock.value = { kind: "error", text: String(err?.message || err), ...meta };
     }
   }
   fetchAndAttachMeta(entry.path).catch(() => {
@@ -17562,14 +17550,15 @@ async function selectFile(entry) {
 }
 async function fetchAndAttachMeta(p5) {
   const gid = groupId.value;
+  if (!gid) return;
   const segs = String(p5 || "").split("/").filter(Boolean).map(encodeURIComponent);
-  const u4 = `api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}?meta=1`;
-  const r4 = await fetch(u4, { credentials: "same-origin", cache: "no-store" });
+  const u5 = `api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}?meta=1`;
+  const r4 = await fetch(u5, { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
   const data = await r4.json();
   const cur = previewBlock.value;
   if (!cur || cur.path !== p5) return;
-  previewBlock.value = {
+  const next = {
     ...cur,
     tags: data.tags || null,
     lyrics: data.lyrics || null,
@@ -17577,6 +17566,7 @@ async function fetchAndAttachMeta(p5) {
     size: data.size ?? cur.size,
     mtime: data.mtime || cur.mtime
   };
+  previewBlock.value = next;
 }
 function closePreview() {
   n2(() => {
@@ -17599,28 +17589,28 @@ function clearPinnedContext() {
 function addPendingFiles(fileList, max, maxSize, maxTotal) {
   if (!fileList || fileList.length === 0) return;
   const next = pending.value.slice();
-  let totalBytes = next.reduce((n4, f4) => n4 + f4.size, 0);
-  for (const f4 of fileList) {
+  let totalBytes = next.reduce((n3, f5) => n3 + f5.size, 0);
+  for (const f5 of Array.from(fileList)) {
     if (next.length >= max) {
       chatStatus.value = `max ${max} files per message`;
       break;
     }
-    if (f4.size > maxSize) {
-      chatStatus.value = `${f4.name} too large (max ${(maxSize / 1024 / 1024).toFixed(0)} MB)`;
+    if (f5.size > maxSize) {
+      chatStatus.value = `${f5.name} too large (max ${(maxSize / 1024 / 1024).toFixed(0)} MB)`;
       continue;
     }
-    if (totalBytes + f4.size > maxTotal) {
+    if (totalBytes + f5.size > maxTotal) {
       chatStatus.value = `total upload too large (max ${(maxTotal / 1024 / 1024).toFixed(0)} MB)`;
       break;
     }
-    next.push(f4);
-    totalBytes += f4.size;
+    next.push({ name: f5.name, size: f5.size, file: f5 });
+    totalBytes += f5.size;
   }
   pending.value = next;
 }
-function removePending(i4) {
+function removePending(i5) {
   const next = pending.value.slice();
-  next.splice(i4, 1);
+  next.splice(i5, 1);
   pending.value = next;
 }
 function clearPending() {
@@ -17637,7 +17627,7 @@ function installLivenessHandlers() {
     if (!threadId.value) return;
     refetchThreadHistory(true).catch((err) => console.error("resume catchup failed", err));
     const ws = refs.ws;
-    const open = ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
+    const open = !!ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
     if (channelType.value === "web" && !open) {
       if (refs.reconnectTimer) {
         clearTimeout(refs.reconnectTimer);
@@ -17648,49 +17638,95 @@ function installLivenessHandlers() {
   });
 }
 
-// src/components/Header.js
-function Header() {
-  const onChange = (e4) => {
-    selectGroup(e4.target.value).catch(console.error);
-  };
-  return html`
-    <header>
-      <button type="button" class="icon-btn mobile-only" aria-label="Threads"
-              onClick=${() => {
-    drawerOpen.threads.value = !drawerOpen.threads.value;
-    drawerOpen.files.value = false;
-  }}>\u2630</button>
-      <span class="brand">NanoClaw</span>
-      <select id="group-select" aria-label="Agent group" value=${groupId.value || ""} onChange=${onChange}>
-        ${groups.value.map((g5) => html`<option value=${g5.id}>${g5.name}${g5.isAdmin ? " [admin]" : ""}</option>`)}
-      </select>
-      <div class="spacer"></div>
-      <span class="user" id="me">${me.value}</span>
-      <button type="button" class="icon-btn mobile-only" aria-label="Files"
-              onClick=${() => {
-    drawerOpen.files.value = !drawerOpen.files.value;
-    drawerOpen.threads.value = false;
-  }}>\uD83D\uDCC1</button>
-      <button type="button" class="icon-btn" aria-label="Settings" title="Settings"
-              onClick=${() => {
-    settingsOpen.value = !settingsOpen.value;
-  }}>\u2699\uFE0F</button>
-      <form method="POST" action="/ui/auth/logout" id="logout-form" style="margin:0">
-        <button type="submit" aria-label="Log out" title="Log out">
-          <svg class="mobile-only" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          <span id="logout-label" class="desktop-only">Log out</span>
-        </button>
-      </form>
-    </header>
-  `;
+// node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
+var f4 = 0;
+var i4 = Array.isArray;
+function u4(e4, t4, n3, o4, i5, u5) {
+  t4 || (t4 = {});
+  var a4, c4, p5 = t4;
+  if ("ref" in p5) for (c4 in p5 = {}, t4) "ref" == c4 ? a4 = t4[c4] : p5[c4] = t4[c4];
+  var l7 = { type: e4, props: p5, key: n3, ref: a4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f4, __i: -1, __u: 0, __source: i5, __self: u5 };
+  if ("function" == typeof e4 && (a4 = e4.defaultProps)) for (c4 in a4) void 0 === p5[c4] && (p5[c4] = a4[c4]);
+  return l.vnode && l.vnode(l7), l7;
 }
 
-// src/components/Pane.js
+// src/components/Header.tsx
+function Header() {
+  const onChange = (e4) => {
+    selectGroup(e4.currentTarget.value).catch(console.error);
+  };
+  return /* @__PURE__ */ u4("header", { children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn mobile-only",
+        "aria-label": "Threads",
+        onClick: () => {
+          drawerOpen.threads.value = !drawerOpen.threads.value;
+          drawerOpen.files.value = false;
+        },
+        children: "\u2630"
+      }
+    ),
+    /* @__PURE__ */ u4("span", { class: "brand", children: "NanoClaw" }),
+    /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: groups.value.map((g5) => /* @__PURE__ */ u4("option", { value: g5.id, children: [
+      g5.name,
+      g5.isAdmin ? " [admin]" : ""
+    ] }, g5.id)) }),
+    /* @__PURE__ */ u4("div", { class: "spacer" }),
+    /* @__PURE__ */ u4("span", { class: "user", id: "me", children: me.value }),
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn mobile-only",
+        "aria-label": "Files",
+        onClick: () => {
+          drawerOpen.files.value = !drawerOpen.files.value;
+          drawerOpen.threads.value = false;
+        },
+        children: "\u{1F4C1}"
+      }
+    ),
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn",
+        "aria-label": "Settings",
+        title: "Settings",
+        onClick: () => {
+          settingsOpen.value = !settingsOpen.value;
+        },
+        children: "\u2699\uFE0F"
+      }
+    ),
+    /* @__PURE__ */ u4("form", { method: "POST", action: "/ui/auth/logout", id: "logout-form", style: "margin:0", children: /* @__PURE__ */ u4("button", { type: "submit", "aria-label": "Log out", title: "Log out", children: [
+      /* @__PURE__ */ u4(
+        "svg",
+        {
+          class: "mobile-only",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+          "aria-hidden": "true",
+          children: [
+            /* @__PURE__ */ u4("path", { d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" }),
+            /* @__PURE__ */ u4("polyline", { points: "16 17 21 12 16 7" }),
+            /* @__PURE__ */ u4("line", { x1: "21", y1: "12", x2: "9", y2: "12" })
+          ]
+        }
+      ),
+      /* @__PURE__ */ u4("span", { id: "logout-label", class: "desktop-only", children: "Log out" })
+    ] }) })
+  ] });
+}
+
+// src/components/Pane.tsx
 function Pane({ paneKey, name, label, extraClass, headActions, children }) {
   const mobile = isMobile.value;
   const collapsed = !mobile && !paneOpen[paneKey].value;
@@ -17710,117 +17746,123 @@ function Pane({ paneKey, name, label, extraClass, headActions, children }) {
     ev.stopPropagation();
     toggle();
   };
-  return html`
-    <aside class=${cls} id=${name} onClick=${onPaneClick}>
-      <div class="head" onClick=${onHeadClick}>
-        <button type="button" class="icon-btn desktop-only" id=${"btn-" + paneKey + "-toggle"}
-                aria-label=${collapsed ? "Expand " + label : "Collapse " + label}
-                onClick=${(e4) => {
-    e4.stopPropagation();
-    toggle();
-  }}></button>
-        <span class="title">${label}</span>
-      </div>
-      ${headActions || null}
-      ${children}
-    </aside>
-  `;
+  return /* @__PURE__ */ u4("aside", { class: cls, id: name, onClick: onPaneClick, children: [
+    /* @__PURE__ */ u4("div", { class: "head", onClick: onHeadClick, children: [
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "icon-btn desktop-only",
+          id: "btn-" + paneKey + "-toggle",
+          "aria-label": collapsed ? "Expand " + label : "Collapse " + label,
+          onClick: (e4) => {
+            e4.stopPropagation();
+            toggle();
+          }
+        }
+      ),
+      /* @__PURE__ */ u4("span", { class: "title", children: label })
+    ] }),
+    headActions || null,
+    children
+  ] });
 }
 
-// src/components/RelativeTime.js
+// src/components/RelativeTime.tsx
 function RelativeTime({ ts, className }) {
   nowTick.value;
   if (!ts) return null;
-  return html`<span class=${className || "ts"} title=${fmtAbsolute(ts)}>${fmtRelative(ts)}</span>`;
+  return /* @__PURE__ */ u4("span", { class: className || "ts", title: fmtAbsolute(ts), children: fmtRelative(ts) });
 }
 
-// src/components/ThreadsRail.js
+// src/components/ThreadsRail.tsx
 var OLD_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1e3;
-function threadCtxOf2(t5) {
-  if (!t5 || !t5.channelType || t5.channelType === "web") return null;
-  return { channelType: t5.channelType, messagingGroupId: t5.messagingGroupId, canSend: !!t5.canSend };
+function threadCtxOf2(t4) {
+  if (!t4 || !t4.channelType || t4.channelType === "web") return null;
+  return { channelType: t4.channelType, messagingGroupId: t4.messagingGroupId ?? null, canSend: !!t4.canSend };
 }
-function ThreadRow({ t: t5 }) {
-  const ct = t5.channelType || "web";
+function ThreadRow({ t: t4 }) {
+  const ct = t4.channelType || "web";
   const meta = channelMeta(ct);
-  const active = t5.threadId === threadId.value;
-  const pillTitle = `${meta.label}${t5.counterparty ? " \xB7 " + t5.counterparty : ""}`;
-  const subTrailer = `${t5.messageCount ? " \xB7 " + t5.messageCount + " msg" : ""}${ct !== "web" && t5.counterparty ? " \xB7 " + t5.counterparty : ""}`;
+  const active = t4.threadId === threadId.value;
+  const pillTitle = `${meta.label}${t4.counterparty ? " \xB7 " + t4.counterparty : ""}`;
+  const subTrailer = `${t4.messageCount ? " \xB7 " + t4.messageCount + " msg" : ""}${ct !== "web" && t4.counterparty ? " \xB7 " + t4.counterparty : ""}`;
   const onOpen = (ev) => {
     if (ev.target.classList.contains("del")) return;
-    openChat(groupId.value, t5.threadId, threadCtxOf2(t5)).catch(console.error);
+    if (groupId.value) openChat(groupId.value, t4.threadId, threadCtxOf2(t4)).catch(console.error);
     drawerOpen.threads.value = false;
   };
   const onDel = async (ev) => {
     ev.stopPropagation();
     if (!confirm(`Delete this thread?
 
-"${t5.title}"`)) return;
-    await deleteThread(t5.threadId);
+"${t4.title}"`)) return;
+    await deleteThread(t4.threadId);
   };
-  return html`
-    <div class=${"thread" + (active ? " active" : "")} data-id=${t5.threadId} onClick=${onOpen}>
-      <div class="title">
-        ${ct !== "web" ? html`<span class="ch-pill" title=${pillTitle}>${meta.icon}</span>` : null}
-        ${t5.title}
-      </div>
-      <div class="meta"><${RelativeTime} ts=${t5.lastActivityAt} />${subTrailer}</div>
-      ${ct === "web" ? html`<button type="button" class="del" title="Delete thread" aria-label="Delete thread" onClick=${onDel}>\u00d7</button>` : null}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "thread" + (active ? " active" : ""), "data-id": t4.threadId, onClick: onOpen, children: [
+    /* @__PURE__ */ u4("div", { class: "title", children: [
+      ct !== "web" ? /* @__PURE__ */ u4("span", { class: "ch-pill", title: pillTitle, children: meta.icon }) : null,
+      t4.title
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "meta", children: [
+      /* @__PURE__ */ u4(RelativeTime, { ts: t4.lastActivityAt }),
+      subTrailer
+    ] }),
+    ct === "web" ? /* @__PURE__ */ u4("button", { type: "button", class: "del", title: "Delete thread", "aria-label": "Delete thread", onClick: onDel, children: "\xD7" }) : null
+  ] });
 }
-function DmRow({ t: t5 }) {
-  const ct = t5.channelType || "web";
+function DmRow({ t: t4 }) {
+  const ct = t4.channelType || "web";
   const meta = channelMeta(ct);
-  const active = t5.threadId === threadId.value;
+  const active = t4.threadId === threadId.value;
   const onOpen = () => {
-    openChat(groupId.value, t5.threadId, threadCtxOf2(t5)).catch(console.error);
+    if (groupId.value) openChat(groupId.value, t4.threadId, threadCtxOf2(t4)).catch(console.error);
     drawerOpen.threads.value = false;
   };
-  return html`
-    <div class=${"thread dm" + (active ? " active" : "")} data-id=${t5.threadId} onClick=${onOpen}>
-      <div class="title">
-        <span class="ch-pill dm" title=${meta.label}>${meta.icon}</span>
-        ${meta.label}
-      </div>
-      <div class="meta">
-        <${RelativeTime} ts=${t5.lastActivityAt} />
-        ${t5.counterparty ? " \xB7 " + t5.counterparty : ""}
-        ${t5.messageCount ? " \xB7 " + t5.messageCount + " msg" : ""}
-      </div>
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "thread dm" + (active ? " active" : ""), "data-id": t4.threadId, onClick: onOpen, children: [
+    /* @__PURE__ */ u4("div", { class: "title", children: [
+      /* @__PURE__ */ u4("span", { class: "ch-pill dm", title: meta.label, children: meta.icon }),
+      meta.label
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "meta", children: [
+      /* @__PURE__ */ u4(RelativeTime, { ts: t4.lastActivityAt }),
+      t4.counterparty ? " \xB7 " + t4.counterparty : "",
+      t4.messageCount ? " \xB7 " + t4.messageCount + " msg" : ""
+    ] })
+  ] });
 }
-function renderRow(t5) {
-  return t5.kind === "dm" ? html`<${DmRow} key=${t5.threadId} t=${t5} />` : html`<${ThreadRow} key=${t5.threadId} t=${t5} />`;
+function renderRow(t4) {
+  return t4.kind === "dm" ? /* @__PURE__ */ u4(DmRow, { t: t4 }, t4.threadId) : /* @__PURE__ */ u4(ThreadRow, { t: t4 }, t4.threadId);
 }
 function ChannelSection({ label, items }) {
   const [showOlder, setShowOlder] = h2(false);
   const cutoff = Date.now() - OLD_THRESHOLD_MS;
   const recent = [];
   const old = [];
-  for (const t5 of items) {
-    const ts = tsKey(t5.lastActivityAt);
-    if (ts && ts >= cutoff) recent.push(t5);
-    else old.push(t5);
+  for (const t4 of items) {
+    const ts = tsKey(t4.lastActivityAt);
+    if (ts && ts >= cutoff) recent.push(t4);
+    else old.push(t4);
   }
-  const activeOld = old.find((t5) => t5.threadId === threadId.value);
+  const activeOld = old.find((t4) => t4.threadId === threadId.value);
   const visible = activeOld && !showOlder ? [...recent, activeOld] : recent;
-  const hidden = activeOld && !showOlder ? old.filter((t5) => t5 !== activeOld) : old;
+  const hidden = activeOld && !showOlder ? old.filter((t4) => t4 !== activeOld) : old;
   const visibleList = showOlder ? items : visible;
-  return html`
-    <div class="thread-section">${label}</div>
-    ${visibleList.map(renderRow)}
-    ${!showOlder && hidden.length > 0 ? html`<button type="button" class="thread-show-older" onClick=${() => setShowOlder(true)}>
-          Show ${hidden.length} older
-        </button>` : null}
-  `;
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("div", { class: "thread-section", children: label }),
+    visibleList.map(renderRow),
+    !showOlder && hidden.length > 0 ? /* @__PURE__ */ u4("button", { type: "button", class: "thread-show-older", onClick: () => setShowOlder(true), children: [
+      "Show ",
+      hidden.length,
+      " older"
+    ] }) : null
+  ] });
 }
 function ThreadsRail() {
   const list = threads.value;
   const onNewChat = () => {
     if (!groupId.value) return;
-    openChat(groupId.value, null).then(() => {
+    openChat(groupId.value, null, null).then(() => {
       const el = document.getElementById("chat-input");
       if (el) el.focus();
       drawerOpen.threads.value = false;
@@ -17828,10 +17870,10 @@ function ThreadsRail() {
     }).catch(console.error);
   };
   const buckets = /* @__PURE__ */ new Map();
-  for (const t5 of list) {
-    const ct = t5.channelType || "web";
+  for (const t4 of list) {
+    const ct = t4.channelType || "web";
     if (!buckets.has(ct)) buckets.set(ct, []);
-    buckets.get(ct).push(t5);
+    buckets.get(ct).push(t4);
   }
   const sections = Array.from(buckets.entries()).map(([ct, items]) => ({ ct, label: channelMeta(ct).label, items })).sort((a4, b4) => {
     if (a4.ct === "web" && b4.ct !== "web") return -1;
@@ -17841,78 +17883,83 @@ function ThreadsRail() {
   for (const s5 of sections) {
     s5.items.sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt));
   }
-  return html`
-    <${Pane} paneKey="threads" name="threads-rail" label="Threads">
-      <div class="threads-actions">
-        <button type="button" id="btn-new-chat" onClick=${onNewChat}>
-          <span class="plus">+</span> <span class="label">New thread</span>
-        </button>
-      </div>
-      <div class="list" id="threads-list">
-        ${list.length === 0 ? html`<div class="empty">No threads yet</div>` : sections.map((s5) => html`<${ChannelSection} key=${s5.ct} label=${s5.label} items=${s5.items} />`)}
-      </div>
-    <//>
-  `;
+  return /* @__PURE__ */ u4(Pane, { paneKey: "threads", name: "threads-rail", label: "Threads", children: [
+    /* @__PURE__ */ u4("div", { class: "threads-actions", children: /* @__PURE__ */ u4("button", { type: "button", id: "btn-new-chat", onClick: onNewChat, children: [
+      /* @__PURE__ */ u4("span", { class: "plus", children: "+" }),
+      " ",
+      /* @__PURE__ */ u4("span", { class: "label", children: "New thread" })
+    ] }) }),
+    /* @__PURE__ */ u4("div", { class: "list", id: "threads-list", children: list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No threads yet" }) : sections.map((s5) => /* @__PURE__ */ u4(ChannelSection, { label: s5.label, items: s5.items }, s5.ct)) })
+  ] });
 }
 
-// src/components/ChatMain.js
+// src/components/ChatMain.tsx
 function Message({ m: m6 }) {
   const ref = A2(null);
   const md = renderMarkdown(m6.text);
   y2(() => {
-    if (md != null && ref.current) {
+    if (md != null && ref.current && groupId.value) {
       rewriteFileLinks(ref.current, groupId.value, (entry) => navFile(entry).catch(console.error));
     }
   }, [m6.text, md != null]);
   const cls = "msg " + m6.direction + (md != null ? " markdown" : "");
-  return html`
-    <div class=${cls}>
-      ${m6.direction === "internal" ? html`<div class="internal-label">internal</div>` : null}
-      ${md != null ? html`<div ref=${ref} dangerouslySetInnerHTML=${{ __html: md }} />` : m6.text || ""}
-      ${m6.files && m6.files.length ? html`<div class="files">${m6.files.map(
-    (f4) => f4.path ? html`<button
-                type="button"
-                class="file-chip"
-                title=${"/" + f4.path}
-                onClick=${() => navFile({ path: f4.path, name: f4.filename, size: f4.size }).catch(console.error)}
-              >\uD83D\uDCCE ${f4.filename}</button>` : html`<span class="file-chip inert" title="Source not in workspace">\uD83D\uDCCE ${f4.filename}</span>`
-  )}</div>` : null}
-      ${m6.ts ? html`<div class="meta"><${RelativeTime} ts=${m6.ts} /></div>` : null}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: cls, children: [
+    m6.direction === "internal" ? /* @__PURE__ */ u4("div", { class: "internal-label", children: "internal" }) : null,
+    md != null ? /* @__PURE__ */ u4("div", { ref, dangerouslySetInnerHTML: { __html: md } }) : m6.text || "",
+    m6.files && m6.files.length ? /* @__PURE__ */ u4("div", { class: "files", children: m6.files.map((f5) => f5.path ? /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "file-chip",
+        title: "/" + f5.path,
+        onClick: () => navFile({ path: f5.path, name: f5.filename, size: f5.size }).catch(console.error),
+        children: [
+          "\u{1F4CE} ",
+          f5.filename
+        ]
+      },
+      f5.path
+    ) : /* @__PURE__ */ u4("span", { class: "file-chip inert", title: "Source not in workspace", children: [
+      "\u{1F4CE} ",
+      f5.filename
+    ] }, f5.filename)) }) : null,
+    m6.ts ? /* @__PURE__ */ u4("div", { class: "meta", children: /* @__PURE__ */ u4(RelativeTime, { ts: m6.ts }) }) : null
+  ] });
 }
 function groupMessages(list) {
-  const groups2 = [];
-  let pending2 = [];
+  const out = [];
+  let pendingMsgs = [];
   for (const m6 of list) {
     if (m6.direction === "internal") {
-      pending2.push(m6);
-    } else if (m6.direction === "out" && pending2.length > 0) {
-      groups2.push({ kind: "thoughts", thoughts: pending2, answer: m6 });
-      pending2 = [];
+      pendingMsgs.push(m6);
+    } else if (m6.direction === "out" && pendingMsgs.length > 0) {
+      out.push({ kind: "thoughts", thoughts: pendingMsgs, answer: m6 });
+      pendingMsgs = [];
     } else {
-      groups2.push({ kind: "single", m: m6 });
+      out.push({ kind: "single", m: m6 });
     }
   }
-  for (const t5 of pending2) groups2.push({ kind: "single", m: t5 });
-  return groups2;
+  for (const t4 of pendingMsgs) out.push({ kind: "single", m: t4 });
+  return out;
 }
 function ThoughtGroup({ thoughts, answer }) {
   const [showThoughts, setShowThoughts] = h2(false);
-  const n4 = thoughts.length;
-  const label = showThoughts ? "answer" : n4 > 1 ? `thoughts (${n4})` : "thoughts";
+  const n3 = thoughts.length;
+  const label = showThoughts ? "answer" : n3 > 1 ? `thoughts (${n3})` : "thoughts";
   const title = showThoughts ? "Show final answer" : "Show agent thoughts leading to this answer";
-  return html`
-    <div class="thought-group">
-      <button
-        type="button"
-        class="thoughts-toggle"
-        title=${title}
-        onClick=${() => setShowThoughts((v5) => !v5)}
-      >${label}</button>
-      ${showThoughts ? thoughts.map((t5, i4) => html`<${Message} key=${"t" + i4} m=${t5} />`) : html`<${Message} m=${answer} />`}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "thought-group", children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "thoughts-toggle",
+        title,
+        onClick: () => setShowThoughts((v5) => !v5),
+        children: label
+      }
+    ),
+    showThoughts ? thoughts.map((t4, i5) => /* @__PURE__ */ u4(Message, { m: t4 }, "t" + i5)) : /* @__PURE__ */ u4(Message, { m: answer })
+  ] });
 }
 function MessageLog() {
   const ref = A2(null);
@@ -17922,44 +17969,36 @@ function MessageLog() {
   const list = chatMessages.value;
   const groups2 = groupMessages(list);
   const typing = isTyping.value && threadId.value && !chatLoading.value;
-  return html`
-    <div class="log" id="chat-log" ref=${ref}>
-      ${chatLoading.value ? null : !threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : groups2.map((g5, i4) => g5.kind === "thoughts" ? html`<${ThoughtGroup} key=${i4} thoughts=${g5.thoughts} answer=${g5.answer} />` : html`<${Message} key=${i4} m=${g5.m} />`)}
-      ${typing ? html`<div class="typing" aria-live="polite">
-            <span></span><span></span><span></span>
-            ${typingHint.value ? html`<span class="hint">${typingHint.value}</span>` : null}
-          </div>` : null}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "log", id: "chat-log", ref, children: [
+    chatLoading.value ? null : !threadId.value ? /* @__PURE__ */ u4("div", { class: "empty", children: "Pick or start a chat." }) : list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No messages yet." }) : groups2.map((g5, i5) => g5.kind === "thoughts" ? /* @__PURE__ */ u4(ThoughtGroup, { thoughts: g5.thoughts, answer: g5.answer }, i5) : /* @__PURE__ */ u4(Message, { m: g5.m }, i5)),
+    typing ? /* @__PURE__ */ u4("div", { class: "typing", "aria-live": "polite", children: [
+      /* @__PURE__ */ u4("span", {}),
+      /* @__PURE__ */ u4("span", {}),
+      /* @__PURE__ */ u4("span", {}),
+      typingHint.value ? /* @__PURE__ */ u4("span", { class: "hint", children: typingHint.value }) : null
+    ] }) : null
+  ] });
 }
 function ContextChip() {
   const pins = pinnedContext.value;
-  if (pins.length === 0) return html`<div class="context" id="chat-context" hidden></div>`;
-  return html`
-    <div class="context" id="chat-context">
-      ${pins.map((p5) => html`
-        <span class="chip" key=${p5}>
-          <span>\uD83D\uDCCE</span>
-          <span class="path" title=${p5}>${p5}</span>
-          <button type="button" title="Unpin" onClick=${() => removePinnedPath(p5)}>\u00d7</button>
-        </span>
-      `)}
-    </div>
-  `;
+  if (pins.length === 0) return /* @__PURE__ */ u4("div", { class: "context", id: "chat-context", hidden: true });
+  return /* @__PURE__ */ u4("div", { class: "context", id: "chat-context", children: pins.map((p5) => /* @__PURE__ */ u4("span", { class: "chip", children: [
+    /* @__PURE__ */ u4("span", { children: "\u{1F4CE}" }),
+    /* @__PURE__ */ u4("span", { class: "path", title: p5, children: p5 }),
+    /* @__PURE__ */ u4("button", { type: "button", title: "Unpin", onClick: () => removePinnedPath(p5), children: "\xD7" })
+  ] }, p5)) });
 }
 function PendingTray() {
   const list = pending.value;
-  if (list.length === 0) return html`<div class="pending" id="chat-pending" hidden></div>`;
-  return html`
-    <div class="pending" id="chat-pending">
-      ${list.map((f4, i4) => html`
-        <span class="item" key=${i4}>
-          \uD83D\uDCCE ${f4.name} (${fmtBytesShort(f4.size)})
-          <button type="button" title="Remove" onClick=${() => removePending(i4)}>\u00d7</button>
-        </span>
-      `)}
-    </div>
-  `;
+  if (list.length === 0) return /* @__PURE__ */ u4("div", { class: "pending", id: "chat-pending", hidden: true });
+  return /* @__PURE__ */ u4("div", { class: "pending", id: "chat-pending", children: list.map((f5, i5) => /* @__PURE__ */ u4("span", { class: "item", children: [
+    "\u{1F4CE} ",
+    f5.name,
+    " (",
+    fmtBytesShort(f5.size),
+    ")",
+    /* @__PURE__ */ u4("button", { type: "button", title: "Remove", onClick: () => removePending(i5), children: "\xD7" })
+  ] }, i5)) });
 }
 function Composer() {
   const inputRef = A2(null);
@@ -17986,8 +18025,8 @@ function Composer() {
   };
   const onAttachClick = () => fileRef.current?.click();
   const onFileChange = (ev) => {
-    addPendingFiles(Array.from(ev.target.files || []), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
-    ev.target.value = "";
+    addPendingFiles(Array.from(ev.currentTarget.files || []), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    ev.currentTarget.value = "";
   };
   const onPaste = (ev) => {
     const items = ev.clipboardData && ev.clipboardData.files;
@@ -17995,30 +18034,47 @@ function Composer() {
     ev.preventDefault();
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
-  return html`
-    <form id="chat-form" onSubmit=${onSubmit} style=${showComposer ? "" : "display:none"}>
-      <input type="file" id="chat-file" multiple hidden ref=${fileRef} onChange=${onFileChange} />
-      <button type="button" id="chat-attach" title="Attach files" aria-label="Attach files" onClick=${onAttachClick}>\uD83D\uDCCE</button>
-      <textarea id="chat-input" rows="1" placeholder="Message the agent\u2026" ref=${inputRef} onKeyDown=${onKey} onPaste=${onPaste}></textarea>
-      <button type="submit" id="chat-send">Send</button>
-    </form>
-  `;
+  return /* @__PURE__ */ u4("form", { id: "chat-form", onSubmit, style: showComposer ? "" : "display:none", children: [
+    /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
+    /* @__PURE__ */ u4("button", { type: "button", id: "chat-attach", title: "Attach files", "aria-label": "Attach files", onClick: onAttachClick, children: "\u{1F4CE}" }),
+    /* @__PURE__ */ u4(
+      "textarea",
+      {
+        id: "chat-input",
+        rows: 1,
+        placeholder: "Message the agent\u2026",
+        ref: inputRef,
+        onKeyDown: onKey,
+        onPaste
+      }
+    ),
+    /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", children: "Send" })
+  ] });
 }
 function ReadonlyBanner() {
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
-  if (showComposer) return html`<div class="readonly-banner" hidden></div>`;
+  if (showComposer) return /* @__PURE__ */ u4("div", { class: "readonly-banner", hidden: true });
   const meta = channelMeta(channelType.value);
-  return html`<div class="readonly-banner">Read-only view \u2014 reply on ${meta.label} to continue this thread.</div>`;
+  return /* @__PURE__ */ u4("div", { class: "readonly-banner", children: [
+    "Read-only view \u2014 reply on ",
+    meta.label,
+    " to continue this thread."
+  ] });
 }
 function Subnotice() {
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
-  if (!(showComposer && !isWeb)) return html`<div class="chat-subnotice" hidden></div>`;
+  if (!(showComposer && !isWeb)) return /* @__PURE__ */ u4("div", { class: "chat-subnotice", hidden: true });
   const meta = channelMeta(channelType.value);
-  const t5 = threads.value.find((x5) => x5.threadId === threadId.value);
-  const cp = t5 && t5.counterparty ? ` \xB7 ${t5.counterparty}` : "";
-  return html`<div class="chat-subnotice">${meta.icon} Sending via ${meta.label}${cp}</div>`;
+  const t4 = threads.value.find((x5) => x5.threadId === threadId.value);
+  const cp = t4 && t4.counterparty ? ` \xB7 ${t4.counterparty}` : "";
+  return /* @__PURE__ */ u4("div", { class: "chat-subnotice", children: [
+    meta.icon,
+    " Sending via ",
+    meta.label,
+    cp
+  ] });
 }
 function ChatMain() {
   const ref = A2(null);
@@ -18026,7 +18082,7 @@ function ChatMain() {
     const el = ref.current;
     if (!el) return void 0;
     let depth = 0;
-    const hasFiles = (ev) => ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes("Files");
+    const hasFiles = (ev) => !!ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes("Files");
     const onEnter = (ev) => {
       if (!hasFiles(ev)) return;
       ev.preventDefault();
@@ -18036,7 +18092,7 @@ function ChatMain() {
     const onOver = (ev) => {
       if (!hasFiles(ev)) return;
       ev.preventDefault();
-      ev.dataTransfer.dropEffect = "copy";
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
     };
     const onLeave = () => {
       depth = Math.max(0, depth - 1);
@@ -18061,20 +18117,18 @@ function ChatMain() {
       el.removeEventListener("drop", onDrop);
     };
   }, []);
-  return html`
-    <section class="chat-main" id="chat-main" ref=${ref}>
-      <${MessageLog} />
-      <div class="status" id="chat-status">${chatStatus.value}</div>
-      <${ContextChip} />
-      <${PendingTray} />
-      <${ReadonlyBanner} />
-      <${Subnotice} />
-      <${Composer} />
-    </section>
-  `;
+  return /* @__PURE__ */ u4("section", { class: "chat-main", id: "chat-main", ref, children: [
+    /* @__PURE__ */ u4(MessageLog, {}),
+    /* @__PURE__ */ u4("div", { class: "status", id: "chat-status", children: chatStatus.value }),
+    /* @__PURE__ */ u4(ContextChip, {}),
+    /* @__PURE__ */ u4(PendingTray, {}),
+    /* @__PURE__ */ u4(ReadonlyBanner, {}),
+    /* @__PURE__ */ u4(Subnotice, {}),
+    /* @__PURE__ */ u4(Composer, {})
+  ] });
 }
 
-// src/uploads.js
+// src/uploads.ts
 function curDir() {
   return treePath.value || "";
 }
@@ -18110,7 +18164,7 @@ async function touchPrompt() {
   await loadTree(treePath.value);
 }
 async function renameEntry(entry) {
-  if (!isAdmin.value) return;
+  if (!isAdmin.value || !groupId.value) return;
   const next = prompt("Rename to:", entry.name);
   if (!next) return;
   const trimmed = next.trim();
@@ -18125,7 +18179,7 @@ async function renameEntry(entry) {
   await loadTree(treePath.value);
 }
 async function deleteEntry(entry) {
-  if (!isAdmin.value) return;
+  if (!isAdmin.value || !groupId.value) return;
   if (!confirm(`Delete ${entry.type === "dir" ? "folder" : "file"} "${entry.name}"?`)) return;
   const r4 = await postJson(`api/groups/${groupId.value}/delete`, { path: entry.path });
   if (!r4.ok) {
@@ -18135,7 +18189,7 @@ async function deleteEntry(entry) {
   await loadTree(treePath.value);
 }
 async function deletePaths(paths) {
-  if (!isAdmin.value || paths.length === 0) return;
+  if (!isAdmin.value || !groupId.value || paths.length === 0) return;
   if (!confirm(`Delete ${paths.length} item${paths.length === 1 ? "" : "s"}?`)) return;
   const errors = [];
   for (const p5 of paths) {
@@ -18171,7 +18225,9 @@ function triggerDownload(url, filename) {
 }
 function updateItem(idx, patch) {
   const next = uploadItems.value.slice();
-  next[idx] = { ...next[idx], ...patch };
+  const cur = next[idx];
+  if (!cur) return;
+  next[idx] = { ...cur, ...patch };
   uploadItems.value = next;
 }
 function clearUploadStrip() {
@@ -18183,12 +18239,18 @@ function resolveConflict(idx, action) {
     return;
   }
   updateItem(idx, { status: "uploading", pct: 0, statusText: "uploading\u2026" });
-  uploadOne(idx, action).catch((err) => updateItem(idx, { status: "error", statusText: String(err && err.message || err) }));
+  uploadOne(idx, action).catch((err) => updateItem(idx, {
+    status: "error",
+    statusText: String(err?.message || err)
+  }));
 }
 function uploadOne(idx, mode) {
   return new Promise((resolve) => {
     const item = uploadItems.value[idx];
-    if (!item) return resolve();
+    if (!item) {
+      resolve();
+      return;
+    }
     const fd = new FormData();
     fd.append("file", item.file, item.name);
     const xhr = new XMLHttpRequest();
@@ -18201,11 +18263,11 @@ function uploadOne(idx, mode) {
       let body = {};
       try {
         body = JSON.parse(xhr.responseText || "{}");
-      } catch (_5) {
+      } catch {
       }
       const r4 = body.results && body.results[0] || {};
       if (xhr.status >= 200 && xhr.status < 300 && r4.status === "ok") {
-        updateItem(idx, { status: "ok", statusText: "uploaded", path: r4.path });
+        updateItem(idx, { status: "ok", statusText: "uploaded", path: r4.path ?? null });
       } else if (r4.status === "conflict") {
         updateItem(idx, { status: "conflict", statusText: "file exists" });
       } else {
@@ -18231,8 +18293,11 @@ async function uploadFiles(fileList) {
     statusText: "uploading\u2026",
     path: null
   }));
-  for (let i4 = 0; i4 < uploadItems.value.length; i4++) {
-    await uploadOne(i4, "skip").catch((err) => updateItem(i4, { status: "error", statusText: String(err && err.message || err) }));
+  for (let i5 = 0; i5 < uploadItems.value.length; i5++) {
+    await uploadOne(i5, "skip").catch((err) => updateItem(i5, {
+      status: "error",
+      statusText: String(err?.message || err)
+    }));
   }
   await loadTree(treePath.value);
 }
@@ -18249,7 +18314,7 @@ async function notifyAgent(paths) {
   clearUploadStrip();
 }
 
-// src/components/Toast.js
+// src/components/Toast.tsx
 var nextId = 1;
 var hideTimer = null;
 function showToast(text, kind = "ok", ms = 1800) {
@@ -18265,30 +18330,29 @@ function showToast(text, kind = "ok", ms = 1800) {
   }, ms);
 }
 function Toast() {
-  const t5 = toastMessage.value;
-  y2(() => void 0, [t5?.id]);
-  if (!t5) return null;
-  return html`
-    <div class=${"toast toast-" + (t5.kind || "ok")} role="status" aria-live="polite" key=${t5.id}>${t5.text}</div>
-  `;
+  const t4 = toastMessage.value;
+  y2(() => void 0, [t4?.id]);
+  if (!t4) return null;
+  return /* @__PURE__ */ u4("div", { class: "toast toast-" + (t4.kind || "ok"), role: "status", "aria-live": "polite", children: t4.text }, t4.id);
 }
 
-// src/components/ActionsMenu.js
-function fileUrl(groupId2, relPath) {
+// src/components/ActionsMenu.tsx
+function fileUrl(gid, relPath) {
   const segs = String(relPath || "").split("/").filter(Boolean).map(encodeURIComponent);
-  return `api/groups/${encodeURIComponent(groupId2)}/files/${segs.join("/")}`;
+  return `api/groups/${encodeURIComponent(gid)}/files/${segs.join("/")}`;
 }
-function openInNewTab(groupId2, relPath) {
-  if (!groupId2 || !relPath) return;
-  window.open(fileUrl(groupId2, relPath), "_blank", "noopener");
+function openInNewTab(gid, relPath) {
+  if (!gid || !relPath) return;
+  window.open(fileUrl(gid, relPath), "_blank", "noopener");
 }
-async function sharePrivate(groupId2, entry) {
-  if (!groupId2 || !entry?.path) return;
-  const url = new URL(fileUrl(groupId2, entry.path), window.location.href).toString();
+async function sharePrivate(gid, entry) {
+  if (!gid || !entry?.path) return;
+  const url = new URL(fileUrl(gid, entry.path), window.location.href).toString();
   const title = entry.name || entry.path.slice(entry.path.lastIndexOf("/") + 1);
-  if (navigator.share) {
+  const navAny = navigator;
+  if (navAny.share) {
     try {
-      await navigator.share({ title, url });
+      await navAny.share({ title, url });
       return;
     } catch (err) {
       if (err && err.name === "AbortError") return;
@@ -18301,9 +18365,9 @@ async function sharePrivate(groupId2, entry) {
     showToast("Copy failed", "err");
   }
 }
-function shareWithToken(groupId2, entry) {
-  if (!groupId2 || !entry?.path) return;
-  shareModalRequest.value = { groupId: groupId2, entry: { path: entry.path, name: entry.name, type: entry.type } };
+function shareWithToken(gid, entry) {
+  if (!gid || !entry?.path) return;
+  shareModalRequest.value = { groupId: gid, entry: { path: entry.path, name: entry.name || "", type: entry.type } };
 }
 function entriesByPath(paths) {
   const set = new Set(paths);
@@ -18329,31 +18393,42 @@ function ActionsMenu({ mode, entry, onUpload }) {
   }, [open]);
   const items = buildItems(mode, entry, onUpload);
   if (items.length === 0) return null;
-  return html`
-    <div class=${"action-menu" + (open ? " open" : "")} ref=${wrapRef}>
-      <button type="button" class="text-btn action-trigger" aria-haspopup="menu" aria-expanded=${open}
-              title="Actions" onClick=${(ev) => {
-    ev.stopPropagation();
-    setOpen((o4) => !o4);
-  }}>\u22EF</button>
-      ${open ? html`
-        <div class="action-panel" role="menu">
-          ${items.map((it, i4) => it === "---" ? html`<div class="action-sep" key=${"s" + i4}></div>` : html`
-                <button type="button" class=${"action-item" + (it.danger ? " danger" : "")}
-                        role="menuitem" key=${it.label} disabled=${it.disabled}
-                        onClick=${(ev) => {
-    ev.stopPropagation();
-    setOpen(false);
-    it.onClick();
-  }}>
-                  <span class="ico">${it.ico}</span>
-                  <span class="lbl">${it.label}</span>
-                </button>
-              `)}
-        </div>
-      ` : null}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "action-menu" + (open ? " open" : ""), ref: wrapRef, children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "text-btn action-trigger",
+        "aria-haspopup": "menu",
+        "aria-expanded": open,
+        title: "Actions",
+        onClick: (ev) => {
+          ev.stopPropagation();
+          setOpen((o4) => !o4);
+        },
+        children: "\u22EF"
+      }
+    ),
+    open ? /* @__PURE__ */ u4("div", { class: "action-panel", role: "menu", children: items.map((it, i5) => it === "---" ? /* @__PURE__ */ u4("div", { class: "action-sep" }, "s" + i5) : /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "action-item" + (it.danger ? " danger" : ""),
+        role: "menuitem",
+        disabled: it.disabled,
+        onClick: (ev) => {
+          ev.stopPropagation();
+          setOpen(false);
+          it.onClick();
+        },
+        children: [
+          /* @__PURE__ */ u4("span", { class: "ico", children: it.ico }),
+          /* @__PURE__ */ u4("span", { class: "lbl", children: it.label })
+        ]
+      },
+      it.label
+    )) }) : null
+  ] });
 }
 function buildItems(mode, entry, onUpload) {
   const admin = isAdmin.value;
@@ -18377,12 +18452,14 @@ function buildItems(mode, entry, onUpload) {
     const p5 = previewBlock.value;
     const fp = filePath.value;
     if (!p5) return [];
-    const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name, type: "file" } : null);
+    const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name || "", type: "file" } : null);
     const items2 = [];
     items2.push({ ico: "\u21AA", label: "Share privately", onClick: () => sharePrivate(gid, entryForPath), disabled: !fp || !gid });
     items2.push({ ico: "\u{1F517}", label: "Share with link\u2026", onClick: () => shareWithToken(gid, entryForPath), disabled: !fp || !gid });
     items2.push({ ico: "\u2197", label: "Open in new tab", onClick: () => openInNewTab(gid, fp), disabled: !fp || !gid });
-    items2.push({ ico: "\u2B07", label: "Download", onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
+    items2.push({ ico: "\u2B07", label: "Download", onClick: () => {
+      if (fp && entryForPath) downloadPaths([fp], [entryForPath]);
+    }, disabled: !fp });
     if (admin && entryForPath) {
       items2.push("---");
       items2.push({ ico: "\u270E", label: "Rename", onClick: () => renameEntry(entryForPath) });
@@ -18413,32 +18490,31 @@ function buildItems(mode, entry, onUpload) {
   return items;
 }
 
-// src/components/MediaPlayer.js
+// src/components/MediaPlayer.tsx
 function MediaPlayer({ kind, url, name, floating }) {
   if (kind !== "audio" && kind !== "video") return null;
   const ref = A2(null);
   y2(() => {
-    const el2 = ref.current;
-    if (!el2) return void 0;
+    const el = ref.current;
+    if (!el) return void 0;
     const push = () => {
-      mediaCurrentTime.value = el2.currentTime || 0;
+      mediaCurrentTime.value = el.currentTime || 0;
     };
-    el2.addEventListener("timeupdate", push);
-    el2.addEventListener("seeked", push);
-    el2.addEventListener("loadedmetadata", push);
+    el.addEventListener("timeupdate", push);
+    el.addEventListener("seeked", push);
+    el.addEventListener("loadedmetadata", push);
     push();
     return () => {
-      el2.removeEventListener("timeupdate", push);
-      el2.removeEventListener("seeked", push);
-      el2.removeEventListener("loadedmetadata", push);
+      el.removeEventListener("timeupdate", push);
+      el.removeEventListener("seeked", push);
+      el.removeEventListener("loadedmetadata", push);
     };
   }, [url]);
-  const el = kind === "audio" ? html`<audio controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />` : html`<video controls preload="metadata" src=${url} aria-label=${name} ref=${ref} />`;
   const cls = "media-player media-player-" + kind + (floating ? " media-player-floating" : "");
-  return html`<div class=${cls}>${el}</div>`;
+  return /* @__PURE__ */ u4("div", { class: cls, children: kind === "audio" ? /* @__PURE__ */ u4("audio", { controls: true, preload: "metadata", src: url, "aria-label": name, ref }) : /* @__PURE__ */ u4("video", { controls: true, preload: "metadata", src: url, "aria-label": name, ref }) });
 }
 
-// src/components/LyricsPanel.js
+// src/components/LyricsPanel.tsx
 var TS_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
 var OFFSET_RE = /^\s*\[offset:\s*([+-]?\d+)\s*\]\s*$/i;
 function parseLyrics(text) {
@@ -18466,19 +18542,19 @@ function parseLyrics(text) {
       continue;
     }
     sawTimestamp = true;
-    for (const t5 of times) lines.push({ t: t5, text: content });
+    for (const t4 of times) lines.push({ t: t4, text: content });
   }
   if (!sawTimestamp) return { synced: false, lines, offset: 0 };
   const synced = lines.filter((l7) => l7.t != null).sort((a4, b4) => a4.t - b4.t);
   return { synced: true, lines: synced, offset };
 }
-function findActiveIdx(lines, t5) {
+function findActiveIdx(lines, t4) {
   let lo = 0;
   let hi = lines.length - 1;
   let ans = -1;
   while (lo <= hi) {
     const mid = lo + hi >> 1;
-    if (lines[mid].t <= t5) {
+    if ((lines[mid].t ?? 0) <= t4) {
       ans = mid;
       lo = mid + 1;
     } else {
@@ -18491,8 +18567,8 @@ function LyricsPanel({ text }) {
   const parsed = T2(() => parseLyrics(text || ""), [text]);
   const [showSynced, setShowSynced] = h2(true);
   const synced = parsed.synced && showSynced;
-  const t5 = mediaCurrentTime.value;
-  const effective = t5 - parsed.offset;
+  const t4 = mediaCurrentTime.value;
+  const effective = t4 - parsed.offset;
   const activeIdx = synced ? findActiveIdx(parsed.lines, effective) : -1;
   const scrollerRef = A2(null);
   const activeRef = A2(null);
@@ -18518,24 +18594,20 @@ function LyricsPanel({ text }) {
     if (p5 && typeof p5.catch === "function") p5.catch(() => {
     });
   };
-  return html`
-    <div class="preview-lyrics" ref=${scrollerRef}>
-      ${parsed.synced ? html`
-        <div class="lyrics-toggle" title=${synced ? "Show plain text" : "Show synced highlighting"}>
-          <button type="button" onClick=${() => setShowSynced((v5) => !v5)}>${synced ? "synced" : "plain"}</button>
-        </div>
-      ` : null}
-      ${synced ? html`<ol class="lyrics-synced">
-            ${parsed.lines.map((l7, i4) => html`
-              <li key=${i4}
-                  ref=${i4 === activeIdx ? activeRef : null}
-                  class=${i4 === activeIdx ? "active" : ""}
-                  onClick=${() => seek(l7.t)}
-                  title=${`Jump to ${formatTime(l7.t)}`}>${l7.text || "\xA0"}</li>
-            `)}
-          </ol>` : html`<pre>${text}</pre>`}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "preview-lyrics", ref: scrollerRef, children: [
+    parsed.synced ? /* @__PURE__ */ u4("div", { class: "lyrics-toggle", title: synced ? "Show plain text" : "Show synced highlighting", children: /* @__PURE__ */ u4("button", { type: "button", onClick: () => setShowSynced((v5) => !v5), children: synced ? "synced" : "plain" }) }) : null,
+    synced ? /* @__PURE__ */ u4("ol", { class: "lyrics-synced", children: parsed.lines.map((l7, i5) => /* @__PURE__ */ u4(
+      "li",
+      {
+        ref: i5 === activeIdx ? activeRef : null,
+        class: i5 === activeIdx ? "active" : "",
+        onClick: () => seek(l7.t),
+        title: `Jump to ${formatTime(l7.t)}`,
+        children: l7.text || "\xA0"
+      },
+      i5
+    )) }) : /* @__PURE__ */ u4("pre", { children: text })
+  ] });
 }
 function formatTime(s5) {
   const m6 = Math.floor(s5 / 60);
@@ -18547,7 +18619,7 @@ function formatTime(s5) {
 var import_common = __toESM(require_common(), 1);
 var common_default = import_common.default;
 
-// src/highlight.js
+// src/highlight.ts
 var EXT_LANG = {
   js: "javascript",
   mjs: "javascript",
@@ -18613,7 +18685,7 @@ var BASENAME_LANG = {
 };
 function detectLanguage(name) {
   if (!name) return null;
-  const base = name.split("/").pop().toLowerCase();
+  const base = (name.split("/").pop() || "").toLowerCase();
   if (BASENAME_LANG[base]) return BASENAME_LANG[base];
   const dot = base.lastIndexOf(".");
   if (dot < 0) return null;
@@ -18635,7 +18707,7 @@ function highlightCode(text, name) {
   }
 }
 
-// src/components/FilesPane.js
+// src/components/FilesPane.tsx
 function Crumb() {
   const ref = A2(null);
   const p5 = treePath.value;
@@ -18644,146 +18716,110 @@ function Crumb() {
   const fileName = fp ? fp.slice(fp.lastIndexOf("/") + 1) : "";
   y2(() => {
     if (ref.current) requestAnimationFrame(() => {
-      ref.current.scrollLeft = ref.current.scrollWidth;
+      if (ref.current) ref.current.scrollLeft = ref.current.scrollWidth;
     });
   }, [p5, fp]);
   let acc = "";
-  return html`
-    <div class="breadcrumb" id="crumb" ref=${ref}>
-      <button type="button" class=${"crumb root" + (segs.length === 0 && !fileName ? " current" : "")} data-path="" title="Root"
-              onClick=${() => navTree("")}>/</button>
-      ${segs.map((s5, i4) => {
-    acc = acc ? acc + "/" + s5 : s5;
-    const path = acc;
-    const last = i4 === segs.length - 1 && !fileName;
-    return html`
-          <span class="sep" aria-hidden="true">\u203a</span>
-          <button type="button" class=${"crumb" + (last ? " current" : "")} data-path=${path} title=${"/" + path}
-                  onClick=${last ? null : () => navTree(path)}>${s5}</button>
-        `;
-  })}
-      ${fileName ? html`
-        <span class="sep" aria-hidden="true">\u203a</span>
-        <span class="crumb file current" title=${"/" + fp}>${fileName}</span>
-      ` : null}
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "breadcrumb", id: "crumb", ref, children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "crumb root" + (segs.length === 0 && !fileName ? " current" : ""),
+        "data-path": "",
+        title: "Root",
+        onClick: () => {
+          navTree("");
+        },
+        children: "/"
+      }
+    ),
+    segs.map((s5, i5) => {
+      acc = acc ? acc + "/" + s5 : s5;
+      const path = acc;
+      const last = i5 === segs.length - 1 && !fileName;
+      const onClick = last ? void 0 : () => {
+        navTree(path);
+      };
+      return /* @__PURE__ */ u4(k, { children: [
+        /* @__PURE__ */ u4("span", { class: "sep", "aria-hidden": "true", children: "\u203A" }),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            class: "crumb" + (last ? " current" : ""),
+            "data-path": path,
+            title: "/" + path,
+            onClick,
+            children: s5
+          }
+        )
+      ] });
+    }),
+    fileName ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4("span", { class: "sep", "aria-hidden": "true", children: "\u203A" }),
+      /* @__PURE__ */ u4("span", { class: "crumb file current", title: "/" + fp, children: fileName })
+    ] }) : null
+  ] });
 }
 function Row({ e: e4 }) {
   const active = e4.path === filePath.value;
   const selected = pinnedContext.value.includes(e4.path);
   const onClick = (ev) => {
-    if (ev.target.closest(".row-sel") || ev.target.closest(".action-menu")) return;
+    const t4 = ev.target;
+    if (t4.closest(".row-sel") || t4.closest(".action-menu")) return;
     if (e4.type === "dir") navTree(e4.path);
     else navFile(e4).catch(console.error);
   };
-  return html`
-    <div class=${"row tier-" + e4.tier + (active ? " active" : "") + (selected ? " selected" : "")} data-path=${e4.path} onClick=${onClick}>
-      <label class="row-sel" onClick=${(ev) => ev.stopPropagation()} title=${selected ? "Detach from next message" : "Attach to next message"}>
-        <input type="checkbox" checked=${selected} onChange=${() => togglePinnedFile(e4.path)} />
-      </label>
-      <div>${e4.type === "dir" ? "\u{1F4C1}" : "\u{1F4C4}"}</div>
-      <div class="name">${e4.name}</div>
-      <div class="size">${fmtBytes(e4.size)}</div>
-      <div class="meta"><${RelativeTime} ts=${e4.mtime} /></div>
-      <div class="row-actions"><${ActionsMenu} mode="row" entry=${e4} /></div>
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "row tier-" + e4.tier + (active ? " active" : "") + (selected ? " selected" : ""), "data-path": e4.path, onClick, children: [
+    /* @__PURE__ */ u4("label", { class: "row-sel", onClick: (ev) => ev.stopPropagation(), title: selected ? "Detach from next message" : "Attach to next message", children: /* @__PURE__ */ u4("input", { type: "checkbox", checked: selected, onChange: () => togglePinnedFile(e4.path) }) }),
+    /* @__PURE__ */ u4("div", { children: e4.type === "dir" ? "\u{1F4C1}" : "\u{1F4C4}" }),
+    /* @__PURE__ */ u4("div", { class: "name", children: e4.name }),
+    /* @__PURE__ */ u4("div", { class: "size", children: fmtBytes(e4.size) }),
+    /* @__PURE__ */ u4("div", { class: "meta", children: /* @__PURE__ */ u4(RelativeTime, { ts: e4.mtime }) }),
+    /* @__PURE__ */ u4("div", { class: "row-actions", children: /* @__PURE__ */ u4(ActionsMenu, { mode: "row", entry: e4 }) })
+  ] });
 }
 function Listing() {
   const p5 = treePath.value;
   const err = treeError.value;
   const entries = treeEntries.value;
-  if (err) return html`<div class="listing" id="listing"><div class="empty">${err}</div></div>`;
-  return html`
-    <div class="listing" id="listing">
-      ${p5 ? html`<div class="row" onClick=${() => navTree(parentPath(p5))}><div class="name">..</div></div>` : null}
-      ${entries.length === 0 ? html`<div class="empty">Empty directory</div>` : entries.map((e4) => html`<${Row} key=${e4.path} e=${e4} />`)}
-    </div>
-  `;
+  if (err) return /* @__PURE__ */ u4("div", { class: "listing", id: "listing", children: /* @__PURE__ */ u4("div", { class: "empty", children: err }) });
+  return /* @__PURE__ */ u4("div", { class: "listing", id: "listing", children: [
+    p5 ? /* @__PURE__ */ u4("div", { class: "row", onClick: () => navTree(parentPath(p5)), children: /* @__PURE__ */ u4("div", { class: "name", children: ".." }) }) : null,
+    entries.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "Empty directory" }) : entries.map((e4) => /* @__PURE__ */ u4(Row, { e: e4 }, e4.path))
+  ] });
 }
 function UploadStrip() {
   const items = uploadItems.value;
-  if (items.length === 0) return html`<div class="upload-strip" id="upload-strip" hidden></div>`;
-  const allDone = items.every((i4) => i4.status !== "uploading");
-  const okPaths = items.filter((i4) => i4.status === "ok" && i4.path).map((i4) => i4.path);
+  if (items.length === 0) return /* @__PURE__ */ u4("div", { class: "upload-strip", id: "upload-strip", hidden: true });
+  const allDone = items.every((i5) => i5.status !== "uploading");
+  const okPaths = items.filter((i5) => i5.status === "ok" && i5.path).map((i5) => i5.path);
   const wakeTitle = !threadId.value ? "Open a thread first" : `Send a message to the agent listing ${okPaths.length} updated file(s)`;
-  return html`
-    <div class="upload-strip" id="upload-strip">
-      ${items.map((item, i4) => html`
-        <div class=${"row " + item.status} key=${i4}>
-          <div class="name">${item.name}</div>
-          ${item.status === "uploading" ? html`<div class="bar"><i style=${`width:${Math.round(item.pct || 0)}%`}></i></div>` : null}
-          <div class="status">${item.statusText || item.status}</div>
-          ${item.status === "conflict" ? html`
-            <div class="actions">
-              <button onClick=${() => resolveConflict(i4, "overwrite")} title="Replace existing file">Overwrite</button>
-              <button onClick=${() => resolveConflict(i4, "rename")} title="Save with a unique name">Rename</button>
-              <button onClick=${() => resolveConflict(i4, "skip")} title="Cancel this upload">Skip</button>
-            </div>
-          ` : null}
-        </div>
-      `)}
-      ${allDone ? html`
-        <div class="footer">
-          <button onClick=${() => notifyAgent(okPaths)}
-                  disabled=${okPaths.length === 0 || !threadId.value}
-                  title=${wakeTitle}>Notify agent</button>
-          <button class="close" onClick=${clearUploadStrip} title="Dismiss">\u2715</button>
-        </div>
-      ` : null}
-    </div>
-  `;
-}
-function Preview() {
-  const ref = A2(null);
-  const p5 = previewBlock.value;
-  if (!p5) return html`<div class="preview-body" id="preview" ref=${ref}></div>`;
-  const fp = filePath.value;
-  const pinned = !!fp && pinnedContext.value.includes(fp);
-  const clippyTitle = pinned ? "Detach from next message" : "Attach to next message";
-  const toolbar = html`
-    <div class="preview-toolbar">
-      <button class=${"text-btn clippy" + (pinned ? " active" : "")}
-              onClick=${() => togglePinnedFile(fp)}
-              disabled=${!fp}
-              title=${clippyTitle}
-              aria-pressed=${pinned}>\uD83D\uDCCE</button>
-      <span class="preview-spacer"></span>
-      <span class="preview-actions">
-        <${ActionsMenu} mode="preview" />
-        <button type="button" class="text-btn close-preview"
-                onClick=${closePreview}
-                title="Close preview" aria-label="Close preview">\u00D7</button>
-      </span>
-    </div>
-  `;
-  const fileRows = [];
-  if (p5.size != null) fileRows.push(["Size", fmtBytes(p5.size)]);
-  const mimeOrKind = p5.mime || mimeFromKind(p5.kind);
-  if (mimeOrKind) fileRows.push(["Type", mimeOrKind]);
-  if (p5.mtime) fileRows.push(["Modified", formatMtime(p5.mtime)]);
-  const tagRows = p5.tags ? Object.entries(p5.tags).map(([k4, v5]) => [k4, String(v5)]) : [];
-  const metaRows = [...fileRows, ...tagRows];
-  const meta = metaRows.length > 0 ? renderMetaPanel(metaRows) : null;
-  const isAudio = p5.kind === "audio";
-  const isVideo = p5.kind === "video";
-  const player = isAudio || isVideo ? html`<${MediaPlayer} kind=${p5.kind} url=${p5.url} name=${p5.name} floating=${isAudio} />` : null;
-  const lyrics = p5.lyrics ? html`<${LyricsPanel} text=${p5.lyrics} />` : null;
-  let body = null;
-  if (p5.kind === "image") body = html`<img alt=${p5.name} src=${p5.url} />`;
-  else if (p5.kind === "pdf") body = html`<iframe src=${p5.url} style="width:100%;height:90vh;border:0" />`;
-  else if (p5.kind === "markdown") {
-    const md = renderMarkdown(p5.text);
-    body = md != null ? html`<div class="markdown-preview" dangerouslySetInnerHTML=${{ __html: md }} />` : html`<pre>${p5.text}</pre>`;
-  } else if (p5.kind === "text") {
-    const hi = highlightCode(p5.text, p5.name);
-    body = hi ? html`<pre class="hljs" data-lang=${hi.language}><code dangerouslySetInnerHTML=${{ __html: hi.html }} /></pre>` : html`<pre>${p5.text}</pre>`;
-  } else if (p5.kind === "binary") body = html`<div class="empty">Binary file (${p5.mime}).</div>`;
-  else if (p5.kind === "error") body = html`<div class="empty">${p5.text}</div>`;
-  return html`<div class=${"preview-body" + (isAudio ? " has-floating-player" : "")} id="preview" ref=${ref}>
-    ${toolbar}${meta}${isVideo ? player : null}${lyrics}${body}${isAudio ? player : null}
-  </div>`;
+  return /* @__PURE__ */ u4("div", { class: "upload-strip", id: "upload-strip", children: [
+    items.map((item, i5) => /* @__PURE__ */ u4("div", { class: "row " + item.status, children: [
+      /* @__PURE__ */ u4("div", { class: "name", children: item.name }),
+      item.status === "uploading" ? /* @__PURE__ */ u4("div", { class: "bar", children: /* @__PURE__ */ u4("i", { style: `width:${Math.round(item.pct || 0)}%` }) }) : null,
+      /* @__PURE__ */ u4("div", { class: "status", children: item.statusText || item.status }),
+      item.status === "conflict" ? /* @__PURE__ */ u4("div", { class: "actions", children: [
+        /* @__PURE__ */ u4("button", { onClick: () => resolveConflict(i5, "overwrite"), title: "Replace existing file", children: "Overwrite" }),
+        /* @__PURE__ */ u4("button", { onClick: () => resolveConflict(i5, "rename"), title: "Save with a unique name", children: "Rename" }),
+        /* @__PURE__ */ u4("button", { onClick: () => resolveConflict(i5, "skip"), title: "Cancel this upload", children: "Skip" })
+      ] }) : null
+    ] }, i5)),
+    allDone ? /* @__PURE__ */ u4("div", { class: "footer", children: [
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          onClick: () => notifyAgent(okPaths),
+          disabled: okPaths.length === 0 || !threadId.value,
+          title: wakeTitle,
+          children: "Notify agent"
+        }
+      ),
+      /* @__PURE__ */ u4("button", { class: "close", onClick: clearUploadStrip, title: "Dismiss", children: "\u2715" })
+    ] }) : null
+  ] });
 }
 function mimeFromKind(kind) {
   switch (kind) {
@@ -18814,14 +18850,84 @@ function formatMtime(iso) {
 }
 function renderMetaPanel(rows) {
   const summary = rows.map(([, v5]) => v5).join(" \xB7 ");
-  return html`
-    <details class="preview-meta">
-      <summary class="preview-meta-summary">${summary}</summary>
-      <dl class="preview-meta-rows">
-        ${rows.map(([k4, v5]) => html`<div class="row" key=${k4}><dt>${k4}</dt><dd>${v5}</dd></div>`)}
-      </dl>
-    </details>
-  `;
+  return /* @__PURE__ */ u4("details", { class: "preview-meta", children: [
+    /* @__PURE__ */ u4("summary", { class: "preview-meta-summary", children: summary }),
+    /* @__PURE__ */ u4("dl", { class: "preview-meta-rows", children: rows.map(([k4, v5]) => /* @__PURE__ */ u4("div", { class: "row", children: [
+      /* @__PURE__ */ u4("dt", { children: k4 }),
+      /* @__PURE__ */ u4("dd", { children: v5 })
+    ] }, k4)) })
+  ] });
+}
+function Preview() {
+  const ref = A2(null);
+  const p5 = previewBlock.value;
+  if (!p5) return /* @__PURE__ */ u4("div", { class: "preview-body", id: "preview", ref });
+  const fp = filePath.value;
+  const pinned = !!fp && pinnedContext.value.includes(fp);
+  const clippyTitle = pinned ? "Detach from next message" : "Attach to next message";
+  const toolbar = /* @__PURE__ */ u4("div", { class: "preview-toolbar", children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        class: "text-btn clippy" + (pinned ? " active" : ""),
+        onClick: () => togglePinnedFile(fp),
+        disabled: !fp,
+        title: clippyTitle,
+        "aria-pressed": pinned,
+        children: "\u{1F4CE}"
+      }
+    ),
+    /* @__PURE__ */ u4("span", { class: "preview-spacer" }),
+    /* @__PURE__ */ u4("span", { class: "preview-actions", children: [
+      /* @__PURE__ */ u4(ActionsMenu, { mode: "preview" }),
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "text-btn close-preview",
+          onClick: closePreview,
+          title: "Close preview",
+          "aria-label": "Close preview",
+          children: "\xD7"
+        }
+      )
+    ] })
+  ] });
+  const fileRows = [];
+  if (p5.size != null) fileRows.push(["Size", fmtBytes(p5.size)]);
+  const mimeOrKind = p5.mime || mimeFromKind(p5.kind);
+  if (mimeOrKind) fileRows.push(["Type", mimeOrKind]);
+  if (p5.mtime) fileRows.push(["Modified", formatMtime(p5.mtime)]);
+  const tagRows = p5.tags ? Object.entries(p5.tags).map(([k4, v5]) => [k4, String(v5)]) : [];
+  const metaRows = [...fileRows, ...tagRows];
+  const meta = metaRows.length > 0 ? renderMetaPanel(metaRows) : null;
+  const isAudio = p5.kind === "audio";
+  const isVideo = p5.kind === "video";
+  const player = isAudio || isVideo ? /* @__PURE__ */ u4(MediaPlayer, { kind: p5.kind, url: p5.url || "", name: p5.name || "", floating: isAudio }) : null;
+  const lyrics = p5.lyrics ? /* @__PURE__ */ u4(LyricsPanel, { text: p5.lyrics }) : null;
+  let body = null;
+  if (p5.kind === "image") body = /* @__PURE__ */ u4("img", { alt: p5.name, src: p5.url });
+  else if (p5.kind === "pdf") body = /* @__PURE__ */ u4("iframe", { src: p5.url, style: "width:100%;height:90vh;border:0" });
+  else if (p5.kind === "markdown") {
+    const md = renderMarkdown(p5.text);
+    body = md != null ? /* @__PURE__ */ u4("div", { class: "markdown-preview", dangerouslySetInnerHTML: { __html: md } }) : /* @__PURE__ */ u4("pre", { children: p5.text });
+  } else if (p5.kind === "text") {
+    const hi = highlightCode(p5.text || "", p5.name);
+    body = hi ? /* @__PURE__ */ u4("pre", { class: "hljs", "data-lang": hi.language, children: /* @__PURE__ */ u4("code", { dangerouslySetInnerHTML: { __html: hi.html } }) }) : /* @__PURE__ */ u4("pre", { children: p5.text });
+  } else if (p5.kind === "binary") body = /* @__PURE__ */ u4("div", { class: "empty", children: [
+    "Binary file (",
+    p5.mime,
+    ")."
+  ] });
+  else if (p5.kind === "error") body = /* @__PURE__ */ u4("div", { class: "empty", children: p5.text });
+  return /* @__PURE__ */ u4("div", { class: "preview-body" + (isAudio ? " has-floating-player" : ""), id: "preview", ref, children: [
+    toolbar,
+    meta,
+    isVideo ? player : null,
+    lyrics,
+    body,
+    isAudio ? player : null
+  ] });
 }
 function FilesPane() {
   const previewing = !!previewBlock.value;
@@ -18831,8 +18937,10 @@ function FilesPane() {
     const zone = document.getElementById("dropzone");
     if (!body || !zone) return void 0;
     let depth = 0;
-    const hasFiles = (ev) => ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes("Files");
-    const highlight = (on) => zone.classList.toggle("drag-over", !!on);
+    const hasFiles = (ev) => !!ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes("Files");
+    const highlight = (on) => {
+      zone.classList.toggle("drag-over", !!on);
+    };
     const onEnter = (ev) => {
       if (!isAdmin.value || !hasFiles(ev)) return;
       ev.preventDefault();
@@ -18842,7 +18950,7 @@ function FilesPane() {
     const onOver = (ev) => {
       if (!isAdmin.value || !hasFiles(ev)) return;
       ev.preventDefault();
-      ev.dataTransfer.dropEffect = "copy";
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
     };
     const onLeave = () => {
       if (!isAdmin.value) return;
@@ -18872,34 +18980,40 @@ function FilesPane() {
     };
   }, []);
   const uploadInputRef = A2(null);
-  const headActions = html`
-    <div class="head-actions">
-      <input type="file" id="upload-input" multiple hidden ref=${uploadInputRef}
-             onChange=${(ev) => {
-    if (ev.target.files?.length) uploadFiles(ev.target.files);
-    ev.target.value = "";
-  }} />
-      <${ActionsMenu} mode="header" onUpload=${() => uploadInputRef.current?.click()} />
-    </div>
-  `;
-  return html`
-    <${Pane} paneKey="files" name="files-pane" label="Files"
-             extraClass=${previewing ? "previewing" : ""}
-             headActions=${headActions}>
-      <div class="files-body" ref=${bodyRef}>
-        <${Crumb} />
-        <${UploadStrip} />
-        <${Listing} />
-        <div class="drop-hint admin-only" id="dropzone">
-          Drag & drop files here to upload to <code id="dropzone-path">/${treePath.value}</code>
-        </div>
-        <${Preview} />
-      </div>
-    <//>
-  `;
+  const headActions = /* @__PURE__ */ u4("div", { class: "head-actions", children: [
+    /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "file",
+        id: "upload-input",
+        multiple: true,
+        hidden: true,
+        ref: uploadInputRef,
+        onChange: (ev) => {
+          const f5 = ev.currentTarget.files;
+          if (f5 && f5.length) uploadFiles(f5);
+          ev.currentTarget.value = "";
+        }
+      }
+    ),
+    /* @__PURE__ */ u4(ActionsMenu, { mode: "header", onUpload: () => uploadInputRef.current?.click() })
+  ] });
+  return /* @__PURE__ */ u4(Pane, { paneKey: "files", name: "files-pane", label: "Files", extraClass: previewing ? "previewing" : "", headActions, children: /* @__PURE__ */ u4("div", { class: "files-body", ref: bodyRef, children: [
+    /* @__PURE__ */ u4(Crumb, {}),
+    /* @__PURE__ */ u4(UploadStrip, {}),
+    /* @__PURE__ */ u4(Listing, {}),
+    /* @__PURE__ */ u4("div", { class: "drop-hint admin-only", id: "dropzone", children: [
+      "Drag & drop files here to upload to ",
+      /* @__PURE__ */ u4("code", { id: "dropzone-path", children: [
+        "/",
+        treePath.value
+      ] })
+    ] }),
+    /* @__PURE__ */ u4(Preview, {})
+  ] }) });
 }
 
-// src/components/Settings.js
+// src/components/Settings.tsx
 var API = "/ui/settings/api";
 async function jget(p5) {
   const r4 = await fetch(p5, { credentials: "same-origin" });
@@ -18930,14 +19044,6 @@ function Settings() {
   const [deepLink, setDeepLink] = h2(null);
   const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
-  y2(() => {
-    if (!open) return;
-    setStatus(null);
-    setChallenge(null);
-    setDeepLink(null);
-    setCode("");
-    refresh();
-  }, [open]);
   async function refresh() {
     const r4 = await jget(`${API}/identities`);
     if (!r4.ok) {
@@ -18946,19 +19052,33 @@ function Settings() {
     }
     setIdentities(r4.data.identities || []);
     setDeepLinkChannels(r4.data.deepLinkChannels || []);
-    const linked = new Set((r4.data.identities || []).map((i4) => i4.channel));
+    const linked = new Set((r4.data.identities || []).map((i5) => i5.channel));
     const available = Array.isArray(r4.data.availableChannels) ? r4.data.availableChannels : Object.keys(CHANNEL_META);
     const opts = available.filter((c4) => c4 !== "web" && c4 !== "cli" && !linked.has(c4));
     setChannels(opts);
     if (opts.length && !opts.includes(chan)) setChan(opts[0]);
   }
+  y2(() => {
+    if (!open) return;
+    setStatus(null);
+    setChallenge(null);
+    setDeepLink(null);
+    setCode("");
+    refresh();
+  }, [open]);
   async function startLink() {
-    if (!handle.trim()) return setStatus({ err: "Enter a handle." });
+    if (!handle.trim()) {
+      setStatus({ err: "Enter a handle." });
+      return;
+    }
     setBusy(true);
     setStatus(null);
     try {
       const r4 = await jsend(`${API}/identities/link/start`, "POST", { channel: chan, handle: handle.trim() });
-      if (!r4.ok) return setStatus({ err: r4.data?.message || r4.data?.error || `HTTP ${r4.status}` });
+      if (!r4.ok) {
+        setStatus({ err: r4.data.message || r4.data.error || `HTTP ${r4.status}` });
+        return;
+      }
       setChallenge({ id: r4.data.challengeId, channel: r4.data.channel, handle: r4.data.handle, expiresAt: r4.data.expiresAt });
       setStatus({ ok: `Code DM'd to ${r4.data.channel}:${r4.data.handle}.` });
     } finally {
@@ -18970,8 +19090,11 @@ function Settings() {
     setStatus(null);
     try {
       const r4 = await jsend(`${API}/identities/link/start-deeplink`, "POST", { channel: chan });
-      if (!r4.ok) return setStatus({ err: r4.data?.message || r4.data?.error || `HTTP ${r4.status}` });
-      setDeepLink({ id: r4.data.challengeId, channel: r4.data.channel, url: r4.data.deepLink, expiresAt: r4.data.expiresAt });
+      if (!r4.ok) {
+        setStatus({ err: r4.data.message || r4.data.error || `HTTP ${r4.status}` });
+        return;
+      }
+      setDeepLink({ id: r4.data.challengeId, channel: r4.data.channel, url: r4.data.deepLink || "", expiresAt: r4.data.expiresAt });
       window.open(r4.data.deepLink, "_blank", "noopener");
       setStatus({ ok: `Opened ${chanLabel(r4.data.channel)}. Confirm the link there, then come back.` });
     } finally {
@@ -18980,7 +19103,7 @@ function Settings() {
   }
   y2(() => {
     if (!deepLink) return void 0;
-    const t5 = setInterval(async () => {
+    const t4 = setInterval(async () => {
       const r4 = await jget(`${API}/identities/link/status?challengeId=${encodeURIComponent(deepLink.id)}`);
       if (!r4.ok) return;
       if (r4.data.consumed) {
@@ -18992,7 +19115,7 @@ function Settings() {
         setDeepLink(null);
       }
     }, 2e3);
-    return () => clearInterval(t5);
+    return () => clearInterval(t4);
   }, [deepLink]);
   async function verify() {
     if (!challenge || !code.trim()) return;
@@ -19001,8 +19124,9 @@ function Settings() {
     try {
       const r4 = await jsend(`${API}/identities/link/verify`, "POST", { challengeId: challenge.id, code: code.trim() });
       if (!r4.ok) {
-        const left = r4.data?.attemptsRemaining != null ? ` (${r4.data.attemptsRemaining} attempts left)` : "";
-        return setStatus({ err: (r4.data?.message || r4.data?.error || `HTTP ${r4.status}`) + left });
+        const left = r4.data.attemptsRemaining != null ? ` (${r4.data.attemptsRemaining} attempts left)` : "";
+        setStatus({ err: (r4.data.message || r4.data.error || `HTTP ${r4.status}`) + left });
+        return;
       }
       setStatus({ ok: `Linked ${r4.data.channel}:${r4.data.handle}.` });
       setChallenge(null);
@@ -19016,7 +19140,10 @@ function Settings() {
   async function unlink(channel, h5) {
     if (!confirm(`Unlink ${channel}:${h5}?`)) return;
     const r4 = await jsend(`${API}/identities/${encodeURIComponent(channel)}/${encodeURIComponent(h5)}`, "DELETE");
-    if (!r4.ok) return setStatus({ err: r4.data?.message || r4.data?.error || `HTTP ${r4.status}` });
+    if (!r4.ok) {
+      setStatus({ err: r4.data.message || r4.data.error || `HTTP ${r4.status}` });
+      return;
+    }
     setStatus({ ok: `Unlinked ${channel}:${h5}.` });
     refresh();
   }
@@ -19030,107 +19157,101 @@ function Settings() {
     if (e4.key === "Escape") close();
   }
   y2(() => {
-    if (!open) return;
+    if (!open) return void 0;
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
   if (!open) return null;
   const muted = notifMutedSig.value;
-  return html`
-    <div class="settings-backdrop" onClick=${onBackdrop}>
-      <div class="settings-modal" role="dialog" aria-label="Settings">
-        <header class="settings-head">
-          <span class="title">Settings</span>
-          <button type="button" class="icon-btn" aria-label="Close" onClick=${close}>\u2715</button>
-        </header>
-        <div class="settings-body">
-          <section>
-            <h3>Notifications</h3>
-            <label class="settings-row">
-              <input type="checkbox" checked=${!muted} onChange=${toggleMute} />
-              <span>Browser notifications for new messages</span>
-            </label>
-            <p class="muted">${muted ? "Currently muted. New messages will not raise notifications." : "Enabled. Permission is requested on first toggle."}</p>
-          </section>
-
-          <section>
-            <h3>Linked identities</h3>
-            <p class="muted">Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user.</p>
-            ${identities.length === 0 ? html`<p class="muted">No identities yet.</p>` : html`
-                <table class="settings-table">
-                  <thead><tr><th>Channel</th><th>Handle</th><th>Primary</th><th></th></tr></thead>
-                  <tbody>
-                    ${identities.map((i4) => html`
-                      <tr>
-                        <td>${chanLabel(i4.channel)}</td>
-                        <td><code>${i4.handle}</code></td>
-                        <td>${i4.primary ? "yes" : ""}</td>
-                        <td>${identities.length > 1 ? html`<button class="danger" onClick=${() => unlink(i4.channel, i4.handle)}>Unlink</button>` : html`<span class="muted">last</span>`}</td>
-                      </tr>
-                    `)}
-                  </tbody>
-                </table>
-              `}
-
-            <h4>Link a new identity</h4>
-            ${channels.length === 0 ? html`<p class="muted">No additional channels available.</p>` : deepLinkChannels.includes(chan) ? html`
-                  <div class="settings-row">
-                    <select value=${chan} onChange=${(e4) => {
-    setChan(e4.target.value);
-    setDeepLink(null);
-    setChallenge(null);
-    setStatus(null);
-  }}>
-                      ${channels.map((c4) => html`<option value=${c4}>${chanLabel(c4)}</option>`)}
-                    </select>
-                    <button onClick=${startDeepLink} disabled=${busy || !!deepLink}>Open ${chanLabel(chan)} to confirm</button>
-                  </div>
-                  ${deepLink ? html`
-                    <div class="settings-row" style="margin-top:8px">
-                      <a href=${deepLink.url} target="_blank" rel="noopener">Reopen link</a>
-                      <button class="ghost" onClick=${() => {
-    setDeepLink(null);
-    setStatus(null);
-  }}>Cancel</button>
-                      <span class="muted">expires ${new Date(deepLink.expiresAt).toLocaleTimeString()}</span>
-                    </div>
-                  ` : null}
-                ` : html`
-                  <div class="settings-row">
-                    <select value=${chan} onChange=${(e4) => {
-    setChan(e4.target.value);
-    setDeepLink(null);
-    setChallenge(null);
-    setStatus(null);
-  }}>
-                      ${channels.map((c4) => html`<option value=${c4}>${chanLabel(c4)}</option>`)}
-                    </select>
-                    <input placeholder="handle" value=${handle} onInput=${(e4) => setHandle(e4.target.value)} />
-                    <button onClick=${startLink} disabled=${busy || !!challenge}>Send code</button>
-                  </div>
-                  ${challenge ? html`
-                    <div class="settings-row" style="margin-top:8px">
-                      <input placeholder="6-digit code" maxlength="6" value=${code} onInput=${(e4) => setCode(e4.target.value)} style="width:120px" />
-                      <button onClick=${verify} disabled=${busy || !code.trim()}>Verify</button>
-                      <button class="ghost" onClick=${() => {
-    setChallenge(null);
-    setCode("");
-    setStatus(null);
-  }}>Cancel</button>
-                      <span class="muted">expires ${new Date(challenge.expiresAt).toLocaleTimeString()}</span>
-                    </div>
-                  ` : null}
-                `}
-          </section>
-
-          ${status ? html`<div class=${"settings-status " + (status.err ? "err" : "ok")}>${status.err || status.ok}</div>` : null}
-        </div>
-      </div>
-    </div>
-  `;
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4("div", { class: "settings-modal", role: "dialog", "aria-label": "Settings", children: [
+    /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+      /* @__PURE__ */ u4("span", { class: "title", children: "Settings" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+      /* @__PURE__ */ u4("section", { children: [
+        /* @__PURE__ */ u4("h3", { children: "Notifications" }),
+        /* @__PURE__ */ u4("label", { class: "settings-row", children: [
+          /* @__PURE__ */ u4("input", { type: "checkbox", checked: !muted, onChange: toggleMute }),
+          /* @__PURE__ */ u4("span", { children: "Browser notifications for new messages" })
+        ] }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: muted ? "Currently muted. New messages will not raise notifications." : "Enabled. Permission is requested on first toggle." })
+      ] }),
+      /* @__PURE__ */ u4("section", { children: [
+        /* @__PURE__ */ u4("h3", { children: "Linked identities" }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: "Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user." }),
+        identities.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No identities yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+          /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+            /* @__PURE__ */ u4("th", { children: "Channel" }),
+            /* @__PURE__ */ u4("th", { children: "Handle" }),
+            /* @__PURE__ */ u4("th", { children: "Primary" }),
+            /* @__PURE__ */ u4("th", {})
+          ] }) }),
+          /* @__PURE__ */ u4("tbody", { children: identities.map((i5) => /* @__PURE__ */ u4("tr", { children: [
+            /* @__PURE__ */ u4("td", { children: chanLabel(i5.channel) }),
+            /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { children: i5.handle }) }),
+            /* @__PURE__ */ u4("td", { children: i5.primary ? "yes" : "" }),
+            /* @__PURE__ */ u4("td", { children: identities.length > 1 ? /* @__PURE__ */ u4("button", { class: "danger", onClick: () => unlink(i5.channel, i5.handle), children: "Unlink" }) : /* @__PURE__ */ u4("span", { class: "muted", children: "last" }) })
+          ] }, i5.channel + ":" + i5.handle)) })
+        ] }),
+        /* @__PURE__ */ u4("h4", { children: "Link a new identity" }),
+        channels.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No additional channels available." }) : deepLinkChannels.includes(chan) ? /* @__PURE__ */ u4(k, { children: [
+          /* @__PURE__ */ u4("div", { class: "settings-row", children: [
+            /* @__PURE__ */ u4("select", { value: chan, onChange: (e4) => {
+              setChan(e4.currentTarget.value);
+              setDeepLink(null);
+              setChallenge(null);
+              setStatus(null);
+            }, children: channels.map((c4) => /* @__PURE__ */ u4("option", { value: c4, children: chanLabel(c4) }, c4)) }),
+            /* @__PURE__ */ u4("button", { onClick: startDeepLink, disabled: busy || !!deepLink, children: [
+              "Open ",
+              chanLabel(chan),
+              " to confirm"
+            ] })
+          ] }),
+          deepLink ? /* @__PURE__ */ u4("div", { class: "settings-row", style: "margin-top:8px", children: [
+            /* @__PURE__ */ u4("a", { href: deepLink.url, target: "_blank", rel: "noopener", children: "Reopen link" }),
+            /* @__PURE__ */ u4("button", { class: "ghost", onClick: () => {
+              setDeepLink(null);
+              setStatus(null);
+            }, children: "Cancel" }),
+            /* @__PURE__ */ u4("span", { class: "muted", children: [
+              "expires ",
+              new Date(deepLink.expiresAt).toLocaleTimeString()
+            ] })
+          ] }) : null
+        ] }) : /* @__PURE__ */ u4(k, { children: [
+          /* @__PURE__ */ u4("div", { class: "settings-row", children: [
+            /* @__PURE__ */ u4("select", { value: chan, onChange: (e4) => {
+              setChan(e4.currentTarget.value);
+              setDeepLink(null);
+              setChallenge(null);
+              setStatus(null);
+            }, children: channels.map((c4) => /* @__PURE__ */ u4("option", { value: c4, children: chanLabel(c4) }, c4)) }),
+            /* @__PURE__ */ u4("input", { placeholder: "handle", value: handle, onInput: (e4) => setHandle(e4.currentTarget.value) }),
+            /* @__PURE__ */ u4("button", { onClick: startLink, disabled: busy || !!challenge, children: "Send code" })
+          ] }),
+          challenge ? /* @__PURE__ */ u4("div", { class: "settings-row", style: "margin-top:8px", children: [
+            /* @__PURE__ */ u4("input", { placeholder: "6-digit code", maxlength: 6, value: code, onInput: (e4) => setCode(e4.currentTarget.value), style: "width:120px" }),
+            /* @__PURE__ */ u4("button", { onClick: verify, disabled: busy || !code.trim(), children: "Verify" }),
+            /* @__PURE__ */ u4("button", { class: "ghost", onClick: () => {
+              setChallenge(null);
+              setCode("");
+              setStatus(null);
+            }, children: "Cancel" }),
+            /* @__PURE__ */ u4("span", { class: "muted", children: [
+              "expires ",
+              new Date(challenge.expiresAt).toLocaleTimeString()
+            ] })
+          ] }) : null
+        ] })
+      ] }),
+      status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+    ] })
+  ] }) });
 }
 
-// src/components/ShareLinkModal.js
+// src/components/ShareLinkModal.tsx
 var DURATIONS = [
   { label: "15 minutes", minutes: 15 },
   { label: "1 hour", minutes: 60 },
@@ -19180,7 +19301,7 @@ function ShareLinkModal() {
         uses
       });
       if (!r4.ok) {
-        setError(r4.data?.error || `HTTP ${r4.status}`);
+        setError(r4.data.error || `HTTP ${r4.status}`);
         return;
       }
       setResult(r4.data);
@@ -19206,98 +19327,119 @@ function ShareLinkModal() {
     showToast(ok ? "Link copied" : "Copy failed", ok ? "ok" : "err");
   }
   async function shareSystem() {
-    if (!result?.url || !navigator.share) return;
+    const navAny2 = navigator;
+    if (!result?.url || !navAny2.share) return;
     try {
-      await navigator.share({ title, url: result.url });
+      await navAny2.share({ title, url: result.url });
     } catch (err) {
       if (err && err.name !== "AbortError") setError(String(err));
     }
   }
   const expiresLabel = result?.expiresAt ? new Date(result.expiresAt).toLocaleString() : null;
-  return html`
-    <div class="settings-backdrop" onClick=${onBackdrop}>
-      <div class="settings-modal" role="dialog" aria-label="Share with link" style="max-width:520px">
-        <header class="settings-head">
-          <span class="title">Share with link</span>
-          <button type="button" class="icon-btn" aria-label="Close" onClick=${close}>\u2715</button>
-        </header>
-        <div class="settings-body">
-          <p class="muted" style="margin-top:0">
-            Anyone with this link can download <code>${title}</code> until it expires
-            or the use count is exhausted. No sign-in required.
-          </p>
-
-          ${result ? html`
-            <section>
-              <h3>Link ready</h3>
-              <div class="settings-row">
-                <input ref=${urlRef} type="text" readonly value=${result.url}
-                       onClick=${(e4) => e4.target.select()} />
-              </div>
-              <p class="muted">
-                Valid for ${result.ttlMinutes} min${expiresLabel ? ` (until ${expiresLabel})` : ""},
-                ${result.uses} download${result.uses === 1 ? "" : "s"}.
-              </p>
-              <div class="settings-row">
-                <button type="button" onClick=${copy}>Copy link</button>
-                ${navigator.share ? html`<button type="button" class="ghost" onClick=${shareSystem}>Share\u2026</button>` : null}
-                <button type="button" class="ghost" onClick=${() => setResult(null)}>Mint another</button>
-              </div>
-            </section>
-          ` : html`
-            <section>
-              <h3>Valid for</h3>
-              <div class="settings-row">
-                <select value=${ttl} onChange=${(e4) => setTtl(Number(e4.target.value))}>
-                  ${DURATIONS.map((d5) => html`<option value=${d5.minutes}>${d5.label}</option>`)}
-                </select>
-                <span class="muted">or custom (minutes):</span>
-                <input type="number" min="1" max="10080" value=${ttl}
-                       onInput=${(e4) => setTtl(Math.max(1, Math.min(10080, Number(e4.target.value) || 1)))} />
-              </div>
-              <p class="muted">Maximum 7 days (10080 minutes).</p>
-
-              <h3>Number of downloads</h3>
-              <div class="settings-row">
-                <input type="number" min="1" max="100" value=${uses}
-                       onInput=${(e4) => setUses(Math.max(1, Math.min(100, Number(e4.target.value) || 1)))} />
-                <button type="button" class="ghost" onClick=${() => setUses(1)} disabled=${uses === 1}>Single use</button>
-              </div>
-              <p class="muted">Maximum 100. The link stops working once exhausted.</p>
-            </section>
-          `}
-
-          ${error ? html`<div class="settings-status err">${error}</div>` : null}
-        </div>
-        <div class="settings-row" style="padding:10px 16px;border-top:1px solid var(--border);justify-content:flex-end">
-          ${result ? html`<button type="button" onClick=${close}>Done</button>` : html`
-              <button type="button" class="ghost" onClick=${close} disabled=${busy}>Cancel</button>
-              <button type="button" onClick=${mint} disabled=${busy}>${busy ? "Creating\u2026" : "Create link"}</button>
-            `}
-        </div>
-      </div>
-    </div>
-  `;
+  const navAny = navigator;
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4("div", { class: "settings-modal", role: "dialog", "aria-label": "Share with link", style: "max-width:520px", children: [
+    /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+      /* @__PURE__ */ u4("span", { class: "title", children: "Share with link" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+      /* @__PURE__ */ u4("p", { class: "muted", style: "margin-top:0", children: [
+        "Anyone with this link can download ",
+        /* @__PURE__ */ u4("code", { children: title }),
+        " until it expires or the use count is exhausted. No sign-in required."
+      ] }),
+      result ? /* @__PURE__ */ u4("section", { children: [
+        /* @__PURE__ */ u4("h3", { children: "Link ready" }),
+        /* @__PURE__ */ u4("div", { class: "settings-row", children: /* @__PURE__ */ u4(
+          "input",
+          {
+            ref: urlRef,
+            type: "text",
+            readonly: true,
+            value: result.url,
+            onClick: (e4) => e4.currentTarget.select()
+          }
+        ) }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: [
+          "Valid for ",
+          result.ttlMinutes,
+          " min",
+          expiresLabel ? ` (until ${expiresLabel})` : "",
+          ",",
+          " ",
+          result.uses,
+          " download",
+          result.uses === 1 ? "" : "s",
+          "."
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-row", children: [
+          /* @__PURE__ */ u4("button", { type: "button", onClick: copy, children: "Copy link" }),
+          navAny.share ? /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: shareSystem, children: [
+            "Share",
+            "\u2026"
+          ] }) : null,
+          /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => setResult(null), children: "Mint another" })
+        ] })
+      ] }) : /* @__PURE__ */ u4("section", { children: [
+        /* @__PURE__ */ u4("h3", { children: "Valid for" }),
+        /* @__PURE__ */ u4("div", { class: "settings-row", children: [
+          /* @__PURE__ */ u4("select", { value: ttl, onChange: (e4) => setTtl(Number(e4.currentTarget.value)), children: DURATIONS.map((d5) => /* @__PURE__ */ u4("option", { value: d5.minutes, children: d5.label }, d5.minutes)) }),
+          /* @__PURE__ */ u4("span", { class: "muted", children: "or custom (minutes):" }),
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              type: "number",
+              min: 1,
+              max: 10080,
+              value: ttl,
+              onInput: (e4) => setTtl(Math.max(1, Math.min(10080, Number(e4.currentTarget.value) || 1)))
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: "Maximum 7 days (10080 minutes)." }),
+        /* @__PURE__ */ u4("h3", { children: "Number of downloads" }),
+        /* @__PURE__ */ u4("div", { class: "settings-row", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              type: "number",
+              min: 1,
+              max: 100,
+              value: uses,
+              onInput: (e4) => setUses(Math.max(1, Math.min(100, Number(e4.currentTarget.value) || 1)))
+            }
+          ),
+          /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => setUses(1), disabled: uses === 1, children: "Single use" })
+        ] }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: "Maximum 100. The link stops working once exhausted." })
+      ] }),
+      error ? /* @__PURE__ */ u4("div", { class: "settings-status err", children: error }) : null
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "settings-row", style: "padding:10px 16px;border-top:1px solid var(--border);justify-content:flex-end", children: result ? /* @__PURE__ */ u4("button", { type: "button", onClick: close, children: "Done" }) : /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: close, disabled: busy, children: "Cancel" }),
+      /* @__PURE__ */ u4("button", { type: "button", onClick: mint, disabled: busy, children: busy ? "Creating\u2026" : "Create link" })
+    ] }) })
+  ] }) });
 }
 
-// src/panels.js
+// src/panels.ts
 var KEYS = { threads: "nc:pane:threads", files: "nc:pane:files" };
 function restorePanelState() {
   try {
-    const t5 = localStorage.getItem(KEYS.threads);
-    const f4 = localStorage.getItem(KEYS.files);
-    if (t5 === "0") paneOpen.threads.value = false;
-    if (t5 === "1") paneOpen.threads.value = true;
-    if (f4 === "0") paneOpen.files.value = false;
-    if (f4 === "1") paneOpen.files.value = true;
-  } catch (_5) {
+    const t4 = localStorage.getItem(KEYS.threads);
+    const f5 = localStorage.getItem(KEYS.files);
+    if (t4 === "0") paneOpen.threads.value = false;
+    if (t4 === "1") paneOpen.threads.value = true;
+    if (f5 === "0") paneOpen.files.value = false;
+    if (f5 === "1") paneOpen.files.value = true;
+  } catch {
   }
 }
 function persistPanelState() {
   try {
     localStorage.setItem(KEYS.threads, paneOpen.threads.value ? "1" : "0");
     localStorage.setItem(KEYS.files, paneOpen.files.value ? "1" : "0");
-  } catch (_5) {
+  } catch {
   }
 }
 function applyPanelClasses() {
@@ -19312,7 +19454,7 @@ function applyPanelClasses() {
   }
 }
 
-// src/router.js
+// src/router.ts
 var router = {
   selectGroup,
   loadThreads,
@@ -19325,7 +19467,7 @@ var router = {
   }
 };
 
-// src/components/App.js
+// src/components/App.tsx
 function App() {
   y2(() => {
     const onChange = () => applyPanelClasses();
@@ -19354,25 +19496,30 @@ function App() {
     drawerOpen.threads.value = false;
     drawerOpen.files.value = false;
   };
-  return html`
-    <${Header} />
-    <main id="main" class=${mainCls.trim()}>
-      <${ThreadsRail} />
-      <${ChatMain} />
-      <${FilesPane} />
-    </main>
-    <div class=${"backdrop" + (backdropShown ? " show" : "")} id="backdrop" onClick=${onBackdrop}></div>
-    <${Settings} />
-    <${ShareLinkModal} />
-    <${Toast} />
-  `;
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4(Header, {}),
+    /* @__PURE__ */ u4("main", { id: "main", class: mainCls.trim(), children: [
+      /* @__PURE__ */ u4(ThreadsRail, {}),
+      /* @__PURE__ */ u4(ChatMain, {}),
+      /* @__PURE__ */ u4(FilesPane, {})
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "backdrop" + (backdropShown ? " show" : ""), id: "backdrop", onClick: onBackdrop }),
+    /* @__PURE__ */ u4(Settings, {}),
+    /* @__PURE__ */ u4(ShareLinkModal, {}),
+    /* @__PURE__ */ u4(Toast, {})
+  ] });
 }
 
-// src/index.js
+// src/index.tsx
 function sortGroups(list) {
   return list.slice().sort((a4, b4) => {
-    const ta = a4.lastActivityAt ? Date.parse(a4.lastActivityAt.includes("T") ? a4.lastActivityAt : a4.lastActivityAt.replace(" ", "T") + "Z") : 0;
-    const tb = b4.lastActivityAt ? Date.parse(b4.lastActivityAt.includes("T") ? b4.lastActivityAt : b4.lastActivityAt.replace(" ", "T") + "Z") : 0;
+    const parseTs = (s5) => {
+      if (!s5) return 0;
+      const norm = s5.includes("T") ? s5 : s5.replace(" ", "T") + "Z";
+      return Date.parse(norm) || 0;
+    };
+    const ta = parseTs(a4.lastActivityAt);
+    const tb = parseTs(b4.lastActivityAt);
     if (tb !== ta) return tb - ta;
     return a4.name.localeCompare(b4.name);
   });
@@ -19387,10 +19534,11 @@ function setupViewportFit() {
   vv.addEventListener("resize", apply);
   vv.addEventListener("scroll", apply);
   document.addEventListener("focusin", (ev) => {
-    if (ev.target?.id === "chat-input") {
+    const t4 = ev.target;
+    if (t4?.id === "chat-input") {
       setTimeout(() => {
         try {
-          ev.target.scrollIntoView({ block: "end", behavior: "smooth" });
+          t4.scrollIntoView({ block: "end", behavior: "smooth" });
         } catch {
         }
       }, 250);
@@ -19404,23 +19552,28 @@ async function init() {
   restorePanelState();
   applyPanelClasses();
   try {
-    const [meRes, groupsRes] = await Promise.all([api("api/me"), api("api/groups")]);
+    const [meRes, groupsRes] = await Promise.all([
+      api("api/me"),
+      api("api/groups")
+    ]);
     n2(() => {
       me.value = meRes.displayName || meRes.userId;
       groups.value = sortGroups(groupsRes.groups);
     });
-  } catch (_5) {
+  } catch {
     return;
   }
   if (groups.value.length === 0) {
-    document.getElementById("app").innerHTML = '<div style="padding:24px;font:14px system-ui">No accessible groups.</div>';
+    const app2 = document.getElementById("app");
+    if (app2) app2.innerHTML = '<div style="padding:24px;font:14px system-ui">No accessible groups.</div>';
     return;
   }
   applyAdminFlag();
   const parsed = parseHash();
   if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error("initial route failed", err));
-  D(html`<${App} />`, document.getElementById("app"));
+  const app = document.getElementById("app");
+  if (app) D(/* @__PURE__ */ u4(App, {}), app);
   try {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("settings") === "1") {
@@ -19430,7 +19583,7 @@ async function init() {
       const url = window.location.pathname + (q3 ? "?" + q3 : "") + window.location.hash;
       window.history.replaceState(null, "", url);
     }
-  } catch (_5) {
+  } catch {
   }
 }
 init().catch((err) => console.error(err));
