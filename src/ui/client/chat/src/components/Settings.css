@@ -40,13 +40,19 @@
 .settings-body button.danger { color: var(--danger); border-color: var(--danger); }
 .settings-body button.danger:hover { background: var(--danger); color: #fff; }
 .settings-body button.ghost { background: transparent; }
-.settings-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.settings-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; table-layout: auto; }
 .settings-table th, .settings-table td {
   text-align: left; padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
 .settings-table th { font-weight: 600; color: var(--muted); }
-.settings-table td code { word-break: break-all; overflow-wrap: anywhere; }
+.settings-table td:nth-child(1), .settings-table td:nth-child(3) { white-space: nowrap; }
+.settings-table td:nth-child(2) { width: 100%; max-width: 0; }
+.settings-table td:nth-child(2) code {
+  display: block; max-width: 100%;
+  white-space: nowrap; overflow-x: auto;
+  word-break: normal; overflow-wrap: normal;
+}
 .settings-status {
   margin-top: 12px; padding: 8px 12px; border-radius: 4px; font-size: 13px;
 }

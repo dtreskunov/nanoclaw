@@ -578,6 +578,7 @@ header .mobile-only {
   border-collapse: collapse;
   margin: 8px 0;
   font-size: 13px;
+  table-layout: auto;
 }
 .settings-table th,
 .settings-table td {
@@ -589,9 +590,21 @@ header .mobile-only {
   font-weight: 600;
   color: var(--muted);
 }
-.settings-table td code {
-  word-break: break-all;
-  overflow-wrap: anywhere;
+.settings-table td:nth-child(1),
+.settings-table td:nth-child(3) {
+  white-space: nowrap;
+}
+.settings-table td:nth-child(2) {
+  width: 100%;
+  max-width: 0;
+}
+.settings-table td:nth-child(2) code {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow-x: auto;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 .settings-status {
   margin-top: 12px;
