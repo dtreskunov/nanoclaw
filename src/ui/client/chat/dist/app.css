@@ -638,6 +638,12 @@ header .mobile-only {
   .settings-table td:nth-child(3) {
     display: none;
   }
+  .settings-table td:nth-child(2) code {
+    scrollbar-width: none;
+  }
+  .settings-table td:nth-child(2) code::-webkit-scrollbar {
+    display: none;
+  }
   .settings-row select,
   .settings-row input {
     min-width: 0;
