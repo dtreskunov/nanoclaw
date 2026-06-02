@@ -17792,8 +17792,6 @@ function DmRow({ t: t5 }) {
 }
 function ThreadsRail() {
   const list = threads.value;
-  const dms = list.filter((t5) => t5.kind === "dm");
-  const rest = list.filter((t5) => t5.kind !== "dm");
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null).then(() => {
@@ -17803,6 +17801,20 @@ function ThreadsRail() {
       drawerOpen.files.value = false;
     }).catch(console.error);
   };
+  const buckets = /* @__PURE__ */ new Map();
+  for (const t5 of list) {
+    const ct = t5.channelType || "web";
+    if (!buckets.has(ct)) buckets.set(ct, []);
+    buckets.get(ct).push(t5);
+  }
+  const sections = Array.from(buckets.entries()).map(([ct, items]) => ({ ct, label: channelMeta(ct).label, items })).sort((a4, b4) => {
+    if (a4.ct === "web" && b4.ct !== "web") return -1;
+    if (b4.ct === "web" && a4.ct !== "web") return 1;
+    return a4.label.localeCompare(b4.label);
+  });
+  for (const s5 of sections) {
+    s5.items.sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt));
+  }
   return html`
     <${Pane} paneKey="threads" name="threads-rail" label="Threads">
       <div class="threads-actions">
@@ -17811,12 +17823,10 @@ function ThreadsRail() {
         </button>
       </div>
       <div class="list" id="threads-list">
-        ${dms.length > 0 ? html`
-          <div class="thread-section">Direct messages</div>
-          ${dms.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${DmRow} key=${t5.threadId} t=${t5} />`)}
-          ${rest.length > 0 ? html`<div class="thread-section">Threads</div>` : null}
-        ` : null}
-        ${rest.length === 0 && dms.length === 0 ? html`<div class="empty">No threads yet</div>` : rest.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
+        ${list.length === 0 ? html`<div class="empty">No threads yet</div>` : sections.map((s5) => html`
+            <div class="thread-section">${s5.label}</div>
+            ${s5.items.map((t5) => t5.kind === "dm" ? html`<${DmRow} key=${t5.threadId} t=${t5} />` : html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
+          `)}
       </div>
     <//>
   `;

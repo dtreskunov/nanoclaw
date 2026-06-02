@@ -67,8 +67,6 @@ function DmRow({ t }) {
 
 export function ThreadsRail() {
   const list = threads.value;
-  const dms = list.filter((t) => t.kind === 'dm');
-  const rest = list.filter((t) => t.kind !== 'dm');
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null).then(() => {
@@ -78,6 +76,28 @@ export function ThreadsRail() {
       drawerOpen.files.value = false;
     }).catch(console.error);
   };
+
+  // Group by channel. DMs render as DmRow, other threads as ThreadRow,
+  // mixed within each channel's section and ordered by recency. The
+  // 'web' bucket is pinned to the top; other channels follow,
+  // alphabetized by their display label.
+  const buckets = new Map();
+  for (const t of list) {
+    const ct = t.channelType || 'web';
+    if (!buckets.has(ct)) buckets.set(ct, []);
+    buckets.get(ct).push(t);
+  }
+  const sections = Array.from(buckets.entries())
+    .map(([ct, items]) => ({ ct, label: channelMeta(ct).label, items }))
+    .sort((a, b) => {
+      if (a.ct === 'web' && b.ct !== 'web') return -1;
+      if (b.ct === 'web' && a.ct !== 'web') return 1;
+      return a.label.localeCompare(b.label);
+    });
+  for (const s of sections) {
+    s.items.sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt));
+  }
+
   return html`
     <${Pane} paneKey="threads" name="threads-rail" label="Threads">
       <div class="threads-actions">
@@ -86,14 +106,14 @@ export function ThreadsRail() {
         </button>
       </div>
       <div class="list" id="threads-list">
-        ${dms.length > 0 ? html`
-          <div class="thread-section">Direct messages</div>
-          ${dms.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${DmRow} key=${t.threadId} t=${t} />`)}
-          ${rest.length > 0 ? html`<div class="thread-section">Threads</div>` : null}
-        ` : null}
-        ${rest.length === 0 && dms.length === 0
+        ${list.length === 0
           ? html`<div class="empty">No threads yet</div>`
-          : rest.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
+          : sections.map((s) => html`
+            <div class="thread-section">${s.label}</div>
+            ${s.items.map((t) => t.kind === 'dm'
+              ? html`<${DmRow} key=${t.threadId} t=${t} />`
+              : html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
+          `)}
       </div>
     <//>
   `;
