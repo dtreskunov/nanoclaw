@@ -311,8 +311,9 @@ header .mobile-only {
 }
 .threads-rail .thread-section-header {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   width: 100%;
   padding: 8px 10px;
   background: var(--wash-subtle);
@@ -325,6 +326,11 @@ header .mobile-only {
 }
 .threads-rail .thread-section-header:hover {
   background: var(--wash-soft);
+}
+.threads-rail .thread-section-header .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .threads-rail .thread-section-header .chev {
   width: 10px;
@@ -341,24 +347,20 @@ header .mobile-only {
   font-weight: 600;
   flex: 0 0 auto;
 }
-.threads-rail .thread-section-header .info {
+.threads-rail .thread-section-header .count {
   margin-left: auto;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
+  flex: 0 0 auto;
   font-size: 11px;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .threads-rail .thread-section-header .handle {
+  font-size: 11px;
+  color: var(--muted);
+  padding-left: 22px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 14ch;
-}
-.threads-rail .thread-section-header .count {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
 }
 .threads-rail .thread-section-body {
   flex: 1;

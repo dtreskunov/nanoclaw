@@ -21,7 +21,7 @@ function ThreadRow({ t }: { t: Thread }) {
   const meta = channelMeta(ct);
   const active = t.threadId === threadId.value;
   const pillTitle = `${meta.label}${t.counterparty ? ' · ' + t.counterparty : ''}`;
-  const subTrailer = `${t.messageCount ? ' · ' + t.messageCount + ' msg' : ''}${ct !== 'web' && t.counterparty ? ' · ' + t.counterparty : ''}`;
+  const subTrailer = t.messageCount ? ' · ' + t.messageCount + ' msg' : '';
   const onOpen = (ev: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     if ((ev.target as HTMLElement).classList.contains('del')) return;
     if (groupId.value) openChat(groupId.value, t.threadId, threadCtxOf(t)).catch(console.error);
@@ -92,13 +92,15 @@ function ChannelSection({ ct, items, defaultOpen }: { ct: string; items: Thread[
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span class="chev" aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span>
-        <span class="ch-pill" aria-hidden="true">{meta.icon}</span>
-        <span class="label">{meta.label}</span>
-        <span class="info">
-          {handleStr ? <span class="handle" title={handles.join(', ')}>{handleStr}</span> : null}
+        <span class="row">
+          <span class="chev" aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span>
+          <span class="ch-pill" aria-hidden="true">{meta.icon}</span>
+          <span class="label">{meta.label}</span>
           <span class="count">{items.length} {'\u00b7'} {totalMsgs} msg</span>
         </span>
+        {handleStr
+          ? <span class="handle" title={handles.join(', ')}>{handleStr}</span>
+          : null}
       </button>
       {open ? <div class="thread-section-body">{items.map(renderRow)}</div> : null}
     </div>

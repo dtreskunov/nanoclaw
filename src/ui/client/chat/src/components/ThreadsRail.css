@@ -34,7 +34,7 @@
 .threads-rail .thread-section.open { flex: 1 1 0; }
 .threads-rail .thread-section.collapsed { flex: 0 0 auto; }
 .threads-rail .thread-section-header {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
   width: 100%;
   padding: 8px 10px;
   background: var(--wash-subtle);
@@ -45,20 +45,25 @@
   cursor: pointer;
 }
 .threads-rail .thread-section-header:hover { background: var(--wash-soft); }
+.threads-rail .thread-section-header .row {
+  display: flex; align-items: center; gap: 6px;
+}
 .threads-rail .thread-section-header .chev { width: 10px; font-size: 10px; color: var(--muted); flex: 0 0 auto; }
 .threads-rail .thread-section-header .ch-pill { font-size: 14px; flex: 0 0 auto; }
 .threads-rail .thread-section-header .label { font-size: 12px; font-weight: 600; flex: 0 0 auto; }
-.threads-rail .thread-section-header .info {
+.threads-rail .thread-section-header .count {
   margin-left: auto;
-  display: flex; align-items: baseline; gap: 8px;
-  min-width: 0;
+  flex: 0 0 auto;
   font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .threads-rail .thread-section-header .handle {
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 14ch;
+  font-size: 11px; color: var(--muted);
+  padding-left: 22px; /* align with label, past chev + pill */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.threads-rail .thread-section-header .count { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .threads-rail .thread-section-body { flex: 1; min-height: 0; overflow-y: auto; }
 
 .threads-rail .thread.dm .title { font-size: 14px; padding-right: 0; }

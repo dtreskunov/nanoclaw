@@ -17789,7 +17789,7 @@ function ThreadRow({ t: t4 }) {
   const meta = channelMeta(ct);
   const active = t4.threadId === threadId.value;
   const pillTitle = `${meta.label}${t4.counterparty ? " \xB7 " + t4.counterparty : ""}`;
-  const subTrailer = `${t4.messageCount ? " \xB7 " + t4.messageCount + " msg" : ""}${ct !== "web" && t4.counterparty ? " \xB7 " + t4.counterparty : ""}`;
+  const subTrailer = t4.messageCount ? " \xB7 " + t4.messageCount + " msg" : "";
   const onOpen = (ev) => {
     if (ev.target.classList.contains("del")) return;
     if (groupId.value) openChat(groupId.value, t4.threadId, threadCtxOf2(t4)).catch(console.error);
@@ -17852,11 +17852,10 @@ function ChannelSection({ ct, items, defaultOpen }) {
         onClick: () => setOpen((o4) => !o4),
         "aria-expanded": open,
         children: [
-          /* @__PURE__ */ u4("span", { class: "chev", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
-          /* @__PURE__ */ u4("span", { class: "ch-pill", "aria-hidden": "true", children: meta.icon }),
-          /* @__PURE__ */ u4("span", { class: "label", children: meta.label }),
-          /* @__PURE__ */ u4("span", { class: "info", children: [
-            handleStr ? /* @__PURE__ */ u4("span", { class: "handle", title: handles.join(", "), children: handleStr }) : null,
+          /* @__PURE__ */ u4("span", { class: "row", children: [
+            /* @__PURE__ */ u4("span", { class: "chev", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
+            /* @__PURE__ */ u4("span", { class: "ch-pill", "aria-hidden": "true", children: meta.icon }),
+            /* @__PURE__ */ u4("span", { class: "label", children: meta.label }),
             /* @__PURE__ */ u4("span", { class: "count", children: [
               items.length,
               " ",
@@ -17865,7 +17864,8 @@ function ChannelSection({ ct, items, defaultOpen }) {
               totalMsgs,
               " msg"
             ] })
-          ] })
+          ] }),
+          handleStr ? /* @__PURE__ */ u4("span", { class: "handle", title: handles.join(", "), children: handleStr }) : null
         ]
       }
     ),
