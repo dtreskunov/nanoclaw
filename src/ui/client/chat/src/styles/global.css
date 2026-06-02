@@ -74,85 +74,13 @@ body.is-admin .admin-only { display: inline-flex; }
 .backdrop { display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 5; }
 .backdrop.show { display: block; }
 
-/* Mobile layout — cross-cutting overrides. Component-local rules live
-   in each component's own .css file; this block reshapes the overall
-   page structure for narrow viewports (drawers, header collapse, etc). */
+/* Cross-cutting mobile overrides. Component-specific mobile tweaks
+   live in each component's own .css file so they reliably override
+   that component's desktop rules regardless of import order. */
 @media (max-width: 720px) {
-  header {
-    padding: max(8px, env(safe-area-inset-top)) 10px 8px;
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
-    gap: 6px;
-  }
-  header .mobile-only { display: inline-flex; }
   .desktop-only { display: none !important; }
-  header .brand, header #me, header .spacer { display: none !important; }
-  header select { flex: 1; min-width: 0; max-width: none; min-height: 44px; height: 44px; font-size: 15px; }
-  header .icon-btn { min-width: 44px; min-height: 44px; font-size: 22px; padding: 4px 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
-  header form { flex-shrink: 0; margin: 0; }
-  header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; position: relative; font-size: 0; }
-  header form button svg { width: 22px; height: 22px; vertical-align: middle; }
   main {
     grid-template-columns: 1fr !important;
     grid-template-rows: 1fr;
   }
-  .threads-rail, .files-pane {
-    position: fixed;
-    top: 0; height: var(--app-height, 100dvh);
-    width: min(86vw, 340px) !important;
-    background: Canvas;
-    z-index: 10;
-    transition: transform 0.18s ease-out;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .threads-rail { left: 0; transform: translateX(-100%); }
-  .threads-rail.open { transform: translateX(0); box-shadow: 2px 0 16px var(--shadow-color-strong); }
-  .files-pane { right: 0; transform: translateX(100%); border-left: 1px solid var(--border); border-right: none; }
-  .files-pane.open { transform: translateX(0); box-shadow: -2px 0 16px var(--shadow-color-strong); }
-  main.files-collapsed .files-pane { width: min(86vw, 340px) !important; }
-  main.files-collapsed .files-pane .files-body { display: flex; flex-direction: column; }
-  /* Hide the desktop collapse chevrons inside drawers on mobile */
-  #btn-files-toggle { display: none; }
-  .threads-rail .head, .files-pane .head {
-    /* Override the desktop rotating-handle: on mobile the pane is a
-       drawer, so the head is a normal in-flow top bar. */
-    position: static !important;
-    transform: none !important;
-    width: auto !important;
-    padding: 8px 10px; gap: 8px; align-items: center;
-  }
-  .threads-rail .threads-actions {
-    position: static !important;
-  }
-  .threads-rail .list { position: static !important; flex: 1; }
-  .threads-rail, .files-pane { display: flex; flex-direction: column; }
-  .files-pane .files-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; top: 0; }
-  .files-pane .row { padding: 10px 12px; font-size: 14px; min-height: 40px; }
-  .threads-rail .head { display: flex; }
-  .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-  .threads-rail .threads-actions #btn-new-chat .plus { font-size: 26px; font-weight: 400; line-height: 1; position: relative; top: -1px; }
-  .threads-rail .thread { padding: 12px 14px; }
-  .threads-rail .thread .title { font-size: 14px; }
-  .threads-rail .thread .meta { font-size: 12px; }
-  .chat-main .msg { max-width: 90%; font-size: 14px; }
-  .chat-main form {
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
-    gap: 8px;
-    align-items: flex-end;
-  }
-  .chat-main #chat-attach { min-width: 44px; min-height: 44px; font-size: 20px; padding: 0; flex-shrink: 0; }
-  .chat-main #chat-send { min-width: 56px; min-height: 44px; font-weight: 600; flex-shrink: 0; }
-  .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 10px; } /* 16px prevents iOS zoom on focus */
-  .files-pane:not(.previewing) .drop-hint { display: none !important; }
-
-  /* Settings: tighten layout so the linked-identities table and
-     link-form controls fit narrow viewports. */
-  .settings-backdrop { padding: 16px 8px; }
-  .settings-body { padding: 12px; }
-  .settings-table { font-size: 12px; }
-  .settings-table th, .settings-table td { padding: 6px 4px; }
-  .settings-table th:nth-child(3), .settings-table td:nth-child(3) { display: none; }
-  .settings-row select, .settings-row input { min-width: 0; }
-  .settings-row > * { flex-shrink: 1; }
 }

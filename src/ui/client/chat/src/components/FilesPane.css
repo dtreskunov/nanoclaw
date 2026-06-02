@@ -260,3 +260,37 @@ body.is-admin .files-pane.collapsed .admin-only { display: none; }
   .hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-function .hljs-title { color: #82aaff; }
   .hljs-type, .hljs-class .hljs-title, .hljs-params { color: #f78c6c; }
 }
+
+@media (max-width: 720px) {
+  .nc-pane.files-pane {
+    position: fixed;
+    top: 0; height: var(--app-height, 100dvh);
+    width: min(86vw, 340px) !important;
+    background: Canvas;
+    z-index: 10;
+    transition: transform 0.18s ease-out;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    right: 0; transform: translateX(100%);
+    border-left: 1px solid var(--border); border-right: none;
+    display: flex; flex-direction: column;
+  }
+  .nc-pane.files-pane.open { transform: translateX(0); box-shadow: -2px 0 16px var(--shadow-color-strong); }
+  main.files-collapsed .files-pane { width: min(86vw, 340px) !important; }
+  main.files-collapsed .files-pane .files-body { display: flex; flex-direction: column; }
+  /* Hide the desktop collapse chevrons inside drawers on mobile */
+  #btn-files-toggle { display: none; }
+  .nc-pane.files-pane > .head {
+    position: static !important;
+    transform: none !important;
+    width: auto !important;
+    padding: 8px 10px; gap: 8px; align-items: center;
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nc-pane.files-pane > .head .title { writing-mode: horizontal-tb; transform: none; }
+  .files-pane .files-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; top: 0; }
+  .files-pane .row { padding: 10px 12px; font-size: 14px; min-height: 40px; }
+  .files-pane:not(.previewing) .drop-hint { display: none !important; }
+}

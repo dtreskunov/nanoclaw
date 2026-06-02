@@ -7,3 +7,19 @@ header .spacer { flex: 1; }
 header .user { font-size: 12px; color: var(--muted); }
 header .mobile-only { display: none; }
 .desktop-only { }
+
+@media (max-width: 720px) {
+  header {
+    padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+    gap: 6px;
+  }
+  header .mobile-only { display: inline-flex; }
+  header .brand, header #me, header .spacer { display: none !important; }
+  header select { flex: 1; min-width: 0; max-width: none; min-height: 44px; height: 44px; font-size: 15px; }
+  header .icon-btn { min-width: 44px; min-height: 44px; font-size: 22px; padding: 4px 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+  header form { flex-shrink: 0; margin: 0; }
+  header form button { min-height: 44px; min-width: 44px; padding: 4px 8px; position: relative; font-size: 0; }
+  header form button svg { width: 22px; height: 22px; vertical-align: middle; }
+}

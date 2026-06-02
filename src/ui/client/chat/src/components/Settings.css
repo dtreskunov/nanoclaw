@@ -52,3 +52,13 @@
 }
 .settings-status.ok { background: rgba(108, 198, 108, 0.15); color: var(--success); }
 .settings-status.err { background: rgba(228, 68, 68, 0.15); color: var(--error); }
+
+@media (max-width: 720px) {
+  .settings-backdrop { padding: 16px 8px; }
+  .settings-body { padding: 12px; }
+  .settings-table { font-size: 12px; }
+  .settings-table th, .settings-table td { padding: 6px 4px; }
+  .settings-table th:nth-child(3), .settings-table td:nth-child(3) { display: none; }
+  .settings-row select, .settings-row input { min-width: 0; }
+  .settings-row > * { flex-shrink: 1; }
+}

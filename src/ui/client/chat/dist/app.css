@@ -107,6 +107,51 @@ body.is-admin .admin-only {
   display: block;
 }
 @media (max-width: 720px) {
+  .desktop-only {
+    display: none !important;
+  }
+  main {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr;
+  }
+}
+
+/* src/components/Header.css */
+header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+header .brand {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+header select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  max-width: 280px;
+}
+header .spacer {
+  flex: 1;
+}
+header .user {
+  font-size: 12px;
+  color: var(--muted);
+}
+header .mobile-only {
+  display: none;
+}
+.desktop-only {
+}
+@media (max-width: 720px) {
   header {
     padding: max(8px, env(safe-area-inset-top)) 10px 8px;
     padding-left: max(10px, env(safe-area-inset-left));
@@ -115,9 +160,6 @@ body.is-admin .admin-only {
   }
   header .mobile-only {
     display: inline-flex;
-  }
-  .desktop-only {
-    display: none !important;
   }
   header .brand,
   header #me,
@@ -159,203 +201,6 @@ body.is-admin .admin-only {
     height: 22px;
     vertical-align: middle;
   }
-  main {
-    grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr;
-  }
-  .threads-rail,
-  .files-pane {
-    position: fixed;
-    top: 0;
-    height: var(--app-height, 100dvh);
-    width: min(86vw, 340px) !important;
-    background: Canvas;
-    z-index: 10;
-    transition: transform 0.18s ease-out;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .threads-rail {
-    left: 0;
-    transform: translateX(-100%);
-  }
-  .threads-rail.open {
-    transform: translateX(0);
-    box-shadow: 2px 0 16px var(--shadow-color-strong);
-  }
-  .files-pane {
-    right: 0;
-    transform: translateX(100%);
-    border-left: 1px solid var(--border);
-    border-right: none;
-  }
-  .files-pane.open {
-    transform: translateX(0);
-    box-shadow: -2px 0 16px var(--shadow-color-strong);
-  }
-  main.files-collapsed .files-pane {
-    width: min(86vw, 340px) !important;
-  }
-  main.files-collapsed .files-pane .files-body {
-    display: flex;
-    flex-direction: column;
-  }
-  #btn-files-toggle {
-    display: none;
-  }
-  .threads-rail .head,
-  .files-pane .head {
-    position: static !important;
-    transform: none !important;
-    width: auto !important;
-    padding: 8px 10px;
-    gap: 8px;
-    align-items: center;
-  }
-  .threads-rail .threads-actions {
-    position: static !important;
-  }
-  .threads-rail .list {
-    position: static !important;
-    flex: 1;
-  }
-  .threads-rail,
-  .files-pane {
-    display: flex;
-    flex-direction: column;
-  }
-  .files-pane .files-body {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    top: 0;
-  }
-  .files-pane .row {
-    padding: 10px 12px;
-    font-size: 14px;
-    min-height: 40px;
-  }
-  .threads-rail .head {
-    display: flex;
-  }
-  .threads-rail .threads-actions #btn-new-chat {
-    min-height: 48px;
-    font-size: 15px;
-    font-weight: 600;
-    width: 100%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-  .threads-rail .threads-actions #btn-new-chat .plus {
-    font-size: 26px;
-    font-weight: 400;
-    line-height: 1;
-    position: relative;
-    top: -1px;
-  }
-  .threads-rail .thread {
-    padding: 12px 14px;
-  }
-  .threads-rail .thread .title {
-    font-size: 14px;
-  }
-  .threads-rail .thread .meta {
-    font-size: 12px;
-  }
-  .chat-main .msg {
-    max-width: 90%;
-    font-size: 14px;
-  }
-  .chat-main form {
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
-    gap: 8px;
-    align-items: flex-end;
-  }
-  .chat-main #chat-attach {
-    min-width: 44px;
-    min-height: 44px;
-    font-size: 20px;
-    padding: 0;
-    flex-shrink: 0;
-  }
-  .chat-main #chat-send {
-    min-width: 56px;
-    min-height: 44px;
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-  .chat-main textarea {
-    min-height: 44px;
-    font-size: 16px;
-    padding: 10px 10px;
-  }
-  .files-pane:not(.previewing) .drop-hint {
-    display: none !important;
-  }
-  .settings-backdrop {
-    padding: 16px 8px;
-  }
-  .settings-body {
-    padding: 12px;
-  }
-  .settings-table {
-    font-size: 12px;
-  }
-  .settings-table th,
-  .settings-table td {
-    padding: 6px 4px;
-  }
-  .settings-table th:nth-child(3),
-  .settings-table td:nth-child(3) {
-    display: none;
-  }
-  .settings-row select,
-  .settings-row input {
-    min-width: 0;
-  }
-  .settings-row > * {
-    flex-shrink: 1;
-  }
-}
-
-/* src/components/Header.css */
-header {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-header .brand {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-header select {
-  font: inherit;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  max-width: 280px;
-}
-header .spacer {
-  flex: 1;
-}
-header .user {
-  font-size: 12px;
-  color: var(--muted);
-}
-header .mobile-only {
-  display: none;
-}
-.desktop-only {
 }
 
 /* src/components/ThreadsRail.css */
@@ -502,6 +347,76 @@ header .mobile-only {
   }
   .threads-rail .thread .title {
     padding-right: 40px;
+  }
+}
+@media (max-width: 720px) {
+  .nc-pane.threads-rail {
+    position: fixed;
+    top: 0;
+    height: var(--app-height, 100dvh);
+    width: min(86vw, 340px) !important;
+    background: Canvas;
+    z-index: 10;
+    transition: transform 0.18s ease-out;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    left: 0;
+    transform: translateX(-100%);
+    display: flex;
+    flex-direction: column;
+  }
+  .nc-pane.threads-rail.open {
+    transform: translateX(0);
+    box-shadow: 2px 0 16px var(--shadow-color-strong);
+  }
+  .nc-pane.threads-rail > .head {
+    position: static !important;
+    transform: none !important;
+    width: auto !important;
+    padding: 8px 10px;
+    gap: 8px;
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nc-pane.threads-rail > .head .title {
+    writing-mode: horizontal-tb;
+    transform: none;
+  }
+  .threads-rail .threads-actions {
+    position: static !important;
+  }
+  .threads-rail .list {
+    position: static !important;
+    flex: 1;
+  }
+  .threads-rail .threads-actions #btn-new-chat {
+    min-height: 48px;
+    font-size: 15px;
+    font-weight: 600;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .threads-rail .threads-actions #btn-new-chat .plus {
+    font-size: 26px;
+    font-weight: 400;
+    line-height: 1;
+    position: relative;
+    top: -1px;
+  }
+  .threads-rail .thread {
+    padding: 12px 14px;
+  }
+  .threads-rail .thread .title {
+    font-size: 14px;
+  }
+  .threads-rail .thread .meta {
+    font-size: 12px;
   }
 }
 
@@ -893,6 +808,35 @@ header .mobile-only {
 .chat-main.drag-active {
   outline: 2px dashed var(--accent-strong);
   outline-offset: -4px;
+}
+@media (max-width: 720px) {
+  .chat-main .msg {
+    max-width: 90%;
+    font-size: 14px;
+  }
+  .chat-main form {
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .chat-main #chat-attach {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 20px;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .chat-main #chat-send {
+    min-width: 56px;
+    min-height: 44px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .chat-main textarea {
+    min-height: 44px;
+    font-size: 16px;
+    padding: 10px 10px;
+  }
 }
 
 /* src/components/FilesPane.css */
@@ -1436,6 +1380,70 @@ body.is-admin .files-pane.collapsed .admin-only {
     color: #f78c6c;
   }
 }
+@media (max-width: 720px) {
+  .nc-pane.files-pane {
+    position: fixed;
+    top: 0;
+    height: var(--app-height, 100dvh);
+    width: min(86vw, 340px) !important;
+    background: Canvas;
+    z-index: 10;
+    transition: transform 0.18s ease-out;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    right: 0;
+    transform: translateX(100%);
+    border-left: 1px solid var(--border);
+    border-right: none;
+    display: flex;
+    flex-direction: column;
+  }
+  .nc-pane.files-pane.open {
+    transform: translateX(0);
+    box-shadow: -2px 0 16px var(--shadow-color-strong);
+  }
+  main.files-collapsed .files-pane {
+    width: min(86vw, 340px) !important;
+  }
+  main.files-collapsed .files-pane .files-body {
+    display: flex;
+    flex-direction: column;
+  }
+  #btn-files-toggle {
+    display: none;
+  }
+  .nc-pane.files-pane > .head {
+    position: static !important;
+    transform: none !important;
+    width: auto !important;
+    padding: 8px 10px;
+    gap: 8px;
+    align-items: center;
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nc-pane.files-pane > .head .title {
+    writing-mode: horizontal-tb;
+    transform: none;
+  }
+  .files-pane .files-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    top: 0;
+  }
+  .files-pane .row {
+    padding: 10px 12px;
+    font-size: 14px;
+    min-height: 40px;
+  }
+  .files-pane:not(.previewing) .drop-hint {
+    display: none !important;
+  }
+}
 
 /* src/components/ActionsMenu.css */
 .action-menu {
@@ -1781,5 +1789,31 @@ body.is-admin .files-pane.collapsed .admin-only {
 .settings-status.err {
   background: rgba(228, 68, 68, 0.15);
   color: var(--error);
+}
+@media (max-width: 720px) {
+  .settings-backdrop {
+    padding: 16px 8px;
+  }
+  .settings-body {
+    padding: 12px;
+  }
+  .settings-table {
+    font-size: 12px;
+  }
+  .settings-table th,
+  .settings-table td {
+    padding: 6px 4px;
+  }
+  .settings-table th:nth-child(3),
+  .settings-table td:nth-child(3) {
+    display: none;
+  }
+  .settings-row select,
+  .settings-row input {
+    min-width: 0;
+  }
+  .settings-row > * {
+    flex-shrink: 1;
+  }
 }
 /*# sourceMappingURL=app.css.map */

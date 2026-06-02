@@ -41,3 +41,39 @@
   .threads-rail .thread .del { display: flex !important; align-items: center; justify-content: center; opacity: 0.7; top: 50%; right: 4px; transform: translateY(-50%); font-size: 26px; min-width: 40px; min-height: 40px; padding: 0; }
   .threads-rail .thread .title { padding-right: 40px; }
 }
+
+@media (max-width: 720px) {
+  .nc-pane.threads-rail {
+    position: fixed;
+    top: 0; height: var(--app-height, 100dvh);
+    width: min(86vw, 340px) !important;
+    background: Canvas;
+    z-index: 10;
+    transition: transform 0.18s ease-out;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    left: 0; transform: translateX(-100%);
+    display: flex; flex-direction: column;
+  }
+  .nc-pane.threads-rail.open { transform: translateX(0); box-shadow: 2px 0 16px var(--shadow-color-strong); }
+  .nc-pane.threads-rail > .head {
+    /* Override the desktop rotating-handle: on mobile the pane is a
+       drawer, so the head is a normal in-flow top bar. */
+    position: static !important;
+    transform: none !important;
+    width: auto !important;
+    padding: 8px 10px; gap: 8px; align-items: center;
+    display: flex;
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nc-pane.threads-rail > .head .title { writing-mode: horizontal-tb; transform: none; }
+  .threads-rail .threads-actions { position: static !important; }
+  .threads-rail .list { position: static !important; flex: 1; }
+  .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .threads-rail .threads-actions #btn-new-chat .plus { font-size: 26px; font-weight: 400; line-height: 1; position: relative; top: -1px; }
+  .threads-rail .thread { padding: 12px 14px; }
+  .threads-rail .thread .title { font-size: 14px; }
+  .threads-rail .thread .meta { font-size: 12px; }
+}
