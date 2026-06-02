@@ -17456,16 +17456,50 @@ function Message({ m: m6 }) {
     </div>
   `;
 }
+function groupMessages(list) {
+  const groups2 = [];
+  let pending2 = [];
+  for (const m6 of list) {
+    if (m6.direction === "internal") {
+      pending2.push(m6);
+    } else if (m6.direction === "out" && pending2.length > 0) {
+      groups2.push({ kind: "thoughts", thoughts: pending2, answer: m6 });
+      pending2 = [];
+    } else {
+      groups2.push({ kind: "single", m: m6 });
+    }
+  }
+  for (const t5 of pending2) groups2.push({ kind: "single", m: t5 });
+  return groups2;
+}
+function ThoughtGroup({ thoughts, answer }) {
+  const [showThoughts, setShowThoughts] = h2(false);
+  const n4 = thoughts.length;
+  const label = showThoughts ? "answer" : n4 > 1 ? `thoughts (${n4})` : "thoughts";
+  const title = showThoughts ? "Show final answer" : "Show agent thoughts leading to this answer";
+  return html`
+    <div class="thought-group">
+      <button
+        type="button"
+        class="thoughts-toggle"
+        title=${title}
+        onClick=${() => setShowThoughts((v5) => !v5)}
+      >${label}</button>
+      ${showThoughts ? thoughts.map((t5, i4) => html`<${Message} key=${"t" + i4} m=${t5} />`) : html`<${Message} m=${answer} />`}
+    </div>
+  `;
+}
 function MessageLog() {
   const ref = A2(null);
   y2(() => {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   });
   const list = chatMessages.value;
+  const groups2 = groupMessages(list);
   const typing = isTyping.value && threadId.value && !chatLoading.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
-      ${chatLoading.value ? null : !threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : list.map((m6, i4) => html`<${Message} key=${i4} m=${m6} />`)}
+      ${chatLoading.value ? null : !threadId.value ? html`<div class="empty">Pick or start a chat.</div>` : list.length === 0 ? html`<div class="empty">No messages yet.</div>` : groups2.map((g5, i4) => g5.kind === "thoughts" ? html`<${ThoughtGroup} key=${i4} thoughts=${g5.thoughts} answer=${g5.answer} />` : html`<${Message} key=${i4} m=${g5.m} />`)}
       ${typing ? html`<div class="typing" aria-live="polite">
             <span></span><span></span><span></span>
             ${typingHint.value ? html`<span class="hint">${typingHint.value}</span>` : null}

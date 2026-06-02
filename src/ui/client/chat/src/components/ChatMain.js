@@ -1,6 +1,6 @@
 // Chat main: message log, status, context chip, pending tray, readonly
 // banner, composer.
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
@@ -45,6 +45,46 @@ function Message({ m }) {
   `;
 }
 
+// Group consecutive 'internal' messages with the trailing 'out' answer
+// into a single visual unit. Trailing internals with no answer yet
+// (still streaming) render standalone so the user sees progress.
+function groupMessages(list) {
+  const groups = [];
+  let pending = [];
+  for (const m of list) {
+    if (m.direction === 'internal') {
+      pending.push(m);
+    } else if (m.direction === 'out' && pending.length > 0) {
+      groups.push({ kind: 'thoughts', thoughts: pending, answer: m });
+      pending = [];
+    } else {
+      groups.push({ kind: 'single', m });
+    }
+  }
+  for (const t of pending) groups.push({ kind: 'single', m: t });
+  return groups;
+}
+
+function ThoughtGroup({ thoughts, answer }) {
+  const [showThoughts, setShowThoughts] = useState(false);
+  const n = thoughts.length;
+  const label = showThoughts ? 'answer' : (n > 1 ? `thoughts (${n})` : 'thoughts');
+  const title = showThoughts ? 'Show final answer' : 'Show agent thoughts leading to this answer';
+  return html`
+    <div class="thought-group">
+      <button
+        type="button"
+        class="thoughts-toggle"
+        title=${title}
+        onClick=${() => setShowThoughts((v) => !v)}
+      >${label}</button>
+      ${showThoughts
+        ? thoughts.map((t, i) => html`<${Message} key=${'t' + i} m=${t} />`)
+        : html`<${Message} m=${answer} />`}
+    </div>
+  `;
+}
+
 function MessageLog() {
   const ref = useRef(null);
   // Autoscroll on each new message.
@@ -52,6 +92,7 @@ function MessageLog() {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   });
   const list = chatMessages.value;
+  const groups = groupMessages(list);
   const typing = isTyping.value && threadId.value && !chatLoading.value;
   return html`
     <div class="log" id="chat-log" ref=${ref}>
@@ -61,7 +102,9 @@ function MessageLog() {
           ? html`<div class="empty">Pick or start a chat.</div>`
           : list.length === 0
             ? html`<div class="empty">No messages yet.</div>`
-            : list.map((m, i) => html`<${Message} key=${i} m=${m} />`)}
+            : groups.map((g, i) => g.kind === 'thoughts'
+                ? html`<${ThoughtGroup} key=${i} thoughts=${g.thoughts} answer=${g.answer} />`
+                : html`<${Message} key=${i} m=${g.m} />`)}
       ${typing
         ? html`<div class="typing" aria-live="polite">
             <span></span><span></span><span></span>
