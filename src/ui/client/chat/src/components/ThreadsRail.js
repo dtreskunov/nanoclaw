@@ -27,7 +27,7 @@ function ThreadRow({ t }) {
   };
   const onDel = async (ev) => {
     ev.stopPropagation();
-    if (!confirm(`Delete this chat?\n\n"${t.title}"`)) return;
+    if (!confirm(`Delete this thread?\n\n"${t.title}"`)) return;
     await deleteThread(t.threadId);
   };
   return html`
@@ -37,7 +37,7 @@ function ThreadRow({ t }) {
         ${t.title}
       </div>
       <div class="meta"><${RelativeTime} ts=${t.lastActivityAt} />${subTrailer}</div>
-      ${ct === 'web' ? html`<button type="button" class="del" title="Delete chat" aria-label="Delete chat" onClick=${onDel}>\u00d7</button>` : null}
+      ${ct === 'web' ? html`<button type="button" class="del" title="Delete thread" aria-label="Delete thread" onClick=${onDel}>\u00d7</button>` : null}
     </div>
   `;
 }
@@ -79,20 +79,20 @@ export function ThreadsRail() {
     }).catch(console.error);
   };
   return html`
-    <${Pane} paneKey="threads" name="threads-rail" label="Chats">
+    <${Pane} paneKey="threads" name="threads-rail" label="Threads">
       <div class="threads-actions">
         <button type="button" id="btn-new-chat" onClick=${onNewChat}>
-          <span class="plus">+</span> <span class="label">New chat</span>
+          <span class="plus">+</span> <span class="label">New thread</span>
         </button>
       </div>
       <div class="list" id="threads-list">
         ${dms.length > 0 ? html`
           <div class="thread-section">Direct messages</div>
           ${dms.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${DmRow} key=${t.threadId} t=${t} />`)}
-          ${rest.length > 0 ? html`<div class="thread-section">Chats</div>` : null}
+          ${rest.length > 0 ? html`<div class="thread-section">Threads</div>` : null}
         ` : null}
         ${rest.length === 0 && dms.length === 0
-          ? html`<div class="empty">No chats yet</div>`
+          ? html`<div class="empty">No threads yet</div>`
           : rest.slice().sort((a, b) => tsKey(b.lastActivityAt) - tsKey(a.lastActivityAt)).map((t) => html`<${ThreadRow} key=${t.threadId} t=${t} />`)}
       </div>
     <//>

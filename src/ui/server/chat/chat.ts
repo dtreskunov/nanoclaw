@@ -919,7 +919,7 @@ function finalizeTitle(raw: string): string {
     .replace(/^>\s*Context.*\n+/i, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return cleaned ? cleaned.slice(0, 60) : '(new chat)';
+  return cleaned ? cleaned.slice(0, 60) : '(new thread)';
 }
 
 /**

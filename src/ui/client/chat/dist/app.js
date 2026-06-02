@@ -17135,7 +17135,7 @@ function updateActiveThreadTitleFromFirstMessage(text) {
   const idx = list.findIndex((x5) => x5.threadId === threadId.value);
   if (idx < 0) return;
   const t5 = list[idx];
-  if (t5.title !== "(new chat)") return;
+  if (t5.title !== "(new thread)") return;
   const clean = String(text || "").replace(/^>\s*Context[^\n]*\n+/i, "").replace(/\s+/g, " ").trim();
   if (!clean) return;
   list[idx] = { ...t5, title: clean.slice(0, 60) };
@@ -17330,7 +17330,7 @@ async function openChat(gid, resumeTid, opts) {
     channelType: "web",
     messagingGroupId: started.messagingGroupId || null,
     sessionMode: started.sessionMode || "per-thread",
-    title: "(new chat)",
+    title: "(new thread)",
     lastActivityAt: (/* @__PURE__ */ new Date()).toISOString(),
     messageCount: 0
   }, ...threads.value];
@@ -17752,7 +17752,7 @@ function ThreadRow({ t: t5 }) {
   };
   const onDel = async (ev) => {
     ev.stopPropagation();
-    if (!confirm(`Delete this chat?
+    if (!confirm(`Delete this thread?
 
 "${t5.title}"`)) return;
     await deleteThread(t5.threadId);
@@ -17764,7 +17764,7 @@ function ThreadRow({ t: t5 }) {
         ${t5.title}
       </div>
       <div class="meta"><${RelativeTime} ts=${t5.lastActivityAt} />${subTrailer}</div>
-      ${ct === "web" ? html`<button type="button" class="del" title="Delete chat" aria-label="Delete chat" onClick=${onDel}>\u00d7</button>` : null}
+      ${ct === "web" ? html`<button type="button" class="del" title="Delete thread" aria-label="Delete thread" onClick=${onDel}>\u00d7</button>` : null}
     </div>
   `;
 }
@@ -17804,19 +17804,19 @@ function ThreadsRail() {
     }).catch(console.error);
   };
   return html`
-    <${Pane} paneKey="threads" name="threads-rail" label="Chats">
+    <${Pane} paneKey="threads" name="threads-rail" label="Threads">
       <div class="threads-actions">
         <button type="button" id="btn-new-chat" onClick=${onNewChat}>
-          <span class="plus">+</span> <span class="label">New chat</span>
+          <span class="plus">+</span> <span class="label">New thread</span>
         </button>
       </div>
       <div class="list" id="threads-list">
         ${dms.length > 0 ? html`
           <div class="thread-section">Direct messages</div>
           ${dms.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${DmRow} key=${t5.threadId} t=${t5} />`)}
-          ${rest.length > 0 ? html`<div class="thread-section">Chats</div>` : null}
+          ${rest.length > 0 ? html`<div class="thread-section">Threads</div>` : null}
         ` : null}
-        ${rest.length === 0 && dms.length === 0 ? html`<div class="empty">No chats yet</div>` : rest.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
+        ${rest.length === 0 && dms.length === 0 ? html`<div class="empty">No threads yet</div>` : rest.slice().sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt)).map((t5) => html`<${ThreadRow} key=${t5.threadId} t=${t5} />`)}
       </div>
     <//>
   `;
@@ -18674,7 +18674,7 @@ function UploadStrip() {
   if (items.length === 0) return html`<div class="upload-strip" id="upload-strip" hidden></div>`;
   const allDone = items.every((i4) => i4.status !== "uploading");
   const okPaths = items.filter((i4) => i4.status === "ok" && i4.path).map((i4) => i4.path);
-  const wakeTitle = !threadId.value ? "Open a chat first" : `Send a message to the agent listing ${okPaths.length} updated file(s)`;
+  const wakeTitle = !threadId.value ? "Open a thread first" : `Send a message to the agent listing ${okPaths.length} updated file(s)`;
   return html`
     <div class="upload-strip" id="upload-strip">
       ${items.map((item, i4) => html`

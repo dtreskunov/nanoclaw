@@ -92,7 +92,7 @@ function UploadStrip() {
   if (items.length === 0) return html`<div class="upload-strip" id="upload-strip" hidden></div>`;
   const allDone = items.every((i) => i.status !== 'uploading');
   const okPaths = items.filter((i) => i.status === 'ok' && i.path).map((i) => i.path);
-  const wakeTitle = !threadId.value ? 'Open a chat first' : `Send a message to the agent listing ${okPaths.length} updated file(s)`;
+  const wakeTitle = !threadId.value ? 'Open a thread first' : `Send a message to the agent listing ${okPaths.length} updated file(s)`;
   return html`
     <div class="upload-strip" id="upload-strip">
       ${items.map((item, i) => html`

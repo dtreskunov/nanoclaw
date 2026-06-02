@@ -67,7 +67,7 @@ function updateActiveThreadTitleFromFirstMessage(text) {
   const idx = list.findIndex((x) => x.threadId === threadId.value);
   if (idx < 0) return;
   const t = list[idx];
-  if (t.title !== '(new chat)') return;
+  if (t.title !== '(new thread)') return;
   const clean = String(text || '').replace(/^>\s*Context[^\n]*\n+/i, '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
   list[idx] = { ...t, title: clean.slice(0, 60) };
@@ -236,7 +236,7 @@ export async function openChat(gid, resumeTid, opts) {
     channelType: 'web',
     messagingGroupId: started.messagingGroupId || null,
     sessionMode: started.sessionMode || 'per-thread',
-    title: '(new chat)',
+    title: '(new thread)',
     lastActivityAt: new Date().toISOString(),
     messageCount: 0,
   }, ...threads.value];
