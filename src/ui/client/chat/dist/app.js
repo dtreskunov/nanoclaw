@@ -18166,6 +18166,12 @@ function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
   const showComposer = !channelType.value || channelType.value === "web" || canSend.value;
+  const autosize = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  };
   const onSubmit = (ev) => {
     ev.preventDefault();
     const text = (inputRef.current?.value || "").trim();
@@ -18175,6 +18181,7 @@ function Composer() {
     const prefix = pins.length > 0 ? "> Context (file browser):\n" + pins.map((p5) => `> - \`${p5}\``).join("\n") + "\n\n" : "";
     const fullText = prefix + text;
     if (inputRef.current) inputRef.current.value = "";
+    autosize();
     clearPending();
     clearPinnedContext();
     sendChat(fullText, files).catch(console.error);
@@ -18206,6 +18213,7 @@ function Composer() {
         rows: 1,
         placeholder: "Message the agent\u2026",
         ref: inputRef,
+        onInput: autosize,
         onKeyDown: onKey,
         onPaste
       }

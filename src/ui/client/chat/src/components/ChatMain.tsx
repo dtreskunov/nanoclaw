@@ -160,6 +160,12 @@ function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const showComposer = (!channelType.value || channelType.value === 'web' || canSend.value);
+  const autosize = (): void => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  };
   const onSubmit = (ev: JSX.TargetedEvent<HTMLFormElement>): void => {
     ev.preventDefault();
     const text = (inputRef.current?.value || '').trim();
@@ -171,6 +177,7 @@ function Composer() {
       : '';
     const fullText = prefix + text;
     if (inputRef.current) inputRef.current.value = '';
+    autosize();
     clearPending();
     clearPinnedContext();
     sendChat(fullText, files).catch(console.error);
@@ -201,6 +208,7 @@ function Composer() {
         rows={1}
         placeholder={'Message the agent\u2026'}
         ref={inputRef}
+        onInput={autosize}
         onKeyDown={onKey}
         onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
       ></textarea>
