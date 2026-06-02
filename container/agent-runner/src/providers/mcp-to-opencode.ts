@@ -8,8 +8,12 @@ import type { McpHttpServerConfig, McpServerConfig, McpStdioServerConfig } from 
  * to OpenCode's `mcp[name].timeout`, which it applies to both `tools/list`
  * and `tools/call`. OpenCode also passes `resetTimeoutOnProgress: true`, so
  * servers that emit progress notifications can run longer than this cap.
+ *
+ * Operator override: set MCP_TOOL_TIMEOUT in the host env (same var Claude
+ * Code reads) to raise or lower the cap without editing source. Shared with
+ * the claude provider so a single knob controls both.
  */
-const DEFAULT_MCP_TIMEOUT_MS = 120_000;
+const DEFAULT_MCP_TIMEOUT_MS = Number(process.env.MCP_TOOL_TIMEOUT) || 120_000;
 
 /** OpenCode `mcp` entry shape (local stdio server). */
 export type OpenCodeMcpLocal = {
