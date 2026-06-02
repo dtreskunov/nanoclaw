@@ -18168,13 +18168,13 @@ function ApprovalsBanner() {
     ] }),
     list.map((a4) => /* @__PURE__ */ u4("div", { class: "approval-row", children: [
       /* @__PURE__ */ u4("div", { class: "approval-text", children: [
-        /* @__PURE__ */ u4("div", { class: "approval-title", children: [
+        /* @__PURE__ */ u4("div", { class: "approval-title", children: a4.title || a4.action }),
+        a4.details ? /* @__PURE__ */ u4("div", { class: "approval-details", children: a4.details }) : null,
+        /* @__PURE__ */ u4("div", { class: "approval-meta", children: [
           /* @__PURE__ */ u4("span", { class: "approval-group", children: a4.agentGroupName || "Global" }),
           /* @__PURE__ */ u4("span", { class: "dot", children: "\xB7" }),
-          /* @__PURE__ */ u4("span", { class: "approval-name", children: a4.title || a4.action })
-        ] }),
-        a4.details ? /* @__PURE__ */ u4("div", { class: "approval-details", children: a4.details }) : null,
-        /* @__PURE__ */ u4("div", { class: "approval-meta", children: /* @__PURE__ */ u4(RelativeTime, { ts: a4.createdAt }) })
+          /* @__PURE__ */ u4(RelativeTime, { ts: a4.createdAt })
+        ] })
       ] }),
       /* @__PURE__ */ u4("div", { class: "approval-actions", children: a4.options.length === 0 ? /* @__PURE__ */ u4("span", { class: "approval-disabled", children: "no options" }) : a4.options.map((o4) => /* @__PURE__ */ u4(
         "button",

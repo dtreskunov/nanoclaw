@@ -280,8 +280,10 @@ function describeApproval(action: string, payloadJson: string): string | null {
       const cmd = typeof frame.command === 'string' ? frame.command : '';
       const args = frame.args as Record<string, unknown> | undefined;
       if (args && typeof args === 'object') {
+        // Drop boilerplate keys that just echo routing context.
+        const SKIP = new Set(['help', 'agent_group_id', 'group', 'id']);
         const parts = Object.entries(args)
-          .filter(([k]) => k !== 'help')
+          .filter(([k, v]) => !SKIP.has(k) && v !== false && v != null)
           .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
           .join(' ');
         return parts ? `${cmd} ${parts}` : cmd || null;

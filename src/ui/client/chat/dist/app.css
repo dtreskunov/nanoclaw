@@ -1132,21 +1132,6 @@ header .mobile-only {
 .chat-main .approval-title {
   font-size: 13px;
   font-weight: 600;
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-.chat-main .approval-title .approval-group {
-  color: var(--accent, #4a9eff);
-}
-.chat-main .approval-title .approval-name {
-  font-weight: 500;
-  opacity: 0.9;
-}
-.chat-main .approval-title .dot {
-  opacity: 0.5;
-  font-weight: 400;
 }
 .chat-main .approval-details {
   font-size: 12px;
@@ -1162,6 +1147,10 @@ header .mobile-only {
   gap: 4px;
   align-items: center;
   margin-top: 4px;
+}
+.chat-main .approval-meta .approval-group {
+  color: var(--fg);
+  font-weight: 500;
 }
 .chat-main .approval-meta .dot {
   opacity: 0.6;

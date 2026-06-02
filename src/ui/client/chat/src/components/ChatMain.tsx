@@ -106,13 +106,11 @@ function ApprovalsBanner() {
       {list.map((a) => (
         <div class="approval-row" key={a.approvalId}>
           <div class="approval-text">
-            <div class="approval-title">
-              <span class="approval-group">{a.agentGroupName || 'Global'}</span>
-              <span class="dot">{'\u00b7'}</span>
-              <span class="approval-name">{a.title || a.action}</span>
-            </div>
+            <div class="approval-title">{a.title || a.action}</div>
             {a.details ? <div class="approval-details">{a.details}</div> : null}
             <div class="approval-meta">
+              <span class="approval-group">{a.agentGroupName || 'Global'}</span>
+              <span class="dot">{'\u00b7'}</span>
               <RelativeTime ts={a.createdAt} />
             </div>
           </div>
