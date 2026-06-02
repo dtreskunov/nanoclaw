@@ -99,13 +99,44 @@ function on(method: FmwMethod, route: string, handler: RouteHandler): void {
   router.on(method, route, handler as any);
 }
 
-/** Wrap a handler that requires an authenticated session; injects userId. */
+/** Wrap a handler that requires an authenticated session; injects userId.
+ *
+ * When the request is a top-level browser navigation (Sec-Fetch-Mode:
+ * navigate, GET, accepts HTML), redirect to the shared login page with
+ * `?next=` set to the original URL so the user lands back on the file
+ * after signing in. XHR/fetch from the SPA still gets a JSON 401. */
 function authed(fn: (ctx: Ctx, userId: string, params: Record<string, string>) => void | Promise<void>): RouteHandler {
   return async (ctx, params) => {
     const session = authenticate(ctx.req);
-    if (!session) return json(ctx, 401, { error: 'unauthorized' });
+    if (!session) {
+      if (isBrowserNavigation(ctx.req)) return redirectToLogin(ctx);
+      return json(ctx, 401, { error: 'unauthorized' });
+    }
     return fn(ctx, session.userId, params);
   };
+}
+
+function isBrowserNavigation(req: http.IncomingMessage): boolean {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  const mode = req.headers['sec-fetch-mode'];
+  if (mode === 'navigate') return true;
+  // Older browsers without Sec-Fetch-Mode: fall back to Accept sniffing.
+  // XHR/fetch typically sends Accept: */* or application/json.
+  if (mode == null) {
+    const accept = String(req.headers['accept'] || '');
+    if (accept.includes('text/html')) return true;
+  }
+  return false;
+}
+
+function redirectToLogin(ctx: Ctx): void {
+  // req.url is the original mount-relative URL (the chat dispatcher only
+  // mutates a local `pathname`), so it already starts with /ui/chat/...
+  // and is safe as the next= target.
+  const next = ctx.req.url || CHAT_MOUNT_PREFIX + '/';
+  const loginUrl = `/ui/login?next=${encodeURIComponent(next)}`;
+  ctx.res.writeHead(303, { Location: loginUrl });
+  ctx.res.end();
 }
 
 // Static + public.
