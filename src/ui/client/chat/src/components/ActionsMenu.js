@@ -5,7 +5,7 @@
 import { html } from '../html.js';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  pinnedContext, isAdmin, treeEntries, filePath, previewBlock, groupId,
+  pinnedContext, isAdmin, treeEntries, filePath, previewBlock, groupId, shareModalRequest,
 } from '../state.js';
 import { clearPinnedContext } from '../actions.js';
 import {
@@ -28,7 +28,9 @@ function openInNewTab(groupId, relPath) {
   window.open(fileUrl(groupId, relPath), '_blank', 'noopener');
 }
 
-export async function shareFile(groupId, entry) {
+// "Share privately" — copies/shares the cookie-authed file URL. Recipient
+// must have access to the group (hits the auth flow if not signed in).
+export async function sharePrivate(groupId, entry) {
   if (!groupId || !entry?.path) return;
   const url = new URL(fileUrl(groupId, entry.path), window.location.href).toString();
   const title = entry.name || entry.path.slice(entry.path.lastIndexOf('/') + 1);
@@ -40,6 +42,15 @@ export async function shareFile(groupId, entry) {
     }
   }
   try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+}
+
+// Backwards-compat alias.
+export const shareFile = sharePrivate;
+
+// "Share with magic link" — opens the modal to pick TTL + use count.
+export function shareWithToken(groupId, entry) {
+  if (!groupId || !entry?.path) return;
+  shareModalRequest.value = { groupId, entry: { path: entry.path, name: entry.name, type: entry.type } };
 }
 
 function entriesByPath(paths) {
@@ -98,7 +109,8 @@ function buildItems(mode, entry, onUpload) {
     items.push({ ico: '\u2B07', label: 'Download', onClick: () => downloadPaths([entry.path], [entry]) });
     if (entry.type !== 'dir') {
       items.push({ ico: '\u2197', label: 'Open in new tab', onClick: () => openInNewTab(gid, entry.path) });
-      items.push({ ico: '\u21AA', label: 'Share', onClick: () => shareFile(gid, entry) });
+      items.push({ ico: '\u21AA', label: 'Share privately', onClick: () => sharePrivate(gid, entry) });
+      items.push({ ico: '\uD83D\uDD17', label: 'Share with link\u2026', onClick: () => shareWithToken(gid, entry) });
     }
     if (admin) {
       items.push('---');
@@ -114,7 +126,8 @@ function buildItems(mode, entry, onUpload) {
     if (!p) return [];
     const entryForPath = treeEntries.value.find((e) => e.path === fp) || (fp ? { path: fp, name: p.name, type: 'file' } : null);
     const items = [];
-    items.push({ ico: '\u21AA', label: 'Share', onClick: () => shareFile(gid, entryForPath), disabled: !fp || !gid });
+    items.push({ ico: '\u21AA', label: 'Share privately', onClick: () => sharePrivate(gid, entryForPath), disabled: !fp || !gid });
+    items.push({ ico: '\uD83D\uDD17', label: 'Share with link\u2026', onClick: () => shareWithToken(gid, entryForPath), disabled: !fp || !gid });
     items.push({ ico: '\u2197', label: 'Open in new tab', onClick: () => openInNewTab(gid, fp), disabled: !fp || !gid });
     items.push({ ico: '\u2B07', label: 'Download', onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
     if (admin && entryForPath) {

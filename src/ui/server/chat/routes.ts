@@ -17,7 +17,8 @@ import { log } from '../../../log.js';
 import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
 import { hasAdminPrivilege } from '../../../modules/permissions/db/user-roles.js';
 import { authenticate, recordAccess } from '../auth.js';
-import { redeemDownloadToken } from '../download-tokens.js';
+import { createDownloadToken, redeemDownloadToken } from '../download-tokens.js';
+import { uiBaseUrl } from '../server.js';
 import { classify, resolveSafe } from './classify.js';
 import { handleChatRequest, handleChatUpgrade } from './chat.js';
 import { handleWriteRequest } from './write.js';
@@ -155,6 +156,12 @@ on(
   'GET',
   '/api/groups/:gid/zip',
   authed((ctx, userId, params) => handleZip(ctx, userId, params.gid, ctx.url.searchParams.getAll('path'))),
+);
+
+on(
+  'POST',
+  '/api/groups/:gid/share-token',
+  authed((ctx, userId, params) => handleShareToken(ctx, userId, params.gid)),
 );
 
 // ── handlers ──────────────────────────────────────────────────────────────
@@ -522,6 +529,84 @@ function handleZip(ctx: Ctx, userId: string, groupId: string, paths: string[]): 
     }
     await archive.finalize();
   })();
+}
+
+// User-initiated "magic link" share. Mints an unbound (recipient_user_id
+// IS NULL) download token for a file the user can already see, and returns
+// the public URL. Anyone with the link can download the file (until it
+// expires or the use count is exhausted).
+const SHARE_TTL_MIN_DEFAULT = 60; // 1h
+const SHARE_TTL_MIN_MAX = 7 * 24 * 60; // 7 days
+const SHARE_TTL_MIN_MIN = 1;
+const SHARE_USES_DEFAULT = 1;
+const SHARE_USES_MAX = 100;
+
+async function handleShareToken(ctx: Ctx, userId: string, groupId: string): Promise<void> {
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(ctx.req)) as Record<string, unknown>;
+  } catch {
+    return json(ctx, 400, { error: 'invalid_body' });
+  }
+
+  const rawPath = typeof body?.path === 'string' ? body.path : '';
+  const relPath = rawPath.replace(/^\/+/, '');
+  if (!relPath) return json(ctx, 400, { error: 'invalid_path' });
+
+  const ttlMinutes = clampInt(body?.ttlMinutes, SHARE_TTL_MIN_DEFAULT, SHARE_TTL_MIN_MIN, SHARE_TTL_MIN_MAX);
+  const uses = clampInt(body?.uses, SHARE_USES_DEFAULT, 1, SHARE_USES_MAX);
+
+  const group = resolveGroupAccess(userId, groupId);
+  if (!group) return json(ctx, 403, { error: 'forbidden' });
+
+  const cls = classify(relPath);
+  if (cls.kind === 'hidden') return json(ctx, 404, { error: 'not_found' });
+  if (cls.tier === 'admin' && !hasAdminPrivilege(userId, group.id)) {
+    return json(ctx, 403, { error: 'forbidden' });
+  }
+
+  const groupDir = path.resolve(GROUPS_DIR, group.folder);
+  const abs = resolveSafe(groupDir, relPath);
+  if (!abs) return json(ctx, 400, { error: 'invalid_path' });
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(abs);
+  } catch {
+    return json(ctx, 404, { error: 'not_found' });
+  }
+  if (!stat.isFile()) return json(ctx, 400, { error: 'not_a_file' });
+
+  const ttlMs = ttlMinutes * 60_000;
+  const { token, expiresAt } = createDownloadToken({
+    issuerUserId: userId,
+    recipientUserId: null,
+    groupId: group.id,
+    relPath,
+    ttlMs,
+    uses,
+  });
+  const url = `${uiBaseUrl()}${CHAT_MOUNT_PREFIX.slice('/ui'.length)}/dl?t=${token}`;
+  recordAccess({ userId, groupId: group.id, path: relPath, action: 'share_token', req: ctx.req });
+  return json(ctx, 200, { url, token, expiresAt, ttlMinutes, uses });
+}
+
+function clampInt(v: unknown, def: number, min: number, max: number): number {
+  const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : def;
+  return Math.min(Math.max(n, min), max);
+}
+
+async function readJsonBody(req: http.IncomingMessage, max = 64 * 1024): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const c of req) {
+    const buf = c as Buffer;
+    total += buf.length;
+    if (total > max) throw new Error('body_too_large');
+    chunks.push(buf);
+  }
+  if (!chunks.length) return {};
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 function handleTokenDownload(ctx: Ctx): void {

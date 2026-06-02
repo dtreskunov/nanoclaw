@@ -15544,6 +15544,7 @@ var uploadItems = y3([]);
 var me = y3("");
 var notifMutedSig = y3(false);
 var settingsOpen = y3(false);
+var shareModalRequest = y3(null);
 var previewBlock = y3(null);
 var nowTick = y3(Date.now());
 var pinnedContext = y3([]);
@@ -18223,7 +18224,7 @@ function openInNewTab(groupId2, relPath) {
   if (!groupId2 || !relPath) return;
   window.open(fileUrl(groupId2, relPath), "_blank", "noopener");
 }
-async function shareFile(groupId2, entry) {
+async function sharePrivate(groupId2, entry) {
   if (!groupId2 || !entry?.path) return;
   const url = new URL(fileUrl(groupId2, entry.path), window.location.href).toString();
   const title = entry.name || entry.path.slice(entry.path.lastIndexOf("/") + 1);
@@ -18239,6 +18240,10 @@ async function shareFile(groupId2, entry) {
     await navigator.clipboard.writeText(url);
   } catch {
   }
+}
+function shareWithToken(groupId2, entry) {
+  if (!groupId2 || !entry?.path) return;
+  shareModalRequest.value = { groupId: groupId2, entry: { path: entry.path, name: entry.name, type: entry.type } };
 }
 function entriesByPath(paths) {
   const set = new Set(paths);
@@ -18298,7 +18303,8 @@ function buildItems(mode, entry, onUpload) {
     items2.push({ ico: "\u2B07", label: "Download", onClick: () => downloadPaths([entry.path], [entry]) });
     if (entry.type !== "dir") {
       items2.push({ ico: "\u2197", label: "Open in new tab", onClick: () => openInNewTab(gid, entry.path) });
-      items2.push({ ico: "\u21AA", label: "Share", onClick: () => shareFile(gid, entry) });
+      items2.push({ ico: "\u21AA", label: "Share privately", onClick: () => sharePrivate(gid, entry) });
+      items2.push({ ico: "\u{1F517}", label: "Share with link\u2026", onClick: () => shareWithToken(gid, entry) });
     }
     if (admin) {
       items2.push("---");
@@ -18313,7 +18319,8 @@ function buildItems(mode, entry, onUpload) {
     if (!p5) return [];
     const entryForPath = treeEntries.value.find((e4) => e4.path === fp) || (fp ? { path: fp, name: p5.name, type: "file" } : null);
     const items2 = [];
-    items2.push({ ico: "\u21AA", label: "Share", onClick: () => shareFile(gid, entryForPath), disabled: !fp || !gid });
+    items2.push({ ico: "\u21AA", label: "Share privately", onClick: () => sharePrivate(gid, entryForPath), disabled: !fp || !gid });
+    items2.push({ ico: "\u{1F517}", label: "Share with link\u2026", onClick: () => shareWithToken(gid, entryForPath), disabled: !fp || !gid });
     items2.push({ ico: "\u2197", label: "Open in new tab", onClick: () => openInNewTab(gid, fp), disabled: !fp || !gid });
     items2.push({ ico: "\u2B07", label: "Download", onClick: () => fp ? downloadPaths([fp], [entryForPath]) : null, disabled: !fp });
     if (admin && entryForPath) {
@@ -19025,6 +19032,153 @@ function Settings() {
   `;
 }
 
+// src/components/ShareLinkModal.js
+var DURATIONS = [
+  { label: "15 minutes", minutes: 15 },
+  { label: "1 hour", minutes: 60 },
+  { label: "1 day", minutes: 60 * 24 },
+  { label: "7 days", minutes: 60 * 24 * 7 }
+];
+function ShareLinkModal() {
+  const req = shareModalRequest.value;
+  const [ttl, setTtl] = h2(60);
+  const [uses, setUses] = h2(1);
+  const [busy, setBusy] = h2(false);
+  const [result, setResult] = h2(null);
+  const [error, setError] = h2(null);
+  const urlRef = A2(null);
+  y2(() => {
+    if (!req) return;
+    setTtl(60);
+    setUses(1);
+    setBusy(false);
+    setResult(null);
+    setError(null);
+  }, [req?.entry?.path, req?.groupId]);
+  y2(() => {
+    if (!req) return void 0;
+    const onKey = (e4) => {
+      if (e4.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [req]);
+  if (!req) return null;
+  const { groupId: groupId2, entry } = req;
+  const title = entry?.name || (entry?.path || "").slice((entry?.path || "").lastIndexOf("/") + 1);
+  function close() {
+    shareModalRequest.value = null;
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close();
+  }
+  async function mint() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r4 = await postJson(`api/groups/${encodeURIComponent(groupId2)}/share-token`, {
+        path: entry.path,
+        ttlMinutes: ttl,
+        uses
+      });
+      if (!r4.ok) {
+        setError(r4.data?.error || `HTTP ${r4.status}`);
+        return;
+      }
+      setResult(r4.data);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function copy() {
+    if (!result?.url) return;
+    try {
+      await navigator.clipboard.writeText(result.url);
+    } catch {
+      if (urlRef.current) {
+        urlRef.current.select();
+        try {
+          document.execCommand("copy");
+        } catch {
+        }
+      }
+    }
+  }
+  async function shareSystem() {
+    if (!result?.url || !navigator.share) return;
+    try {
+      await navigator.share({ title, url: result.url });
+    } catch (err) {
+      if (err && err.name !== "AbortError") setError(String(err));
+    }
+  }
+  const expiresLabel = result?.expiresAt ? new Date(result.expiresAt).toLocaleString() : null;
+  return html`
+    <div class="settings-backdrop" onClick=${onBackdrop}>
+      <div class="settings-modal" role="dialog" aria-label="Share with link" style="max-width:520px">
+        <header class="settings-head">
+          <span class="title">Share with link</span>
+          <button type="button" class="icon-btn" aria-label="Close" onClick=${close}>\u2715</button>
+        </header>
+        <div class="settings-body">
+          <p class="muted" style="margin-top:0">
+            Anyone with this link can download <code>${title}</code> until it expires
+            or the use count is exhausted. No sign-in required.
+          </p>
+
+          ${result ? html`
+            <section>
+              <h3>Link ready</h3>
+              <div class="settings-row">
+                <input ref=${urlRef} type="text" readonly value=${result.url}
+                       onClick=${(e4) => e4.target.select()} />
+              </div>
+              <p class="muted">
+                Valid for ${result.ttlMinutes} min${expiresLabel ? ` (until ${expiresLabel})` : ""},
+                ${result.uses} download${result.uses === 1 ? "" : "s"}.
+              </p>
+              <div class="settings-row">
+                <button type="button" onClick=${copy}>Copy link</button>
+                ${navigator.share ? html`<button type="button" class="ghost" onClick=${shareSystem}>Share\u2026</button>` : null}
+                <button type="button" class="ghost" onClick=${() => setResult(null)}>Mint another</button>
+              </div>
+            </section>
+          ` : html`
+            <section>
+              <h3>Valid for</h3>
+              <div class="settings-row">
+                <select value=${ttl} onChange=${(e4) => setTtl(Number(e4.target.value))}>
+                  ${DURATIONS.map((d5) => html`<option value=${d5.minutes}>${d5.label}</option>`)}
+                </select>
+                <span class="muted">or custom (minutes):</span>
+                <input type="number" min="1" max="10080" value=${ttl}
+                       onInput=${(e4) => setTtl(Math.max(1, Math.min(10080, Number(e4.target.value) || 1)))} />
+              </div>
+              <p class="muted">Maximum 7 days (10080 minutes).</p>
+
+              <h3>Number of downloads</h3>
+              <div class="settings-row">
+                <input type="number" min="1" max="100" value=${uses}
+                       onInput=${(e4) => setUses(Math.max(1, Math.min(100, Number(e4.target.value) || 1)))} />
+                <button type="button" class="ghost" onClick=${() => setUses(1)} disabled=${uses === 1}>Single use</button>
+              </div>
+              <p class="muted">Maximum 100. The link stops working once exhausted.</p>
+            </section>
+          `}
+
+          ${error ? html`<div class="settings-status err">${error}</div>` : null}
+        </div>
+        <div class="settings-row" style="padding:10px 16px;border-top:1px solid var(--border);justify-content:flex-end">
+          ${result ? html`<button type="button" onClick=${close}>Done</button>` : html`
+              <button type="button" class="ghost" onClick=${close} disabled=${busy}>Cancel</button>
+              <button type="button" onClick=${mint} disabled=${busy}>${busy ? "Creating\u2026" : "Create link"}</button>
+            `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // src/panels.js
 var KEYS = { threads: "nc:pane:threads", files: "nc:pane:files" };
 function restorePanelState() {
@@ -19108,6 +19262,7 @@ function App() {
     </main>
     <div class=${"backdrop" + (backdropShown ? " show" : "")} id="backdrop" onClick=${onBackdrop}></div>
     <${Settings} />
+    <${ShareLinkModal} />
   `;
 }
 
