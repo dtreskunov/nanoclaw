@@ -97,7 +97,7 @@
       /*   </aside>                                                          */
       /* JS: registerPane(id, () => isOpen, toggleFn). Toggling adds/removes */
       /* the `collapsed` class on the pane; CSS handles the rest.            */
-      :root { --handle-h: 40px; --collapsed-w: 40px; }
+      :root { --handle-h: 40px; --collapsed-w: 40px; --bottom-row-h: 49px; }
 
       .nc-pane { position: relative; overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
       .nc-pane.collapsed { cursor: pointer; }
@@ -169,7 +169,41 @@
       .threads-rail .thread .del { position: absolute; top: 6px; right: 6px; padding: 0 5px; border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; display: none; }
       .threads-rail .thread:hover .del { display: block; }
       .threads-rail .thread .del:hover { color: var(--error); }
-      .threads-rail .thread-section { padding: 8px 10px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+      .threads-rail .thread-section { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--border); }
+      .threads-rail .thread-section.open { flex: 1 1 0; }
+      .threads-rail .thread-section.collapsed { flex: 0 0 auto; }
+      .threads-rail .thread-section-header {
+        display: flex; flex-direction: column; align-items: stretch; gap: 2px; justify-content: center;
+        width: 100%;
+        padding: 8px 10px;
+        background: var(--wash-subtle);
+        border: 0;
+        border-top: 1px solid var(--border);
+        font: inherit; color: var(--fg);
+        text-align: left;
+        cursor: pointer;
+      }
+      .threads-rail .thread-section.collapsed > .thread-section-header { min-height: var(--bottom-row-h); }
+      .threads-rail .thread-section.collapsed > .thread-section-header > .handle { display: none; }
+      .threads-rail .thread-section-header:hover { background: var(--wash-soft); }
+      .threads-rail .thread-section-header .row { display: flex; align-items: center; gap: 6px; }
+      .threads-rail .thread-section-header .chev { width: 10px; font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+      .threads-rail .thread-section-header .ch-pill { font-size: 14px; flex: 0 0 auto; }
+      .threads-rail .thread-section-header .label { font-size: 12px; font-weight: 600; flex: 0 0 auto; }
+      .threads-rail .thread-section-header .count {
+        margin-left: auto;
+        flex: 0 0 auto;
+        font-size: 11px; color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .threads-rail .thread-section-header .handle {
+        font-size: 11px; color: var(--muted);
+        padding-left: 22px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .threads-rail .thread-section-body { flex: 1; min-height: 0; overflow-y: auto; }
       .threads-rail .thread-show-older {
         display: block; width: calc(100% - 16px); margin: 4px 8px 8px;
         padding: 6px 10px; background: transparent; color: var(--muted);
