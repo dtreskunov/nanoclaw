@@ -38,6 +38,8 @@ export interface MessageInRow {
   channel_type: string | null;
   thread_id: string | null;
   content: string;
+  /** Canonical UUID of the sender (host's users.id). Null when unresolved. */
+  sender_user_id?: string | null;
 }
 
 // Cap on how many messages reach the agent in one prompt. Read from

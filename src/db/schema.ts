@@ -177,9 +177,24 @@ CREATE TABLE IF NOT EXISTS messages_in (
   -- group's "newest" session. NULL on channel-side inbound and on a2a rows
   -- written before this column existed.
   source_session_id TEXT,
-  on_wake        INTEGER NOT NULL DEFAULT 0
+  on_wake        INTEGER NOT NULL DEFAULT 0,
                -- 1 = only deliver on the container's first poll (fresh start).
                -- Dying containers (past first poll) skip these rows.
+  -- Canonical UUID of the sender (central users.id). Null when the
+  -- inbound row has no resolvable sender (system messages, scheduled
+  -- tasks, agent-to-agent). Authoritative source for the container's
+  -- formatter -- replaces the legacy "channel_type:raw" synthesis
+  -- from message content. No FK because users lives in the central DB,
+  -- not in this per-session file; the CHECK below catches obvious
+  -- shape mismatches at the schema level. Host writers also validate
+  -- before insert (see insertMessage in session-db.ts).
+  sender_user_id TEXT CHECK (sender_user_id IS NULL OR (
+    length(sender_user_id) = 36
+    AND substr(sender_user_id, 9, 1) = '-'
+    AND substr(sender_user_id, 14, 1) = '-'
+    AND substr(sender_user_id, 19, 1) = '-'
+    AND substr(sender_user_id, 24, 1) = '-'
+  ))
 );
 CREATE INDEX IF NOT EXISTS idx_messages_in_series ON messages_in(series_id);
 

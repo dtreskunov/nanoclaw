@@ -221,6 +221,13 @@ export function writeSessionMessage(
      * Dying containers (past first poll) skip these rows.
      */
     onWake?: 0 | 1;
+    /**
+     * Canonical UUID of the sender (users.id). Set by the router after
+     * senderResolver resolves the channel/handle. Null for system,
+     * scheduled-task, agent-to-agent, and other host-internal callers
+     * that don't have a user identity to attribute.
+     */
+    senderUserId?: string | null;
   },
 ): void {
   // Extract base64 attachment data, save to inbox, replace with file paths
@@ -241,6 +248,7 @@ export function writeSessionMessage(
       trigger: message.trigger ?? 1,
       sourceSessionId: message.sourceSessionId ?? null,
       onWake: message.onWake ?? 0,
+      senderUserId: message.senderUserId ?? null,
     });
   } finally {
     db.close();

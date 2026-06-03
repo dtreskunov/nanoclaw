@@ -197,7 +197,14 @@ export function initTestSessionDb(): { inbound: Database; outbound: Database } {
       channel_type   TEXT,
       thread_id      TEXT,
       content        TEXT NOT NULL,
-      on_wake        INTEGER NOT NULL DEFAULT 0
+      on_wake        INTEGER NOT NULL DEFAULT 0,
+      sender_user_id TEXT CHECK (sender_user_id IS NULL OR (
+        length(sender_user_id) = 36
+        AND substr(sender_user_id, 9, 1) = '-'
+        AND substr(sender_user_id, 14, 1) = '-'
+        AND substr(sender_user_id, 19, 1) = '-'
+        AND substr(sender_user_id, 24, 1) = '-'
+      ))
     );
     CREATE TABLE delivered (
       message_out_id      TEXT PRIMARY KEY,

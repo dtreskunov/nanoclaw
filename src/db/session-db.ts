@@ -8,6 +8,7 @@
 import Database from 'better-sqlite3';
 
 import { INBOUND_SCHEMA, OUTBOUND_SCHEMA } from './schema.js';
+import { assertUserUuid } from './uuid.js';
 
 /** Apply the inbound or outbound schema to a DB file. Idempotent. */
 export function ensureSchema(dbPath: string, schema: 'inbound' | 'outbound'): void {
@@ -119,16 +120,24 @@ export function insertMessage(
      * Dying containers (past first poll) skip these rows.
      */
     onWake?: 0 | 1;
+    /**
+     * Canonical UUID of the sender (users.id). Null for system rows,
+     * scheduled tasks, agent-to-agent inbound, and any path where no
+     * users row was resolved. Authoritative source for the container.
+     */
+    senderUserId?: string | null;
   },
 ): void {
+  assertUserUuid(message.senderUserId, 'insertMessage.senderUserId');
   db.prepare(
-    `INSERT INTO messages_in (id, seq, kind, timestamp, status, platform_id, channel_type, thread_id, content, process_after, recurrence, series_id, trigger, source_session_id, on_wake)
-     VALUES (@id, @seq, @kind, @timestamp, 'pending', @platformId, @channelType, @threadId, @content, @processAfter, @recurrence, @id, @trigger, @sourceSessionId, @onWake)`,
+    `INSERT INTO messages_in (id, seq, kind, timestamp, status, platform_id, channel_type, thread_id, content, process_after, recurrence, series_id, trigger, source_session_id, on_wake, sender_user_id)
+     VALUES (@id, @seq, @kind, @timestamp, 'pending', @platformId, @channelType, @threadId, @content, @processAfter, @recurrence, @id, @trigger, @sourceSessionId, @onWake, @senderUserId)`,
   ).run({
     ...message,
     trigger: message.trigger ?? 1,
     onWake: message.onWake ?? 0,
     sourceSessionId: message.sourceSessionId ?? null,
+    senderUserId: message.senderUserId ?? null,
     seq: nextEvenSeq(db),
   });
 }
@@ -328,6 +337,12 @@ export function migrateMessagesInTable(db: Database.Database): void {
     // 1 = only deliver on the container's first poll (fresh start).
     // All existing rows are normal messages, so default 0.
     db.prepare('ALTER TABLE messages_in ADD COLUMN on_wake INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!cols.has('sender_user_id')) {
+    // Canonical UUID of the sender (central users.id). Pre-migration rows
+    // stay NULL; the container's formatter falls back to the legacy
+    // ${channel_type}:${raw} synthesis for those.
+    db.prepare('ALTER TABLE messages_in ADD COLUMN sender_user_id TEXT').run();
   }
 }
 
