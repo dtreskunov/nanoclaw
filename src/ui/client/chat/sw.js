@@ -185,11 +185,16 @@ async function handlePush(event) {
     tag,
     renotify: true,
     data: { groupId, threadId, msgId },
+    actions: [
+      { action: 'open', title: 'Open' },
+      { action: 'dismiss', title: 'Dismiss' },
+    ],
   });
 }
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  if (event.action === 'dismiss') return;
   event.waitUntil(focusOrOpen(event.notification.data));
 });
 
