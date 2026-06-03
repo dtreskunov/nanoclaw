@@ -11,6 +11,7 @@ import { effect } from '@preact/signals';
 import { notifMutedSig, NOTIF_MUTE_KEY } from './state';
 import type { ChatMessageFile } from './types';
 import { showStickyToast } from './components/Toast';
+import { bumpUnread } from './badge';
 
 let registration: ServiceWorkerRegistration | null = null;
 let updatePromptShown = false;
@@ -173,7 +174,9 @@ async function unsubscribePush(): Promise<void> {
 /** Retained for source compatibility — SW now handles all notification display. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function maybeNotify(_text: string, _files: ChatMessageFile[] | null | undefined): void {
-  /* no-op: service worker shows notifications */
+  // SW shows the notification; we bump the installed-app badge here.
+  if (notifMutedSig.value) return;
+  bumpUnread();
 }
 
 /** True on iOS Safari that hasn't been installed as a PWA — Web Push on
