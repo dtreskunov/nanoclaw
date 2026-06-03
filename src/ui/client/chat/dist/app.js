@@ -15487,7 +15487,17 @@ async function postJson(path, body) {
 // src/state.ts
 var groups = y3([]);
 var groupId = y3(null);
-var isAdmin = y3(false);
+var isAdmin = g2(() => {
+  const id = groupId.value;
+  if (!id) return false;
+  const g5 = groups.value.find((x5) => x5.id === id);
+  return !!(g5 && g5.isAdmin);
+});
+if (typeof document !== "undefined") {
+  j3(() => {
+    document.body.classList.toggle("is-admin", isAdmin.value);
+  });
+}
 var treePath = y3("");
 var filePath = y3(null);
 var treeEntries = y3([]);
@@ -15528,16 +15538,12 @@ var refs = {
   ws: null,
   reconnectTimer: null,
   reconnectAttempt: 0,
-  pollTimer: null,
-  threadsPollTimer: null,
-  approvalsPollTimer: null,
+  syncTimer: null,
   seenIds: /* @__PURE__ */ new Set(),
   suppressHashCount: 0,
   uploadDragDepth: 0
 };
-var POLL_INTERVAL_MS = 1e4;
-var THREADS_POLL_MS = 2e4;
-var APPROVALS_POLL_MS = 15e3;
+var SYNC_INTERVAL_MS = 1e4;
 var UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 var UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
 var UPLOAD_MAX_FILES = 10;
@@ -16981,11 +16987,6 @@ function writeHash() {
     location.hash = h5;
   }
 }
-function applyAdminFlag() {
-  const g5 = groups.value.find((x5) => x5.id === groupId.value);
-  isAdmin.value = !!(g5 && g5.isAdmin);
-  document.body.classList.toggle("is-admin", isAdmin.value);
-}
 function threadCtx(t4) {
   if (!t4) return null;
   if (!t4.channelType || t4.channelType === "web") return null;
@@ -17006,7 +17007,6 @@ async function applyHash(router2) {
     groupId.value = parsed.groupId;
     filePath.value = null;
   });
-  applyAdminFlag();
   if (groupChanged) await router2.loadThreads(parsed.groupId);
   if (parsed.threadId) {
     router2.openChat(parsed.groupId, parsed.threadId, null).catch((err) => console.error("chat open failed", err));
@@ -17027,6 +17027,7 @@ async function applyHash(router2) {
 }
 
 // src/notify.ts
+var registration = null;
 function loadMuted() {
   try {
     return localStorage.getItem(NOTIF_MUTE_KEY) === "1";
@@ -17042,38 +17043,116 @@ function initNotif() {
     } catch {
     }
   });
+  void registerServiceWorker().then(() => {
+    if (!notifMutedSig.value) void ensureSubscribed();
+  });
+}
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const existing = await navigator.serviceWorker.getRegistration("/ui/chat/");
+    if (existing && !existing.active && !existing.installing && !existing.waiting) {
+      await existing.unregister().catch(() => {
+      });
+    }
+    registration = await navigator.serviceWorker.register("/ui/chat/sw.js", {
+      scope: "/ui/chat/",
+      updateViaCache: "none"
+    });
+  } catch (err) {
+    console.warn("SW register failed", err);
+  }
 }
 function toggleMute() {
   notifMutedSig.value = !notifMutedSig.value;
-  if (!notifMutedSig.value && "Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {
-    });
+  if (notifMutedSig.value) {
+    void unsubscribePush();
+  } else {
+    void ensureSubscribed();
   }
 }
-function maybeNotify(text, files) {
-  if (notifMutedSig.value) return;
-  if (document.visibilityState === "visible" && document.hasFocus()) return;
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-  try {
-    const body = (text || "").slice(0, 200) + (files && files.length ? ` \xB7 ${files.length} file${files.length > 1 ? "s" : ""}` : "");
-    const n3 = new Notification("NanoClaw", { body, icon: "icon.svg", tag: "nanoclaw-chat" });
-    n3.onclick = () => {
-      window.focus();
-      n3.close();
-    };
-  } catch {
+async function ensureSubscribed() {
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  let permission = Notification.permission;
+  if (permission === "default") {
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      return;
+    }
   }
+  if (permission !== "granted") {
+    notifMutedSig.value = true;
+    return;
+  }
+  if (!registration) {
+    try {
+      registration = await navigator.serviceWorker.ready;
+    } catch {
+      return;
+    }
+  }
+  try {
+    let sub = await registration.pushManager.getSubscription();
+    if (!sub) {
+      const keyResp = await fetch("api/push/public-key", { credentials: "include" });
+      if (!keyResp.ok) return;
+      const { publicKey } = await keyResp.json();
+      if (!publicKey) return;
+      sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey).buffer
+      });
+    }
+    await fetch("api/push/subscribe", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON())
+    });
+  } catch (err) {
+    console.warn("push subscribe failed", err);
+  }
+}
+async function unsubscribePush() {
+  if (!registration) return;
+  try {
+    const sub = await registration.pushManager.getSubscription();
+    if (!sub) return;
+    const endpoint = sub.endpoint;
+    await sub.unsubscribe();
+    await fetch("api/push/subscribe", {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint })
+    });
+  } catch (err) {
+    console.warn("push unsubscribe failed", err);
+  }
+}
+function maybeNotify(_text, _files) {
+}
+function shouldShowIosInstallHint() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const isIos = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  if (!isIos) return false;
+  const standalone = typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  return !standalone;
+}
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i5 = 0; i5 < rawData.length; ++i5) outputArray[i5] = rawData.charCodeAt(i5);
+  return outputArray;
 }
 
 // src/actions.ts
-async function loadThreads(gid) {
-  try {
-    const { threads: t4 } = await api(`api/groups/${encodeURIComponent(gid)}/chat/threads`);
-    threads.value = t4 || [];
-  } catch (err) {
-    console.error("threads load failed", err);
-    threads.value = [];
-  }
+async function loadThreads(_gid) {
+  await runSync();
 }
 async function deleteThread(tid) {
   if (!groupId.value) return;
@@ -17140,7 +17219,6 @@ function clearChat() {
     messagingGroupId.value = null;
     canSend.value = true;
   });
-  stopChatPoll();
   if (refs.ws) {
     try {
       refs.ws.close();
@@ -17154,25 +17232,58 @@ function clearChat() {
   }
   refs.seenIds.clear();
 }
-function stopChatPoll() {
-  if (refs.pollTimer) {
-    clearInterval(refs.pollTimer);
-    refs.pollTimer = null;
+function startSyncPoll() {
+  if (refs.syncTimer) return;
+  runSync().catch(() => {
+  });
+  refs.syncTimer = setInterval(() => {
+    if (document.hidden) return;
+    runSync().catch((err) => console.error("sync failed", err));
+  }, SYNC_INTERVAL_MS);
+}
+async function runSync() {
+  const gid = groupId.value;
+  const tid = threadId.value;
+  const ct = channelType.value;
+  const mg = messagingGroupId.value;
+  const params = new URLSearchParams();
+  if (gid) {
+    params.set("gid", gid);
+    if (tid && ct && ct !== "web" && mg) {
+      params.set("tid", tid);
+      params.set("channel", ct);
+      params.set("mg", mg);
+    }
+  }
+  let res;
+  try {
+    res = await api("api/sync" + (params.toString() ? "?" + params.toString() : ""));
+  } catch {
+    return;
+  }
+  if (Array.isArray(res.approvals)) pendingApprovals.value = res.approvals;
+  if (gid && groupId.value === gid && Array.isArray(res.threads)) threads.value = res.threads;
+  if (gid && groupId.value === gid && tid && threadId.value === tid && ct === channelType.value && ct !== "web" && Array.isArray(res.threadMessages)) {
+    mergeIncomingMessages(res.threadMessages);
   }
 }
-function startChatPoll() {
-  stopChatPoll();
-  refs.pollTimer = setInterval(async () => {
-    if (!threadId.value || channelType.value === "web") {
-      stopChatPoll();
-      return;
-    }
-    try {
-      await refetchThreadHistory(true);
-    } catch (err) {
-      console.error("poll failed", err);
-    }
-  }, POLL_INTERVAL_MS);
+function mergeIncomingMessages(messages) {
+  let maxTs = "";
+  const additions = [];
+  for (const m6 of messages) {
+    const direction = normDirection(m6.direction);
+    const key = m6.id ? `${direction}:${m6.id}` : null;
+    if (key && refs.seenIds.has(key)) continue;
+    const ts = m6.timestamp || "";
+    additions.push({ direction, text: m6.text, files: m6.files || null, ts });
+    if (key) refs.seenIds.add(key);
+    if (ts > maxTs) maxTs = ts;
+    if (direction === "out") maybeNotify(m6.text, m6.files || []);
+  }
+  if (additions.length) {
+    chatMessages.value = chatMessages.value.concat(additions);
+    bumpActiveThread(maxTs);
+  }
 }
 function historyUrl(gid, tid) {
   let u5 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
@@ -17237,7 +17348,6 @@ async function openChat(gid, resumeTid, opts) {
     clearTimeout(refs.reconnectTimer);
     refs.reconnectTimer = null;
   }
-  stopChatPoll();
   refs.reconnectAttempt = 0;
   let ct = "web";
   let mg = null;
@@ -17296,7 +17406,6 @@ async function openChat(gid, resumeTid, opts) {
     if (ct === "web") connectChatWs();
     else {
       chatStatus.value = "";
-      startChatPoll();
     }
     return;
   }
@@ -17448,21 +17557,6 @@ async function sendChat(text, files) {
     chatStatus.value = `send failed: ${m6}`;
   }
 }
-function startThreadsPoll(gid) {
-  if (refs.threadsPollTimer) {
-    clearInterval(refs.threadsPollTimer);
-    refs.threadsPollTimer = null;
-  }
-  refs.threadsPollTimer = setInterval(() => {
-    if (groupId.value === gid)
-      loadThreads(gid).catch(() => {
-      });
-    else if (refs.threadsPollTimer) {
-      clearInterval(refs.threadsPollTimer);
-      refs.threadsPollTimer = null;
-    }
-  }, THREADS_POLL_MS);
-}
 async function selectGroup(gid) {
   n2(() => {
     groupId.value = gid;
@@ -17470,7 +17564,6 @@ async function selectGroup(gid) {
     filePath.value = null;
   });
   await loadThreads(gid);
-  startThreadsPoll(gid);
   await loadTree("");
   const latest = threads.value.length > 0 ? threads.value[0] : null;
   if (latest) {
@@ -17643,7 +17736,7 @@ function installLivenessHandlers() {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
     nowTick.value = Date.now();
-    loadApprovals().catch(() => {
+    runSync().catch(() => {
     });
     if (!threadId.value) return;
     refetchThreadHistory(true).catch((err) => console.error("resume catchup failed", err));
@@ -17657,23 +17750,6 @@ function installLivenessHandlers() {
       connectChatWs();
     }
   });
-}
-async function loadApprovals() {
-  try {
-    const res = await api("api/approvals");
-    pendingApprovals.value = Array.isArray(res.approvals) ? res.approvals : [];
-  } catch {
-  }
-}
-function startApprovalsPoll() {
-  if (refs.approvalsPollTimer) return;
-  loadApprovals().catch(() => {
-  });
-  refs.approvalsPollTimer = setInterval(() => {
-    if (document.hidden) return;
-    loadApprovals().catch(() => {
-    });
-  }, APPROVALS_POLL_MS);
 }
 async function respondApproval(approvalId, value) {
   if (respondingApprovalIds.value.has(approvalId)) return;
@@ -17699,7 +17775,7 @@ async function respondApproval(approvalId, value) {
   } catch (err) {
     console.error("approval respond failed", err);
     chatStatus.value = "approval failed: " + (err instanceof Error ? err.message : String(err));
-    loadApprovals().catch(() => {
+    runSync().catch(() => {
     });
   } finally {
     const cleared = new Set(respondingApprovalIds.value);
@@ -19267,6 +19343,19 @@ function FilesPane() {
         }
       }
     ),
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn refresh-btn",
+        title: "Refresh",
+        "aria-label": "Refresh",
+        onClick: () => {
+          loadTree(treePath.peek()).catch(console.error);
+        },
+        children: "\u21BB"
+      }
+    ),
     /* @__PURE__ */ u4(ActionsMenu, { mode: "header", onUpload: () => uploadInputRef.current?.click() })
   ] });
   return /* @__PURE__ */ u4(Pane, { paneKey: "files", name: "files-pane", label: "Files", extraClass: previewing ? "previewing" : "", headActions, children: /* @__PURE__ */ u4("div", { class: "files-body", ref: bodyRef, children: [
@@ -19832,12 +19921,36 @@ function setupViewportFit() {
     }
   });
 }
+var IOS_HINT_DISMISSED_KEY = "nanoclaw:ios-install-hint-dismissed";
+function maybeShowIosInstallHint() {
+  if (!shouldShowIosInstallHint()) return;
+  try {
+    if (localStorage.getItem(IOS_HINT_DISMISSED_KEY) === "1") return;
+  } catch {
+  }
+  const el = document.createElement("div");
+  el.setAttribute("role", "note");
+  el.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:8px;padding:12px 14px;font:13px system-ui;-webkit-font-smoothing:antialiased;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;gap:10px;align-items:flex-start";
+  el.innerHTML = '<div style="flex:1">Add to Home Screen to receive notifications when the app is closed. Tap the Share button, then "Add to Home Screen".</div><button type="button" aria-label="Dismiss" style="background:transparent;color:#9ca3af;border:0;font-size:18px;line-height:1;cursor:pointer;padding:0 4px">\xD7</button>';
+  const btn = el.querySelector("button");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      try {
+        localStorage.setItem(IOS_HINT_DISMISSED_KEY, "1");
+      } catch {
+      }
+      el.remove();
+    });
+  }
+  document.body.appendChild(el);
+}
 async function init() {
   initNotif();
   setupViewportFit();
   installLivenessHandlers();
   restorePanelState();
   applyPanelClasses();
+  maybeShowIosInstallHint();
   try {
     const [meRes, groupsRes] = await Promise.all([
       api("api/me"),
@@ -19855,13 +19968,12 @@ async function init() {
     if (app2) app2.innerHTML = '<div style="padding:24px;font:14px system-ui">No accessible groups.</div>';
     return;
   }
-  applyAdminFlag();
   const parsed = parseHash();
   if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error("initial route failed", err));
   const app = document.getElementById("app");
   if (app) D(/* @__PURE__ */ u4(App, {}), app);
-  startApprovalsPoll();
+  startSyncPoll();
   try {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("settings") === "1") {
