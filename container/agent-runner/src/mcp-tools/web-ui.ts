@@ -22,18 +22,25 @@ export const requestLoginLink: McpToolDefinition = {
   tool: {
     name: 'request_login_link',
     description:
-      "Mint and send a one-time web UI login link to a user via the current channel. " +
+      "Mint and send a one-time web UI login link to a user. " +
       "Use when the user asks to see, browse, or download their files. The host generates " +
-      "the link and delivers it as a follow-up message — do NOT include the link in your " +
+      "the link and delivers it out-of-band to the user's primary registered identity " +
+      "(typically their email) — NOT necessarily the channel this request came from. " +
+      "This is intentional: out-of-band delivery prevents a hijacked session in one channel " +
+      "from being escalated via a link delivered to that same channel. Tell the user to " +
+      "check their primary contact channel (usually email). Do NOT include the link in your " +
       "own reply (you don't have one) and do NOT ask the user to send /web-login. " +
-      "Pass the requesting user's namespaced id (e.g. 'resend:user@example.com', " +
-      "'telegram:12345') — usually the sender of the message you're responding to.",
+      "Pass the requesting user's canonical UUID — read it from the inbound message's " +
+      "`from` attribute / sender id (it's a UUID like '550e8400-e29b-41d4-a716-446655440000', " +
+      "not a 'channel:handle' string). Usually the sender of the message you're responding to.",
     inputSchema: {
       type: 'object' as const,
       properties: {
         userId: {
           type: 'string',
-          description: "Namespaced user id, e.g. 'resend:user@example.com'.",
+          description:
+            "Canonical UUID of the requesting user (matches users.id on the host). " +
+            "Read from the inbound message's sender id; do NOT pass a 'channel:handle' string.",
         },
       },
       required: ['userId'],
@@ -62,7 +69,7 @@ export const requestLoginLink: McpToolDefinition = {
     });
 
     return ok(
-      `Login link requested for ${userId}. The host will deliver it to them via this channel — your reply doesn't need to include the link.`,
+      `Login link requested for ${userId}. The host will deliver it out-of-band to the user's primary registered identity (typically email), which may differ from this channel. Tell the user to check their primary contact channel.`,
     );
   },
 };
