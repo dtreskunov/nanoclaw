@@ -7,7 +7,7 @@ import {
   treePath, treeEntries, treeError, filePath, isAdmin,
   previewBlock, uploadItems, threadId, pinnedContext,
 } from '../state';
-import { navTree, navFile, closePreview, togglePinnedFile } from '../actions';
+import { navTree, navFile, closePreview, togglePinnedFile, loadTree } from '../actions';
 import {
   uploadFiles, clearUploadStrip, resolveConflict, notifyAgent,
 } from '../uploads';
@@ -300,6 +300,13 @@ export function FilesPane() {
           ev.currentTarget.value = '';
         }}
       />
+      <button
+        type="button"
+        class="icon-btn refresh-btn"
+        title="Refresh"
+        aria-label="Refresh"
+        onClick={() => { loadTree(treePath.peek()).catch(console.error); }}
+      >{'\u21BB'}</button>
       <ActionsMenu mode="header" onUpload={() => uploadInputRef.current?.click()} />
     </div>
   );
