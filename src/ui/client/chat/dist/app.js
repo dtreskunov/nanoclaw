@@ -20180,8 +20180,37 @@ async function init() {
       const url = window.location.pathname + (q3 ? "?" + q3 : "") + window.location.hash;
       window.history.replaceState(null, "", url);
     }
+    handleShareTarget();
   } catch {
   }
+}
+function handleShareTarget() {
+  const onShareRoute = window.location.pathname.endsWith("/share");
+  const sp = new URLSearchParams(window.location.search);
+  const title = sp.get("title") || "";
+  const text = sp.get("text") || "";
+  const url = sp.get("url") || "";
+  if (!title && !text && !url) {
+    if (onShareRoute) window.history.replaceState(null, "", "/ui/chat/" + window.location.hash);
+    return;
+  }
+  const combined = [title, text, url].filter(Boolean).join("\n").trim();
+  const apply2 = () => {
+    const el = document.getElementById("chat-input");
+    if (!el) return false;
+    el.value = (el.value ? el.value + "\n\n" : "") + combined;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.focus();
+    return true;
+  };
+  if (!apply2()) {
+    let tries = 0;
+    const t4 = window.setInterval(() => {
+      if (apply2() || ++tries > 50) window.clearInterval(t4);
+    }, 100);
+  }
+  const nextPath = onShareRoute ? "/ui/chat/" : window.location.pathname;
+  window.history.replaceState(null, "", nextPath + window.location.hash);
 }
 init().catch((err) => console.error(err));
 //# sourceMappingURL=app.js.map

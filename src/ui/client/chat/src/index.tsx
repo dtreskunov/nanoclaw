@@ -118,7 +118,42 @@ async function init(): Promise<void> {
       const url = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
       window.history.replaceState(null, '', url);
     }
+    handleShareTarget();
   } catch { /* ignore */ }
+}
+
+// Web Share Target: if the user shared from another app, the manifest's
+// share_target landing route (/ui/chat/share) preserves the title/text/url
+// query params. Stuff them into the composer once it mounts, then rewrite
+// the URL so a reload doesn't re-share.
+function handleShareTarget(): void {
+  const onShareRoute = window.location.pathname.endsWith('/share');
+  const sp = new URLSearchParams(window.location.search);
+  const title = sp.get('title') || '';
+  const text = sp.get('text') || '';
+  const url = sp.get('url') || '';
+  if (!title && !text && !url) {
+    // Even if we landed on /share with no params, normalize back to /.
+    if (onShareRoute) window.history.replaceState(null, '', '/ui/chat/' + window.location.hash);
+    return;
+  }
+  const combined = [title, text, url].filter(Boolean).join('\n').trim();
+  const apply = (): boolean => {
+    const el = document.getElementById('chat-input') as HTMLTextAreaElement | null;
+    if (!el) return false;
+    el.value = (el.value ? el.value + '\n\n' : '') + combined;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.focus();
+    return true;
+  };
+  if (!apply()) {
+    let tries = 0;
+    const t = window.setInterval(() => {
+      if (apply() || ++tries > 50) window.clearInterval(t);
+    }, 100);
+  }
+  const nextPath = onShareRoute ? '/ui/chat/' : window.location.pathname;
+  window.history.replaceState(null, '', nextPath + window.location.hash);
 }
 
 init().catch((err) => console.error(err));

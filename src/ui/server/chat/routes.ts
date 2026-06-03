@@ -148,6 +148,9 @@ function redirectToLogin(ctx: Ctx): void {
 // Static + public.
 on('GET', '/', (ctx) => serveStatic(ctx, 'index.html'));
 on('GET', '/index.html', (ctx) => serveStatic(ctx, 'index.html'));
+// Web Share Target landing — the manifest points /ui/chat/share here.
+// We serve the SPA shell; the client reads the share params from the URL.
+on('GET', '/share', (ctx) => serveStatic(ctx, 'index.html'));
 on('GET', '/manifest.webmanifest', (ctx) => serveStatic(ctx, 'manifest.webmanifest'));
 on('GET', '/icon.svg', (ctx) => serveStatic(ctx, 'icon.svg'));
 on('GET', '/icon-192.png', (ctx) => serveStatic(ctx, 'icon-192.png'));
