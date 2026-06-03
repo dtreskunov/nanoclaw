@@ -86,6 +86,33 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-main textarea::placeholder { animation: none; }
+  .chat-main #chat-send::before { animation: none; }
+}
+.chat-main #chat-send {
+  position: relative;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 0 12px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+.chat-main #chat-send::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #8be4d4 0%, #3fbfae 40%, #b07cff 100%);
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  animation: placeholder-shimmer 6s ease-in-out infinite;
 }
 .chat-main form.ws-down textarea,
 .chat-main form.ws-down > button { opacity: 0.55; cursor: not-allowed; }
