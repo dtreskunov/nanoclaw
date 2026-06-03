@@ -6,6 +6,7 @@ import { api } from './api';
 import { me, groups, settingsOpen, chatLoading } from './state';
 import { App } from './components/App';
 import { initNotif, shouldShowIosInstallHint } from './notify';
+import { initInstall } from './install';
 import { restorePanelState, applyPanelClasses } from './panels';
 import { applyHash, parseHash } from './hash';
 import { router } from './router';
@@ -77,6 +78,7 @@ function maybeShowIosInstallHint(): void {
 
 async function init(): Promise<void> {
   initNotif();
+  initInstall();
   setupViewportFit();
   installLivenessHandlers();
   restorePanelState();

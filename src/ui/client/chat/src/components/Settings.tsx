@@ -3,7 +3,9 @@ import './Settings.css';
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { settingsOpen, notifMutedSig, CHANNEL_META, me } from '../state';
-import { toggleMute } from '../notify';
+import { toggleMute, shouldShowIosInstallHint } from '../notify';
+import { installAvailable, installCompleted, triggerInstall } from '../install';
+import { showToast } from './Toast';
 import { requestConfirm } from './PromptModal';
 import type { Identity } from '../types';
 
@@ -195,6 +197,8 @@ export function Settings() {
               : 'Enabled. Permission is requested on first toggle.'}</p>
           </section>
 
+          <InstallSection />
+
           <section>
             <h3>Linked identities</h3>
             <p class="muted">Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The <em>primary</em> identity is where NanoClaw reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from.</p>
@@ -271,5 +275,32 @@ export function Settings() {
         </div>
       </div>
     </div>
+  );
+}
+
+function InstallSection() {
+  const canInstall = installAvailable.value;
+  const installed = installCompleted.value;
+  const iosNeedsHint = !installed && !canInstall && shouldShowIosInstallHint();
+  if (!canInstall && !installed && !iosNeedsHint) return null;
+  async function onInstall(): Promise<void> {
+    const outcome = await triggerInstall();
+    if (outcome === 'accepted') showToast('Installing…');
+    else if (outcome === 'dismissed') showToast('Install canceled', 'err');
+  }
+  return (
+    <section>
+      <h3>Install app</h3>
+      {installed ? (
+        <p class="muted">NanoClaw is installed and running as an app.</p>
+      ) : canInstall ? (
+        <>
+          <button type="button" onClick={onInstall}>Install NanoClaw</button>
+          <p class="muted">Adds NanoClaw to your home screen / app launcher and runs it in its own window.</p>
+        </>
+      ) : (
+        <p class="muted">Tap the Share button in Safari, then <em>Add to Home Screen</em> to install NanoClaw as an app.</p>
+      )}
+    </section>
   );
 }

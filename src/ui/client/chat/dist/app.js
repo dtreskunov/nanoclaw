@@ -19465,6 +19465,46 @@ function FilesPane() {
   ] }) });
 }
 
+// src/install.ts
+var installAvailable = y3(false);
+var installCompleted = y3(false);
+var deferred = null;
+function initInstall() {
+  if (isStandalone()) {
+    installCompleted.value = true;
+    return;
+  }
+  window.addEventListener("beforeinstallprompt", (e4) => {
+    e4.preventDefault();
+    deferred = e4;
+    installAvailable.value = true;
+  });
+  window.addEventListener("appinstalled", () => {
+    deferred = null;
+    installAvailable.value = false;
+    installCompleted.value = true;
+  });
+}
+async function triggerInstall() {
+  if (!deferred) return "unavailable";
+  try {
+    await deferred.prompt();
+    const { outcome } = await deferred.userChoice;
+    deferred = null;
+    installAvailable.value = false;
+    return outcome;
+  } catch {
+    return "dismissed";
+  }
+}
+function isStandalone() {
+  if (typeof window === "undefined") return false;
+  if (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) {
+    return true;
+  }
+  return navigator.standalone === true;
+}
+
 // src/components/Settings.tsx
 var API = "/ui/settings/api";
 async function jget(p5) {
@@ -19635,6 +19675,7 @@ function Settings() {
         ] }),
         /* @__PURE__ */ u4("p", { class: "muted", children: muted ? "Currently muted. New messages will not raise notifications." : "Enabled. Permission is requested on first toggle." })
       ] }),
+      /* @__PURE__ */ u4(InstallSection, {}),
       /* @__PURE__ */ u4("section", { children: [
         /* @__PURE__ */ u4("h3", { children: "Linked identities" }),
         /* @__PURE__ */ u4("p", { class: "muted", children: [
@@ -19715,6 +19756,28 @@ function Settings() {
       ] })
     ] })
   ] }) });
+}
+function InstallSection() {
+  const canInstall = installAvailable.value;
+  const installed = installCompleted.value;
+  const iosNeedsHint = !installed && !canInstall && shouldShowIosInstallHint();
+  if (!canInstall && !installed && !iosNeedsHint) return null;
+  async function onInstall() {
+    const outcome = await triggerInstall();
+    if (outcome === "accepted") showToast("Installing\u2026");
+    else if (outcome === "dismissed") showToast("Install canceled", "err");
+  }
+  return /* @__PURE__ */ u4("section", { children: [
+    /* @__PURE__ */ u4("h3", { children: "Install app" }),
+    installed ? /* @__PURE__ */ u4("p", { class: "muted", children: "NanoClaw is installed and running as an app." }) : canInstall ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4("button", { type: "button", onClick: onInstall, children: "Install NanoClaw" }),
+      /* @__PURE__ */ u4("p", { class: "muted", children: "Adds NanoClaw to your home screen / app launcher and runs it in its own window." })
+    ] }) : /* @__PURE__ */ u4("p", { class: "muted", children: [
+      "Tap the Share button in Safari, then ",
+      /* @__PURE__ */ u4("em", { children: "Add to Home Screen" }),
+      " to install NanoClaw as an app."
+    ] })
+  ] });
 }
 
 // src/components/ShareLinkModal.tsx
@@ -20038,6 +20101,7 @@ function maybeShowIosInstallHint() {
 }
 async function init() {
   initNotif();
+  initInstall();
   setupViewportFit();
   installLivenessHandlers();
   restorePanelState();
