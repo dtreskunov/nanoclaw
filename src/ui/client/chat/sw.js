@@ -2,28 +2,130 @@
 /**
  * NanoClaw chat PWA service worker.
  *
- * Receives Web Push events with a thin payload (`{ v, kind, groupId,
- * threadId, msgId, ts }`), fetches the actual notification text from
- * `/ui/chat/api/push/notification` (gated by the `ui_session` cookie),
- * and shows the notification. On click, focuses an existing tab on
- * the right thread or opens one.
+ * Two responsibilities:
+ *   1. Web Push: receive thin payloads, fetch notification details via the
+ *      authenticated `/ui/chat/api/push/notification` endpoint, show the
+ *      notification, and route clicks back to the right thread.
+ *   2. Offline shell: precache the app shell (HTML, JS, CSS, manifest, icon)
+ *      so the UI loads with no network. API calls, downloads, and the WS
+ *      bypass the cache entirely — the UI shows its existing "Disconnected"
+ *      states when the network is gone.
  *
- * Hand-written, no bundler — served as-is by routes.ts at /ui/chat/sw.js
- * with `Service-Worker-Allowed: /ui/chat/`.
+ * Hand-written, no bundler — served by routes.ts at /ui/chat/sw.js with
+ * `Service-Worker-Allowed: /ui/chat/`. The server replaces the cache version
+ * placeholder below with a per-deploy stamp before serving, so each new dist
+ * invalidates the cache and the browser detects an update.
  */
 
 const SCOPE_PATH = '/ui/chat/';
 const NOTIF_DETAILS_URL = '/ui/chat/api/push/notification';
 const SUBSCRIBE_URL = '/ui/chat/api/push/subscribe';
 
+const CACHE_VERSION = '__CACHE_VERSION__';
+const SHELL_CACHE = 'nanoclaw-shell-' + CACHE_VERSION;
+const SHELL_ASSETS = [
+  '/ui/chat/',
+  '/ui/chat/dist/app.js',
+  '/ui/chat/dist/app.css',
+  '/ui/chat/icon.svg',
+  '/ui/chat/manifest.webmanifest',
+];
+
 self.addEventListener('install', (event) => {
-  // Activate immediately on first install so push works without a reload.
-  self.skipWaiting();
+  event.waitUntil(
+    (async () => {
+      try {
+        const cache = await caches.open(SHELL_CACHE);
+        await cache.addAll(SHELL_ASSETS);
+      } catch (_e) {
+        // First install with no network — fetch handler will repopulate on
+        // the next successful navigation.
+      }
+    })(),
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((k) => k.startsWith('nanoclaw-shell-') && k !== SHELL_CACHE)
+          .map((k) => caches.delete(k)),
+      );
+      await self.clients.claim();
+    })(),
+  );
 });
+
+self.addEventListener('message', (event) => {
+  // Triggered by the client when the user accepts the "Reload to update" toast.
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith(SCOPE_PATH)) return;
+  // Bypass: API, downloads, the SW itself.
+  if (url.pathname.startsWith('/ui/chat/api/')) return;
+  if (url.pathname.startsWith('/ui/chat/dl')) return;
+  if (url.pathname === '/ui/chat/sw.js') return;
+
+  // App-shell navigation — serve cached shell when offline.
+  if (req.mode === 'navigate') {
+    event.respondWith(handleNavigation(req));
+    return;
+  }
+
+  // Static assets: stale-while-revalidate.
+  if (
+    url.pathname.startsWith('/ui/chat/dist/') ||
+    url.pathname === '/ui/chat/icon.svg' ||
+    url.pathname === '/ui/chat/manifest.webmanifest'
+  ) {
+    event.respondWith(handleStatic(req));
+    return;
+  }
+});
+
+async function handleNavigation(req) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const fresh = await fetch(req);
+    if (fresh && fresh.ok) {
+      cache.put('/ui/chat/', fresh.clone()).catch(() => {});
+      return fresh;
+    }
+    if (fresh) return fresh;
+  } catch (_e) {
+    /* fall through to cache */
+  }
+  const cached = (await cache.match('/ui/chat/')) || (await cache.match(req));
+  return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
+}
+
+async function handleStatic(req) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match(req);
+  const networkPromise = fetch(req)
+    .then((r) => {
+      if (r && r.ok) cache.put(req, r.clone()).catch(() => {});
+      return r;
+    })
+    .catch(() => null);
+  if (cached) {
+    networkPromise.catch(() => {}); // fire-and-forget revalidate
+    return cached;
+  }
+  const fresh = await networkPromise;
+  return fresh || new Response('Offline', { status: 503, statusText: 'Offline' });
+}
 
 self.addEventListener('push', (event) => {
   event.waitUntil(handlePush(event));

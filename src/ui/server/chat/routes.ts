@@ -917,23 +917,39 @@ function handlePushNotification(ctx: Ctx, userId: string): void {
   });
 }
 
+let cachedSw: { version: string; body: Buffer } | null = null;
+
 function serveServiceWorker(ctx: Ctx): void {
-  const full = path.join(UI_DIR, 'sw.js');
-  let stat: fs.Stats;
+  const swPath = path.join(UI_DIR, 'sw.js');
+  const appJsPath = path.join(UI_DIR, 'dist', 'app.js');
+  let swStat: fs.Stats;
   try {
-    stat = fs.statSync(full);
+    swStat = fs.statSync(swPath);
   } catch {
     return text(ctx, 404, 'Not found');
   }
+  // Per-deploy stamp so each new dist activates a fresh cache. Includes the
+  // bundle size to guard against mtime preservation across rsync/copy.
+  let version = `sw-${Math.floor(swStat.mtimeMs)}`;
+  try {
+    const appStat = fs.statSync(appJsPath);
+    version = `${Math.max(Math.floor(swStat.mtimeMs), Math.floor(appStat.mtimeMs))}-${appStat.size}`;
+  } catch {
+    /* fall back to sw mtime only */
+  }
+  if (!cachedSw || cachedSw.version !== version) {
+    const raw = fs.readFileSync(swPath, 'utf-8').replace(/__CACHE_VERSION__/g, version);
+    cachedSw = { version, body: Buffer.from(raw, 'utf-8') };
+  }
   ctx.res.writeHead(200, {
     'Content-Type': 'application/javascript; charset=utf-8',
-    'Content-Length': stat.size,
+    'Content-Length': cachedSw.body.length,
     // `private` prevents Cloudflare/proxies from caching; browser still caches per SW rules.
     'Cache-Control': 'private, no-cache, no-store, must-revalidate',
     'CDN-Cache-Control': 'no-store',
     'Service-Worker-Allowed': '/ui/chat/',
   });
-  fs.createReadStream(full).pipe(ctx.res);
+  ctx.res.end(cachedSw.body);
 }
 
 function clampInt(v: unknown, def: number, min: number, max: number): number {
