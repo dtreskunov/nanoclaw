@@ -9,18 +9,25 @@
  */
 import { registerDeliveryAction, getDeliveryAdapter } from '../../delivery.js';
 import { log } from '../../log.js';
-import { ensureUserDm } from '../../modules/permissions/user-dm.js';
+import { ensureUserDm, resolveUserId } from '../../modules/permissions/user-dm.js';
 import { issueMagicLink } from './auth.js';
 import { isUiEnabled, uiBaseUrl } from './server.js';
 
 registerDeliveryAction('mint_login_link', async (content, session) => {
-  const userId = content.userId as string | undefined;
+  const rawUserId = content.userId as string | undefined;
   const originChannelType = (content.channelType as string | undefined) ?? null;
   const originPlatformId = (content.platformId as string | undefined) ?? null;
-  const originThreadId = (content.threadId as string | null | undefined) ?? null;
 
-  if (!userId) {
+  if (!rawUserId) {
     log.warn('mint_login_link missing userId', { sessionId: session.id });
+    return;
+  }
+
+  // Resolve once up front — magic-link tokens, sessions, and user_dms are
+  // all keyed on users.id (UUID), never the namespaced form.
+  const userId = resolveUserId(rawUserId);
+  if (!userId) {
+    log.warn('mint_login_link: user not found', { rawUserId, sessionId: session.id });
     return;
   }
 
@@ -31,36 +38,21 @@ registerDeliveryAction('mint_login_link', async (content, session) => {
   }
 
   // Always deliver to the user's DM — never the originating thread, which
-  // may be a group chat. If we can't resolve a DM, fall back to the origin
-  // thread only when it's already a 1:1 with this user (same platform_id).
+  // may be a group chat where the link would leak. If DM resolution fails,
+  // bail rather than risk leaking the token to a group.
   const dm = await ensureUserDm(userId);
-  let targetChannelType: string | null;
-  let targetPlatformId: string | null;
-  let targetThreadId: string | null;
-  if (dm) {
-    targetChannelType = dm.channel_type;
-    targetPlatformId = dm.platform_id;
-    targetThreadId = null;
-  } else {
-    // No DM channel resolvable. The only safe origin fallback is when the
-    // origin chat IS the user's DM (handle matches platform_id on the same
-    // channel). Group chats, threads, etc. never qualify.
-    const handle = userId.includes(':') ? userId.slice(userId.indexOf(':') + 1) : userId;
-    const isOriginAlreadyUserDm =
-      originChannelType !== null && originPlatformId !== null && originPlatformId === handle;
-    if (!isOriginAlreadyUserDm) {
-      log.warn('mint_login_link: cannot resolve DM and origin is not a 1:1 with the user', {
-        userId,
-        originChannelType,
-        originPlatformId,
-        sessionId: session.id,
-      });
-      return;
-    }
-    targetChannelType = originChannelType;
-    targetPlatformId = originPlatformId;
-    targetThreadId = originThreadId;
+  if (!dm) {
+    log.warn('mint_login_link: cannot resolve DM for user', {
+      userId,
+      originChannelType,
+      originPlatformId,
+      sessionId: session.id,
+    });
+    return;
   }
+  const targetChannelType = dm.channel_type;
+  const targetPlatformId = dm.platform_id;
+  const targetThreadId: string | null = null;
 
   let text: string;
   if (!isUiEnabled()) {

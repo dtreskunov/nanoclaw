@@ -36,9 +36,28 @@ import { getChannelAdapter } from '../../channels/channel-registry.js';
 import { getMessagingGroup, getMessagingGroupByPlatform, createMessagingGroup } from '../../db/messaging-groups.js';
 import { log } from '../../log.js';
 import type { MessagingGroup } from '../../types.js';
-import { getIdentitiesForUser } from './db/identities.js';
+import { getIdentitiesForUser, getIdentity } from './db/identities.js';
 import { getUser } from './db/users.js';
 import { getUserDm, upsertUserDm } from './db/user-dms.js';
+
+/**
+ * Accept either a canonical UUID user id or a legacy namespaced
+ * `channel:handle` form (still emitted by chat-sdk-bridge's formatter for
+ * inbound sender ids and forwarded by the agent through MCP tools).
+ * Returns the canonical UUID, or null if the user is unknown.
+ *
+ * Validation is the DB lookup itself: an unknown id never resolves, so
+ * callers can trust a non-null return as a verified existing user.
+ */
+export function resolveUserId(userId: string): string | null {
+  // Canonical UUID form: direct hit on users.id.
+  if (getUser(userId)) return userId;
+  // Namespaced form: split exactly once at the first colon.
+  const idx = userId.indexOf(':');
+  if (idx <= 0 || idx === userId.length - 1) return null;
+  const ident = getIdentity(userId.slice(0, idx), userId.slice(idx + 1));
+  return ident ? ident.user_id : null;
+}
 
 /**
  * Return a messaging_group usable to DM this user, creating it lazily if
@@ -51,28 +70,36 @@ import { getUserDm, upsertUserDm } from './db/user-dms.js';
  * Callers should treat null as "this user is unreachable on this channel".
  */
 export async function ensureUserDm(userId: string): Promise<MessagingGroup | null> {
-  const user = getUser(userId);
-  if (!user) {
+  const resolvedId = resolveUserId(userId);
+  if (!resolvedId) {
     log.warn('ensureUserDm: user not found', { userId });
     return null;
   }
+  const user = getUser(resolvedId)!;
 
-  const parsed = parseUserId(userId);
+  const parsed = parseUserId(resolvedId);
   if (!parsed) {
-    log.warn('ensureUserDm: user has no identity rows', { userId });
+    log.warn('ensureUserDm: user has no identity rows', { userId: resolvedId });
     return null;
   }
   const { channelType, handle } = parsed;
 
   // Cache hit: existing user_dms row → load and return the messaging_group.
-  const cached = getUserDm(userId, channelType);
+  // We refuse to reuse a cached row whose messaging_group looks like an
+  // inbound bucket rather than a real DM. On Resend specifically, the
+  // 2-part `resend:<alias>` form is the synthetic group the inbound router
+  // mints for "anyone who emailed <alias>"; routing outbound through it
+  // makes the host send FROM <alias> (often unverified) → Resend silently
+  // rejects. A real outbound DM has a 4-part threadId encoded as the
+  // platform_id. When the row is stale we drop it and re-resolve.
+  const cached = getUserDm(resolvedId, channelType);
   if (cached) {
     const mg = getMessagingGroup(cached.messaging_group_id);
-    if (mg) return mg;
-    // Row points to a deleted messaging_group — fall through and re-resolve.
-    log.warn('ensureUserDm: cached row references missing messaging_group, re-resolving', {
-      userId,
+    if (mg && !isStaleDmGroup(mg)) return mg;
+    log.warn('ensureUserDm: cached row stale, re-resolving', {
+      userId: resolvedId,
       messagingGroupId: cached.messaging_group_id,
+      platformId: mg?.platform_id ?? null,
     });
   }
 
@@ -97,14 +124,14 @@ export async function ensureUserDm(userId: string): Promise<MessagingGroup | nul
     };
     createMessagingGroup(mg);
     log.info('ensureUserDm: created DM messaging_group', {
-      userId,
+      userId: resolvedId,
       channelType,
       messagingGroupId: mgId,
     });
   }
 
   upsertUserDm({
-    user_id: userId,
+    user_id: resolvedId,
     channel_type: channelType,
     messaging_group_id: mg.id,
     resolved_at: now,
@@ -137,6 +164,26 @@ export async function resolveDmPlatformId(channelType: string, handle: string): 
     log.error('ensureUserDm: adapter.openDM failed', { channelType, handle, err });
     return null;
   }
+}
+
+/**
+ * True when a cached messaging_group is unsuitable as an outbound DM target.
+ *
+ * Resend-specific: the inbound router mints a "bucket" group keyed on
+ * `resend:<alias>` for everyone who emails a given alias. That group is
+ * fine for inbound routing, but if a `user_dms` row points at it, the
+ * outbound deliver path will try to send FROM `<alias>` — which only
+ * works if `<alias>` is a verified Resend sender. Real outbound DMs
+ * always carry a 4-part threadId (`resend:<alias>:<to>:<hash>`) as
+ * platform_id; anything else is a stale legacy mapping.
+ */
+function isStaleDmGroup(mg: MessagingGroup): boolean {
+  if (mg.channel_type === 'resend') {
+    // 4-part outbound threadId has at least 3 colons. The inbound bucket
+    // form `resend:<alias>` has exactly one. Anything 2-part is stale.
+    return mg.platform_id.split(':').length < 4;
+  }
+  return false;
 }
 
 function parseUserId(userId: string): { channelType: string; handle: string } | null {
