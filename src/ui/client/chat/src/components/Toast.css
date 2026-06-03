@@ -34,3 +34,40 @@
 @media (prefers-reduced-motion: reduce) {
   .toast { animation: none; }
 }
+
+/* Sticky variant: bottom-center (away from header chrome), no auto-hide,
+   accepts pointer events so the action button is clickable. */
+.toast-sticky {
+  top: auto;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  animation: toast-in-bottom 160ms ease-out;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 8px;
+}
+.toast-sticky .toast-text {
+  white-space: nowrap;
+}
+@keyframes toast-in-bottom {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.toast-action {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.toast-action:hover { background: rgba(255, 255, 255, 0.28); }
+.toast-action:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}

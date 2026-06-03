@@ -17026,8 +17026,64 @@ async function applyHash(router2) {
   }
 }
 
+// node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
+var f4 = 0;
+var i4 = Array.isArray;
+function u4(e4, t4, n3, o4, i5, u5) {
+  t4 || (t4 = {});
+  var a4, c4, p5 = t4;
+  if ("ref" in p5) for (c4 in p5 = {}, t4) "ref" == c4 ? a4 = t4[c4] : p5[c4] = t4[c4];
+  var l7 = { type: e4, props: p5, key: n3, ref: a4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f4, __i: -1, __u: 0, __source: i5, __self: u5 };
+  if ("function" == typeof e4 && (a4 = e4.defaultProps)) for (c4 in a4) void 0 === p5[c4] && (p5[c4] = a4[c4]);
+  return l.vnode && l.vnode(l7), l7;
+}
+
+// src/components/Toast.tsx
+var nextId = 1;
+var hideTimer = null;
+function showToast(text, kind = "ok", ms = 1800) {
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  const id = nextId++;
+  toastMessage.value = { id, text, kind };
+  hideTimer = setTimeout(() => {
+    if (toastMessage.value && toastMessage.value.id === id) toastMessage.value = null;
+    hideTimer = null;
+  }, ms);
+}
+function showStickyToast(text, action, kind = "ok") {
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  const id = nextId++;
+  toastMessage.value = { id, text, kind, action };
+}
+function Toast() {
+  const t4 = toastMessage.value;
+  y2(() => void 0, [t4?.id]);
+  if (!t4) return null;
+  const sticky = !!t4.action;
+  return /* @__PURE__ */ u4(
+    "div",
+    {
+      class: "toast toast-" + (t4.kind || "ok") + (sticky ? " toast-sticky" : ""),
+      role: "status",
+      "aria-live": "polite",
+      children: [
+        /* @__PURE__ */ u4("span", { class: "toast-text", children: t4.text }),
+        t4.action ? /* @__PURE__ */ u4("button", { type: "button", class: "toast-action", onClick: t4.action.onClick, children: t4.action.label }) : null
+      ]
+    },
+    t4.id
+  );
+}
+
 // src/notify.ts
 var registration = null;
+var updatePromptShown = false;
 function loadMuted() {
   try {
     return localStorage.getItem(NOTIF_MUTE_KEY) === "1";
@@ -17059,9 +17115,41 @@ async function registerServiceWorker() {
       scope: "/ui/chat/",
       updateViaCache: "none"
     });
+    watchForUpdates(registration);
   } catch (err) {
     console.warn("SW register failed", err);
   }
+}
+function watchForUpdates(reg) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  const onNewWorker = (worker) => {
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "installed" && navigator.serviceWorker.controller) {
+        promptForUpdate(worker);
+      }
+    });
+  };
+  if (reg.waiting && navigator.serviceWorker.controller) {
+    promptForUpdate(reg.waiting);
+  }
+  reg.addEventListener("updatefound", () => {
+    if (reg.installing) onNewWorker(reg.installing);
+  });
+}
+function promptForUpdate(worker) {
+  if (updatePromptShown) return;
+  updatePromptShown = true;
+  showStickyToast("New version available", {
+    label: "Reload",
+    onClick: () => {
+      worker.postMessage({ type: "SKIP_WAITING" });
+    }
+  });
 }
 function toggleMute() {
   notifMutedSig.value = !notifMutedSig.value;
@@ -17784,18 +17872,6 @@ async function respondApproval(approvalId, value) {
   }
 }
 
-// node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
-var f4 = 0;
-var i4 = Array.isArray;
-function u4(e4, t4, n3, o4, i5, u5) {
-  t4 || (t4 = {});
-  var a4, c4, p5 = t4;
-  if ("ref" in p5) for (c4 in p5 = {}, t4) "ref" == c4 ? a4 = t4[c4] : p5[c4] = t4[c4];
-  var l7 = { type: e4, props: p5, key: n3, ref: a4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f4, __i: -1, __u: 0, __source: i5, __self: u5 };
-  if ("function" == typeof e4 && (a4 = e4.defaultProps)) for (c4 in a4) void 0 === p5[c4] && (p5[c4] = a4[c4]);
-  return l.vnode && l.vnode(l7), l7;
-}
-
 // src/components/Header.tsx
 function Header() {
   const onChange = (e4) => {
@@ -18479,28 +18555,6 @@ function ChatMain() {
     /* @__PURE__ */ u4(Subnotice, {}),
     /* @__PURE__ */ u4(Composer, {})
   ] });
-}
-
-// src/components/Toast.tsx
-var nextId = 1;
-var hideTimer = null;
-function showToast(text, kind = "ok", ms = 1800) {
-  if (hideTimer) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-  const id = nextId++;
-  toastMessage.value = { id, text, kind };
-  hideTimer = setTimeout(() => {
-    if (toastMessage.value && toastMessage.value.id === id) toastMessage.value = null;
-    hideTimer = null;
-  }, ms);
-}
-function Toast() {
-  const t4 = toastMessage.value;
-  y2(() => void 0, [t4?.id]);
-  if (!t4) return null;
-  return /* @__PURE__ */ u4("div", { class: "toast toast-" + (t4.kind || "ok"), role: "status", "aria-live": "polite", children: t4.text }, t4.id);
 }
 
 // src/uploads.ts

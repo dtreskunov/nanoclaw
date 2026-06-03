@@ -112,6 +112,8 @@ export interface ToastMessage {
   id: number;
   text: string;
   kind?: 'ok' | 'err';
+  // When set, the toast is sticky (no auto-hide) and renders a button.
+  action?: { label: string; onClick: () => void };
 }
 
 export interface PendingFile {

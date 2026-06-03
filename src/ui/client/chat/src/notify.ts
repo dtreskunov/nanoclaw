@@ -10,8 +10,10 @@
 import { effect } from '@preact/signals';
 import { notifMutedSig, NOTIF_MUTE_KEY } from './state';
 import type { ChatMessageFile } from './types';
+import { showStickyToast } from './components/Toast';
 
 let registration: ServiceWorkerRegistration | null = null;
+let updatePromptShown = false;
 
 export function loadMuted(): boolean {
   try {
@@ -48,9 +50,53 @@ async function registerServiceWorker(): Promise<void> {
       scope: '/ui/chat/',
       updateViaCache: 'none',
     });
+    watchForUpdates(registration);
   } catch (err) {
     console.warn('SW register failed', err);
   }
+}
+
+// Prompt the user to reload when a new SW version is waiting. The new
+// worker only takes control after the client posts SKIP_WAITING and we
+// observe a controllerchange (then reload).
+function watchForUpdates(reg: ServiceWorkerRegistration): void {
+  // Reload exactly once when control hands over to the new worker.
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+
+  const onNewWorker = (worker: ServiceWorker): void => {
+    worker.addEventListener('statechange', () => {
+      // Only prompt when there's an existing controller — otherwise this
+      // is the very first install and there's nothing to "update from".
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        promptForUpdate(worker);
+      }
+    });
+  };
+
+  // A worker may already be waiting from a prior tab.
+  if (reg.waiting && navigator.serviceWorker.controller) {
+    promptForUpdate(reg.waiting);
+  }
+  reg.addEventListener('updatefound', () => {
+    if (reg.installing) onNewWorker(reg.installing);
+  });
+}
+
+function promptForUpdate(worker: ServiceWorker): void {
+  if (updatePromptShown) return;
+  updatePromptShown = true;
+  showStickyToast('New version available', {
+    label: 'Reload',
+    onClick: () => {
+      worker.postMessage({ type: 'SKIP_WAITING' });
+      // controllerchange handler above will reload once the new worker takes over.
+    },
+  });
 }
 
 export function toggleMute(): void {
