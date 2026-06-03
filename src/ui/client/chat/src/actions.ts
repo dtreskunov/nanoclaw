@@ -26,9 +26,7 @@ import {
   pinnedContext,
   pendingApprovals,
   respondingApprovalIds,
-  POLL_INTERVAL_MS,
-  THREADS_POLL_MS,
-  APPROVALS_POLL_MS,
+  SYNC_INTERVAL_MS,
 } from './state';
 import { api, postJson } from './api';
 import { writeHash } from './hash';
@@ -56,14 +54,11 @@ interface ServerMessage {
 }
 
 // ── threads ─────────────────────────────────────────────────────────
-export async function loadThreads(gid: string): Promise<void> {
-  try {
-    const { threads: t } = await api<{ threads: Thread[] }>(`api/groups/${encodeURIComponent(gid)}/chat/threads`);
-    threads.value = t || [];
-  } catch (err) {
-    console.error('threads load failed', err);
-    threads.value = [];
-  }
+// Threads are part of the unified /api/sync response and live in the
+// `threads` signal. Callers that just want a fresh snapshot before
+// rendering can await this; everything else gets updated by the ticker.
+export async function loadThreads(_gid: string): Promise<void> {
+  await runSync();
 }
 
 export async function deleteThread(tid: string): Promise<void> {
@@ -139,7 +134,6 @@ export function clearChat(): void {
     messagingGroupId.value = null;
     canSend.value = true;
   });
-  stopChatPoll();
   if (refs.ws) {
     try {
       refs.ws.close();
@@ -155,26 +149,87 @@ export function clearChat(): void {
   refs.seenIds.clear();
 }
 
-export function stopChatPoll(): void {
-  if (refs.pollTimer) {
-    clearInterval(refs.pollTimer);
-    refs.pollTimer = null;
+// Single global ticker. Hits /api/sync, which returns approvals plus
+// (when applicable) the active group's thread list and the active
+// non-web thread's history. Web threads use the WS for live updates;
+// /api/sync does NOT fetch history for them. Pauses when the tab is
+// hidden; resumes via the visibilitychange handler in installLivenessHandlers.
+export function stopSyncPoll(): void {
+  if (refs.syncTimer) {
+    clearInterval(refs.syncTimer);
+    refs.syncTimer = null;
   }
 }
 
-export function startChatPoll(): void {
-  stopChatPoll();
-  refs.pollTimer = setInterval(async () => {
-    if (!threadId.value || channelType.value === 'web') {
-      stopChatPoll();
-      return;
+export function startSyncPoll(): void {
+  if (refs.syncTimer) return;
+  runSync().catch(() => {
+    /* ignore */
+  });
+  refs.syncTimer = setInterval(() => {
+    if (document.hidden) return;
+    runSync().catch((err) => console.error('sync failed', err));
+  }, SYNC_INTERVAL_MS);
+}
+
+interface SyncResponse {
+  approvals: PendingApprovalDto[];
+  threads?: Thread[];
+  threadMessages?: ServerMessage[];
+}
+
+export async function runSync(): Promise<void> {
+  const gid = groupId.value;
+  const tid = threadId.value;
+  const ct = channelType.value;
+  const mg = messagingGroupId.value;
+  const params = new URLSearchParams();
+  if (gid) {
+    params.set('gid', gid);
+    if (tid && ct && ct !== 'web' && mg) {
+      params.set('tid', tid);
+      params.set('channel', ct);
+      params.set('mg', mg);
     }
-    try {
-      await refetchThreadHistory(true);
-    } catch (err) {
-      console.error('poll failed', err);
-    }
-  }, POLL_INTERVAL_MS);
+  }
+  let res: SyncResponse;
+  try {
+    res = await api<SyncResponse>('api/sync' + (params.toString() ? '?' + params.toString() : ''));
+  } catch {
+    return;
+  }
+  if (Array.isArray(res.approvals)) pendingApprovals.value = res.approvals;
+  if (gid && groupId.value === gid && Array.isArray(res.threads)) threads.value = res.threads;
+  if (
+    gid &&
+    groupId.value === gid &&
+    tid &&
+    threadId.value === tid &&
+    ct === channelType.value &&
+    ct !== 'web' &&
+    Array.isArray(res.threadMessages)
+  ) {
+    mergeIncomingMessages(res.threadMessages);
+  }
+}
+
+function mergeIncomingMessages(messages: ServerMessage[]): void {
+  let maxTs = '';
+  const additions: ChatMessage[] = [];
+  for (const m of messages) {
+    const direction = normDirection(m.direction);
+    const key = m.id ? `${direction}:${m.id}` : null;
+    if (key && refs.seenIds.has(key)) continue;
+    const ts = m.timestamp || '';
+    additions.push({ direction, text: m.text, files: m.files || null, ts });
+    if (key) refs.seenIds.add(key);
+    if (ts > maxTs) maxTs = ts;
+    if (direction === 'out') maybeNotify(m.text, m.files || []);
+  }
+  if (additions.length) {
+    chatMessages.value = chatMessages.value.concat(additions);
+    bumpActiveThread(maxTs);
+  }
 }
 
 function historyUrl(gid: string, tid: string): string {
@@ -259,7 +314,6 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
     clearTimeout(refs.reconnectTimer);
     refs.reconnectTimer = null;
   }
-  stopChatPoll();
   refs.reconnectAttempt = 0;
 
   let ct: string = 'web';
@@ -321,7 +375,9 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
     if (ct === 'web') connectChatWs();
     else {
       chatStatus.value = '';
-      startChatPoll();
+      // Non-web threads catch up via runSync() on the next tick (or sooner
+      // via the visibilitychange handler). The unified ticker is owned at
+      // the app level by startSyncPoll().
     }
     return;
   }
@@ -484,23 +540,6 @@ export async function sendChat(text: string, files: PendingFile[] | null | undef
 }
 
 // ── files ───────────────────────────────────────────────────────────
-function startThreadsPoll(gid: string): void {
-  if (refs.threadsPollTimer) {
-    clearInterval(refs.threadsPollTimer);
-    refs.threadsPollTimer = null;
-  }
-  refs.threadsPollTimer = setInterval(() => {
-    if (groupId.value === gid)
-      loadThreads(gid).catch(() => {
-        /* ignore */
-      });
-    else if (refs.threadsPollTimer) {
-      clearInterval(refs.threadsPollTimer);
-      refs.threadsPollTimer = null;
-    }
-  }, THREADS_POLL_MS);
-}
-
 export async function selectGroup(gid: string): Promise<void> {
   batch(() => {
     groupId.value = gid;
@@ -508,7 +547,8 @@ export async function selectGroup(gid: string): Promise<void> {
     filePath.value = null;
   });
   await loadThreads(gid);
-  startThreadsPoll(gid);
+  // Threads list refresh now happens via the unified sync ticker
+  // (startSyncPoll), which picks up groupId.value automatically.
   await loadTree('');
   const latest = threads.value.length > 0 ? threads.value[0]! : null;
   if (latest) {
@@ -723,7 +763,7 @@ export function installLivenessHandlers(): void {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     nowTick.value = Date.now();
-    loadApprovals().catch(() => {
+    runSync().catch(() => {
       /* ignore */
     });
     if (!threadId.value) return;
@@ -741,28 +781,6 @@ export function installLivenessHandlers(): void {
 }
 
 // ── pending approvals (banner inbox) ────────────────────────────────
-export async function loadApprovals(): Promise<void> {
-  try {
-    const res = await api<{ approvals: PendingApprovalDto[] }>('api/approvals');
-    pendingApprovals.value = Array.isArray(res.approvals) ? res.approvals : [];
-  } catch {
-    // network/auth blip — leave the previous list visible
-  }
-}
-
-export function startApprovalsPoll(): void {
-  if (refs.approvalsPollTimer) return;
-  loadApprovals().catch(() => {
-    /* ignore */
-  });
-  refs.approvalsPollTimer = setInterval(() => {
-    if (document.hidden) return;
-    loadApprovals().catch(() => {
-      /* ignore */
-    });
-  }, APPROVALS_POLL_MS);
-}
-
 export async function respondApproval(approvalId: string, value: string): Promise<void> {
   if (respondingApprovalIds.value.has(approvalId)) return;
   const next = new Set(respondingApprovalIds.value);
@@ -796,7 +814,7 @@ export async function respondApproval(approvalId: string, value: string): Promis
     console.error('approval respond failed', err);
     chatStatus.value = 'approval failed: ' + (err instanceof Error ? err.message : String(err));
     // Restore canonical state from the server.
-    loadApprovals().catch(() => {
+    runSync().catch(() => {
       /* ignore */
     });
   } finally {

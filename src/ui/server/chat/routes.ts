@@ -15,7 +15,7 @@ import { getAgentGroup } from '../../../db/agent-groups.js';
 import { getDb } from '../../../db/connection.js';
 import { getSession } from '../../../db/sessions.js';
 import { log } from '../../../log.js';
-import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
+import { listAccessibleAgentGroups, canAccessAgentGroup } from '../../../modules/permissions/access.js';
 import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
 import { dispatchResponse } from '../../../response-registry.js';
 import type { PendingApproval } from '../../../types.js';
@@ -23,7 +23,8 @@ import { authenticate, recordAccess } from '../auth.js';
 import { createDownloadToken, redeemDownloadToken } from '../download-tokens.js';
 import { uiBaseUrl } from '../server.js';
 import { classify, resolveSafe } from './classify.js';
-import { handleChatRequest, handleChatUpgrade } from './chat.js';
+import { handleChatRequest, handleChatUpgrade, listAllThreadsForUser, readChatHistory } from './chat.js';
+import type { ThreadSummary, HistoryMessage } from './chat.js';
 import { handleWriteRequest } from './write.js';
 
 export { handleChatUpgrade };
@@ -208,6 +209,15 @@ on(
   '/api/approvals/:id/respond',
   authed((ctx, userId, params) => handleRespondApproval(ctx, userId, params.id)),
 );
+// Consolidated polling endpoint. One ticker on the client hits this and
+// receives whichever slices it asked for: approvals (always), threads list
+// (when ?gid= present), and a thread's message history (when ?gid=&tid=&
+// channel=&mg= present and channel is non-web — web threads use the WS).
+on(
+  'GET',
+  '/api/sync',
+  authed((ctx, userId) => handleSync(ctx, userId)),
+);
 // ── handlers ──────────────────────────────────────────────────────────────
 
 function handleMe(ctx: Ctx, userId: string): void {
@@ -288,7 +298,7 @@ function describeApproval(action: string, payloadJson: string): string | null {
   return null;
 }
 
-function handleListApprovals(ctx: Ctx, userId: string): void {
+function listApprovalsForUser(userId: string): ApprovalDto[] {
   // pending_approvals are unbounded global rows; filter to those the user
   // is eligible to approve. Owner/global-admin sees all (incl. agent_group_id IS NULL);
   // a scoped admin sees only rows for their agent groups.
@@ -344,7 +354,40 @@ function handleListApprovals(ctx: Ctx, userId: string): void {
       createdAt: r.created_at,
     });
   }
-  json(ctx, 200, { approvals: visible });
+  return visible;
+}
+
+function handleListApprovals(ctx: Ctx, userId: string): void {
+  json(ctx, 200, { approvals: listApprovalsForUser(userId) });
+}
+
+interface SyncResponse {
+  approvals: ApprovalDto[];
+  threads?: ThreadSummary[];
+  threadMessages?: HistoryMessage[];
+}
+
+function handleSync(ctx: Ctx, userId: string): void {
+  const out: SyncResponse = { approvals: listApprovalsForUser(userId) };
+  const gid = ctx.url.searchParams.get('gid') || '';
+  if (gid && canAccessAgentGroup(userId, gid).allowed && getAgentGroup(gid)) {
+    try {
+      out.threads = listAllThreadsForUser(userId, gid);
+    } catch (err) {
+      log.warn('sync threads list failed', { userId, gid, err });
+    }
+    const tid = ctx.url.searchParams.get('tid') || '';
+    const channel = ctx.url.searchParams.get('channel') || '';
+    const mg = ctx.url.searchParams.get('mg') || '';
+    if (tid && channel && channel !== 'web' && mg) {
+      try {
+        out.threadMessages = readChatHistory(userId, gid, tid, { channelType: channel, messagingGroupId: mg });
+      } catch (err) {
+        log.warn('sync history read failed', { userId, gid, tid, err });
+      }
+    }
+  }
+  json(ctx, 200, out);
 }
 
 async function handleRespondApproval(ctx: Ctx, userId: string, approvalId: string): Promise<void> {

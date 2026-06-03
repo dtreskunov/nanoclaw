@@ -7,9 +7,9 @@ import { me, groups, settingsOpen, chatLoading } from './state';
 import { App } from './components/App';
 import { initNotif } from './notify';
 import { restorePanelState, applyPanelClasses } from './panels';
-import { applyHash, applyAdminFlag, parseHash } from './hash';
+import { applyHash, parseHash } from './hash';
 import { router } from './router';
-import { installLivenessHandlers, startApprovalsPoll } from './actions';
+import { installLivenessHandlers, startSyncPoll } from './actions';
 import type { Group } from './types';
 
 interface MeResponse { displayName?: string; userId: string }
@@ -69,13 +69,12 @@ async function init(): Promise<void> {
     if (app) app.innerHTML = '<div style="padding:24px;font:14px system-ui">No accessible groups.</div>';
     return;
   }
-  applyAdminFlag();
   const parsed = parseHash();
   if (parsed && parsed.groupId) chatLoading.value = true;
   applyHash(router).catch((err) => console.error('initial route failed', err));
   const app = document.getElementById('app');
   if (app) render(<App />, app);
-  startApprovalsPoll();
+  startSyncPoll();
   try {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get('settings') === '1') {

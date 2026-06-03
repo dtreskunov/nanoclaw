@@ -1,7 +1,7 @@
 // URL hash routing.
 import { batch } from '@preact/signals';
 import { match, compile } from 'path-to-regexp';
-import { groups, groupId, isAdmin, treePath, filePath, threads, threadId, refs } from './state';
+import { groups, groupId, treePath, filePath, threads, threadId, refs } from './state';
 import { parentPath } from './utils';
 import type { Thread, ThreadCtx, RouterApi } from './types';
 
@@ -73,12 +73,6 @@ export function writeHash(): void {
   }
 }
 
-export function applyAdminFlag(): void {
-  const g = groups.value.find((x) => x.id === groupId.value);
-  isAdmin.value = !!(g && g.isAdmin);
-  document.body.classList.toggle('is-admin', isAdmin.value);
-}
-
 export function threadCtx(t: Thread | null | undefined): ThreadCtx | null {
   if (!t) return null;
   if (!t.channelType || t.channelType === 'web') return null;
@@ -100,7 +94,6 @@ export async function applyHash(router: RouterApi): Promise<void> {
     groupId.value = parsed.groupId;
     filePath.value = null;
   });
-  applyAdminFlag();
   if (groupChanged) await router.loadThreads(parsed.groupId);
 
   if (parsed.threadId) {

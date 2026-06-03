@@ -394,7 +394,7 @@ export async function handleChatRequest(
   return false;
 }
 
-interface HistoryMessage {
+export interface HistoryMessage {
   direction: 'in' | 'out' | 'internal';
   // messages_in.id / messages_out.id — stable per-row id the client uses
   // as the dedup key against live WS pushes.
@@ -411,7 +411,7 @@ interface HistoryMessage {
  * `override` lets the caller target a non-web messaging group; without it
  * defaults to the per-user web messaging group (legacy behavior).
  */
-function readChatHistory(
+export function readChatHistory(
   userId: string,
   groupId: string,
   threadId: string,
@@ -773,7 +773,7 @@ function parseOutboundContent(content: string): {
   }
 }
 
-interface ThreadSummary {
+export interface ThreadSummary {
   threadId: string;
   sessionId: string;
   channelType: string;
@@ -929,7 +929,7 @@ function finalizeTitle(raw: string): string {
  * session_mode, so the listing stays correct when mga.session_mode and
  * the session table have drifted (e.g. mode was changed mid-life).
  */
-function listAllThreadsForUser(userId: string, agentGroupId: string): ThreadSummary[] {
+export function listAllThreadsForUser(userId: string, agentGroupId: string): ThreadSummary[] {
   const ctxs = listUserMessagingContexts(userId, agentGroupId);
   const out: ThreadSummary[] = [];
 

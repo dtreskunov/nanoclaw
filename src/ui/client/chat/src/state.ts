@@ -1,5 +1,5 @@
 // Reactive state (signals) + constants + non-reactive refs.
-import { signal, type Signal } from '@preact/signals';
+import { signal, computed, effect, type Signal, type ReadonlySignal } from '@preact/signals';
 import type {
   Group,
   Thread,
@@ -18,7 +18,17 @@ import type {
 // ── reactive state ──────────────────────────────────────────────────
 export const groups: Signal<Group[]> = signal<Group[]>([]);
 export const groupId: Signal<string | null> = signal<string | null>(null);
-export const isAdmin: Signal<boolean> = signal(false);
+export const isAdmin: ReadonlySignal<boolean> = computed(() => {
+  const id = groupId.value;
+  if (!id) return false;
+  const g = groups.value.find((x) => x.id === id);
+  return !!(g && g.isAdmin);
+});
+if (typeof document !== 'undefined') {
+  effect(() => {
+    document.body.classList.toggle('is-admin', isAdmin.value);
+  });
+}
 
 // File browser
 export const treePath: Signal<string> = signal('');
@@ -73,9 +83,7 @@ export interface Refs {
   ws: WebSocket | null;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   reconnectAttempt: number;
-  pollTimer: ReturnType<typeof setInterval> | null;
-  threadsPollTimer: ReturnType<typeof setInterval> | null;
-  approvalsPollTimer: ReturnType<typeof setInterval> | null;
+  syncTimer: ReturnType<typeof setInterval> | null;
   seenIds: Set<string>;
   suppressHashCount: number;
   uploadDragDepth: number;
@@ -85,9 +93,7 @@ export const refs: Refs = {
   ws: null,
   reconnectTimer: null,
   reconnectAttempt: 0,
-  pollTimer: null,
-  threadsPollTimer: null,
-  approvalsPollTimer: null,
+  syncTimer: null,
   seenIds: new Set<string>(),
   suppressHashCount: 0,
   uploadDragDepth: 0,
@@ -98,9 +104,7 @@ export const PANES: { key: 'threads' | 'files'; mainClass: string }[] = [
   { key: 'threads', mainClass: 'threads-collapsed' },
   { key: 'files', mainClass: 'files-collapsed' },
 ];
-export const POLL_INTERVAL_MS = 10000;
-export const THREADS_POLL_MS = 20000;
-export const APPROVALS_POLL_MS = 15000;
+export const SYNC_INTERVAL_MS = 10000;
 export const UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 export const UPLOAD_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
 export const UPLOAD_MAX_FILES = 10;
