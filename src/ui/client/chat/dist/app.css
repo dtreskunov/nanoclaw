@@ -1168,11 +1168,29 @@ header .mobile-only {
       #8be4d4 0%,
       #3fbfae 40%,
       #b07cff 100%);
+  background-size: 300% 300%;
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
   opacity: 1;
+  animation: placeholder-shimmer 6s ease-in-out infinite;
+}
+@keyframes placeholder-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-main textarea::placeholder {
+    animation: none;
+  }
 }
 .chat-main form.ws-down textarea,
 .chat-main form.ws-down > button {

@@ -18451,6 +18451,11 @@ function Composer() {
   const autosize = () => {
     const el = inputRef.current;
     if (!el) return;
+    if (!el.value) {
+      el.style.height = "";
+      el.style.overflowY = "hidden";
+      return;
+    }
     el.style.height = "auto";
     const h5 = Math.min(el.scrollHeight, 200);
     el.style.height = h5 + "px";
@@ -18521,10 +18526,9 @@ function Composer() {
           {
             id: "chat-input",
             rows: 1,
-            placeholder: wsDown ? "Disconnected \u2014 reconnecting\u2026" : "Message the agent\u2026",
+            placeholder: wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
             ref: inputRef,
             onInput: autosize,
-            onFocus: autosize,
             onKeyDown: onKey,
             onPaste,
             disabled: wsDown,
