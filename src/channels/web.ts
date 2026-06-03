@@ -19,6 +19,7 @@
 import type { ChannelAdapter, ChannelSetup, InboundEvent, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 import { log } from '../log.js';
+import { sendToUser as sendPushToUser } from '../modules/push/sender.js';
 
 export const WEB_CHANNEL_TYPE = 'web';
 
@@ -139,6 +140,23 @@ function createAdapter(): ChannelAdapter {
     },
 
     async deliver(platformId, threadId, message: OutboundMessage): Promise<string | undefined> {
+      // Fire a push to the owning user regardless of whether a live tab is
+      // attached — service worker dedupes against focused windows. Thin
+      // payload only; the SW fetches text via an authenticated request.
+      // platformId format: `${userId}#${agentGroupId}` (chat.ts platformIdFor).
+      const hashIdx = platformId.indexOf('#');
+      if (hashIdx > 0 && threadId && message.id && (message.kind === 'chat' || message.kind === 'text')) {
+        const userId = platformId.slice(0, hashIdx);
+        const groupId = platformId.slice(hashIdx + 1);
+        void sendPushToUser(userId, {
+          v: 1,
+          kind: 'message',
+          groupId,
+          threadId,
+          msgId: message.id,
+          ts: new Date().toISOString(),
+        }).catch((err) => log.warn('web push send failed', { err }));
+      }
       const set = subscribers.get(subKey(platformId, threadId));
       if (!set || set.size === 0) {
         // No live tab — the row stays in outbound.db; reconnecting clients

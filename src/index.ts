@@ -16,6 +16,7 @@ import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runti
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
 import { createDeliveryBridge } from './delivery-bridge.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
+import { ensureVapidKeys } from './modules/push/bootstrap.js';
 import { routeInbound } from './router.js';
 import { log } from './log.js';
 
@@ -66,6 +67,10 @@ async function main(): Promise<void> {
   const db = initDb(dbPath);
   runMigrations(db);
   log.info('Central DB ready', { path: dbPath });
+
+  // 1a. Ensure VAPID keys exist for Web Push (PWA notifications). First
+  // boot generates them and persists to .env; idempotent thereafter.
+  ensureVapidKeys();
 
   // 1b. Backfill container_configs from legacy container.json files.
   // Idempotent — skips groups that already have a config row.

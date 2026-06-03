@@ -17,6 +17,8 @@ import { getSession } from '../../../db/sessions.js';
 import { log } from '../../../log.js';
 import { listAccessibleAgentGroups, canAccessAgentGroup } from '../../../modules/permissions/access.js';
 import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
+import { deleteSubscriptionByEndpoint, upsertSubscription } from '../../../modules/push/db.js';
+import { pushAvailable, vapidPublicKey } from '../../../modules/push/sender.js';
 import { dispatchResponse } from '../../../response-registry.js';
 import type { PendingApproval } from '../../../types.js';
 import { authenticate, recordAccess } from '../auth.js';
@@ -218,6 +220,25 @@ on(
   '/api/sync',
   authed((ctx, userId) => handleSync(ctx, userId)),
 );
+// ── push (PWA tier-2 notifications) ─────────────────────────────────
+on('GET', '/api/push/public-key', (ctx) => handlePushPublicKey(ctx));
+on(
+  'POST',
+  '/api/push/subscribe',
+  authed((ctx, userId) => handlePushSubscribe(ctx, userId)),
+);
+on(
+  'DELETE',
+  '/api/push/subscribe',
+  authed((ctx, userId) => handlePushUnsubscribe(ctx, userId)),
+);
+on(
+  'GET',
+  '/api/push/notification',
+  authed((ctx, userId) => handlePushNotification(ctx, userId)),
+);
+// Service worker — must be served from the app scope so it can control /ui/chat/.
+on('GET', '/sw.js', (ctx) => serveServiceWorker(ctx));
 // ── handlers ──────────────────────────────────────────────────────────────
 
 function handleMe(ctx: Ctx, userId: string): void {
@@ -822,6 +843,97 @@ async function handleShareToken(ctx: Ctx, userId: string, groupId: string): Prom
   const url = `${uiBaseUrl()}${CHAT_MOUNT_PREFIX.slice('/ui'.length)}/dl?t=${token}`;
   recordAccess({ userId, groupId: group.id, path: relPath, action: 'share_token', req: ctx.req });
   return json(ctx, 200, { url, token, expiresAt, ttlMinutes, uses });
+}
+
+// ── push handlers ───────────────────────────────────────────────────
+
+function handlePushPublicKey(ctx: Ctx): void {
+  if (!pushAvailable()) return json(ctx, 503, { error: 'push_unavailable' });
+  json(ctx, 200, { publicKey: vapidPublicKey() });
+}
+
+interface PushSubscribeBody {
+  endpoint?: unknown;
+  keys?: { p256dh?: unknown; auth?: unknown };
+}
+
+async function handlePushSubscribe(ctx: Ctx, userId: string): Promise<void> {
+  if (!pushAvailable()) return json(ctx, 503, { error: 'push_unavailable' });
+  let body: PushSubscribeBody;
+  try {
+    body = (await readJsonBody(ctx.req)) as PushSubscribeBody;
+  } catch {
+    return json(ctx, 400, { error: 'invalid_body' });
+  }
+  const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
+  const p256dh = typeof body.keys?.p256dh === 'string' ? body.keys.p256dh : '';
+  const auth = typeof body.keys?.auth === 'string' ? body.keys.auth : '';
+  if (!endpoint || !p256dh || !auth) return json(ctx, 400, { error: 'missing_fields' });
+  if (!/^https?:\/\//.test(endpoint)) return json(ctx, 400, { error: 'invalid_endpoint' });
+  const ua = String(ctx.req.headers['user-agent'] || '').slice(0, 500) || null;
+  upsertSubscription({ userId, endpoint, p256dh, auth, ua });
+  json(ctx, 200, { ok: true });
+}
+
+async function handlePushUnsubscribe(ctx: Ctx, userId: string): Promise<void> {
+  let body: { endpoint?: unknown };
+  try {
+    body = (await readJsonBody(ctx.req)) as { endpoint?: unknown };
+  } catch {
+    return json(ctx, 400, { error: 'invalid_body' });
+  }
+  const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
+  if (!endpoint) return json(ctx, 400, { error: 'missing_endpoint' });
+  // Scope by user_id so a stolen endpoint can't unsubscribe another account.
+  const row = getDb().prepare('SELECT user_id FROM push_subscriptions WHERE endpoint = ?').get(endpoint) as
+    | { user_id: string }
+    | undefined;
+  if (row && row.user_id === userId) deleteSubscriptionByEndpoint(endpoint);
+  json(ctx, 200, { ok: true });
+}
+
+function handlePushNotification(ctx: Ctx, userId: string): void {
+  const groupId = ctx.url.searchParams.get('groupId') || '';
+  const threadId = ctx.url.searchParams.get('threadId') || '';
+  const msgId = ctx.url.searchParams.get('msgId') || '';
+  if (!groupId || !threadId || !msgId) return json(ctx, 400, { error: 'missing_params' });
+  if (!canAccessAgentGroup(userId, groupId).allowed) return json(ctx, 403, { error: 'forbidden' });
+  const group = getAgentGroup(groupId);
+  if (!group) return json(ctx, 404, { error: 'group_not_found' });
+  const history = readChatHistory(userId, groupId, threadId);
+  const msg = history.find((h) => h.id === msgId && h.direction === 'out');
+  if (!msg) return json(ctx, 404, { error: 'message_not_found' });
+  const text = (msg.text || '').trim();
+  const fileCount = msg.files?.length ?? 0;
+  const filePart = fileCount > 0 ? ` · ${fileCount} file${fileCount > 1 ? 's' : ''}` : '';
+  const body = (text.slice(0, 200) + filePart).trim() || (filePart ? filePart.trim() : 'New message');
+  json(ctx, 200, {
+    title: group.name || 'NanoClaw',
+    body,
+    icon: '/ui/chat/icon.svg',
+    groupId,
+    threadId,
+    msgId,
+  });
+}
+
+function serveServiceWorker(ctx: Ctx): void {
+  const full = path.join(UI_DIR, 'sw.js');
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(full);
+  } catch {
+    return text(ctx, 404, 'Not found');
+  }
+  ctx.res.writeHead(200, {
+    'Content-Type': 'application/javascript; charset=utf-8',
+    'Content-Length': stat.size,
+    // `private` prevents Cloudflare/proxies from caching; browser still caches per SW rules.
+    'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+    'CDN-Cache-Control': 'no-store',
+    'Service-Worker-Allowed': '/ui/chat/',
+  });
+  fs.createReadStream(full).pipe(ctx.res);
 }
 
 function clampInt(v: unknown, def: number, min: number, max: number): number {

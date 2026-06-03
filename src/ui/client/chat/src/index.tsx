@@ -5,7 +5,7 @@ import { batch } from '@preact/signals';
 import { api } from './api';
 import { me, groups, settingsOpen, chatLoading } from './state';
 import { App } from './components/App';
-import { initNotif } from './notify';
+import { initNotif, shouldShowIosInstallHint } from './notify';
 import { restorePanelState, applyPanelClasses } from './panels';
 import { applyHash, parseHash } from './hash';
 import { router } from './router';
@@ -46,12 +46,42 @@ function setupViewportFit(): void {
   });
 }
 
+const IOS_HINT_DISMISSED_KEY = 'nanoclaw:ios-install-hint-dismissed';
+
+function maybeShowIosInstallHint(): void {
+  if (!shouldShowIosInstallHint()) return;
+  try {
+    if (localStorage.getItem(IOS_HINT_DISMISSED_KEY) === '1') return;
+  } catch { /* ignore */ }
+  const el = document.createElement('div');
+  el.setAttribute('role', 'note');
+  el.style.cssText =
+    'position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;' +
+    'background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:8px;' +
+    'padding:12px 14px;font:13px system-ui;-webkit-font-smoothing:antialiased;' +
+    'box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;gap:10px;align-items:flex-start';
+  el.innerHTML =
+    '<div style="flex:1">Add to Home Screen to receive notifications when the app is closed. ' +
+    'Tap the Share button, then "Add to Home Screen".</div>' +
+    '<button type="button" aria-label="Dismiss" ' +
+    'style="background:transparent;color:#9ca3af;border:0;font-size:18px;line-height:1;cursor:pointer;padding:0 4px">×</button>';
+  const btn = el.querySelector('button');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      try { localStorage.setItem(IOS_HINT_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+      el.remove();
+    });
+  }
+  document.body.appendChild(el);
+}
+
 async function init(): Promise<void> {
   initNotif();
   setupViewportFit();
   installLivenessHandlers();
   restorePanelState();
   applyPanelClasses();
+  maybeShowIosInstallHint();
   try {
     const [meRes, groupsRes] = await Promise.all([
       api<MeResponse>('api/me'),
