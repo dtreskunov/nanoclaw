@@ -1,8 +1,8 @@
 {
   "id": "/ui/chat/",
-  "name": "NanoClaw",
-  "short_name": "NanoClaw",
-  "description": "Personal Claude assistant — chat with your agent from any browser or installed device.",
+  "name": "{{BRAND_NAME}}",
+  "short_name": "{{BRAND_SHORT_NAME}}",
+  "description": "{{BRAND_DESCRIPTION}}",
   "categories": ["productivity", "utilities"],
   "lang": "en",
   "dir": "ltr",
@@ -11,8 +11,8 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "{{BRAND_BACKGROUND_COLOR}}",
+  "theme_color": "{{BRAND_THEME_COLOR}}",
   "launch_handler": { "client_mode": "focus-existing" },
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

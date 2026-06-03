@@ -22,6 +22,7 @@ import { pushAvailable, vapidPublicKey } from '../../../modules/push/sender.js';
 import { dispatchResponse } from '../../../response-registry.js';
 import type { PendingApproval } from '../../../types.js';
 import { authenticate, recordAccess } from '../auth.js';
+import { applyBrandTokens, brandBootstrapScript, getBranding } from '../branding.js';
 import { createDownloadToken, redeemDownloadToken } from '../download-tokens.js';
 import { uiBaseUrl } from '../server.js';
 import { classify, resolveSafe } from './classify.js';
@@ -914,7 +915,7 @@ function handlePushNotification(ctx: Ctx, userId: string): void {
   const filePart = fileCount > 0 ? ` · ${fileCount} file${fileCount > 1 ? 's' : ''}` : '';
   const body = (text.slice(0, 200) + filePart).trim() || (filePart ? filePart.trim() : 'New message');
   json(ctx, 200, {
-    title: group.name || 'NanoClaw',
+    title: group.name || getBranding().name,
     body,
     icon: '/ui/chat/icon.svg',
     groupId,
@@ -945,7 +946,7 @@ function serveServiceWorker(ctx: Ctx): void {
   }
   if (!cachedSw || cachedSw.version !== version) {
     const raw = fs.readFileSync(swPath, 'utf-8').replace(/__CACHE_VERSION__/g, version);
-    cachedSw = { version, body: Buffer.from(raw, 'utf-8') };
+    cachedSw = { version, body: Buffer.from(applyBrandTokens(raw), 'utf-8') };
   }
   ctx.res.writeHead(200, {
     'Content-Type': 'application/javascript; charset=utf-8',
@@ -1160,7 +1161,21 @@ function serveStatic(ctx: Ctx, relName: string): void {
   if (segments.length > 2 || segments.some((s) => s === '')) {
     return text(ctx, 400, 'Bad request');
   }
-  const full = path.join(UI_DIR, ...segments);
+  let full = path.join(UI_DIR, ...segments);
+  // Per-deploy icon override via UI_BRAND_ICON_DIR. Only top-level icon
+  // files (icon.svg, icon-192.png, etc.) are overridable; the override
+  // file must exist or we fall back to the bundled default.
+  if (segments.length === 1 && /^icon([-.][a-z0-9-]+)?\.(svg|png)$/i.test(segments[0])) {
+    const dir = getBranding().iconDir;
+    if (dir) {
+      const candidate = path.join(dir, segments[0]);
+      try {
+        if (fs.statSync(candidate).isFile()) full = candidate;
+      } catch {
+        /* override missing — fall through to bundled default */
+      }
+    }
+  }
   let stat: fs.Stats;
   try {
     stat = fs.statSync(full);
@@ -1184,7 +1199,21 @@ function serveStatic(ctx: Ctx, relName: string): void {
                 ? 'application/manifest+json; charset=utf-8'
                 : 'application/octet-stream';
   if (ext === '.html') {
-    const body = fs.readFileSync(full, 'utf8').replace(/(<script[^>]+src="dist\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
+    let body = fs.readFileSync(full, 'utf8').replace(/(<script[^>]+src="dist\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
+    body = applyBrandTokens(body).replace(/\{\{BRAND_BOOTSTRAP\}\}/g, brandBootstrapScript());
+    const buf = Buffer.from(body, 'utf8');
+    ctx.res.writeHead(200, {
+      'Content-Type': type,
+      'Content-Length': buf.length,
+      'Cache-Control': 'no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    });
+    ctx.res.end(buf);
+    return;
+  }
+  if (ext === '.webmanifest') {
+    const body = applyBrandTokens(fs.readFileSync(full, 'utf8'));
     const buf = Buffer.from(body, 'utf8');
     ctx.res.writeHead(200, {
       'Content-Type': type,

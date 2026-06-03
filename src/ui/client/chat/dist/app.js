@@ -14537,8 +14537,8 @@ function P() {
   P.__r = 0;
 }
 function $(n3, l7, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
-  var a4, h5, y5, d5, w5, _5, g5 = t4 && t4.__k || v, m6 = l7.length;
-  for (f5 = I(u5, l7, g5, f5, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u5.__k[a4]) && (h5 = -1 === y5.__i ? p : g5[y5.__i] || p, y5.__i = a4, _5 = j(n3, y5, h5, i5, r4, o4, e4, f5, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f5 = A(y5, f5, n3) : "function" == typeof y5.type && void 0 !== _5 ? f5 = _5 : d5 && (f5 = d5.nextSibling), y5.__u &= -7);
+  var a4, h5, y5, d5, w5, _5, g6 = t4 && t4.__k || v, m6 = l7.length;
+  for (f5 = I(u5, l7, g6, f5, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u5.__k[a4]) && (h5 = -1 === y5.__i ? p : g6[y5.__i] || p, y5.__i = a4, _5 = j(n3, y5, h5, i5, r4, o4, e4, f5, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f5 = A(y5, f5, n3) : "function" == typeof y5.type && void 0 !== _5 ? f5 = _5 : d5 && (f5 = d5.nextSibling), y5.__u &= -7);
   return u5.__e = w5, f5;
 }
 function I(n3, l7, u5, t4, i5) {
@@ -14606,7 +14606,7 @@ function O(n3) {
   };
 }
 function j(n3, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
-  var a4, h5, p5, v5, y5, g5, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u5.type;
+  var a4, h5, p5, v5, y5, g6, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u5.type;
   if (void 0 !== u5.constructor) return null;
   128 & t4.__u && (c4 = !!(32 & t4.__u), o4 = [f5 = u5.__e = t4.__e]), (a4 = l.__b) && a4(u5);
   n: if ("function" == typeof F3) try {
@@ -14620,7 +14620,7 @@ function j(n3, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
         break n;
       }
       null != h5.componentWillUpdate && h5.componentWillUpdate(b4, h5.__s, M3), C3 && null != h5.componentDidUpdate && h5.__h.push(function() {
-        h5.componentDidUpdate(v5, y5, g5);
+        h5.componentDidUpdate(v5, y5, g6);
       });
     }
     if (h5.context = M3, h5.props = b4, h5.__P = n3, h5.__e = false, I3 = l.__r, A5 = 0, C3) {
@@ -14629,7 +14629,7 @@ function j(n3, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
     } else do {
       h5.__d = false, I3 && I3(u5), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
     } while (h5.__d && ++A5 < 25);
-    h5.state = h5.__s, null != h5.getChildContext && (i5 = w(w({}, i5), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g5 = h5.getSnapshotBeforeUpdate(v5, y5)), f5 = $(n3, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u5, t4, i5, r4, o4, e4, f5, c4, s5), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
+    h5.state = h5.__s, null != h5.getChildContext && (i5 = w(w({}, i5), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g6 = h5.getSnapshotBeforeUpdate(v5, y5)), f5 = $(n3, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u5, t4, i5, r4, o4, e4, f5, c4, s5), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
   } catch (n4) {
     if (u5.__v = null, c4 || null != o4) if (n4.then) {
       for (u5.__u |= c4 ? 160 : 128; f5 && 8 == f5.nodeType && f5.nextSibling; ) f5 = f5.nextSibling;
@@ -14654,7 +14654,7 @@ function z(n3, u5, t4) {
   });
 }
 function N(u5, t4, i5, r4, o4, e4, f5, c4, s5) {
-  var a4, h5, v5, y5, w5, g5, m6, b4 = i5.props, k4 = t4.props, x5 = t4.type;
+  var a4, h5, v5, y5, w5, g6, m6, b4 = i5.props, k4 = t4.props, x5 = t4.type;
   if ("svg" == x5 ? o4 = "http://www.w3.org/2000/svg" : "math" == x5 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
     for (a4 = 0; a4 < e4.length; a4++) if ((w5 = e4[a4]) && "setAttribute" in w5 == !!x5 && (x5 ? w5.localName == x5 : 3 == w5.nodeType)) {
       u5 = w5, e4[a4] = null;
@@ -14674,10 +14674,10 @@ function N(u5, t4, i5, r4, o4, e4, f5, c4, s5) {
       if ("value" == a4 && "defaultValue" in k4 || "checked" == a4 && "defaultChecked" in k4) continue;
       F(u5, a4, null, w5, o4);
     }
-    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g5 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u5, a4, w5, b4[a4], o4);
+    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g6 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u5, a4, w5, b4[a4], o4);
     if (h5) c4 || v5 && (h5.__html === v5.__html || h5.__html === u5.innerHTML) || (u5.innerHTML = h5.__html), t4.__k = [];
     else if (v5 && (u5.innerHTML = ""), $(u5, d(y5) ? y5 : [y5], t4, i5, r4, "foreignObject" == x5 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && C(i5, 0), c4, s5), null != e4) for (a4 = e4.length; a4--; ) _(e4[a4]);
-    c4 || (a4 = "value", "progress" == x5 && null == g5 ? u5.removeAttribute("value") : void 0 !== g5 && (g5 !== u5[a4] || "progress" == x5 && !g5 || "option" == x5 && g5 !== b4[a4]) && F(u5, a4, g5, b4[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u5[a4] && F(u5, a4, m6, b4[a4], o4));
+    c4 || (a4 = "value", "progress" == x5 && null == g6 ? u5.removeAttribute("value") : void 0 !== g6 && (g6 !== u5[a4] || "progress" == x5 && !g6 || "option" == x5 && g6 !== b4[a4]) && F(u5, a4, g6, b4[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u5[a4] && F(u5, a4, m6, b4[a4], o4));
   }
   return u5;
 }
@@ -15490,8 +15490,8 @@ var groupId = y3(null);
 var isAdmin = g2(() => {
   const id = groupId.value;
   if (!id) return false;
-  const g5 = groups.value.find((x5) => x5.id === id);
-  return !!(g5 && g5.isAdmin);
+  const g6 = groups.value.find((x5) => x5.id === id);
+  return !!(g6 && g6.isAdmin);
 });
 if (typeof document !== "undefined") {
   j3(() => {
@@ -16998,7 +16998,7 @@ async function applyHash(router2) {
     if (groups.value.length) await router2.selectGroup(groups.value[0].id);
     return;
   }
-  if (!groups.value.find((g5) => g5.id === parsed.groupId)) {
+  if (!groups.value.find((g6) => g6.id === parsed.groupId)) {
     router2.notFound("No access to group " + parsed.groupId);
     return;
   }
@@ -17912,6 +17912,16 @@ async function respondApproval(approvalId, value) {
   }
 }
 
+// src/brand.ts
+var g5 = globalThis.__BRAND__ ?? {};
+var BRAND = {
+  name: g5.name || "NanoClaw",
+  shortName: g5.shortName || g5.name || "NanoClaw",
+  description: g5.description || "",
+  themeColor: g5.themeColor || "#0d1117",
+  backgroundColor: g5.backgroundColor || "#0d1117"
+};
+
 // src/components/Header.tsx
 function Header() {
   const onChange = (e4) => {
@@ -17932,11 +17942,11 @@ function Header() {
         children: "\u2630"
       }
     ),
-    /* @__PURE__ */ u4("span", { class: "brand", children: "NanoClaw" }),
-    /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: groups.value.map((g5) => /* @__PURE__ */ u4("option", { value: g5.id, children: [
-      g5.isAdmin ? "" : "\u{1F512} ",
-      g5.name
-    ] }, g5.id)) }),
+    /* @__PURE__ */ u4("span", { class: "brand", children: BRAND.name }),
+    /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: groups.value.map((g6) => /* @__PURE__ */ u4("option", { value: g6.id, children: [
+      g6.isAdmin ? "" : "\u{1F512} ",
+      g6.name
+    ] }, g6.id)) }),
     !isAdmin.value && groupId.value ? /* @__PURE__ */ u4("span", { class: "readonly-badge", title: readOnlyHint, "aria-label": readOnlyHint, children: [
       /* @__PURE__ */ u4("span", { "aria-hidden": "true", children: "\u{1F512}" }),
       /* @__PURE__ */ u4("span", { class: "desktop-only", children: "Read-only" })
@@ -18402,7 +18412,7 @@ function MessageLog() {
   const groups2 = groupMessages(list);
   const typing = isTyping.value && threadId.value && !chatLoading.value;
   return /* @__PURE__ */ u4("div", { class: "log", id: "chat-log", ref, children: [
-    chatLoading.value ? null : !threadId.value ? /* @__PURE__ */ u4("div", { class: "empty", children: "Pick or start a chat." }) : list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No messages yet." }) : groups2.map((g5, i5) => g5.kind === "thoughts" ? /* @__PURE__ */ u4(ThoughtGroup, { thoughts: g5.thoughts, answer: g5.answer }, i5) : /* @__PURE__ */ u4(Message, { m: g5.m }, i5)),
+    chatLoading.value ? null : !threadId.value ? /* @__PURE__ */ u4("div", { class: "empty", children: "Pick or start a chat." }) : list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No messages yet." }) : groups2.map((g6, i5) => g6.kind === "thoughts" ? /* @__PURE__ */ u4(ThoughtGroup, { thoughts: g6.thoughts, answer: g6.answer }, i5) : /* @__PURE__ */ u4(Message, { m: g6.m }, i5)),
     typing ? /* @__PURE__ */ u4("div", { class: "typing", "aria-live": "polite", children: [
       /* @__PURE__ */ u4("span", {}),
       /* @__PURE__ */ u4("span", {}),
@@ -19719,9 +19729,13 @@ function Settings() {
       /* @__PURE__ */ u4("section", { children: [
         /* @__PURE__ */ u4("h3", { children: "Linked identities" }),
         /* @__PURE__ */ u4("p", { class: "muted", children: [
-          "Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The ",
+          "Identities let ",
+          BRAND.name,
+          " recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The ",
           /* @__PURE__ */ u4("em", { children: "primary" }),
-          " identity is where NanoClaw reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from."
+          " identity is where ",
+          BRAND.name,
+          " reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from."
         ] }),
         identities.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No identities yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
           /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
@@ -19809,13 +19823,25 @@ function InstallSection() {
   }
   return /* @__PURE__ */ u4("section", { children: [
     /* @__PURE__ */ u4("h3", { children: "Install app" }),
-    installed ? /* @__PURE__ */ u4("p", { class: "muted", children: "NanoClaw is installed and running as an app." }) : canInstall ? /* @__PURE__ */ u4(k, { children: [
-      /* @__PURE__ */ u4("button", { type: "button", onClick: onInstall, children: "Install NanoClaw" }),
-      /* @__PURE__ */ u4("p", { class: "muted", children: "Adds NanoClaw to your home screen / app launcher and runs it in its own window." })
+    installed ? /* @__PURE__ */ u4("p", { class: "muted", children: [
+      BRAND.name,
+      " is installed and running as an app."
+    ] }) : canInstall ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4("button", { type: "button", onClick: onInstall, children: [
+        "Install ",
+        BRAND.name
+      ] }),
+      /* @__PURE__ */ u4("p", { class: "muted", children: [
+        "Adds ",
+        BRAND.name,
+        " to your home screen / app launcher and runs it in its own window."
+      ] })
     ] }) : /* @__PURE__ */ u4("p", { class: "muted", children: [
       "Tap the Share button in Safari, then ",
       /* @__PURE__ */ u4("em", { children: "Add to Home Screen" }),
-      " to install NanoClaw as an app."
+      " to install ",
+      BRAND.name,
+      " as an app."
     ] })
   ] });
 }

@@ -247,11 +247,20 @@ header .mobile-only {
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding-right: 8px;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  background: var(--surface, #1f2329);
+  color: var(--surface-fg, #e6e6e6);
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 .toast-sticky .toast-text {
   white-space: nowrap;
+  opacity: 0.9;
 }
 @keyframes toast-in-bottom {
   from {
@@ -265,21 +274,21 @@ header .mobile-only {
 }
 .toast-action {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  padding: 5px 12px;
+  border: 1px solid var(--border-strong, rgba(127, 127, 127, 0.45));
+  background: var(--wash, rgba(127, 127, 127, 0.12));
+  color: inherit;
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0;
+  padding: 4px 11px;
   border-radius: 999px;
   cursor: pointer;
 }
 .toast-action:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--wash-strong, rgba(127, 127, 127, 0.2));
 }
 .toast-action:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--accent-strong, #1a73e8);
   outline-offset: 2px;
 }
 

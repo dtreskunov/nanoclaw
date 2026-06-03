@@ -7,6 +7,7 @@ import { toggleMute, shouldShowIosInstallHint } from '../notify';
 import { installAvailable, installCompleted, triggerInstall } from '../install';
 import { showToast } from './Toast';
 import { requestConfirm } from './PromptModal';
+import { BRAND } from '../brand';
 import type { Identity } from '../types';
 
 const API = '/ui/settings/api';
@@ -201,7 +202,7 @@ export function Settings() {
 
           <section>
             <h3>Linked identities</h3>
-            <p class="muted">Identities let NanoClaw recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The <em>primary</em> identity is where NanoClaw reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from.</p>
+            <p class="muted">Identities let {BRAND.name} recognize you across channels. Add more so any channel you DM the bot from is treated as the same user. The <em>primary</em> identity is where {BRAND.name} reaches out when it needs to message you first (approval prompts, pairing, host notifications); replies always go back through whichever channel you wrote from.</p>
             {identities.length === 0
               ? <p class="muted">No identities yet.</p>
               : (
@@ -292,14 +293,14 @@ function InstallSection() {
     <section>
       <h3>Install app</h3>
       {installed ? (
-        <p class="muted">NanoClaw is installed and running as an app.</p>
+        <p class="muted">{BRAND.name} is installed and running as an app.</p>
       ) : canInstall ? (
         <>
-          <button type="button" onClick={onInstall}>Install NanoClaw</button>
-          <p class="muted">Adds NanoClaw to your home screen / app launcher and runs it in its own window.</p>
+          <button type="button" onClick={onInstall}>Install {BRAND.name}</button>
+          <p class="muted">Adds {BRAND.name} to your home screen / app launcher and runs it in its own window.</p>
         </>
       ) : (
-        <p class="muted">Tap the Share button in Safari, then <em>Add to Home Screen</em> to install NanoClaw as an app.</p>
+        <p class="muted">Tap the Share button in Safari, then <em>Add to Home Screen</em> to install {BRAND.name} as an app.</p>
       )}
     </section>
   );

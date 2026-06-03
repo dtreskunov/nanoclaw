@@ -145,7 +145,7 @@ async function handlePush(event) {
     payload = null;
   }
   if (!payload || payload.kind !== 'message') {
-    return self.registration.showNotification('NanoClaw', {
+    return self.registration.showNotification('{{BRAND_NAME}}', {
       body: 'New activity',
       icon: '/ui/chat/icon.svg',
       tag: 'nanoclaw-generic',
@@ -161,7 +161,7 @@ async function handlePush(event) {
   );
   if (focusedOnThread) return;
 
-  let title = 'NanoClaw';
+  let title = '{{BRAND_NAME}}';
   let body = 'New message';
   let icon = '/ui/chat/icon.svg';
   try {

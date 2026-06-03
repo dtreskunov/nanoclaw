@@ -51,6 +51,7 @@ import { sendHandleDm } from '../../modules/permissions/handle-dm.js';
 import { buildDeepLink, hasDeepLinkBuilder } from '../../modules/permissions/identity-link-deeplinks.js';
 
 import { authenticate } from './auth.js';
+import { getBranding } from './branding.js';
 
 const SETTINGS_PREFIX = '/ui/settings';
 
@@ -182,7 +183,7 @@ async function handleApi(
     const ok = await sendHandleDm(
       channel,
       handle,
-      `NanoClaw verification code: ${code}\n\nThis code expires in 10 minutes.`,
+      `${getBranding().name} verification code: ${code}\n\nThis code expires in 10 minutes.`,
     );
     if (!ok) {
       // Leave the row for audit; the user will just see a timeout / failure

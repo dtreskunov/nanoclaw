@@ -3,6 +3,7 @@ import './Header.css';
 import type { JSX } from 'preact';
 import { groups, groupId, drawerOpen, settingsOpen, isAdmin } from '../state';
 import { selectGroup } from '../actions';
+import { BRAND } from '../brand';
 
 export function Header() {
   const onChange = (e: JSX.TargetedEvent<HTMLSelectElement>): void => {
@@ -17,7 +18,7 @@ export function Header() {
         aria-label="Threads"
         onClick={() => { drawerOpen.threads.value = !drawerOpen.threads.value; drawerOpen.files.value = false; }}
       >{'\u2630'}</button>
-      <span class="brand">NanoClaw</span>
+      <span class="brand">{BRAND.name}</span>
       <select id="group-select" aria-label="Agent group" value={groupId.value || ''} onChange={onChange}>
         {groups.value.map((g) => (
           <option value={g.id} key={g.id}>{g.isAdmin ? '' : '\uD83D\uDD12 '}{g.name}</option>

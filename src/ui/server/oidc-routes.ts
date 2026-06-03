@@ -28,6 +28,7 @@ import { insertOidcLink, getOidcLink, touchOidcLink } from '../../modules/permis
 import { createPendingApproval, findPendingByOidcSub } from '../../modules/permissions/db/pending-user-approvals.js';
 
 import { buildSessionCookie, createUiSessionForUser } from './auth.js';
+import { getBranding } from './branding.js';
 import { getOidcProvider, listConfiguredProviders } from './oidc/registry.js';
 
 const STATE_COOKIE = 'oidc_state';
@@ -156,6 +157,7 @@ const PAGE_STYLE = `
 `;
 
 export function renderLoginPage(next: string | null): string {
+  const brand = getBranding().name;
   const providers = listConfiguredProviders();
   const safeNext = sanitizeNext(next) || LANDING;
   const buttons = providers
@@ -168,9 +170,9 @@ export function renderLoginPage(next: string | null): string {
     providers.length === 0
       ? `<p>No sign-in providers configured. Ask your operator to set <code>OIDC_GOOGLE_CLIENT_ID</code> and <code>OIDC_GOOGLE_CLIENT_SECRET</code> in <code>.env</code>, or to DM you a magic link.</p>`
       : `<p class="muted">Or wait for your operator to DM you a magic link.</p>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Sign in — NanoClaw</title>${PAGE_STYLE}</head><body>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Sign in — ${brand}</title>${PAGE_STYLE}</head><body>
     <div class="card">
-      <div class="brand">NanoClaw</div>
+      <div class="brand">${brand}</div>
       <h1>Sign in</h1>
       ${buttons}
       ${fallback}
@@ -179,10 +181,11 @@ export function renderLoginPage(next: string | null): string {
 }
 
 function renderPendingPage(pendingId: string, email: string | null): string {
+  const brand = getBranding().name;
   const who = email ? `<code>${email}</code>` : 'this account';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Pending approval — NanoClaw</title>${PAGE_STYLE}</head><body>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Pending approval — ${brand}</title>${PAGE_STYLE}</head><body>
     <div class="card">
-      <div class="brand">NanoClaw</div>
+      <div class="brand">${brand}</div>
       <h1>Waiting for admin approval</h1>
       <p>${who} isn't recognized yet. We've recorded your sign-in request.</p>
       <p>Ask an admin to run:</p>
@@ -193,9 +196,10 @@ function renderPendingPage(pendingId: string, email: string | null): string {
 }
 
 function renderError(message: string): string {
+  const brand = getBranding().name;
   return `<!doctype html><html><head><meta charset="utf-8"><title>Sign-in error</title>${PAGE_STYLE}</head><body>
     <div class="card">
-      <div class="brand">NanoClaw</div>
+      <div class="brand">${brand}</div>
       <h1>Sign-in failed</h1>
       <p>${message}</p>
       <p><a class="btn" href="/ui/login">Try again</a></p>
