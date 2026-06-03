@@ -1,4 +1,5 @@
 import { getDb } from './connection.js';
+import { assertUserUuid } from './uuid.js';
 
 export interface UnregisteredSender {
   channel_type: string;
@@ -22,6 +23,7 @@ export function recordDroppedMessage(msg: {
   messaging_group_id: string | null;
   agent_group_id: string | null;
 }): void {
+  assertUserUuid(msg.user_id, 'recordDroppedMessage.user_id');
   const now = new Date().toISOString();
   getDb()
     .prepare(
