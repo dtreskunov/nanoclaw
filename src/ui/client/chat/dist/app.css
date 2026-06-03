@@ -1065,6 +1065,11 @@ header .mobile-only {
   background: transparent;
   color: inherit;
 }
+.chat-main form.ws-down textarea,
+.chat-main form.ws-down > button {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .chat-main.drag-active {
   outline: 2px dashed var(--accent-strong);
   outline-offset: -4px;

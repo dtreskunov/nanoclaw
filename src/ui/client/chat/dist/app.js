@@ -18319,7 +18319,9 @@ function PendingTray() {
 function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
-  const showComposer = !channelType.value || channelType.value === "web" || canSend.value;
+  const isWeb = !channelType.value || channelType.value === "web";
+  const showComposer = isWeb || canSend.value;
+  const wsDown = isWeb && chatStatus.value !== "connected";
   const autosize = () => {
     const el = inputRef.current;
     if (!el) return;
@@ -18362,23 +18364,44 @@ function Composer() {
     ev.preventDefault();
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
-  return /* @__PURE__ */ u4("form", { id: "chat-form", onSubmit, style: showComposer ? "" : "display:none", children: [
-    /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
-    /* @__PURE__ */ u4("button", { type: "button", id: "chat-attach", title: "Attach files", "aria-label": "Attach files", onClick: onAttachClick, children: "\u{1F4CE}" }),
-    /* @__PURE__ */ u4(
-      "textarea",
-      {
-        id: "chat-input",
-        rows: 1,
-        placeholder: "Message the agent\u2026",
-        ref: inputRef,
-        onInput: autosize,
-        onKeyDown: onKey,
-        onPaste
-      }
-    ),
-    /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", children: "Send" })
-  ] });
+  return /* @__PURE__ */ u4(
+    "form",
+    {
+      id: "chat-form",
+      onSubmit,
+      style: showComposer ? "" : "display:none",
+      class: wsDown ? "ws-down" : "",
+      children: [
+        /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            id: "chat-attach",
+            title: wsDown ? "Disconnected" : "Attach files",
+            "aria-label": "Attach files",
+            onClick: onAttachClick,
+            disabled: wsDown,
+            children: "\u{1F4CE}"
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "textarea",
+          {
+            id: "chat-input",
+            rows: 1,
+            placeholder: wsDown ? "Disconnected \u2014 reconnecting\u2026" : "Message the agent\u2026",
+            ref: inputRef,
+            onInput: autosize,
+            onKeyDown: onKey,
+            onPaste,
+            disabled: wsDown
+          }
+        ),
+        /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", disabled: wsDown, children: "Send" })
+      ]
+    }
+  );
 }
 function ReadonlyBanner() {
   const isWeb = !channelType.value || channelType.value === "web";

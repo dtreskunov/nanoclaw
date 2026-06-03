@@ -198,7 +198,12 @@ function PendingTray() {
 function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const showComposer = (!channelType.value || channelType.value === 'web' || canSend.value);
+  const isWeb = !channelType.value || channelType.value === 'web';
+  const showComposer = (isWeb || canSend.value);
+  // Web threads send over the WebSocket; if it isn't connected, block input
+  // rather than silently dropping the message. Non-web channels post via
+  // HTTP and don't care about chatStatus.
+  const wsDown = isWeb && chatStatus.value !== 'connected';
   const autosize = (): void => {
     const el = inputRef.current;
     if (!el) return;
@@ -244,19 +249,32 @@ function Composer() {
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
   return (
-    <form id="chat-form" onSubmit={onSubmit} style={showComposer ? '' : 'display:none'}>
+    <form
+      id="chat-form"
+      onSubmit={onSubmit}
+      style={showComposer ? '' : 'display:none'}
+      class={wsDown ? 'ws-down' : ''}
+    >
       <input type="file" id="chat-file" multiple hidden ref={fileRef} onChange={onFileChange} />
-      <button type="button" id="chat-attach" title="Attach files" aria-label="Attach files" onClick={onAttachClick}>{'\uD83D\uDCCE'}</button>
+      <button
+        type="button"
+        id="chat-attach"
+        title={wsDown ? 'Disconnected' : 'Attach files'}
+        aria-label="Attach files"
+        onClick={onAttachClick}
+        disabled={wsDown}
+      >{'\uD83D\uDCCE'}</button>
       <textarea
         id="chat-input"
         rows={1}
-        placeholder={'Message the agent\u2026'}
+        placeholder={wsDown ? 'Disconnected \u2014 reconnecting\u2026' : 'Message the agent\u2026'}
         ref={inputRef}
         onInput={autosize}
         onKeyDown={onKey}
         onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
+        disabled={wsDown}
       ></textarea>
-      <button type="submit" id="chat-send">Send</button>
+      <button type="submit" id="chat-send" disabled={wsDown}>Send</button>
     </form>
   );
 }
