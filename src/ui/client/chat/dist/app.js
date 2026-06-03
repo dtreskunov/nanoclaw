@@ -18458,6 +18458,11 @@ function Composer() {
   };
   y2(() => {
     autosize();
+    const el = inputRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(autosize);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
   const onSubmit = (ev) => {
     ev.preventDefault();
@@ -18519,9 +18524,11 @@ function Composer() {
             placeholder: wsDown ? "Disconnected \u2014 reconnecting\u2026" : "Message the agent\u2026",
             ref: inputRef,
             onInput: autosize,
+            onFocus: autosize,
             onKeyDown: onKey,
             onPaste,
-            disabled: wsDown
+            disabled: wsDown,
+            autocomplete: "off"
           }
         ),
         /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", disabled: wsDown, children: "Send" })

@@ -214,7 +214,16 @@ function Composer() {
     // below the cap; only show it when actually capped.
     el.style.overflowY = h >= 200 ? 'auto' : 'hidden';
   };
-  useEffect(() => { autosize(); }, []);
+  useEffect(() => {
+    autosize();
+    const el = inputRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    // Width changes (pane toggle, drawer, viewport resize) rewrap the text
+    // and change scrollHeight; re-run autosize so the box tracks content.
+    const ro = new ResizeObserver(autosize);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const onSubmit = (ev: JSX.TargetedEvent<HTMLFormElement>): void => {
     ev.preventDefault();
     const text = (inputRef.current?.value || '').trim();
@@ -270,9 +279,11 @@ function Composer() {
         placeholder={wsDown ? 'Disconnected \u2014 reconnecting\u2026' : 'Message the agent\u2026'}
         ref={inputRef}
         onInput={autosize}
+        onFocus={autosize}
         onKeyDown={onKey}
         onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
         disabled={wsDown}
+        autocomplete="off"
       ></textarea>
       <button type="submit" id="chat-send" disabled={wsDown}>Send</button>
     </form>
