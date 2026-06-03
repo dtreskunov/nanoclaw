@@ -207,6 +207,15 @@ function Composer() {
   const autosize = (): void => {
     const el = inputRef.current;
     if (!el) return;
+    // When empty, size to min-height. Chrome's scrollHeight reflects the
+    // placeholder when value is empty, which makes a long/wrapping
+    // placeholder (e.g. the wsDown 'Reconnecting…') puff the box to two
+    // lines and leaves it stuck there once the placeholder shortens.
+    if (!el.value) {
+      el.style.height = '';
+      el.style.overflowY = 'hidden';
+      return;
+    }
     el.style.height = 'auto';
     const h = Math.min(el.scrollHeight, 200);
     el.style.height = h + 'px';
@@ -214,12 +223,18 @@ function Composer() {
     // below the cap; only show it when actually capped.
     el.style.overflowY = h >= 200 ? 'auto' : 'hidden';
   };
+  // Mount + width-change observer. The empty-value early return inside
+  // autosize() means we don't need to re-run on focus or on wsDown
+  // placeholder changes — only the value and the available width can
+  // change the right height.
   useEffect(() => {
     autosize();
     const el = inputRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    // Width changes (pane toggle, drawer, viewport resize) rewrap the text
+    // Width changes (pane toggle, drawer, viewport resize) rewrap text
     // and change scrollHeight; re-run autosize so the box tracks content.
+    // No-op when empty (early return), idempotent when stable, so this
+    // doesn't ping-pong on the height changes autosize itself causes.
     const ro = new ResizeObserver(autosize);
     ro.observe(el);
     return () => ro.disconnect();
@@ -276,10 +291,9 @@ function Composer() {
       <textarea
         id="chat-input"
         rows={1}
-        placeholder={wsDown ? 'Disconnected \u2014 reconnecting\u2026' : 'Message the agent\u2026'}
+        placeholder={wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
         ref={inputRef}
         onInput={autosize}
-        onFocus={autosize}
         onKeyDown={onKey}
         onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
         disabled={wsDown}
