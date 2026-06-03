@@ -7,7 +7,7 @@ import {
   treePath, treeEntries, treeError, filePath, isAdmin,
   previewBlock, uploadItems, threadId, pinnedContext,
 } from '../state';
-import { navTree, navFile, closePreview, togglePinnedFile, loadTree } from '../actions';
+import { navTree, navFile, closePreview, togglePinnedFile, loadTree, selectFile } from '../actions';
 import {
   uploadFiles, clearUploadStrip, resolveConflict, notifyAgent,
 } from '../uploads';
@@ -199,6 +199,17 @@ function Preview() {
       >{'\uD83D\uDCCE'}</button>
       <span class="preview-spacer"></span>
       <span class="preview-actions">
+        <button
+          type="button"
+          class="text-btn refresh-btn"
+          onClick={() => {
+            if (!p.name || !fp) return;
+            selectFile({ path: fp, name: p.name }).catch(console.error);
+          }}
+          disabled={!fp || !p.name}
+          title="Refresh"
+          aria-label="Refresh"
+        >{'\u21BB'}</button>
         <ActionsMenu mode="preview" />
         <button
           type="button"

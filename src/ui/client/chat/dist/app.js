@@ -19226,6 +19226,21 @@ function Preview() {
     ),
     /* @__PURE__ */ u4("span", { class: "preview-spacer" }),
     /* @__PURE__ */ u4("span", { class: "preview-actions", children: [
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "text-btn refresh-btn",
+          onClick: () => {
+            if (!p5.name || !fp) return;
+            selectFile({ path: fp, name: p5.name }).catch(console.error);
+          },
+          disabled: !fp || !p5.name,
+          title: "Refresh",
+          "aria-label": "Refresh",
+          children: "\u21BB"
+        }
+      ),
       /* @__PURE__ */ u4(ActionsMenu, { mode: "preview" }),
       /* @__PURE__ */ u4(
         "button",
