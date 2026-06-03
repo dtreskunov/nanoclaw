@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable variant: full-bleed background, glyph scaled to ~70% so it
+       sits comfortably inside the platform's safe-zone circle. -->
+  <rect width="512" height="512" fill="#1f6feb"/>
+  <g transform="translate(80 80) scale(0.6875)">
+    <path d="M128 384V128h48l160 192V128h48v256h-48L176 192v192z" fill="#fff"/>
+  </g>
+</svg>

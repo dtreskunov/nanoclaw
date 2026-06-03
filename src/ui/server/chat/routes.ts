@@ -150,6 +150,9 @@ on('GET', '/', (ctx) => serveStatic(ctx, 'index.html'));
 on('GET', '/index.html', (ctx) => serveStatic(ctx, 'index.html'));
 on('GET', '/manifest.webmanifest', (ctx) => serveStatic(ctx, 'manifest.webmanifest'));
 on('GET', '/icon.svg', (ctx) => serveStatic(ctx, 'icon.svg'));
+on('GET', '/icon-192.png', (ctx) => serveStatic(ctx, 'icon-192.png'));
+on('GET', '/icon-512.png', (ctx) => serveStatic(ctx, 'icon-512.png'));
+on('GET', '/icon-maskable-512.png', (ctx) => serveStatic(ctx, 'icon-maskable-512.png'));
 on('GET', '/dist/*', (ctx, params) => serveStatic(ctx, 'dist/' + params['*']));
 on('GET', '/dl', (ctx) => handleTokenDownload(ctx));
 
@@ -1172,9 +1175,11 @@ function serveStatic(ctx: Ctx, relName: string): void {
           ? 'application/javascript; charset=utf-8'
           : ext === '.svg'
             ? 'image/svg+xml'
-            : ext === '.webmanifest'
-              ? 'application/manifest+json; charset=utf-8'
-              : 'application/octet-stream';
+            : ext === '.png'
+              ? 'image/png'
+              : ext === '.webmanifest'
+                ? 'application/manifest+json; charset=utf-8'
+                : 'application/octet-stream';
   if (ext === '.html') {
     const body = fs.readFileSync(full, 'utf8').replace(/(<script[^>]+src="dist\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
     const buf = Buffer.from(body, 'utf8');

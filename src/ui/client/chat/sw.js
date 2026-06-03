@@ -28,6 +28,9 @@ const SHELL_ASSETS = [
   '/ui/chat/dist/app.js',
   '/ui/chat/dist/app.css',
   '/ui/chat/icon.svg',
+  '/ui/chat/icon-192.png',
+  '/ui/chat/icon-512.png',
+  '/ui/chat/icon-maskable-512.png',
   '/ui/chat/manifest.webmanifest',
 ];
 
@@ -87,6 +90,9 @@ self.addEventListener('fetch', (event) => {
   if (
     url.pathname.startsWith('/ui/chat/dist/') ||
     url.pathname === '/ui/chat/icon.svg' ||
+    url.pathname === '/ui/chat/icon-192.png' ||
+    url.pathname === '/ui/chat/icon-512.png' ||
+    url.pathname === '/ui/chat/icon-maskable-512.png' ||
     url.pathname === '/ui/chat/manifest.webmanifest'
   ) {
     event.respondWith(handleStatic(req));
