@@ -874,6 +874,26 @@ header .mobile-only {
 .chat-main .msg.out {
   align-self: flex-start;
   background: var(--wash);
+  position: relative;
+  border-radius: 8px;
+}
+.chat-main .msg.out::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background:
+    linear-gradient(
+      135deg,
+      #8be4d4 0%,
+      #3fbfae 40%,
+      #b07cff 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 .chat-main .msg.internal {
   align-self: flex-start;
