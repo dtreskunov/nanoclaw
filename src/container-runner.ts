@@ -173,10 +173,17 @@ async function spawnContainer(session: Session): Promise<void> {
   activeContainers.set(session.id, { process: container, containerName });
   markContainerRunning(session.id);
 
-  // Log stderr
+  // Buffer last N stderr lines so a non-zero exit can surface them. The
+  // container runs with --rm, so logs are gone after exit; without this,
+  // fatal startup errors (bad provider, missing dep) are invisible.
+  const stderrTail: string[] = [];
+  const STDERR_TAIL_MAX = 40;
   container.stderr?.on('data', (data) => {
     for (const line of data.toString().trim().split('\n')) {
-      if (line) log.debug(line, { container: agentGroup.folder });
+      if (!line) continue;
+      log.debug(line, { container: agentGroup.folder });
+      stderrTail.push(line);
+      if (stderrTail.length > STDERR_TAIL_MAX) stderrTail.shift();
     }
   });
 
@@ -193,6 +200,16 @@ async function spawnContainer(session: Session): Promise<void> {
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
     log.info('Container exited', { sessionId: session.id, code, containerName });
+    // 137 = SIGKILL (clean kill via killContainer). Anything else non-zero
+    // is an unexpected exit — surface buffered stderr so the cause is visible.
+    if (code !== 0 && code !== 137 && code !== null && stderrTail.length > 0) {
+      log.warn('Container exited unexpectedly — stderr tail', {
+        sessionId: session.id,
+        containerName,
+        code,
+        stderr: stderrTail.join('\n'),
+      });
+    }
   });
 
   container.on('error', (err) => {

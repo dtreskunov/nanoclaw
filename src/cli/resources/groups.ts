@@ -227,7 +227,19 @@ registerResource({
             'provider' | 'model' | 'effort' | 'image_tag' | 'assistant_name' | 'max_messages_per_prompt' | 'cli_scope'
           >
         > = {};
-        if (args.provider !== undefined) updates.provider = args.provider as string;
+        if (args.provider !== undefined) {
+          // Keep in sync with REQUIRED_PROVIDER_MODULES + OPTIONAL_PROVIDER_MODULES
+          // in container/agent-runner/src/providers/index.ts. Bad provider names
+          // cause silent container-exit-code-1 loops (see follow-up to denis@bot incident).
+          const validProviders = ['claude', 'mock', 'opencode'];
+          const p = args.provider as string;
+          if (!validProviders.includes(p)) {
+            throw new Error(
+              `--provider must be one of: ${validProviders.join(', ')} (got: ${p}). For OpenRouter/etc., use provider=opencode with model=<route>/<model>.`,
+            );
+          }
+          updates.provider = p;
+        }
         if (args.model !== undefined) updates.model = args.model as string;
         if (args.effort !== undefined) updates.effort = args.effort as string;
         if (args.image_tag !== undefined) updates.image_tag = args.image_tag as string;
