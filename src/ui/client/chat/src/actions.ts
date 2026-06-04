@@ -258,11 +258,18 @@ function mergeIncomingMessages(messages: ServerMessage[]): void {
 function historyUrl(gid: string, tid: string): string {
   let u = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   const params = new URLSearchParams();
-  if (channelType.value && channelType.value !== 'web' && messagingGroupId.value) {
-    params.set('channel', channelType.value);
-    params.set('mg', messagingGroupId.value);
+  const spectate = spectatingCurrentGroup.value;
+  // Spectator mode: look up the thread to get its owning mg/channel —
+  // the server defaults to the viewer's own web mg when no override is
+  // sent, which would miss the spectated thread's messages.
+  const t = spectate ? threads.value.find((x) => x.threadId === tid) : null;
+  const ct = t?.channelType || channelType.value;
+  const mg = t?.messagingGroupId || messagingGroupId.value;
+  if (mg && (spectate || ct !== 'web')) {
+    params.set('channel', ct);
+    params.set('mg', mg);
   }
-  if (spectatingCurrentGroup.value) params.set('spectate', '1');
+  if (spectate) params.set('spectate', '1');
   const qs = params.toString();
   if (qs) u += '?' + qs;
   return u;

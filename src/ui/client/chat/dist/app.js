@@ -17449,11 +17449,15 @@ function mergeIncomingMessages(messages) {
 function historyUrl(gid, tid) {
   let u5 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   const params = new URLSearchParams();
-  if (channelType.value && channelType.value !== "web" && messagingGroupId.value) {
-    params.set("channel", channelType.value);
-    params.set("mg", messagingGroupId.value);
+  const spectate = spectatingCurrentGroup.value;
+  const t4 = spectate ? threads.value.find((x5) => x5.threadId === tid) : null;
+  const ct = t4?.channelType || channelType.value;
+  const mg = t4?.messagingGroupId || messagingGroupId.value;
+  if (mg && (spectate || ct !== "web")) {
+    params.set("channel", ct);
+    params.set("mg", mg);
   }
-  if (spectatingCurrentGroup.value) params.set("spectate", "1");
+  if (spectate) params.set("spectate", "1");
   const qs = params.toString();
   if (qs) u5 += "?" + qs;
   return u5;
