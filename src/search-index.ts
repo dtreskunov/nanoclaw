@@ -229,7 +229,7 @@ export function searchMessages(query: string, opts: SearchOptions): SearchResult
          JOIN message_index mi ON mi.rowid = message_fts.rowid
          WHERE message_fts MATCH @query
            AND ${where}
-         ORDER BY rank
+         ORDER BY mi.timestamp DESC
          LIMIT @limit`,
       )
       .all(params) as SearchResultRow[];
