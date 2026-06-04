@@ -6,7 +6,7 @@ import { useRef, useEffect, useState } from 'preact/hooks';
 import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
-  spectatingCurrentGroup, highlightMessageId, searchQuery,
+  highlightMessageId, searchQuery,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
 import { renderMarkdown, rewriteFileLinks, highlightTextNodes, fmtBytesShort } from '../utils';
@@ -242,8 +242,7 @@ function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const isWeb = !channelType.value || channelType.value === 'web';
-  const spectating = spectatingCurrentGroup.value;
-  const showComposer = !spectating && (isWeb || canSend.value);
+  const showComposer = isWeb || canSend.value;
   // Web threads send over the WebSocket; if it isn't connected, block input
   // rather than silently dropping the message. Non-web channels post via
   // HTTP and don't care about chatStatus.
@@ -350,18 +349,15 @@ function Composer() {
 
 function ReadonlyBanner() {
   const isWeb = !channelType.value || channelType.value === 'web';
-  const spectating = spectatingCurrentGroup.value;
-  const showComposer = !spectating && (isWeb || canSend.value);
+  const showComposer = isWeb || canSend.value;
   if (showComposer) return <div class="readonly-banner" hidden></div>;
-  if (spectating) return <div class="readonly-banner">Spectator view — read-only. Toggle off “Show all” in the header to leave spectator mode.</div>;
   const meta = channelMeta(channelType.value);
   return <div class="readonly-banner">Read-only view — reply on {meta.label} to continue this thread.</div>;
 }
 
 function Subnotice() {
   const isWeb = !channelType.value || channelType.value === 'web';
-  const spectating = spectatingCurrentGroup.value;
-  const showComposer = !spectating && (isWeb || canSend.value);
+  const showComposer = isWeb || canSend.value;
   if (!(showComposer && !isWeb)) return <div class="chat-subnotice" hidden></div>;
   const meta = channelMeta(channelType.value);
   const t = threads.value.find((x) => x.threadId === threadId.value);

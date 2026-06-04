@@ -26,7 +26,6 @@ import {
   pinnedContext,
   pendingApprovals,
   respondingApprovalIds,
-  spectatingCurrentGroup,
   searchQuery,
   searchResults,
   searchLoading,
@@ -161,7 +160,6 @@ export async function searchThreads(gid: string, query: string): Promise<void> {
   searchQuery.value = query;
   try {
     let url = `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`;
-    if (spectatingCurrentGroup.value) url += '&spectate=1';
     const { results } = await api<{ results: SearchResult[] }>(url);
     searchResults.value = results ?? [];
   } catch (err) {
@@ -250,7 +248,6 @@ export async function runSync(): Promise<void> {
       params.set('channel', ct);
       params.set('mg', mg);
     }
-    if (spectatingCurrentGroup.value) params.set('spectate', '1');
   }
   let res: SyncResponse;
   try {
@@ -295,18 +292,15 @@ function mergeIncomingMessages(messages: ServerMessage[]): void {
 function historyUrl(gid: string, tid: string): string {
   let u = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   const params = new URLSearchParams();
-  const spectate = spectatingCurrentGroup.value;
-  // Spectator mode: look up the thread to get its owning mg/channel —
-  // the server defaults to the viewer's own web mg when no override is
-  // sent, which would miss the spectated thread's messages.
-  const t = spectate ? threads.value.find((x) => x.threadId === tid) : null;
+  // For non-web threads, look up the thread to get its owning mg/channel
+  // so the server can resolve the correct session DB.
+  const t = threads.value.find((x) => x.threadId === tid);
   const ct = t?.channelType || channelType.value;
   const mg = t?.messagingGroupId || messagingGroupId.value;
-  if (mg && (spectate || ct !== 'web')) {
+  if (mg && ct !== 'web') {
     params.set('channel', ct);
     params.set('mg', mg);
   }
-  if (spectate) params.set('spectate', '1');
   const qs = params.toString();
   if (qs) u += '?' + qs;
   return u;

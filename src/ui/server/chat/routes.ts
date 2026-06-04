@@ -414,10 +414,11 @@ function handleSync(ctx: Ctx, userId: string): void {
   const out: SyncResponse = { approvals: listApprovalsForUser(userId) };
   const gid = ctx.url.searchParams.get('gid') || '';
   if (gid && canAccessAgentGroup(userId, gid).allowed && getAgentGroup(gid)) {
-    // Spectator mode is owner/global-admin only — see canSpectate() in chat.ts.
-    const spectate = ctx.url.searchParams.get('spectate') === '1' && (isOwner(userId) || isGlobalAdmin(userId));
+    // Elevated users (owner/global admin) see every thread; others see
+    // only their own. No query-param gate — derived from user role.
+    const elevated = isOwner(userId) || isGlobalAdmin(userId);
     try {
-      out.threads = spectate ? listAllThreadsForAgentGroup(gid) : listAllThreadsForUser(userId, gid);
+      out.threads = elevated ? listAllThreadsForAgentGroup(gid) : listAllThreadsForUser(userId, gid);
     } catch (err) {
       log.warn('sync threads list failed', { userId, gid, err });
     }
@@ -426,13 +427,7 @@ function handleSync(ctx: Ctx, userId: string): void {
     const mg = ctx.url.searchParams.get('mg') || '';
     if (tid && channel && channel !== 'web' && mg) {
       try {
-        out.threadMessages = readChatHistory(
-          userId,
-          gid,
-          tid,
-          { channelType: channel, messagingGroupId: mg },
-          spectate,
-        );
+        out.threadMessages = readChatHistory(userId, gid, tid, { channelType: channel, messagingGroupId: mg });
       } catch (err) {
         log.warn('sync history read failed', { userId, gid, tid, err });
       }

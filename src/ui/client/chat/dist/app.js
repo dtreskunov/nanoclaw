@@ -15498,26 +15498,7 @@ if (typeof document !== "undefined") {
     document.body.classList.toggle("is-admin", isAdmin.value);
   });
 }
-var SHOW_ALL_KEY = "nc.showAllGroups";
-var initialShowAll = typeof localStorage !== "undefined" && localStorage.getItem(SHOW_ALL_KEY) === "1";
-var showAllGroups = y3(initialShowAll);
-if (typeof localStorage !== "undefined") {
-  j3(() => {
-    try {
-      if (showAllGroups.value) localStorage.setItem(SHOW_ALL_KEY, "1");
-      else localStorage.removeItem(SHOW_ALL_KEY);
-    } catch {
-    }
-  });
-}
 var isElevatedUser = y3(false);
-var spectatingCurrentGroup = g2(() => {
-  if (!showAllGroups.value) return false;
-  const id = groupId.value;
-  if (!id) return false;
-  const g6 = groups.value.find((x5) => x5.id === id);
-  return !!g6 && g6.hasContent === false;
-});
 var treePath = y3("");
 var filePath = y3(null);
 var treeEntries = y3([]);
@@ -15589,6 +15570,16 @@ var CHANNEL_META = {
 function channelMeta(ct) {
   return ct && CHANNEL_META[ct] || { label: ct || "Channel", icon: "\u2022" };
 }
+
+// src/brand.ts
+var g4 = globalThis.__BRAND__ ?? {};
+var BRAND = {
+  name: g4.name || "NanoClaw",
+  shortName: g4.shortName || g4.name || "NanoClaw",
+  description: g4.description || "",
+  themeColor: g4.themeColor || "#0d1117",
+  backgroundColor: g4.backgroundColor || "#0d1117"
+};
 
 // src/hash.ts
 var import_path_to_regexp = __toESM(require_dist(), 1);
@@ -16800,40 +16791,40 @@ Please report this to https://github.com/markedjs/marked.`, e4) {
   }
 };
 var z3 = new q2();
-function g4(l7, e4) {
+function g5(l7, e4) {
   return z3.parse(l7, e4);
 }
-g4.options = g4.setOptions = function(l7) {
-  return z3.setOptions(l7), g4.defaults = z3.defaults, N2(g4.defaults), g4;
+g5.options = g5.setOptions = function(l7) {
+  return z3.setOptions(l7), g5.defaults = z3.defaults, N2(g5.defaults), g5;
 };
-g4.getDefaults = M2;
-g4.defaults = T3;
-g4.use = function(...l7) {
-  return z3.use(...l7), g4.defaults = z3.defaults, N2(g4.defaults), g4;
+g5.getDefaults = M2;
+g5.defaults = T3;
+g5.use = function(...l7) {
+  return z3.use(...l7), g5.defaults = z3.defaults, N2(g5.defaults), g5;
 };
-g4.walkTokens = function(l7, e4) {
+g5.walkTokens = function(l7, e4) {
   return z3.walkTokens(l7, e4);
 };
-g4.parseInline = z3.parseInline;
-g4.Parser = b3;
-g4.parser = b3.parse;
-g4.Renderer = y4;
-g4.TextRenderer = L2;
-g4.Lexer = x4;
-g4.lexer = x4.lex;
-g4.Tokenizer = w4;
-g4.Hooks = P2;
-g4.parse = g4;
-var Ft = g4.options;
-var Ut = g4.setOptions;
-var Kt = g4.use;
-var Wt = g4.walkTokens;
-var Xt = g4.parseInline;
+g5.parseInline = z3.parseInline;
+g5.Parser = b3;
+g5.parser = b3.parse;
+g5.Renderer = y4;
+g5.TextRenderer = L2;
+g5.Lexer = x4;
+g5.lexer = x4.lex;
+g5.Tokenizer = w4;
+g5.Hooks = P2;
+g5.parse = g5;
+var Ft = g5.options;
+var Ut = g5.setOptions;
+var Kt = g5.use;
+var Wt = g5.walkTokens;
+var Xt = g5.parseInline;
 var Vt = b3.parse;
 var Yt = x4.lex;
 
 // src/utils.ts
-g4.use({
+g5.use({
   renderer: {
     link({ href, title, tokens }) {
       const text = this.parser.parseInline(tokens);
@@ -16844,7 +16835,7 @@ g4.use({
     }
   }
 });
-g4.use({
+g5.use({
   extensions: [
     {
       name: "msgRef",
@@ -16926,7 +16917,7 @@ function normalizeFileLinks(text) {
 }
 function renderMarkdown(text) {
   try {
-    return g4.parse(normalizeFileLinks(text || ""), { breaks: true, gfm: true });
+    return g5.parse(normalizeFileLinks(text || ""), { breaks: true, gfm: true });
   } catch {
     return null;
   }
@@ -17444,7 +17435,6 @@ async function searchThreads(gid, query) {
   searchQuery.value = query;
   try {
     let url = `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`;
-    if (spectatingCurrentGroup.value) url += "&spectate=1";
     const { results } = await api(url);
     searchResults.value = results ?? [];
   } catch (err) {
@@ -17508,7 +17498,6 @@ async function runSync() {
       params.set("channel", ct);
       params.set("mg", mg);
     }
-    if (spectatingCurrentGroup.value) params.set("spectate", "1");
   }
   let res;
   try {
@@ -17543,15 +17532,13 @@ function mergeIncomingMessages(messages) {
 function historyUrl(gid, tid) {
   let u5 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   const params = new URLSearchParams();
-  const spectate = spectatingCurrentGroup.value;
-  const t4 = spectate ? threads.value.find((x5) => x5.threadId === tid) : null;
+  const t4 = threads.value.find((x5) => x5.threadId === tid);
   const ct = t4?.channelType || channelType.value;
   const mg = t4?.messagingGroupId || messagingGroupId.value;
-  if (mg && (spectate || ct !== "web")) {
+  if (mg && ct !== "web") {
     params.set("channel", ct);
     params.set("mg", mg);
   }
-  if (spectate) params.set("spectate", "1");
   const qs = params.toString();
   if (qs) u5 += "?" + qs;
   return u5;
@@ -18052,30 +18039,43 @@ async function respondApproval(approvalId, value) {
   }
 }
 
-// src/brand.ts
-var g5 = globalThis.__BRAND__ ?? {};
-var BRAND = {
-  name: g5.name || "NanoClaw",
-  shortName: g5.shortName || g5.name || "NanoClaw",
-  description: g5.description || "",
-  themeColor: g5.themeColor || "#0d1117",
-  backgroundColor: g5.backgroundColor || "#0d1117"
-};
+// src/components/GroupPicker.tsx
+function GroupStrip() {
+  const elevated = isElevatedUser.value;
+  const visible = elevated ? groups.value : groups.value.filter((g6) => g6.hasContent !== false);
+  nowTick.value;
+  const pick = (gid) => {
+    if (gid !== groupId.value) selectGroup(gid).catch(console.error);
+  };
+  return /* @__PURE__ */ u4("nav", { class: "group-strip", role: "tablist", "aria-label": "Agent groups", children: visible.map((g6) => {
+    const active = g6.id === groupId.value;
+    const isAdminOnly = elevated && g6.hasContent === false;
+    const parts = [];
+    if (!g6.isAdmin) parts.push("\u{1F512}");
+    if (isAdminOnly) parts.push("\u{1F441}");
+    if (g6.lastActivityAt) parts.push(fmtRelative(g6.lastActivityAt));
+    const subtitle = parts.join(" \xB7 ");
+    return /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        role: "tab",
+        "aria-selected": active,
+        class: `group-chip${active ? " active" : ""}${isAdminOnly ? " admin-only" : ""}`,
+        title: isAdminOnly ? `Visible to you as admin${g6.lastActivityAt ? " \xB7 " + fmtAbsolute(g6.lastActivityAt) : ""}` : g6.lastActivityAt ? fmtAbsolute(g6.lastActivityAt) : "",
+        onClick: () => pick(g6.id),
+        children: [
+          /* @__PURE__ */ u4("span", { class: "chip-name", children: g6.name }),
+          subtitle ? /* @__PURE__ */ u4("span", { class: "chip-sub", children: subtitle }) : null
+        ]
+      },
+      g6.id
+    );
+  }) });
+}
 
 // src/components/Header.tsx
 function Header() {
-  const onChange = (e4) => {
-    selectGroup(e4.currentTarget.value).catch(console.error);
-  };
-  const readOnlyHint = "\u{1F512} Read-only \u2014 you don\u2019t have admin rights in this group, so you can\u2019t upload, rename or delete files.";
-  const showAll = showAllGroups.value;
-  const visibleGroups = groups.value.filter((g6) => {
-    if (showAll) return true;
-    if (g6.hasContent !== false) return true;
-    if (g6.id === groupId.value) return true;
-    return false;
-  });
-  const hiddenCount = groups.value.length - visibleGroups.length;
   return /* @__PURE__ */ u4("header", { children: [
     /* @__PURE__ */ u4(
       "button",
@@ -18091,35 +18091,7 @@ function Header() {
       }
     ),
     /* @__PURE__ */ u4("span", { class: "brand", children: BRAND.name }),
-    /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: visibleGroups.map((g6) => /* @__PURE__ */ u4("option", { value: g6.id, children: [
-      g6.isAdmin ? "" : "\u{1F512} ",
-      g6.name
-    ] }, g6.id)) }),
-    isElevatedUser.value ? /* @__PURE__ */ u4(
-      "label",
-      {
-        class: "show-all-toggle desktop-only",
-        title: showAll ? "Showing every accessible group. Toggle off to hide groups you have no threads in." : `Show every accessible group${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}.`,
-        children: [
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              type: "checkbox",
-              checked: showAll,
-              onChange: (e4) => {
-                showAllGroups.value = e4.currentTarget.checked;
-              }
-            }
-          ),
-          /* @__PURE__ */ u4("span", { class: "label", children: "Show all" })
-        ]
-      }
-    ) : null,
-    !isAdmin.value && groupId.value ? /* @__PURE__ */ u4("span", { class: "readonly-badge", title: readOnlyHint, "aria-label": readOnlyHint, children: [
-      /* @__PURE__ */ u4("span", { "aria-hidden": "true", children: "\u{1F512}" }),
-      /* @__PURE__ */ u4("span", { class: "desktop-only", children: "Read-only" })
-    ] }) : null,
-    /* @__PURE__ */ u4("div", { class: "spacer" }),
+    /* @__PURE__ */ u4(GroupStrip, {}),
     /* @__PURE__ */ u4(
       "button",
       {
@@ -18756,8 +18728,7 @@ function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
   const isWeb = !channelType.value || channelType.value === "web";
-  const spectating = spectatingCurrentGroup.value;
-  const showComposer = !spectating && (isWeb || canSend.value);
+  const showComposer = isWeb || canSend.value;
   const wsDown = isWeb && chatStatus.value !== "connected";
   const autosize = () => {
     const el = inputRef.current;
@@ -18853,10 +18824,8 @@ function Composer() {
 }
 function ReadonlyBanner() {
   const isWeb = !channelType.value || channelType.value === "web";
-  const spectating = spectatingCurrentGroup.value;
-  const showComposer = !spectating && (isWeb || canSend.value);
+  const showComposer = isWeb || canSend.value;
   if (showComposer) return /* @__PURE__ */ u4("div", { class: "readonly-banner", hidden: true });
-  if (spectating) return /* @__PURE__ */ u4("div", { class: "readonly-banner", children: "Spectator view \u2014 read-only. Toggle off \u201CShow all\u201D in the header to leave spectator mode." });
   const meta = channelMeta(channelType.value);
   return /* @__PURE__ */ u4("div", { class: "readonly-banner", children: [
     "Read-only view \u2014 reply on ",
@@ -18866,8 +18835,7 @@ function ReadonlyBanner() {
 }
 function Subnotice() {
   const isWeb = !channelType.value || channelType.value === "web";
-  const spectating = spectatingCurrentGroup.value;
-  const showComposer = !spectating && (isWeb || canSend.value);
+  const showComposer = isWeb || canSend.value;
   if (!(showComposer && !isWeb)) return /* @__PURE__ */ u4("div", { class: "chat-subnotice", hidden: true });
   const meta = channelMeta(channelType.value);
   const t4 = threads.value.find((x5) => x5.threadId === threadId.value);

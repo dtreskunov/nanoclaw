@@ -32,49 +32,11 @@ if (typeof document !== 'undefined') {
 }
 
 /**
- * "Show all (admin)" toggle. When false (default), the dropdown filters
- * out groups the viewer has no messaging context in. When true, every
- * accessible group is listed and `?spectate=1` is appended to threads
- * + history fetches so admins can see content they don't own.
- *
- * Persisted to localStorage so the toggle survives reloads. Surfaced
- * only when the user holds admin privilege on at least one group.
- */
-const SHOW_ALL_KEY = 'nc.showAllGroups';
-const initialShowAll = typeof localStorage !== 'undefined' && localStorage.getItem(SHOW_ALL_KEY) === '1';
-export const showAllGroups: Signal<boolean> = signal<boolean>(initialShowAll);
-if (typeof localStorage !== 'undefined') {
-  effect(() => {
-    try {
-      if (showAllGroups.value) localStorage.setItem(SHOW_ALL_KEY, '1');
-      else localStorage.removeItem(SHOW_ALL_KEY);
-    } catch {
-      /* private mode etc. */
-    }
-  });
-}
-
-/**
  * True only for global owners / global admins (server-reported via
- * `/api/me`). Group-level admins are NOT elevated. Drives visibility
- * of the "Show all" dropdown toggle, which in turn enables spectator
- * mode (`?spectate=1`) on threads + history fetches — a privilege
- * the server gates with the same check.
+ * `/api/me`). Group-level admins are NOT elevated. Controls group
+ * picker visibility of admin-only groups.
  */
 export const isElevatedUser: Signal<boolean> = signal<boolean>(false);
-
-/**
- * Effective spectate flag: true when the user enabled "Show all" AND
- * the current group is one they don't own messaging context in. Used
- * by sync/history/threads fetches to append `?spectate=1`.
- */
-export const spectatingCurrentGroup: ReadonlySignal<boolean> = computed(() => {
-  if (!showAllGroups.value) return false;
-  const id = groupId.value;
-  if (!id) return false;
-  const g = groups.value.find((x) => x.id === id);
-  return !!g && g.hasContent === false;
-});
 
 // File browser
 export const treePath: Signal<string> = signal('');

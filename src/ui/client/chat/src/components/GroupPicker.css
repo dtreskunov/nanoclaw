@@ -1,0 +1,39 @@
+/* Horizontally scrollable group strip. */
+
+.group-strip {
+  display: flex; align-items: stretch; gap: 2px;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+  flex: 1; min-width: 0;
+  padding: 0 4px;
+}
+.group-strip::-webkit-scrollbar { display: none; }
+
+.group-chip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4px 12px; border: 0; border-radius: 4px;
+  background: transparent; color: inherit; cursor: pointer;
+  font-family: inherit; white-space: nowrap; flex-shrink: 0;
+  border-bottom: 2px solid transparent;
+  transition: background 0.1s;
+}
+.group-chip:hover { background: var(--wash); }
+.group-chip.active {
+  border-bottom-color: currentColor;
+  background: var(--wash-subtle);
+}
+.group-chip.admin-only { opacity: 0.6; }
+
+.chip-name { font-size: 13px; font-weight: 500; line-height: 1.3; }
+.chip-sub {
+  font-size: 10px; line-height: 1.2;
+  color: var(--muted); letter-spacing: 0.01em;
+}
+
+@media (max-width: 720px) {
+  .group-strip { gap: 0; padding: 0 2px; }
+  .group-chip { padding: 6px 10px; min-height: 44px; }
+  .chip-name { font-size: 14px; }
+  .chip-sub { font-size: 11px; }
+}

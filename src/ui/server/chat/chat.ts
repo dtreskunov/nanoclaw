@@ -34,13 +34,13 @@ import { getIdentitiesForUser } from '../../../modules/permissions/db/identities
 import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
 
 /**
- * Spectator mode (cross-user thread listing + history) is reserved
+ * Elevated access (cross-user thread listing + history) is reserved
  * for global owners/admins. Group-level admins still have full admin
  * rights on their own group (file write, approvals, etc.) but cannot
- * peek into other users' DM threads via `?spectate=1` — that would
- * leak content across the per-user boundary inside a group.
+ * peek into other users' DM threads — that would leak content across
+ * the per-user boundary inside a group.
  */
-function canSpectate(userId: string): boolean {
+function isElevated(userId: string): boolean {
   return isOwner(userId) || isGlobalAdmin(userId);
 }
 import { log } from '../../../log.js';
@@ -382,9 +382,8 @@ export async function handleChatRequest(
     const qChannel = q.get('channel') || undefined;
     const qMg = q.get('mg') || undefined;
     const override = qChannel && qMg ? { channelType: qChannel, messagingGroupId: qMg } : undefined;
-    const spectate = q.get('spectate') === '1' && canSpectate(userId);
     try {
-      const messages = readChatHistory(userId, m.groupId, m.threadId, override, spectate);
+      const messages = readChatHistory(userId, m.groupId, m.threadId, override);
       writeJson(res, 200, { messages });
     } catch (err) {
       log.warn('web chat history read failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
@@ -399,12 +398,11 @@ export async function handleChatRequest(
       return true;
     }
     try {
-      // Spectator mode: admins/owners can list every thread in the
-      // group, not just their own. Silently ignored for non-admins so
-      // the response shape stays consistent.
-      const q = new URLSearchParams((req.url || '').split('?')[1] || '');
-      const spectator = q.get('spectate') === '1' && canSpectate(userId);
-      const threads = spectator ? listAllThreadsForAgentGroup(m.groupId) : listAllThreadsForUser(userId, m.groupId);
+      // Elevated users (owner/global admin) see every thread in the
+      // group; everyone else sees only their own.
+      const threads = isElevated(userId)
+        ? listAllThreadsForAgentGroup(m.groupId)
+        : listAllThreadsForUser(userId, m.groupId);
       writeJson(res, 200, { threads });
     } catch (err) {
       log.warn('web chat threads list failed', { userId, groupId: m.groupId, err });
@@ -425,13 +423,18 @@ export async function handleChatRequest(
       return true;
     }
     try {
-      // Collect accessible messaging group IDs for this user in this agent group.
-      const contexts = listUserMessagingContexts(userId, m.groupId);
-      const mgIds = contexts.map((c) => c.messagingGroupId).filter(Boolean) as string[];
-      const spectator = q.get('spectate') === '1' && canSpectate(userId);
+      // Elevated users search all messaging groups; everyone else is
+      // scoped to their own contexts.
+      const elevated = isElevated(userId);
+      let mgIds: string[] | undefined;
+      if (!elevated) {
+        const contexts = listUserMessagingContexts(userId, m.groupId);
+        const ids = contexts.map((c) => c.messagingGroupId).filter(Boolean) as string[];
+        mgIds = ids.length > 0 ? ids : ['__none__'];
+      }
       const results = searchMessages(query, {
         agentGroupId: m.groupId,
-        messagingGroupIds: spectator ? undefined : mgIds.length > 0 ? mgIds : ['__none__'],
+        messagingGroupIds: mgIds,
       });
       writeJson(res, 200, { results });
     } catch (err) {
@@ -476,38 +479,38 @@ export interface HistoryMessage {
  * `override` lets the caller target a non-web messaging group; without it
  * defaults to the per-user web messaging group (legacy behavior).
  *
- * `spectate` (admin-only — route gates on hasAdminPrivilege) skips the
- * userOwnsMessagingGroup check so admins can read history of threads
- * they don't participate in. The DM viewer-handle scoping is also
- * skipped so threadless DMs come through in full.
+ * For elevated users (owner/global admin), the ownership check on the
+ * target messaging group is skipped so they can read history of threads
+ * they don't participate in. DM viewer-handle scoping is also skipped
+ * so threadless DMs come through in full.
  */
 export function readChatHistory(
   userId: string,
   groupId: string,
   threadId: string,
   override?: { channelType: string; messagingGroupId: string },
-  spectate?: boolean,
 ): HistoryMessage[] {
-  const target = resolveTargetMessagingGroup(userId, groupId, override, !!spectate);
+  const elevated = isElevated(userId);
+  const target = resolveTargetMessagingGroup(userId, groupId, override, elevated);
   if (!target) return [];
   // Threadless DM rooms (e.g. Telegram 1:1) use a synthetic `__dm:<mg>`
   // threadId. The session-lookup wants thread_id=null and the message
   // queries need `thread_id IS NULL`. We also scope by the viewer's
   // platform_id(s) so DMs from other users sharing the mg don't leak —
-  // unless spectator mode is on, in which case all DMs in the mg are
+  // unless the viewer is elevated, in which case all DMs in the mg are
   // returned.
   const isDm = threadId.startsWith('__dm:');
   const session = resolveSessionForMode(groupId, target.messagingGroupId, target.sessionMode, isDm ? '' : threadId);
   if (!session) return [];
-  const viewerHandles = isDm && !spectate ? viewerHandlesForChannel(userId, target.channelType) : [];
-  if (isDm && !spectate && viewerHandles.length === 0) return [];
+  const viewerHandles = isDm && !elevated ? viewerHandlesForChannel(userId, target.channelType) : [];
+  if (isDm && !elevated && viewerHandles.length === 0) return [];
 
   const messages: HistoryMessage[] = [];
   try {
     const inDb = openInboundDb(groupId, session.id);
     try {
       let rows: { id: string; timestamp: string; content: string }[];
-      if (isDm && spectate) {
+      if (isDm && elevated) {
         rows = inDb
           .prepare(
             'SELECT id, timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id IS NULL ORDER BY seq',
@@ -596,26 +599,26 @@ export function readChatHistory(
  * Resolve the (channelType, messagingGroupId, sessionMode) the user is
  * targeting. If `override` is provided, authorize that user is the
  * counterparty of that messaging group (web ownership or `user_dms`
- * entry). Returns null on auth failure or unknown mg.
+ * entry). Elevated users skip the ownership check. Returns null on
+ * auth failure or unknown mg.
  */
 function resolveTargetMessagingGroup(
   userId: string,
   agentGroupId: string,
   override: { channelType: string; messagingGroupId: string } | undefined,
-  spectate: boolean,
+  elevated: boolean,
 ): { channelType: string; messagingGroupId: string; sessionMode: 'per-thread' | 'shared' | 'agent-shared' } | null {
   if (!override) {
-    // Spectator mode without an explicit mg defaults to the admin's own
-    // web mg (if any) — they can specify a different mg via override to
-    // peek at someone else's thread.
+    // Without an explicit mg, default to the viewer's own web mg (if any)
+    // — elevated users can specify a different mg via override to peek at
+    // someone else's thread.
     const platformId = platformIdFor(userId, agentGroupId);
     const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
     if (!mg) return null;
     return { channelType: WEB_CHANNEL_TYPE, messagingGroupId: mg.id, sessionMode: 'per-thread' };
   }
-  // Override path: require ownership unless the caller is in spectator
-  // mode (route handler must have already gated on hasAdminPrivilege).
-  if (!spectate && !userOwnsMessagingGroup(userId, agentGroupId, override.channelType, override.messagingGroupId)) {
+  // Override path: require ownership unless the caller is elevated.
+  if (!elevated && !userOwnsMessagingGroup(userId, agentGroupId, override.channelType, override.messagingGroupId)) {
     return null;
   }
   const mga = getMessagingGroupAgentByPair(override.messagingGroupId, agentGroupId);

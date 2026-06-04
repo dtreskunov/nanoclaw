@@ -131,49 +131,6 @@ header .brand {
   font-weight: 600;
   white-space: nowrap;
 }
-header select {
-  font: inherit;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  max-width: 280px;
-}
-header .spacer {
-  flex: 1;
-}
-header .readonly-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  white-space: nowrap;
-  cursor: help;
-  flex-shrink: 0;
-}
-header .show-all-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  flex-shrink: 0;
-}
-header .show-all-toggle input[type=checkbox] {
-  margin: 0;
-  cursor: pointer;
-}
-header .show-all-toggle .label {
-  letter-spacing: 0.02em;
-}
 header .mobile-only {
   display: none;
 }
@@ -193,14 +150,6 @@ header .mobile-only {
   header .spacer {
     display: none !important;
   }
-  header select {
-    flex: 1;
-    min-width: 0;
-    max-width: none;
-    min-height: 44px;
-    height: 44px;
-    font-size: 15px;
-  }
   header .icon-btn {
     min-width: 44px;
     min-height: 44px;
@@ -211,6 +160,77 @@ header .mobile-only {
     align-items: center;
     justify-content: center;
     line-height: 1;
+  }
+}
+
+/* src/components/GroupPicker.css */
+.group-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
+}
+.group-strip::-webkit-scrollbar {
+  display: none;
+}
+.group-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-bottom: 2px solid transparent;
+  transition: background 0.1s;
+}
+.group-chip:hover {
+  background: var(--wash);
+}
+.group-chip.active {
+  border-bottom-color: currentColor;
+  background: var(--wash-subtle);
+}
+.group-chip.admin-only {
+  opacity: 0.6;
+}
+.chip-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.chip-sub {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+@media (max-width: 720px) {
+  .group-strip {
+    gap: 0;
+    padding: 0 2px;
+  }
+  .group-chip {
+    padding: 6px 10px;
+    min-height: 44px;
+  }
+  .chip-name {
+    font-size: 14px;
+  }
+  .chip-sub {
+    font-size: 11px;
   }
 }
 
