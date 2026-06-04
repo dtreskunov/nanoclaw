@@ -148,6 +148,10 @@ export function indexMessage(msg: IndexableMessage): void {
   const suffix = msg.agentGroupId ? `:${msg.agentGroupId}` : '';
   const id = suffix && msg.id.endsWith(suffix) ? msg.id.slice(0, -suffix.length) : msg.id;
 
+  // Normalize timestamp to "YYYY-MM-DD HH:MM:SS" so mixed ISO/space formats
+  // sort correctly (T > space in ASCII breaks ordering within the same day).
+  const ts = msg.timestamp.replace('T', ' ').replace(/\.\d+Z$/, '').replace(/Z$/, '');
+
   try {
     getSearchDb()
       .prepare(
@@ -163,7 +167,7 @@ export function indexMessage(msg: IndexableMessage): void {
         channelType: msg.channelType,
         threadId: msg.threadId,
         direction: msg.direction,
-        timestamp: msg.timestamp,
+        timestamp: ts,
         text: msg.text,
         senderUserId: msg.senderUserId ?? null,
       });
