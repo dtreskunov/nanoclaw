@@ -17471,6 +17471,7 @@ function clearChat() {
     channelType.value = "web";
     messagingGroupId.value = null;
     canSend.value = true;
+    highlightMessageId.value = null;
   });
   if (refs.ws) {
     try {
@@ -18698,15 +18699,10 @@ function ApprovalsBanner() {
 function MessageLog() {
   const ref = A2(null);
   const appliedHighlightRef = A2(null);
-  const clearTimerRef = A2(null);
   const highlight = highlightMessageId.value;
   y2(() => {
     if (!ref.current) return;
     if (highlight) {
-      if (clearTimerRef.current) {
-        clearTimeout(clearTimerRef.current);
-        clearTimerRef.current = null;
-      }
       if (appliedHighlightRef.current && appliedHighlightRef.current !== highlight) {
         appliedHighlightRef.current = null;
       }
@@ -18716,11 +18712,6 @@ function MessageLog() {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.classList.add("highlight-pulse");
         setTimeout(() => el.classList.remove("highlight-pulse"), 2e3);
-        clearTimerRef.current = setTimeout(() => {
-          highlightMessageId.value = null;
-          appliedHighlightRef.current = null;
-          clearTimerRef.current = null;
-        }, 2100);
       }
     } else {
       appliedHighlightRef.current = null;

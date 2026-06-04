@@ -160,16 +160,10 @@ function ApprovalsBanner() {
 function MessageLog() {
   const ref = useRef<HTMLDivElement | null>(null);
   const appliedHighlightRef = useRef<string | null>(null);
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const highlight = highlightMessageId.value;
   useEffect(() => {
     if (!ref.current) return;
     if (highlight) {
-      // Cancel any pending clear from a previous highlight.
-      if (clearTimerRef.current) {
-        clearTimeout(clearTimerRef.current);
-        clearTimerRef.current = null;
-      }
       // If the highlight changed, reset so we can apply the new one.
       if (appliedHighlightRef.current && appliedHighlightRef.current !== highlight) {
         appliedHighlightRef.current = null;
@@ -180,12 +174,8 @@ function MessageLog() {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('highlight-pulse');
         setTimeout(() => el.classList.remove('highlight-pulse'), 2000);
-        clearTimerRef.current = setTimeout(() => {
-          highlightMessageId.value = null;
-          appliedHighlightRef.current = null;
-          clearTimerRef.current = null;
-        }, 2100);
       }
+      // While a highlight is active (pending or applied), don't scroll to bottom.
     } else {
       appliedHighlightRef.current = null;
       ref.current.scrollTop = ref.current.scrollHeight;

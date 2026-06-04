@@ -191,6 +191,7 @@ export function clearChat(): void {
     channelType.value = 'web';
     messagingGroupId.value = null;
     canSend.value = true;
+    highlightMessageId.value = null;
   });
   if (refs.ws) {
     try {
