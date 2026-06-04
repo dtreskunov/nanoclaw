@@ -18515,7 +18515,8 @@ function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
   const isWeb = !channelType.value || channelType.value === "web";
-  const showComposer = isWeb || canSend.value;
+  const spectating = spectatingCurrentGroup.value;
+  const showComposer = !spectating && (isWeb || canSend.value);
   const wsDown = isWeb && chatStatus.value !== "connected";
   const autosize = () => {
     const el = inputRef.current;
@@ -18611,8 +18612,10 @@ function Composer() {
 }
 function ReadonlyBanner() {
   const isWeb = !channelType.value || channelType.value === "web";
-  const showComposer = isWeb || canSend.value;
+  const spectating = spectatingCurrentGroup.value;
+  const showComposer = !spectating && (isWeb || canSend.value);
   if (showComposer) return /* @__PURE__ */ u4("div", { class: "readonly-banner", hidden: true });
+  if (spectating) return /* @__PURE__ */ u4("div", { class: "readonly-banner", children: "Spectator view \u2014 read-only. Toggle off \u201CShow all\u201D in the header to leave spectator mode." });
   const meta = channelMeta(channelType.value);
   return /* @__PURE__ */ u4("div", { class: "readonly-banner", children: [
     "Read-only view \u2014 reply on ",
@@ -18622,7 +18625,8 @@ function ReadonlyBanner() {
 }
 function Subnotice() {
   const isWeb = !channelType.value || channelType.value === "web";
-  const showComposer = isWeb || canSend.value;
+  const spectating = spectatingCurrentGroup.value;
+  const showComposer = !spectating && (isWeb || canSend.value);
   if (!(showComposer && !isWeb)) return /* @__PURE__ */ u4("div", { class: "chat-subnotice", hidden: true });
   const meta = channelMeta(channelType.value);
   const t4 = threads.value.find((x5) => x5.threadId === threadId.value);

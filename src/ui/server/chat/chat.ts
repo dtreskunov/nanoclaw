@@ -339,6 +339,20 @@ export async function handleChatRequest(
 
     ensureWebMessagingGroup(userId, m.groupId);
     const platformId = platformIdFor(userId, m.groupId);
+    // Spectator guard: if a session already exists for this (agentGroup,
+    // threadId) under a different mg, the sender is trying to write into
+    // someone else's thread. Refuse rather than minting a polluting
+    // session in the sender's mg with a borrowed thread UUID. (Cross-
+    // channel sends are already guarded by userOwnsMessagingGroup inside
+    // sendViaChannelAdapter.)
+    const senderMg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+    const existing = getDb()
+      .prepare('SELECT messaging_group_id FROM sessions WHERE agent_group_id = ? AND thread_id = ? LIMIT 1')
+      .get(m.groupId, m.threadId) as { messaging_group_id: string } | undefined;
+    if (existing && (!senderMg || existing.messaging_group_id !== senderMg.id)) {
+      writeJson(res, 403, { error: 'not_owner_of_thread' });
+      return true;
+    }
     try {
       const id = await submitWebInbound({
         userId,
