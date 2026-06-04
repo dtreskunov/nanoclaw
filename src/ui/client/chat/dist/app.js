@@ -17443,9 +17443,9 @@ async function searchThreads(gid, query) {
   searchLoading.value = true;
   searchQuery.value = query;
   try {
-    const { results } = await api(
-      `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`
-    );
+    let url = `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`;
+    if (spectatingCurrentGroup.value) url += "&spectate=1";
+    const { results } = await api(url);
     searchResults.value = results ?? [];
   } catch (err) {
     console.error("search failed", err);

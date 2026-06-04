@@ -160,9 +160,9 @@ export async function searchThreads(gid: string, query: string): Promise<void> {
   searchLoading.value = true;
   searchQuery.value = query;
   try {
-    const { results } = await api<{ results: SearchResult[] }>(
-      `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`,
-    );
+    let url = `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`;
+    if (spectatingCurrentGroup.value) url += '&spectate=1';
+    const { results } = await api<{ results: SearchResult[] }>(url);
     searchResults.value = results ?? [];
   } catch (err) {
     console.error('search failed', err);
