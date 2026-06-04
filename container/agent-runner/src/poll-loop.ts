@@ -535,6 +535,40 @@ async function processQuery(
     (getOutboundDb().prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM messages_out').get() as { m: number }).m;
   let outboundMaxAtTurnStart = currentOutboundMax();
 
+  /**
+   * Count outbound rows written this turn that represent a real user-facing
+   * reply (text, file, or any non-operation chat content) vs operation-only
+   * rows (reactions, edits) and web-only internal-thought rows.
+   *
+   * A reaction or edit is NOT a substitute for answering the user; if the
+   * agent only reacts and then leaves its final-result text unwrapped, the
+   * nudge path must still fire so the answer isn't silently dropped.
+   */
+  const countTurnContentMessages = (since: number): number => {
+    const rows = getOutboundDb()
+      .prepare('SELECT kind, content FROM messages_out WHERE seq > ?')
+      .all(since) as { kind: string; content: string }[];
+    let n = 0;
+    for (const r of rows) {
+      // kind='internal' is the web thought-bubble surfaced by dispatchResultText
+      // from <internal>...</internal> blocks — not a reply.
+      if (r.kind === 'internal') continue;
+      // chat-kind rows can carry either content (text/markdown/files) or a
+      // bare operation (reaction/edit). Only the former counts as a reply.
+      if (r.kind === 'chat') {
+        let parsed: { operation?: unknown; text?: unknown; markdown?: unknown; files?: unknown } | null = null;
+        try {
+          parsed = JSON.parse(r.content) as typeof parsed;
+        } catch {
+          parsed = null;
+        }
+        if (parsed && parsed.operation && !parsed.text && !parsed.markdown && !parsed.files) continue;
+      }
+      n++;
+    }
+    return n;
+  };
+
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open avoids
   // re-spawning the SDK subprocess (~few seconds) and re-loading the .jsonl
@@ -723,16 +757,21 @@ async function processQuery(
         // at all — either way the turn is finished.
         markCompleted(initialBatchIds);
         if (event.text) {
-          // If the agent already wrote outbound rows this turn via MCP
-          // tools (send_message / send_file / send_email), treat any
-          // unwrapped final-result text as conversational scratchpad and
-          // skip the <message>-wrap nudge. Otherwise the agent's polite
-          // "sent!" confirmation gets force-wrapped and delivered as a
-          // duplicate message.
-          const mcpWroteSomething = currentOutboundMax() > outboundMaxAtTurnStart;
+          // If the agent already wrote a real user-facing reply this turn
+          // via MCP tools (send_message / send_file), treat any unwrapped
+          // final-result text as conversational scratchpad and skip the
+          // <message>-wrap nudge. Otherwise the agent's polite "sent!"
+          // confirmation gets force-wrapped and delivered as a duplicate.
+          //
+          // Operation-only rows (add_reaction, edit_message) do NOT count
+          // here — a reaction is not a substitute for answering the user.
+          // Without this distinction, a weaker model that reacts ✅ and
+          // then leaves its actual answer unwrapped would have the nudge
+          // suppressed and the answer silently dropped.
+          const mcpWroteReply = countTurnContentMessages(outboundMaxAtTurnStart) > 0;
           const { sent, hasUnwrapped } = dispatchResultText(event.text, routing);
           if (sent > 0) sentAny = true;
-          if (mcpWroteSomething) {
+          if (mcpWroteReply) {
             sentAny = true;
           } else if (hasUnwrapped && !unwrappedNudged) {
             unwrappedNudged = true;

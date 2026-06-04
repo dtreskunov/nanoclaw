@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
 import { initTestSessionDb, closeSessionDb, getInboundDb, getOutboundDb } from './db/connection.js';
-import { getUndeliveredMessages } from './db/messages-out.js';
+import { getUndeliveredMessages, writeMessageOut } from './db/messages-out.js';
 import { getPendingMessages } from './db/messages-in.js';
 import { getContinuation, setContinuation } from './db/session-state.js';
 import { MockProvider } from './providers/mock.js';
@@ -266,6 +266,60 @@ describe('poll loop integration', () => {
     const out = getUndeliveredMessages();
     expect(out).toHaveLength(1);
     expect(JSON.parse(out[0].content).text).toBe('answer');
+
+    await loopPromise.catch(() => {});
+  });
+
+  it('reaction-only MCP write does NOT suppress the unwrapped-text nudge', async () => {
+    // Regression for: a weaker model that reacts ✅ and then leaves its
+    // actual answer unwrapped used to have the nudge suppressed (because
+    // any MCP write counted as "the agent already replied"). Result was
+    // silent dropping of the answer. After the fix, operation-only rows
+    // (kind='chat' with {operation: 'reaction'}) do NOT count, the nudge
+    // fires, and the model gets a chance to re-wrap on the next turn.
+    insertMessage('m1', { sender: 'Alice', text: 'what model?' }, { platformId: 'chan-1', channelType: 'discord' });
+
+    let turn = 0;
+    const provider = new MockProvider({}, (prompt) => {
+      turn++;
+      if (turn === 1) {
+        // Simulate add_reaction firing mid-turn alongside unwrapped text.
+        writeMessageOut({
+          id: `reaction-${Date.now()}`,
+          kind: 'chat',
+          platform_id: 'chan-1',
+          channel_type: 'discord',
+          thread_id: null,
+          content: JSON.stringify({ operation: 'reaction', messageId: '1', emoji: 'white_check_mark' }),
+        });
+        return "I'm powered by deepseek-v3.1";  // BARE TEXT — no wrapping
+      }
+      // Verify the nudge actually arrived in the follow-up prompt.
+      expect(prompt).toContain('was not delivered');
+      return '<message to="discord-test">I\'m powered by deepseek-v3.1</message>';
+    });
+    const controller = new AbortController();
+    const loopPromise = runPollLoopWithTimeout(provider, controller.signal, 3000);
+
+    // Wait for the recovered text reply (separate from the reaction row).
+    await waitFor(
+      () => getUndeliveredMessages().some((m) => {
+        try {
+          const c = JSON.parse(m.content) as { text?: string };
+          return typeof c.text === 'string' && c.text.includes('deepseek');
+        } catch { return false; }
+      }),
+      3000,
+    );
+    controller.abort();
+
+    const out = getUndeliveredMessages();
+    const textRow = out.find((m) => {
+      try { return typeof (JSON.parse(m.content) as { text?: string }).text === 'string'; }
+      catch { return false; }
+    });
+    expect(textRow).toBeDefined();
+    expect(JSON.parse(textRow!.content).text).toContain('deepseek');
 
     await loopPromise.catch(() => {});
   });
