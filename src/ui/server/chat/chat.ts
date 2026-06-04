@@ -30,6 +30,7 @@ import { killContainer } from '../../../container-runner.js';
 import { canAccessAgentGroup } from '../../../modules/permissions/access.js';
 import { getUser } from '../../../modules/permissions/db/users.js';
 import { getIdentitiesForUser } from '../../../modules/permissions/db/identities.js';
+import { hasAdminPrivilege } from '../../../modules/permissions/db/user-roles.js';
 import { log } from '../../../log.js';
 import { getChannelAdapter } from '../../../channels/channel-registry.js';
 import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../../channels/web.js';
@@ -352,8 +353,9 @@ export async function handleChatRequest(
     const qChannel = q.get('channel') || undefined;
     const qMg = q.get('mg') || undefined;
     const override = qChannel && qMg ? { channelType: qChannel, messagingGroupId: qMg } : undefined;
+    const spectate = q.get('spectate') === '1' && hasAdminPrivilege(userId, m.groupId);
     try {
-      const messages = readChatHistory(userId, m.groupId, m.threadId, override);
+      const messages = readChatHistory(userId, m.groupId, m.threadId, override, spectate);
       writeJson(res, 200, { messages });
     } catch (err) {
       log.warn('web chat history read failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
@@ -368,7 +370,12 @@ export async function handleChatRequest(
       return true;
     }
     try {
-      const threads = listAllThreadsForUser(userId, m.groupId);
+      // Spectator mode: admins/owners can list every thread in the
+      // group, not just their own. Silently ignored for non-admins so
+      // the response shape stays consistent.
+      const q = new URLSearchParams((req.url || '').split('?')[1] || '');
+      const spectator = q.get('spectate') === '1' && hasAdminPrivilege(userId, m.groupId);
+      const threads = spectator ? listAllThreadsForAgentGroup(m.groupId) : listAllThreadsForUser(userId, m.groupId);
       writeJson(res, 200, { threads });
     } catch (err) {
       log.warn('web chat threads list failed', { userId, groupId: m.groupId, err });
@@ -411,43 +418,60 @@ export interface HistoryMessage {
  *
  * `override` lets the caller target a non-web messaging group; without it
  * defaults to the per-user web messaging group (legacy behavior).
+ *
+ * `spectate` (admin-only — route gates on hasAdminPrivilege) skips the
+ * userOwnsMessagingGroup check so admins can read history of threads
+ * they don't participate in. The DM viewer-handle scoping is also
+ * skipped so threadless DMs come through in full.
  */
 export function readChatHistory(
   userId: string,
   groupId: string,
   threadId: string,
   override?: { channelType: string; messagingGroupId: string },
+  spectate?: boolean,
 ): HistoryMessage[] {
-  const target = resolveTargetMessagingGroup(userId, groupId, override);
+  const target = resolveTargetMessagingGroup(userId, groupId, override, !!spectate);
   if (!target) return [];
   // Threadless DM rooms (e.g. Telegram 1:1) use a synthetic `__dm:<mg>`
   // threadId. The session-lookup wants thread_id=null and the message
   // queries need `thread_id IS NULL`. We also scope by the viewer's
-  // platform_id(s) so DMs from other users sharing the mg don't leak.
+  // platform_id(s) so DMs from other users sharing the mg don't leak —
+  // unless spectator mode is on, in which case all DMs in the mg are
+  // returned.
   const isDm = threadId.startsWith('__dm:');
   const session = resolveSessionForMode(groupId, target.messagingGroupId, target.sessionMode, isDm ? '' : threadId);
   if (!session) return [];
-  const viewerHandles = isDm ? viewerHandlesForChannel(userId, target.channelType) : [];
-  if (isDm && viewerHandles.length === 0) return [];
+  const viewerHandles = isDm && !spectate ? viewerHandlesForChannel(userId, target.channelType) : [];
+  if (isDm && !spectate && viewerHandles.length === 0) return [];
 
   const messages: HistoryMessage[] = [];
   try {
     const inDb = openInboundDb(groupId, session.id);
     try {
-      const rows = isDm
-        ? (inDb
-            .prepare(
-              `SELECT id, timestamp, content FROM messages_in
-                WHERE channel_type = ? AND thread_id IS NULL
-                  AND platform_id IN (${viewerHandles.map(() => '?').join(',')})
-                ORDER BY seq`,
-            )
-            .all(target.channelType, ...viewerHandles) as { id: string; timestamp: string; content: string }[])
-        : (inDb
-            .prepare(
-              'SELECT id, timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq',
-            )
-            .all(target.channelType, threadId) as { id: string; timestamp: string; content: string }[]);
+      let rows: { id: string; timestamp: string; content: string }[];
+      if (isDm && spectate) {
+        rows = inDb
+          .prepare(
+            'SELECT id, timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id IS NULL ORDER BY seq',
+          )
+          .all(target.channelType) as { id: string; timestamp: string; content: string }[];
+      } else if (isDm) {
+        rows = inDb
+          .prepare(
+            `SELECT id, timestamp, content FROM messages_in
+              WHERE channel_type = ? AND thread_id IS NULL
+                AND platform_id IN (${viewerHandles.map(() => '?').join(',')})
+              ORDER BY seq`,
+          )
+          .all(target.channelType, ...viewerHandles) as { id: string; timestamp: string; content: string }[];
+      } else {
+        rows = inDb
+          .prepare(
+            'SELECT id, timestamp, content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq',
+          )
+          .all(target.channelType, threadId) as { id: string; timestamp: string; content: string }[];
+      }
       // Router namespaces ids as `<rawId>:<agentGroupId>` when writing
       // into per-agent session DBs (router.ts messageIdForAgent), but the
       // live WS echo from submitWebInbound sends the raw `<rawId>`. If we
@@ -521,14 +545,22 @@ function resolveTargetMessagingGroup(
   userId: string,
   agentGroupId: string,
   override: { channelType: string; messagingGroupId: string } | undefined,
+  spectate: boolean,
 ): { channelType: string; messagingGroupId: string; sessionMode: 'per-thread' | 'shared' | 'agent-shared' } | null {
   if (!override) {
+    // Spectator mode without an explicit mg defaults to the admin's own
+    // web mg (if any) — they can specify a different mg via override to
+    // peek at someone else's thread.
     const platformId = platformIdFor(userId, agentGroupId);
     const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
     if (!mg) return null;
     return { channelType: WEB_CHANNEL_TYPE, messagingGroupId: mg.id, sessionMode: 'per-thread' };
   }
-  if (!userOwnsMessagingGroup(userId, agentGroupId, override.channelType, override.messagingGroupId)) return null;
+  // Override path: require ownership unless the caller is in spectator
+  // mode (route handler must have already gated on hasAdminPrivilege).
+  if (!spectate && !userOwnsMessagingGroup(userId, agentGroupId, override.channelType, override.messagingGroupId)) {
+    return null;
+  }
   const mga = getMessagingGroupAgentByPair(override.messagingGroupId, agentGroupId);
   if (!mga) return null;
   const mode = (mga.session_mode || 'per-thread') as 'per-thread' | 'shared' | 'agent-shared';
@@ -597,10 +629,15 @@ async function sendViaChannelAdapter(args: {
   text: string;
   attachments: { filename: string; contentType: string; data: string; size: number }[];
 }): Promise<string> {
-  const target = resolveTargetMessagingGroup(args.userId, args.agentGroupId, {
-    channelType: args.channelType,
-    messagingGroupId: args.messagingGroupId,
-  });
+  const target = resolveTargetMessagingGroup(
+    args.userId,
+    args.agentGroupId,
+    {
+      channelType: args.channelType,
+      messagingGroupId: args.messagingGroupId,
+    },
+    false,
+  );
   if (!target) throw Object.assign(new Error('http_403'), { detail: 'not_owner_of_messaging_group' });
 
   const adapter = getChannelAdapter(args.channelType);
@@ -842,6 +879,40 @@ function viewerHandlesForChannel(userId: string, channelType: string): string[] 
  * don't require a user_dms entry, because email-bot-style adapters don't
  * always write one, and we filter per-thread later by inbound platform_id.
  */
+/**
+ * Cheap viewer-scoped "does this user have any threads they can see in
+ * this group" probe. Used by the dropdown filter so groups the viewer
+ * has no actual conversations in are hidden by default. Owners/global
+ * admins can still see those groups by enabling the "Show all" toggle
+ * (which uses {@link listAllThreadsForAgentGroup} for spectator-mode
+ * threads listing).
+ *
+ * "Content" means "viewer has at least one session in a messaging
+ * group they own" — not just "the messaging group exists". A web mg is
+ * provisioned eagerly when a user clicks into a group; we only count
+ * the group as having content once a session row exists.
+ *
+ * Non-web channels: we still report `hasContent=true` whenever the
+ * viewer has a matching identity AND the (mg, agent_group) pair has
+ * any session, even if no thread belongs to the viewer — confirming
+ * "you have threads here" via per-thread filtering would require
+ * opening every session DB, too expensive for the dropdown.
+ */
+export function viewerHasContent(userId: string, agentGroupId: string): boolean {
+  const ctxs = listUserMessagingContexts(userId, agentGroupId);
+  if (ctxs.length === 0) return false;
+  const stmt = getDb().prepare(
+    'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? LIMIT 1',
+  );
+  for (const ctx of ctxs) {
+    if (stmt.get(agentGroupId, ctx.messagingGroupId)) return true;
+  }
+  // Agent-shared session (no mg link) is shared by everyone with a
+  // messaging context, so it also counts.
+  if (hasAgentSharedSession(agentGroupId)) return true;
+  return false;
+}
+
 function listUserMessagingContexts(userId: string, agentGroupId: string): UserMessagingContext[] {
   const out: UserMessagingContext[] = [];
   const seen = new Set<string>();
@@ -932,13 +1003,50 @@ function finalizeTitle(raw: string): string {
  */
 export function listAllThreadsForUser(userId: string, agentGroupId: string): ThreadSummary[] {
   const ctxs = listUserMessagingContexts(userId, agentGroupId);
+  return collectThreadsForContexts(userId, agentGroupId, ctxs, false);
+}
+
+/**
+ * Spectator view: list every thread for every messaging group wired to
+ * this agent group, regardless of viewer ownership. Used by the "Show
+ * all" admin toggle so owners/global admins can inspect activity in
+ * groups they don't actively participate in. The route handler MUST
+ * gate this on `hasAdminPrivilege(userId, agentGroupId)`.
+ */
+export function listAllThreadsForAgentGroup(agentGroupId: string): ThreadSummary[] {
+  // Enumerate every messaging group wired to this agent group, with no
+  // viewer-handle filter so all conversations are visible.
+  type Row = { mg_id: string; channel_type: string; platform_id: string; session_mode: string | null };
+  const rows = getDb()
+    .prepare(
+      `SELECT mg.id AS mg_id, mg.channel_type, mg.platform_id, mga.session_mode
+         FROM messaging_groups mg
+         JOIN messaging_group_agents mga ON mga.messaging_group_id = mg.id
+        WHERE mga.agent_group_id = ?`,
+    )
+    .all(agentGroupId) as Row[];
+  const ctxs: UserMessagingContext[] = rows.map((r) => ({
+    messagingGroupId: r.mg_id,
+    channelType: r.channel_type,
+    platformId: r.platform_id,
+    sessionMode: (r.session_mode || 'per-thread') as UserMessagingContext['sessionMode'],
+  }));
+  return collectThreadsForContexts('', agentGroupId, ctxs, true);
+}
+
+function collectThreadsForContexts(
+  userId: string,
+  agentGroupId: string,
+  ctxs: UserMessagingContext[],
+  spectator: boolean,
+): ThreadSummary[] {
   const out: ThreadSummary[] = [];
 
   // Per-mg: any session with thread_id IS NOT NULL is per-thread-style;
   // any session with thread_id IS NULL is shared-style. Either may exist.
   const sharedCtxs: UserMessagingContext[] = [];
   for (const ctx of ctxs) {
-    enumeratePerThread(userId, agentGroupId, ctx, out);
+    enumeratePerThread(userId, agentGroupId, ctx, out, spectator);
     if (hasSharedSession(agentGroupId, ctx.messagingGroupId)) sharedCtxs.push(ctx);
   }
   for (const ctx of sharedCtxs) enumerateShared(agentGroupId, ctx, out);
@@ -947,7 +1055,7 @@ export function listAllThreadsForUser(userId: string, agentGroupId: string): Thr
   // These are e.g. Telegram 1:1 DMs — the channel adapter doesn't
   // synthesize a thread id, so all messages live in a single virtual
   // chat keyed by (mg, viewer platform id).
-  for (const ctx of sharedCtxs) enumerateThreadlessDm(userId, agentGroupId, ctx, out);
+  for (const ctx of sharedCtxs) enumerateThreadlessDm(userId, agentGroupId, ctx, out, spectator);
 
   // Agent-shared session (one per agent group, no mg link in sessions).
   if (ctxs.length > 0 && hasAgentSharedSession(agentGroupId)) {
@@ -1001,6 +1109,7 @@ function enumeratePerThread(
   agentGroupId: string,
   ctx: UserMessagingContext,
   out: ThreadSummary[],
+  spectator: boolean,
 ): void {
   type Row = { id: string; thread_id: string; last_active: string | null; created_at: string };
   const rows = getDb()
@@ -1010,10 +1119,14 @@ function enumeratePerThread(
     )
     .all(agentGroupId, ctx.messagingGroupId) as Row[];
   const isWeb = ctx.channelType === WEB_CHANNEL_TYPE;
-  const viewerHandles = isWeb ? [] : viewerHandlesForChannel(userId, ctx.channelType);
-  if (!isWeb && viewerHandles.length === 0) return;
+  const viewerHandles = isWeb || spectator ? [] : viewerHandlesForChannel(userId, ctx.channelType);
+  if (!isWeb && !spectator && viewerHandles.length === 0) return;
   for (const r of rows) {
-    if (!isWeb && !threadBelongsToViewer(agentGroupId, r.id, ctx.channelType, r.thread_id, viewerHandles)) {
+    if (
+      !spectator &&
+      !isWeb &&
+      !threadBelongsToViewer(agentGroupId, r.id, ctx.channelType, r.thread_id, viewerHandles)
+    ) {
       continue;
     }
     const stats = readThreadStats(agentGroupId, r.id, ctx.channelType, r.thread_id);
@@ -1093,12 +1206,13 @@ function enumerateThreadlessDm(
   agentGroupId: string,
   ctx: UserMessagingContext,
   out: ThreadSummary[],
+  spectator: boolean,
 ): void {
   if (ctx.channelType === WEB_CHANNEL_TYPE) return;
   const session = findSessionForAgent(agentGroupId, ctx.messagingGroupId, null);
   if (!session) return;
-  const handles = viewerHandlesForChannel(userId, ctx.channelType);
-  if (handles.length === 0) return;
+  const handles = spectator ? [] : viewerHandlesForChannel(userId, ctx.channelType);
+  if (!spectator && handles.length === 0) return;
   let inDb: ReturnType<typeof openInboundDb>;
   try {
     inDb = openInboundDb(agentGroupId, session.id);
@@ -1106,16 +1220,28 @@ function enumerateThreadlessDm(
     return;
   }
   try {
-    const placeholders = handles.map(() => '?').join(',');
     type Row = { platform_id: string; max_ts: string | null; n: number };
-    const rows = inDb
-      .prepare(
-        `SELECT platform_id, MAX(timestamp) AS max_ts, COUNT(*) AS n
-           FROM messages_in
-          WHERE channel_type = ? AND thread_id IS NULL AND platform_id IN (${placeholders})
-          GROUP BY platform_id`,
-      )
-      .all(ctx.channelType, ...handles) as Row[];
+    let rows: Row[];
+    if (spectator) {
+      rows = inDb
+        .prepare(
+          `SELECT platform_id, MAX(timestamp) AS max_ts, COUNT(*) AS n
+             FROM messages_in
+            WHERE channel_type = ? AND thread_id IS NULL
+            GROUP BY platform_id`,
+        )
+        .all(ctx.channelType) as Row[];
+    } else {
+      const placeholders = handles.map(() => '?').join(',');
+      rows = inDb
+        .prepare(
+          `SELECT platform_id, MAX(timestamp) AS max_ts, COUNT(*) AS n
+             FROM messages_in
+            WHERE channel_type = ? AND thread_id IS NULL AND platform_id IN (${placeholders})
+            GROUP BY platform_id`,
+        )
+        .all(ctx.channelType, ...handles) as Row[];
+    }
     if (rows.length === 0) return;
 
     // Collapse all matched handles into a single summary per mg. (A user
@@ -1123,7 +1249,7 @@ function enumerateThreadlessDm(
     // channel; aggregating is just defensive.)
     let total = 0;
     let maxTs = '';
-    let representativeHandle = handles[0];
+    let representativeHandle = handles[0] ?? rows[0].platform_id;
     for (const r of rows) {
       total += r.n;
       if (r.max_ts && (!maxTs || Date.parse(normTs(r.max_ts)) > Date.parse(normTs(maxTs)))) maxTs = r.max_ts;

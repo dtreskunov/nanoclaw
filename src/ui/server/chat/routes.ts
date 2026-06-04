@@ -26,7 +26,14 @@ import { applyBrandTokens, brandBootstrapScript, getBranding } from '../branding
 import { createDownloadToken, redeemDownloadToken } from '../download-tokens.js';
 import { uiBaseUrl } from '../server.js';
 import { classify, resolveSafe } from './classify.js';
-import { handleChatRequest, handleChatUpgrade, listAllThreadsForUser, readChatHistory } from './chat.js';
+import {
+  handleChatRequest,
+  handleChatUpgrade,
+  listAllThreadsForAgentGroup,
+  listAllThreadsForUser,
+  readChatHistory,
+  viewerHasContent,
+} from './chat.js';
 import type { ThreadSummary, HistoryMessage } from './chat.js';
 import { handleWriteRequest } from './write.js';
 
@@ -270,6 +277,10 @@ function handleGroups(ctx: Ctx, userId: string): void {
     name: g.name,
     folder: g.folder,
     isAdmin: hasAdminPrivilege(userId, g.id),
+    // Whether this viewer has any messaging context (web mg, or a non-web
+    // mg matching one of their identities) in the group. Drives the
+    // default dropdown filter; admins can override with "Show all".
+    hasContent: viewerHasContent(userId, g.id),
     lastActivityAt: lastByGroup.get(g.id) ?? null,
   }));
   json(ctx, 200, { groups });
@@ -399,8 +410,9 @@ function handleSync(ctx: Ctx, userId: string): void {
   const out: SyncResponse = { approvals: listApprovalsForUser(userId) };
   const gid = ctx.url.searchParams.get('gid') || '';
   if (gid && canAccessAgentGroup(userId, gid).allowed && getAgentGroup(gid)) {
+    const spectate = ctx.url.searchParams.get('spectate') === '1' && hasAdminPrivilege(userId, gid);
     try {
-      out.threads = listAllThreadsForUser(userId, gid);
+      out.threads = spectate ? listAllThreadsForAgentGroup(gid) : listAllThreadsForUser(userId, gid);
     } catch (err) {
       log.warn('sync threads list failed', { userId, gid, err });
     }
@@ -409,7 +421,13 @@ function handleSync(ctx: Ctx, userId: string): void {
     const mg = ctx.url.searchParams.get('mg') || '';
     if (tid && channel && channel !== 'web' && mg) {
       try {
-        out.threadMessages = readChatHistory(userId, gid, tid, { channelType: channel, messagingGroupId: mg });
+        out.threadMessages = readChatHistory(
+          userId,
+          gid,
+          tid,
+          { channelType: channel, messagingGroupId: mg },
+          spectate,
+        );
       } catch (err) {
         log.warn('sync history read failed', { userId, gid, tid, err });
       }

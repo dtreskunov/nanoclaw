@@ -23,6 +23,13 @@ export interface Group {
   id: string;
   name: string;
   isAdmin?: boolean;
+  /**
+   * Whether the viewer has any messaging-group context (web mg, or a
+   * non-web mg matching one of their identities) in this group. The
+   * dropdown hides groups with `hasContent=false` by default — toggle
+   * "Show all" to override.
+   */
+  hasContent?: boolean;
   lastActivityAt?: string;
 }
 

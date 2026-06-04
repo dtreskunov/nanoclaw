@@ -26,6 +26,7 @@ import {
   pinnedContext,
   pendingApprovals,
   respondingApprovalIds,
+  spectatingCurrentGroup,
   SYNC_INTERVAL_MS,
 } from './state';
 import { api, postJson } from './api';
@@ -212,6 +213,7 @@ export async function runSync(): Promise<void> {
       params.set('channel', ct);
       params.set('mg', mg);
     }
+    if (spectatingCurrentGroup.value) params.set('spectate', '1');
   }
   let res: SyncResponse;
   try {
@@ -255,9 +257,14 @@ function mergeIncomingMessages(messages: ServerMessage[]): void {
 
 function historyUrl(gid: string, tid: string): string {
   let u = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
+  const params = new URLSearchParams();
   if (channelType.value && channelType.value !== 'web' && messagingGroupId.value) {
-    u += `?channel=${encodeURIComponent(channelType.value)}&mg=${encodeURIComponent(messagingGroupId.value)}`;
+    params.set('channel', channelType.value);
+    params.set('mg', messagingGroupId.value);
   }
+  if (spectatingCurrentGroup.value) params.set('spectate', '1');
+  const qs = params.toString();
+  if (qs) u += '?' + qs;
   return u;
 }
 

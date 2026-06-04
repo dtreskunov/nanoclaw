@@ -15498,6 +15498,28 @@ if (typeof document !== "undefined") {
     document.body.classList.toggle("is-admin", isAdmin.value);
   });
 }
+var SHOW_ALL_KEY = "nc.showAllGroups";
+var initialShowAll = typeof localStorage !== "undefined" && localStorage.getItem(SHOW_ALL_KEY) === "1";
+var showAllGroups = y3(initialShowAll);
+if (typeof localStorage !== "undefined") {
+  j3(() => {
+    try {
+      if (showAllGroups.value) localStorage.setItem(SHOW_ALL_KEY, "1");
+      else localStorage.removeItem(SHOW_ALL_KEY);
+    } catch {
+    }
+  });
+}
+var hasAnyAdminGroup = g2(
+  () => groups.value.some((g6) => g6.isAdmin === true)
+);
+var spectatingCurrentGroup = g2(() => {
+  if (!showAllGroups.value) return false;
+  const id = groupId.value;
+  if (!id) return false;
+  const g6 = groups.value.find((x5) => x5.id === id);
+  return !!g6 && g6.hasContent === false;
+});
 var treePath = y3("");
 var filePath = y3(null);
 var treeEntries = y3([]);
@@ -17394,6 +17416,7 @@ async function runSync() {
       params.set("channel", ct);
       params.set("mg", mg);
     }
+    if (spectatingCurrentGroup.value) params.set("spectate", "1");
   }
   let res;
   try {
@@ -17427,9 +17450,14 @@ function mergeIncomingMessages(messages) {
 }
 function historyUrl(gid, tid) {
   let u5 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
+  const params = new URLSearchParams();
   if (channelType.value && channelType.value !== "web" && messagingGroupId.value) {
-    u5 += `?channel=${encodeURIComponent(channelType.value)}&mg=${encodeURIComponent(messagingGroupId.value)}`;
+    params.set("channel", channelType.value);
+    params.set("mg", messagingGroupId.value);
   }
+  if (spectatingCurrentGroup.value) params.set("spectate", "1");
+  const qs = params.toString();
+  if (qs) u5 += "?" + qs;
   return u5;
 }
 function appendMsg(direction, text, files, ts, id) {
@@ -17941,6 +17969,14 @@ function Header() {
     selectGroup(e4.currentTarget.value).catch(console.error);
   };
   const readOnlyHint = "\u{1F512} Read-only \u2014 you don\u2019t have admin rights in this group, so you can\u2019t upload, rename or delete files.";
+  const showAll = showAllGroups.value;
+  const visibleGroups = groups.value.filter((g6) => {
+    if (showAll) return true;
+    if (g6.hasContent !== false) return true;
+    if (g6.id === groupId.value) return true;
+    return false;
+  });
+  const hiddenCount = groups.value.length - visibleGroups.length;
   return /* @__PURE__ */ u4("header", { children: [
     /* @__PURE__ */ u4(
       "button",
@@ -17956,10 +17992,30 @@ function Header() {
       }
     ),
     /* @__PURE__ */ u4("span", { class: "brand", children: BRAND.name }),
-    /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: groups.value.map((g6) => /* @__PURE__ */ u4("option", { value: g6.id, children: [
+    /* @__PURE__ */ u4("select", { id: "group-select", "aria-label": "Agent group", value: groupId.value || "", onChange, children: visibleGroups.map((g6) => /* @__PURE__ */ u4("option", { value: g6.id, children: [
       g6.isAdmin ? "" : "\u{1F512} ",
       g6.name
     ] }, g6.id)) }),
+    hasAnyAdminGroup.value ? /* @__PURE__ */ u4(
+      "label",
+      {
+        class: "show-all-toggle desktop-only",
+        title: showAll ? "Showing every accessible group. Toggle off to hide groups you have no threads in." : `Show every accessible group${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}.`,
+        children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              type: "checkbox",
+              checked: showAll,
+              onChange: (e4) => {
+                showAllGroups.value = e4.currentTarget.checked;
+              }
+            }
+          ),
+          /* @__PURE__ */ u4("span", { class: "label", children: "Show all" })
+        ]
+      }
+    ) : null,
     !isAdmin.value && groupId.value ? /* @__PURE__ */ u4("span", { class: "readonly-badge", title: readOnlyHint, "aria-label": readOnlyHint, children: [
       /* @__PURE__ */ u4("span", { "aria-hidden": "true", children: "\u{1F512}" }),
       /* @__PURE__ */ u4("span", { class: "desktop-only", children: "Read-only" })
