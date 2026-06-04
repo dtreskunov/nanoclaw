@@ -260,7 +260,11 @@ function handleMe(ctx: Ctx, userId: string): void {
     | { display_name: string | null }
     | undefined;
   const displayName = row?.display_name?.trim() || null;
-  json(ctx, 200, { userId, displayName });
+  // `isElevated` controls UI surfaces that are reserved for global
+  // owners/admins (e.g. the "Show all" dropdown toggle that enables
+  // spectator mode). Group-level admins do NOT get isElevated.
+  const isElevated = isOwner(userId) || isGlobalAdmin(userId);
+  json(ctx, 200, { userId, displayName, isElevated });
 }
 
 function handleGroups(ctx: Ctx, userId: string): void {
@@ -410,7 +414,8 @@ function handleSync(ctx: Ctx, userId: string): void {
   const out: SyncResponse = { approvals: listApprovalsForUser(userId) };
   const gid = ctx.url.searchParams.get('gid') || '';
   if (gid && canAccessAgentGroup(userId, gid).allowed && getAgentGroup(gid)) {
-    const spectate = ctx.url.searchParams.get('spectate') === '1' && hasAdminPrivilege(userId, gid);
+    // Spectator mode is owner/global-admin only — see canSpectate() in chat.ts.
+    const spectate = ctx.url.searchParams.get('spectate') === '1' && (isOwner(userId) || isGlobalAdmin(userId));
     try {
       out.threads = spectate ? listAllThreadsForAgentGroup(gid) : listAllThreadsForUser(userId, gid);
     } catch (err) {

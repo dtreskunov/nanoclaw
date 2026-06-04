@@ -15510,9 +15510,7 @@ if (typeof localStorage !== "undefined") {
     }
   });
 }
-var hasAnyAdminGroup = g2(
-  () => groups.value.some((g6) => g6.isAdmin === true)
-);
+var isElevatedUser = y3(false);
 var spectatingCurrentGroup = g2(() => {
   if (!showAllGroups.value) return false;
   const id = groupId.value;
@@ -17996,7 +17994,7 @@ function Header() {
       g6.isAdmin ? "" : "\u{1F512} ",
       g6.name
     ] }, g6.id)) }),
-    hasAnyAdminGroup.value ? /* @__PURE__ */ u4(
+    isElevatedUser.value ? /* @__PURE__ */ u4(
       "label",
       {
         class: "show-all-toggle desktop-only",
@@ -20259,6 +20257,7 @@ async function init() {
     ]);
     n2(() => {
       me.value = meRes.displayName || meRes.userId;
+      isElevatedUser.value = meRes.isElevated === true;
       groups.value = sortGroups(groupsRes.groups);
     });
   } catch {

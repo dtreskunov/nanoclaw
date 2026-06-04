@@ -30,7 +30,18 @@ import { killContainer } from '../../../container-runner.js';
 import { canAccessAgentGroup } from '../../../modules/permissions/access.js';
 import { getUser } from '../../../modules/permissions/db/users.js';
 import { getIdentitiesForUser } from '../../../modules/permissions/db/identities.js';
-import { hasAdminPrivilege } from '../../../modules/permissions/db/user-roles.js';
+import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
+
+/**
+ * Spectator mode (cross-user thread listing + history) is reserved
+ * for global owners/admins. Group-level admins still have full admin
+ * rights on their own group (file write, approvals, etc.) but cannot
+ * peek into other users' DM threads via `?spectate=1` — that would
+ * leak content across the per-user boundary inside a group.
+ */
+function canSpectate(userId: string): boolean {
+  return isOwner(userId) || isGlobalAdmin(userId);
+}
 import { log } from '../../../log.js';
 import { getChannelAdapter } from '../../../channels/channel-registry.js';
 import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../../channels/web.js';
@@ -353,7 +364,7 @@ export async function handleChatRequest(
     const qChannel = q.get('channel') || undefined;
     const qMg = q.get('mg') || undefined;
     const override = qChannel && qMg ? { channelType: qChannel, messagingGroupId: qMg } : undefined;
-    const spectate = q.get('spectate') === '1' && hasAdminPrivilege(userId, m.groupId);
+    const spectate = q.get('spectate') === '1' && canSpectate(userId);
     try {
       const messages = readChatHistory(userId, m.groupId, m.threadId, override, spectate);
       writeJson(res, 200, { messages });
@@ -374,7 +385,7 @@ export async function handleChatRequest(
       // group, not just their own. Silently ignored for non-admins so
       // the response shape stays consistent.
       const q = new URLSearchParams((req.url || '').split('?')[1] || '');
-      const spectator = q.get('spectate') === '1' && hasAdminPrivilege(userId, m.groupId);
+      const spectator = q.get('spectate') === '1' && canSpectate(userId);
       const threads = spectator ? listAllThreadsForAgentGroup(m.groupId) : listAllThreadsForUser(userId, m.groupId);
       writeJson(res, 200, { threads });
     } catch (err) {

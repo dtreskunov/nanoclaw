@@ -53,8 +53,14 @@ if (typeof localStorage !== 'undefined') {
   });
 }
 
-/** Whether the viewer admins at least one group — controls toggle visibility. */
-export const hasAnyAdminGroup: ReadonlySignal<boolean> = computed(() => groups.value.some((g) => g.isAdmin === true));
+/**
+ * True only for global owners / global admins (server-reported via
+ * `/api/me`). Group-level admins are NOT elevated. Drives visibility
+ * of the "Show all" dropdown toggle, which in turn enables spectator
+ * mode (`?spectate=1`) on threads + history fetches — a privilege
+ * the server gates with the same check.
+ */
+export const isElevatedUser: Signal<boolean> = signal<boolean>(false);
 
 /**
  * Effective spectate flag: true when the user enabled "Show all" AND

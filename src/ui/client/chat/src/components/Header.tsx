@@ -8,7 +8,7 @@ import {
   settingsOpen,
   isAdmin,
   showAllGroups,
-  hasAnyAdminGroup,
+  isElevatedUser,
 } from '../state';
 import { selectGroup } from '../actions';
 import { BRAND } from '../brand';
@@ -43,7 +43,7 @@ export function Header() {
           <option value={g.id} key={g.id}>{g.isAdmin ? '' : '\uD83D\uDD12 '}{g.name}</option>
         ))}
       </select>
-      {hasAnyAdminGroup.value
+      {isElevatedUser.value
         ? (
           <label
             class="show-all-toggle desktop-only"
