@@ -258,15 +258,19 @@ export function killContainer(sessionId: string, reason: string, onExit?: () => 
  *
  *   sessions.agent_provider
  *     → container_configs.provider
+ *     → DEFAULT_PROVIDER (env)
  *     → 'claude'
  *
  * Pure so the precedence can be unit-tested without a DB or filesystem.
+ * Callers in the runtime path pass `readDefaultProvider()` for the env
+ * default; tests can pass any value.
  */
 export function resolveProviderName(
   sessionProvider: string | null | undefined,
   containerConfigProvider: string | null | undefined,
+  envDefaultProvider: string | null | undefined = null,
 ): string {
-  return (sessionProvider || containerConfigProvider || 'claude').toLowerCase();
+  return (sessionProvider || containerConfigProvider || envDefaultProvider || 'claude').toLowerCase();
 }
 
 function resolveProviderContribution(
@@ -274,7 +278,11 @@ function resolveProviderContribution(
   agentGroup: AgentGroup,
   containerConfig: import('./container-config.js').ContainerConfig,
 ): { provider: string; contribution: ProviderContainerContribution } {
-  const provider = resolveProviderName(session.agent_provider, containerConfig.provider);
+  const provider = resolveProviderName(
+    session.agent_provider,
+    containerConfig.provider,
+    resolveEnv('DEFAULT_PROVIDER'),
+  );
   const fn = getProviderContainerConfig(provider);
   const contribution = fn
     ? fn({

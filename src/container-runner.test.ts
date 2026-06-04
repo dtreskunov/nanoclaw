@@ -24,4 +24,18 @@ describe('resolveProviderName', () => {
     expect(resolveProviderName('', 'opencode')).toBe('opencode');
     expect(resolveProviderName(null, '')).toBe('claude');
   });
+
+  it('uses env default when session and config are both unset', () => {
+    expect(resolveProviderName(null, null, 'codex')).toBe('codex');
+    expect(resolveProviderName(null, undefined, 'OPENCODE')).toBe('opencode');
+  });
+
+  it('row provider still wins over env default', () => {
+    expect(resolveProviderName(null, 'claude', 'codex')).toBe('claude');
+  });
+
+  it('falls through env empty/null to claude', () => {
+    expect(resolveProviderName(null, null, '')).toBe('claude');
+    expect(resolveProviderName(null, null, null)).toBe('claude');
+  });
 });

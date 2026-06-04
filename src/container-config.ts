@@ -14,6 +14,7 @@ import path from 'path';
 import { GROUPS_DIR } from './config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { getAgentGroup } from './db/agent-groups.js';
+import { readEnvFile } from './env.js';
 import type { AgentGroup, ContainerConfigRow } from './types.js';
 
 export interface McpStdioServerConfig {
@@ -55,7 +56,25 @@ export interface ContainerConfig {
   effort?: string;
 }
 
-/** Build a `ContainerConfig` from a DB row + agent group identity. */
+/**
+ * Resolve an env var via process.env first, then the .env file. Mirrors
+ * `resolveEnv()` in container-runner.ts — duplicated here to avoid a
+ * runner ↔ config import cycle. Values can change at runtime (.env is
+ * re-read), so we never cache.
+ */
+function envFallback(name: string): string | undefined {
+  if (process.env[name] !== undefined) return process.env[name];
+  const file = readEnvFile([name]);
+  return file[name];
+}
+
+/**
+ * Build a `ContainerConfig` from a DB row + agent group identity. Per-row
+ * NULLs fall back to env defaults (`DEFAULT_PROVIDER` / `DEFAULT_MODEL` /
+ * `DEFAULT_EFFORT`) so an operator can set a fleet-wide preference once
+ * in `.env` instead of running `ncl groups config update` after every
+ * onboarding. Row values always win.
+ */
 export function configFromDb(row: ContainerConfigRow, group: AgentGroup): ContainerConfig {
   return {
     mcpServers: JSON.parse(row.mcp_servers) as Record<string, McpServerConfig>,
@@ -67,13 +86,13 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     imageTag: row.image_tag ?? undefined,
     additionalMounts: JSON.parse(row.additional_mounts) as AdditionalMountConfig[],
     skills: JSON.parse(row.skills) as string[] | 'all',
-    provider: row.provider ?? undefined,
+    provider: row.provider ?? envFallback('DEFAULT_PROVIDER'),
     groupName: group.name,
     assistantName: row.assistant_name ?? group.name,
     agentGroupId: group.id,
     maxMessagesPerPrompt: row.max_messages_per_prompt ?? undefined,
-    model: row.model ?? undefined,
-    effort: row.effort ?? undefined,
+    model: row.model ?? envFallback('DEFAULT_MODEL'),
+    effort: row.effort ?? envFallback('DEFAULT_EFFORT'),
   };
 }
 
