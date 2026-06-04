@@ -1220,10 +1220,10 @@ header .mobile-only {
 }
 @keyframes msg-highlight {
   0%, 20% {
-    background: rgba(255, 200, 0, 0.35);
+    box-shadow: inset 0 0 0 100px rgba(255, 200, 0, 0.35);
   }
   100% {
-    background: revert;
+    box-shadow: inset 0 0 0 100px transparent;
   }
 }
 .chat-main .msg .search-hl {
