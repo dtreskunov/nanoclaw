@@ -4,6 +4,7 @@
  * Usage:
  *   pnpm exec tsx src/ui/scripts/mint-magic.ts             # interactive picker
  *   pnpm exec tsx src/ui/scripts/mint-magic.ts <user-id>   # one-shot
+ *   pnpm exec tsx src/ui/scripts/mint-magic.ts --list      # print users
  *   pnpm exec tsx src/ui/scripts/mint-magic.ts --help
  *
  * Base URL comes from UI_BASE_URL in .env (via `uiBaseUrl()`); there is no
@@ -24,6 +25,7 @@ const HELP = `mint-magic — issue a UI magic-link login URL.
 Usage:
   mint-magic                interactive picker (lists users from the DB)
   mint-magic <user-id>      non-interactive
+  mint-magic --list         print id\tdisplay_name\tkind for every user
   mint-magic -h | --help    show this help
 
 Base URL is read from UI_BASE_URL in .env.
@@ -37,6 +39,14 @@ async function main(): Promise<void> {
   }
 
   initDb(path.resolve(process.cwd(), 'data', 'v2.db'));
+
+  if (args.includes('--list') || args.includes('-l')) {
+    const users = getAllUsers();
+    for (const u of users) {
+      process.stdout.write(`${u.id}\t${u.display_name ?? ''}\t${u.kind}\n`);
+    }
+    return;
+  }
 
   let userId = args[0];
 
