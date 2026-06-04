@@ -275,7 +275,9 @@ export function writeSessionMessage(
           senderUserId: message.senderUserId ?? null,
         });
       }
-    } catch { /* search index failures must never block routing */ }
+    } catch {
+      /* search index failures must never block routing */
+    }
   }
 
   updateSession(sessionId, { last_active: new Date().toISOString() });

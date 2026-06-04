@@ -183,9 +183,9 @@ function SearchResultRow({ r }: { r: SearchResult }) {
 function SearchResults() {
   const results = searchResults.value;
   const loading = searchLoading.value;
-  if (loading) return <div class="empty">Searching\u2026</div>;
+  if (loading) return <div class="search-results"><div class="empty">Searching…</div></div>;
   if (!results) return null;
-  if (results.length === 0) return <div class="empty">No results</div>;
+  if (results.length === 0) return <div class="search-results"><div class="empty">No results</div></div>;
   return (
     <div class="search-results">
       {results.map((r) => <SearchResultRow key={r.messageId} r={r} />)}

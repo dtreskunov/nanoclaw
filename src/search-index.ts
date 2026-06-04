@@ -245,10 +245,7 @@ export function searchMessages(query: string, opts: SearchOptions): SearchResult
  * Fallback for malformed FTS5 queries — plain LIKE search.
  */
 function likeFallback(query: string, opts: SearchOptions, limit: number): SearchResultRow[] {
-  const conditions: string[] = [
-    'agent_group_id = @agentGroupId',
-    "text LIKE '%' || @query || '%'",
-  ];
+  const conditions: string[] = ['agent_group_id = @agentGroupId', "text LIKE '%' || @query || '%'"];
   const params: Record<string, unknown> = {
     agentGroupId: opts.agentGroupId,
     query,

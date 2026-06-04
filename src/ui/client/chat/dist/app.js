@@ -16845,29 +16845,31 @@ g4.use({
   }
 });
 g4.use({
-  extensions: [{
-    name: "msgRef",
-    level: "inline",
-    start(src) {
-      return src.indexOf("[[msg:");
-    },
-    tokenizer(src) {
-      const m6 = src.match(/^\[\[msg:([^\]|]+)\|([^\]]+)\]\]/);
-      if (m6) {
-        return {
-          type: "msgRef",
-          raw: m6[0],
-          messageId: m6[1],
-          threadId: m6[2]
-        };
+  extensions: [
+    {
+      name: "msgRef",
+      level: "inline",
+      start(src) {
+        return src.indexOf("[[msg:");
+      },
+      tokenizer(src) {
+        const m6 = src.match(/^\[\[msg:([^\]|]+)\|([^\]]+)\]\]/);
+        if (m6) {
+          return {
+            type: "msgRef",
+            raw: m6[0],
+            messageId: m6[1],
+            threadId: m6[2]
+          };
+        }
+        return void 0;
+      },
+      renderer(token) {
+        const { messageId, threadId: threadId2 } = token;
+        return `<a href="#" class="msg-ref" data-msg-id="${messageId}" data-thread-id="${threadId2}" title="Jump to message">\u{1F517} referenced message</a>`;
       }
-      return void 0;
-    },
-    renderer(token) {
-      const { messageId, threadId: threadId2 } = token;
-      return `<a href="#" class="msg-ref" data-msg-id="${messageId}" data-thread-id="${threadId2}" title="Jump to message">\u{1F517} referenced message</a>`;
     }
-  }]
+  ]
 });
 function fmtBytes(n3) {
   if (n3 == null) return "";
@@ -18474,9 +18476,9 @@ function SearchResultRow({ r: r4 }) {
 function SearchResults() {
   const results = searchResults.value;
   const loading = searchLoading.value;
-  if (loading) return /* @__PURE__ */ u4("div", { class: "empty", children: "Searching\\u2026" });
+  if (loading) return /* @__PURE__ */ u4("div", { class: "search-results", children: /* @__PURE__ */ u4("div", { class: "empty", children: "Searching\u2026" }) });
   if (!results) return null;
-  if (results.length === 0) return /* @__PURE__ */ u4("div", { class: "empty", children: "No results" });
+  if (results.length === 0) return /* @__PURE__ */ u4("div", { class: "search-results", children: /* @__PURE__ */ u4("div", { class: "empty", children: "No results" }) });
   return /* @__PURE__ */ u4("div", { class: "search-results", children: results.map((r4) => /* @__PURE__ */ u4(SearchResultRow, { r: r4 }, r4.messageId)) });
 }
 function ThreadsRail() {

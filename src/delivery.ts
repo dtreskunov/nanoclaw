@@ -220,7 +220,9 @@ async function drainSession(session: Session): Promise<void> {
                 text,
               });
             }
-          } catch { /* search index failures must never block delivery */ }
+          } catch {
+            /* search index failures must never block delivery */
+          }
         }
 
         // No post-delivery typing pause: turn_ended_at is now the
