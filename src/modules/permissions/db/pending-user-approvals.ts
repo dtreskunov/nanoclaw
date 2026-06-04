@@ -11,6 +11,12 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { getDb } from '../../../db/connection.js';
+import { log } from '../../../log.js';
+import { addMember } from './agent-group-members.js';
+import { insertIdentity } from './identities.js';
+import { insertOidcLink } from './oidc-links.js';
+import { grantRole } from './user-roles.js';
+import { createUser } from './users.js';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'denied' | 'expired';
 
@@ -39,7 +45,10 @@ function sha256Hex(s: string): string {
 
 /**
  * Find an existing pending row for (provider, sub) — used to coalesce
- * repeat sign-in attempts before approval.
+ * repeat sign-in attempts before approval. Resolved rows (approved,
+ * denied) are excluded; the partial unique index added in migration 024
+ * lets resolved rows accumulate for audit while still enforcing one
+ * in-flight pending row per subject.
  */
 export function findPendingByOidcSub(provider: string, sub: string): PendingUserApproval | undefined {
   return getDb()
@@ -126,6 +135,129 @@ export function resolveApproval(args: {
        WHERE id = ? AND status = 'pending'`,
     )
     .run(args.status, args.resolved_by_user_id, args.granted_agent_group_id, args.note, args.id);
+}
+
+/**
+ * Transactional approve: mint the user, link the OIDC subject, seed the
+ * `web` identity, optionally provision an agent group (callback-injected
+ * to avoid pulling group scaffolding into the DB layer), add membership,
+ * and mark the row resolved. Shared by the CLI command and the in-band
+ * admin DM approval handler so both paths converge on identical state.
+ *
+ * The `provisionAgentGroup` callback runs INSIDE the transaction; rolling
+ * back leaves no users / identities / oidc_links / group rows behind, but
+ * any filesystem side effects the callback performs are not rolled back
+ * (callers should perform fs work after the transaction returns).
+ */
+export interface ApprovePendingUserArgs {
+  id: string;
+  resolverUserId: string;
+  displayName?: string | null;
+  note?: string | null;
+  /**
+   * Optional pre-existing agent group to grant membership to. If omitted
+   * and {@link provisionAgentGroup} is provided, the callback decides; if
+   * both are omitted the user is created with no group access.
+   */
+  agentGroupId?: string | null;
+  /**
+   * Optional callback that creates a per-user agent group (DB rows only —
+   * no filesystem). Returns the new agent_group_id. Runs inside the same
+   * transaction as user creation so a failure rolls everything back.
+   */
+  provisionAgentGroup?: (ctx: { userId: string; row: PendingUserApproval }) => string;
+  /**
+   * Optional callback to run AFTER the transaction commits — typically
+   * filesystem initialization for the agent group. Failures here are
+   * logged but do not roll back the approve (the row is already resolved).
+   */
+  postCommit?: (ctx: { userId: string; agentGroupId: string | null; row: PendingUserApproval }) => void;
+}
+
+export interface ApprovePendingUserResult {
+  userId: string;
+  displayName: string;
+  agentGroupId: string | null;
+  row: PendingUserApproval;
+}
+
+export function approvePendingUser(args: ApprovePendingUserArgs): ApprovePendingUserResult {
+  const row = getPendingApproval(args.id);
+  if (!row) throw new Error(`No pending approval: ${args.id}`);
+  if (row.status !== 'pending') throw new Error(`Approval ${args.id} is already ${row.status}`);
+
+  const displayName = args.displayName ?? row.display_name ?? row.email ?? `User ${row.sub.slice(0, 8)}`;
+  const userId = randomUUID();
+  const now = new Date().toISOString();
+  let resolvedAgentGroupId: string | null = args.agentGroupId ?? null;
+
+  const txn = getDb().transaction(() => {
+    createUser({
+      id: userId,
+      kind: row.provider === 'google' ? 'oidc' : row.provider,
+      display_name: displayName,
+      created_at: now,
+    });
+    insertIdentity({ userId, channel: 'web', handle: userId, primary: true });
+    insertOidcLink({
+      provider: row.provider,
+      sub: row.sub,
+      user_id: userId,
+      email: row.email,
+      claims: row.claims_json ? (JSON.parse(row.claims_json) as Record<string, unknown>) : null,
+    });
+
+    if (!resolvedAgentGroupId && args.provisionAgentGroup) {
+      resolvedAgentGroupId = args.provisionAgentGroup({ userId, row });
+    }
+
+    if (resolvedAgentGroupId) {
+      // Scoped admin grant first (implicit member), explicit member row for
+      // symmetry with the rest of the codebase that treats agent_group_members
+      // as the membership source of truth.
+      grantRole({
+        user_id: userId,
+        role: 'admin',
+        agent_group_id: resolvedAgentGroupId,
+        granted_by: args.resolverUserId,
+        granted_at: now,
+      });
+      addMember({
+        user_id: userId,
+        agent_group_id: resolvedAgentGroupId,
+        added_by: args.resolverUserId,
+        added_at: now,
+      });
+    }
+
+    resolveApproval({
+      id: args.id,
+      status: 'approved',
+      resolved_by_user_id: args.resolverUserId,
+      granted_agent_group_id: resolvedAgentGroupId,
+      note: args.note ?? null,
+    });
+  });
+  txn();
+
+  log.info('oidc approval approved', {
+    id: args.id,
+    user_id: userId,
+    provider: row.provider,
+    sub: row.sub,
+    email: row.email,
+    granted_agent_group_id: resolvedAgentGroupId,
+  });
+
+  if (args.postCommit) {
+    try {
+      args.postCommit({ userId, agentGroupId: resolvedAgentGroupId, row });
+    } catch (err) {
+      log.error('oidc approval post-commit hook threw', { id: args.id, err });
+    }
+  }
+
+  return { userId, displayName, agentGroupId: resolvedAgentGroupId, row };
 }
 
 export { randomUUID };

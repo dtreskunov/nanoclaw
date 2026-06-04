@@ -544,7 +544,9 @@ function headersOf(email: any): Record<string, string> {
 // match on label or value). Falls back to the raw extracted text when no
 // option list is on file so the response handlers can still try to match.
 function matchApprovalReply(plain: string): { approvalId: string; optionValue: string } | null {
-  const m = plain.match(/Approval ref:\s*(appr-[A-Za-z0-9_-]+|nsa-[A-Za-z0-9_-]+|mg-[A-Za-z0-9_-]+)/);
+  const m = plain.match(
+    /Approval ref:\s*(appr-[A-Za-z0-9_-]+|nsa-[A-Za-z0-9_-]+|mg-[A-Za-z0-9_-]+|pua-[A-Za-z0-9_-]+)/,
+  );
   if (!m) return null;
   return resolveOptionForReply(m[1], extractUnquotedReply(plain));
 }
@@ -557,7 +559,7 @@ function matchApprovalReplyFromSubject(
   subject: string,
   body: string,
 ): { approvalId: string; optionValue: string } | null {
-  const m = subject.match(/\[ref:(appr-[A-Za-z0-9_-]+|nsa-[A-Za-z0-9_-]+|mg-[A-Za-z0-9_-]+)\]/);
+  const m = subject.match(/\[ref:(appr-[A-Za-z0-9_-]+|nsa-[A-Za-z0-9_-]+|mg-[A-Za-z0-9_-]+|pua-[A-Za-z0-9_-]+)\]/);
   if (!m) return null;
   return resolveOptionForReply(m[1], extractUnquotedReply(body));
 }

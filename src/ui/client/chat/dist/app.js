@@ -17279,6 +17279,18 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 // src/actions.ts
+function focusComposerSoon() {
+  let tries = 0;
+  const attempt = () => {
+    const el = document.getElementById("chat-input");
+    if (el && !el.disabled) {
+      el.focus();
+      return;
+    }
+    if (++tries < 180) requestAnimationFrame(attempt);
+  };
+  requestAnimationFrame(attempt);
+}
 async function loadThreads(_gid) {
   await runSync();
 }
@@ -17535,6 +17547,7 @@ async function openChat(gid, resumeTid, opts) {
     else {
       chatStatus.value = "";
     }
+    focusComposerSoon();
     return;
   }
   n2(() => {
@@ -17572,6 +17585,7 @@ async function openChat(gid, resumeTid, opts) {
   ];
   writeHash();
   connectChatWs();
+  focusComposerSoon();
 }
 function connectChatWs() {
   if (!groupId.value || !threadId.value) return;
@@ -17697,8 +17711,7 @@ async function selectGroup(gid) {
   if (latest) {
     openChat(gid, latest.threadId, threadCtxOf(latest)).catch((err) => console.error("chat open failed", err));
   } else {
-    clearChat();
-    writeHash();
+    openChat(gid, null, null).catch((err) => console.error("auto-start chat failed", err));
   }
 }
 async function loadTree(p5) {
@@ -18268,8 +18281,6 @@ function ThreadsRail() {
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null, null).then(() => {
-      const el = document.getElementById("chat-input");
-      if (el) el.focus();
       drawerOpen.threads.value = false;
       drawerOpen.files.value = false;
     }).catch(console.error);

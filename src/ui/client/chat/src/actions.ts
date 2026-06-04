@@ -53,6 +53,27 @@ interface ServerMessage {
   timestamp: string;
 }
 
+/**
+ * Focus the composer textarea once it's both mounted and enabled. The
+ * element is unmounted while a group has no active thread and disabled
+ * while the WebSocket is reconnecting, so a naive focus() after openChat
+ * resolves often hits a dead element. Poll briefly with rAF instead
+ * (budget ~3s — enough for a typical WS handshake, not so long that a
+ * later user click steals focus back from us).
+ */
+function focusComposerSoon(): void {
+  let tries = 0;
+  const attempt = (): void => {
+    const el = document.getElementById('chat-input') as HTMLTextAreaElement | null;
+    if (el && !el.disabled) {
+      el.focus();
+      return;
+    }
+    if (++tries < 180) requestAnimationFrame(attempt);
+  };
+  requestAnimationFrame(attempt);
+}
+
 // ── threads ─────────────────────────────────────────────────────────
 // Threads are part of the unified /api/sync response and live in the
 // `threads` signal. Callers that just want a fresh snapshot before
@@ -379,6 +400,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
       // via the visibilitychange handler). The unified ticker is owned at
       // the app level by startSyncPoll().
     }
+    focusComposerSoon();
     return;
   }
 
@@ -418,6 +440,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
   ];
   writeHash();
   connectChatWs();
+  focusComposerSoon();
 }
 
 function connectChatWs(): void {
@@ -554,8 +577,10 @@ export async function selectGroup(gid: string): Promise<void> {
   if (latest) {
     openChat(gid, latest.threadId, threadCtxOf(latest)).catch((err) => console.error('chat open failed', err));
   } else {
-    clearChat();
-    writeHash();
+    // Brand-new group with no threads — auto-start one so the user lands
+    // in an immediately usable state instead of staring at a disabled
+    // composer ("Reconnecting…") and wondering what to click.
+    openChat(gid, null, null).catch((err) => console.error('auto-start chat failed', err));
   }
 }
 

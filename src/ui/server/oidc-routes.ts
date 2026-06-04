@@ -25,7 +25,12 @@ import { URL } from 'url';
 import { log } from '../../log.js';
 import { getIdentity } from '../../modules/permissions/db/identities.js';
 import { insertOidcLink, getOidcLink, touchOidcLink } from '../../modules/permissions/db/oidc-links.js';
-import { createPendingApproval, findPendingByOidcSub } from '../../modules/permissions/db/pending-user-approvals.js';
+import {
+  createPendingApproval,
+  findPendingByOidcSub,
+  getPendingApproval,
+} from '../../modules/permissions/db/pending-user-approvals.js';
+import { requestUserApproval } from '../../modules/permissions/user-approval.js';
 
 import { buildSessionCookie, createUiSessionForUser } from './auth.js';
 import { getBranding } from './branding.js';
@@ -180,17 +185,31 @@ export function renderLoginPage(next: string | null): string {
   </body></html>`;
 }
 
+/** Page auto-refreshes every 60s so the user lands in the app the next tick after an admin approves. */
 function renderPendingPage(pendingId: string, email: string | null): string {
   const brand = getBranding().name;
   const who = email ? `<code>${email}</code>` : 'this account';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Pending approval — ${brand}</title>${PAGE_STYLE}</head><body>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="60"><title>Pending approval — ${brand}</title>${PAGE_STYLE}</head><body>
     <div class="card">
       <div class="brand">${brand}</div>
       <h1>Waiting for admin approval</h1>
-      <p>${who} isn't recognized yet. We've recorded your sign-in request.</p>
-      <p>Ask an admin to run:</p>
-      <p><code>ncl pending-approvals approve ${pendingId} --group &lt;agent-group-id&gt;</code></p>
-      <p class="muted">Once approved, sign in again with the same provider.</p>
+      <p>${who} isn't recognized yet. We've sent your sign-in request to an admin.</p>
+      <p class="muted">This page checks for approval every minute. You can leave it open.</p>
+      <p class="muted">Reference: <code>${pendingId}</code></p>
+    </div>
+  </body></html>`;
+}
+
+function renderDeniedPage(email: string | null): string {
+  const brand = getBranding().name;
+  const who = email ? `<code>${email}</code>` : 'this account';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Access denied — ${brand}</title>${PAGE_STYLE}</head><body>
+    <div class="card">
+      <div class="brand">${brand}</div>
+      <h1>Access denied</h1>
+      <p>${who} was not approved.</p>
+      <p class="muted">You can try signing in again to request another review.</p>
+      <p><a class="btn" href="/ui/login">Try again</a></p>
     </div>
   </body></html>`;
 }
@@ -220,6 +239,15 @@ export async function handleOidcRoute(
   secureCookie: boolean,
 ): Promise<void> {
   sweepFlows();
+
+  // Status poller for the waiting page. Reuses the same URL the user lands
+  // on after the callback, so the meta-refresh closes the loop without
+  // bouncing through the provider again.
+  const pendingMatch = pathname.match(/^\/oidc\/pending\/([A-Za-z0-9_-]+)$/);
+  if (pendingMatch && req.method === 'GET') {
+    return handlePendingPoll(res, pendingMatch[1], secureCookie);
+  }
+
   // pathname is like /oidc/google/start or /oidc/google/callback
   const match = pathname.match(/^\/oidc\/([a-z0-9_-]+)\/(start|callback)$/);
   if (!match) {
@@ -242,6 +270,33 @@ export async function handleOidcRoute(
   }
   res.writeHead(405, { 'Content-Type': 'text/plain' });
   res.end('Method Not Allowed');
+}
+
+function handlePendingPoll(res: http.ServerResponse, pendingId: string, secureCookie: boolean): void {
+  const row = getPendingApproval(pendingId);
+  if (!row) {
+    renderHtml(res, 404, renderError('Sign-in request not found. Start again.'));
+    return;
+  }
+  if (row.status === 'approved') {
+    // The approval handler created the user + oidc_link; look it up and
+    // mint a UI session inline so the user lands in the app without
+    // bouncing through the provider.
+    const link = getOidcLink(row.provider, row.sub);
+    if (!link) {
+      log.warn('pending poll: approved row has no oidc_link', { pendingId, provider: row.provider });
+      renderHtml(res, 500, renderError('Approval inconsistent. Sign in again.'));
+      return;
+    }
+    completeLogin(res, link.user_id, LANDING, secureCookie);
+    return;
+  }
+  if (row.status === 'denied') {
+    renderHtml(res, 200, renderDeniedPage(row.email));
+    return;
+  }
+  // 'pending' (or anything else) → keep waiting.
+  renderHtml(res, 200, renderPendingPage(pendingId, row.email));
 }
 
 function handleStart(
@@ -341,7 +396,9 @@ async function handleCallback(
     }
   }
 
-  // 3. Queue for admin approval.
+  // 3. Queue for admin approval. Re-attempts (including after a prior
+  // denial) coalesce on any in-flight pending row; otherwise a fresh
+  // pending row is inserted so resolved rows accumulate for audit.
   let pending = findPendingByOidcSub(providerName, info.sub);
   if (!pending) {
     const created = createPendingApproval({
@@ -359,11 +416,21 @@ async function handleCallback(
       email: info.email,
     });
   }
-  res.writeHead(200, {
-    'Content-Type': 'text/html; charset=utf-8',
+
+  // Fire-and-forget: pick an approver, deliver an Approve/Reject card to
+  // their primary DM. Idempotent — re-attempts that find an existing
+  // pending row with approver_user_id already set are no-ops.
+  requestUserApproval(pending.id).catch((err) =>
+    log.error('requestUserApproval failed', { pendingId: pending?.id, err }),
+  );
+
+  // Redirect to the canonical waiting page URL so the meta-refresh re-hits
+  // the status poller (rather than bouncing through the provider again).
+  res.writeHead(303, {
+    Location: `/ui/auth/oidc/pending/${pending.id}`,
     'Set-Cookie': clearStateCookie(secureCookie),
   });
-  res.end(renderPendingPage(pending.id, info.email));
+  res.end();
 }
 
 function completeLogin(res: http.ServerResponse, userId: string, next: string, secureCookie: boolean): void {

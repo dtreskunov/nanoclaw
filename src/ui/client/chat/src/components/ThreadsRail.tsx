@@ -125,9 +125,8 @@ export function ThreadsRail() {
   const list = threads.value;
   const onNewChat = (): void => {
     if (!groupId.value) return;
+    // openChat handles composer focus once the WS is connected.
     openChat(groupId.value, null, null).then(() => {
-      const el = document.getElementById('chat-input') as HTMLTextAreaElement | null;
-      if (el) el.focus();
       drawerOpen.threads.value = false;
       drawerOpen.files.value = false;
     }).catch(console.error);

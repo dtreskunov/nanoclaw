@@ -54,6 +54,10 @@ import { hasAdminPrivilege } from './db/user-roles.js';
 import { requestSenderApproval } from './sender-approval.js';
 import { ensureUserDm } from './user-dm.js';
 
+// Side effect: registers a response handler for pending_user_approvals
+// rows (OIDC sign-in admin approval).
+import './user-approval.js';
+
 // ── Free-text name input state ──
 // Tracks approvers waiting for a text reply with the agent name. Keyed by
 // namespaced userId (e.g. "slack:U0ABC"). Cleared on receipt or restart.

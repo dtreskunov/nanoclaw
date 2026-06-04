@@ -1,20 +1,29 @@
-import { randomUUID } from 'node:crypto';
-
 import { getDb } from '../../db/connection.js';
 import { log } from '../../log.js';
-import { addMember } from '../../modules/permissions/db/agent-group-members.js';
-import { insertIdentity } from '../../modules/permissions/db/identities.js';
-import { insertOidcLink } from '../../modules/permissions/db/oidc-links.js';
-import { getPendingApproval, resolveApproval } from '../../modules/permissions/db/pending-user-approvals.js';
-import { createUser } from '../../modules/permissions/db/users.js';
+import {
+  getPendingApproval,
+  approvePendingUser,
+  resolveApproval,
+} from '../../modules/permissions/db/pending-user-approvals.js';
+import {
+  initPerUserAgentGroupFs,
+  scaffoldPerUserAgentGroupDb,
+  userAgentGroupFolder,
+} from '../../modules/permissions/user-approval.js';
 import { registerResource } from '../crud.js';
 
 /**
  * `ncl pending-approvals` — admin surface for OIDC sign-in requests that
  * landed in `pending_user_approvals` (an unrecognized Google account hit
  * the callback). `approve` mints the user, links the OIDC subject,
- * grants membership to the named agent group, and marks the row resolved.
- * `deny` just marks it resolved.
+ * grants membership to an agent group (auto-provisioned per-user unless
+ * an explicit `--group` is given), and marks the row resolved. `deny`
+ * just marks it resolved.
+ *
+ * The same flow runs automatically when an admin taps Approve on the DM
+ * card delivered by src/modules/permissions/user-approval.ts. This CLI
+ * surface is the fallback / scripted entry point — they call the same
+ * shared helpers.
  */
 registerResource({
   name: 'pending-approval',
@@ -46,9 +55,10 @@ registerResource({
     approve: {
       access: 'approval',
       description:
-        'Approve a pending OIDC sign-in. Mints a new user, links the OIDC subject, and optionally grants ' +
-        'membership to an agent group. Use --id <approval-id> [--group <ag-id>] [--display-name <name>] [--note <text>]. ' +
-        'Without --group the user can log in but will see no accessible groups until a separate `ncl members add` runs.',
+        'Approve a pending OIDC sign-in. Mints a new user, links the OIDC subject, and auto-provisions a ' +
+        'per-user agent group (folder = <provider>-<sub>) with the new user as scoped admin. ' +
+        'Use --id <approval-id> [--group <ag-id>] [--display-name <name>] [--note <text>]. ' +
+        'Pass --group to grant access to an existing group instead of auto-provisioning.',
       handler: async (args, ctx) => {
         const id = args.id as string;
         if (!id) throw new Error('--id is required');
@@ -56,61 +66,46 @@ registerResource({
         if (!row) throw new Error(`No pending approval: ${id}`);
         if (row.status !== 'pending') throw new Error(`Approval ${id} is already ${row.status}`);
 
-        const groupId = (args.group as string) || null;
-        if (groupId) {
-          const ag = getDb().prepare('SELECT id FROM agent_groups WHERE id = ?').get(groupId);
-          if (!ag) throw new Error(`Unknown agent group: ${groupId}`);
+        const overrideGroupId = (args.group as string) || null;
+        if (overrideGroupId) {
+          const ag = getDb().prepare('SELECT id FROM agent_groups WHERE id = ?').get(overrideGroupId);
+          if (!ag) throw new Error(`Unknown agent group: ${overrideGroupId}`);
         }
 
-        const displayName =
-          (args['display-name'] as string) || row.display_name || row.email || `User ${row.sub.slice(0, 8)}`;
+        const displayName = (args['display-name'] as string) || null;
         const note = (args.note as string) || null;
-        const resolverUserId = ctx.caller === 'host' ? null : ((ctx as { userId?: string }).userId ?? null);
-        const userId = randomUUID();
-        const now = new Date().toISOString();
+        const resolverUserId = ctx.caller === 'host' ? 'cli-host' : ((ctx as { userId?: string }).userId ?? 'cli-host');
 
-        getDb().transaction(() => {
-          createUser({
-            id: userId,
-            kind: row.provider === 'google' ? 'oidc' : row.provider,
-            display_name: displayName,
-            created_at: now,
-          });
-          insertIdentity({ userId, channel: 'web', handle: userId, primary: true });
-          insertOidcLink({
-            provider: row.provider,
-            sub: row.sub,
-            user_id: userId,
-            email: row.email,
-            claims: row.claims_json ? (JSON.parse(row.claims_json) as Record<string, unknown>) : null,
-          });
-          if (groupId) {
-            addMember({ user_id: userId, agent_group_id: groupId, added_by: resolverUserId, added_at: now });
-          }
-          resolveApproval({
-            id,
-            status: 'approved',
-            resolved_by_user_id: resolverUserId ?? 'cli-host',
-            granted_agent_group_id: groupId,
-            note,
-          });
-        })();
-
-        log.info('oidc approval approved', {
+        const result = approvePendingUser({
           id,
-          user_id: userId,
-          provider: row.provider,
-          sub: row.sub,
-          email: row.email,
-          granted_agent_group_id: groupId,
+          resolverUserId,
+          displayName,
+          note,
+          agentGroupId: overrideGroupId,
+          provisionAgentGroup: overrideGroupId
+            ? undefined
+            : ({ row: r }) =>
+                scaffoldPerUserAgentGroupDb({
+                  provider: r.provider,
+                  sub: r.sub,
+                  displayName: r.display_name,
+                  email: r.email,
+                }),
+          postCommit: ({ agentGroupId, row: r }) => {
+            if (!agentGroupId || overrideGroupId) return;
+            const folder = userAgentGroupFolder(r.provider, r.sub);
+            const name = r.display_name || r.email || folder;
+            initPerUserAgentGroupFs(agentGroupId, folder, name);
+          },
         });
+
         return {
           approved: true,
-          userId,
-          displayName,
+          userId: result.userId,
+          displayName: result.displayName,
           provider: row.provider,
           email: row.email,
-          grantedAgentGroupId: groupId,
+          grantedAgentGroupId: result.agentGroupId,
         };
       },
     },

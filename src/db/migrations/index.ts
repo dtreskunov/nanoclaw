@@ -20,6 +20,7 @@ import { migration020 } from './020-oidc-and-approvals.js';
 import { migration021 } from './021-identity-link-challenges.js';
 import { migration022 } from './022-push-subscriptions.js';
 import { migration023 } from './023-unregistered-senders-uuid.js';
+import { migration024 } from './024-pending-user-approvals-partial-unique.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
@@ -53,6 +54,7 @@ const migrations: Migration[] = [
   migration021,
   migration022,
   migration023,
+  migration024,
   moduleResendThreadRoots,
   moduleContainerConfigsPip,
 ];
