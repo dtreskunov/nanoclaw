@@ -44,6 +44,19 @@ export function isCorruptionError(msg: string): boolean {
   );
 }
 
+/**
+ * True for SQLite errors that indicate the DB file has been removed
+ * (e.g. the host deleted the chat thread / session dir). The container
+ * should exit immediately rather than poll a dead file forever.
+ */
+export function isMissingDbError(msg: string): boolean {
+  return (
+    msg.includes('unable to open database file') ||
+    msg.includes('SQLITE_CANTOPEN') ||
+    msg.includes('no such file or directory')
+  );
+}
+
 function log(msg: string): void {
   console.error(`[poll-loop] ${msg}`);
 }
@@ -655,6 +668,19 @@ async function processQuery(
         // path is not, so it needs its own.
         const errMsg = err instanceof Error ? err.message : String(err);
         log(`Follow-up poll error: ${errMsg}`);
+
+        // Session DB gone — the host deleted the thread (e.g. user clicked
+        // the trash icon) and removed the on-disk session dir. Without this
+        // bail, we'd spam `unable to open database file` at the poll rate
+        // forever until host-sweep's heartbeat-staleness rule eventually
+        // notices. Exit immediately so the container is torn down.
+        if (isMissingDbError(errMsg)) {
+          log('Follow-up poll: inbound.db is gone — session was deleted by host. Exiting.');
+          done = true;
+          clearInterval(pollHandle);
+          setTimeout(() => process.exit(0), 100);
+          return;
+        }
 
         // Detect SQLite cross-mount corruption (Docker Desktop macOS virtiofs /
         // gRPC-FUSE coherency bug — the kernel page cache for the inbound.db

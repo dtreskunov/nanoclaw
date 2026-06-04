@@ -26,6 +26,7 @@ import {
 } from '../../../db/messaging-groups.js';
 import { deleteSession, findSessionByAgentGroup, findSessionForAgent } from '../../../db/sessions.js';
 import { openInboundDb, openOutboundDb, sessionDir, writeSessionMessage } from '../../../session-manager.js';
+import { killContainer } from '../../../container-runner.js';
 import { canAccessAgentGroup } from '../../../modules/permissions/access.js';
 import { getUser } from '../../../modules/permissions/db/users.js';
 import { getIdentitiesForUser } from '../../../modules/permissions/db/identities.js';
@@ -1312,9 +1313,14 @@ function readThreadStats(
 
 /**
  * Delete a chat thread — drops the sessions row and removes the on-disk
- * session directory. Returns true if a row was deleted. Does not stop a
- * running container (the host sweeper will tear it down when its DB
- * disappears).
+/**
+ * Delete a chat thread: drop its session row + remove its on-disk
+ * session directory. Returns true if a row was deleted.
+ *
+ * Kills the running container first so the agent-runner doesn't poll a
+ * nuked inbound.db forever (which used to spam `unable to open database
+ * file` until the host sweeper noticed — and even then the sweeper only
+ * acts on heartbeat staleness, not on missing files).
  */
 function deleteChatThread(userId: string, groupId: string, threadId: string): boolean {
   const platformId = platformIdFor(userId, groupId);
@@ -1323,6 +1329,7 @@ function deleteChatThread(userId: string, groupId: string, threadId: string): bo
   const session = findSessionForAgent(groupId, mg.id, threadId);
   if (!session) return false;
   const dir = sessionDir(groupId, session.id);
+  killContainer(session.id, 'thread-deleted');
   deleteSession(session.id);
   try {
     fs.rmSync(dir, { recursive: true, force: true });

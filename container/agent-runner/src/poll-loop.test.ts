@@ -4,7 +4,7 @@ import { initTestSessionDb, closeSessionDb, getInboundDb, getOutboundDb } from '
 import { getPendingMessages, markCompleted } from './db/messages-in.js';
 import { getUndeliveredMessages } from './db/messages-out.js';
 import { formatMessages, extractRouting } from './formatter.js';
-import { isCorruptionError } from './poll-loop.js';
+import { isCorruptionError, isMissingDbError } from './poll-loop.js';
 import { MockProvider } from './providers/mock.js';
 
 beforeEach(() => {
@@ -393,5 +393,19 @@ describe('isCorruptionError', () => {
     expect(isCorruptionError('database is locked')).toBe(false);
     expect(isCorruptionError('no such table: messages_in')).toBe(false);
     expect(isCorruptionError('')).toBe(false);
+  });
+});
+
+describe('isMissingDbError', () => {
+  it('matches the host-deleted-session symptom', () => {
+    expect(isMissingDbError('unable to open database file')).toBe(true);
+    expect(isMissingDbError('SqliteError: SQLITE_CANTOPEN: unable to open database file')).toBe(true);
+    expect(isMissingDbError('ENOENT: no such file or directory, open ...')).toBe(true);
+  });
+
+  it('returns false for unrelated errors', () => {
+    expect(isMissingDbError('database is locked')).toBe(false);
+    expect(isMissingDbError('database disk image is malformed')).toBe(false);
+    expect(isMissingDbError('')).toBe(false);
   });
 });
