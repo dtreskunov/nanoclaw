@@ -28,6 +28,7 @@ import { deleteSession, findSessionByAgentGroup, findSessionForAgent } from '../
 import { openInboundDb, openOutboundDb, sessionDir, writeSessionMessage } from '../../../session-manager.js';
 import { killContainer } from '../../../container-runner.js';
 import { canAccessAgentGroup } from '../../../modules/permissions/access.js';
+import { searchMessages, type SearchResultRow } from '../../../search-index.js';
 import { getUser } from '../../../modules/permissions/db/users.js';
 import { getIdentitiesForUser } from '../../../modules/permissions/db/identities.js';
 import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
@@ -112,12 +113,15 @@ export function matchChatPath(
   | { kind: 'send'; groupId: string; threadId: string }
   | { kind: 'history'; groupId: string; threadId: string }
   | { kind: 'threads'; groupId: string }
+  | { kind: 'search'; groupId: string }
   | { kind: 'delete'; groupId: string; threadId: string }
   | null {
   const start = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/start$/);
   if (start) return { kind: 'start', groupId: start[1] };
   const threads = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/threads$/);
   if (threads) return { kind: 'threads', groupId: threads[1] };
+  const search = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/search$/);
+  if (search) return { kind: 'search', groupId: decodeURIComponent(search[1]) };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
   if (send) return { kind: 'send', groupId: decodeURIComponent(send[1]), threadId: decodeURIComponent(send[2]) };
   const hist = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/history$/);
@@ -405,6 +409,34 @@ export async function handleChatRequest(
     } catch (err) {
       log.warn('web chat threads list failed', { userId, groupId: m.groupId, err });
       writeJson(res, 200, { threads: [] });
+    }
+    return true;
+  }
+
+  if (m.kind === 'search') {
+    if (req.method !== 'GET') {
+      writeJson(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+    const q = new URLSearchParams((req.url || '').split('?')[1] || '');
+    const query = q.get('q') || '';
+    if (!query.trim()) {
+      writeJson(res, 200, { results: [] });
+      return true;
+    }
+    try {
+      // Collect accessible messaging group IDs for this user in this agent group.
+      const contexts = listUserMessagingContexts(userId, m.groupId);
+      const mgIds = contexts.map((c) => c.messagingGroupId).filter(Boolean) as string[];
+      const spectator = q.get('spectate') === '1' && canSpectate(userId);
+      const results = searchMessages(query, {
+        agentGroupId: m.groupId,
+        messagingGroupIds: spectator ? undefined : mgIds.length > 0 ? mgIds : ['__none__'],
+      });
+      writeJson(res, 200, { results });
+    } catch (err) {
+      log.warn('web chat search failed', { userId, groupId: m.groupId, query, err });
+      writeJson(res, 200, { results: [] });
     }
     return true;
   }

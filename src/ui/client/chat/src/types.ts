@@ -62,10 +62,23 @@ export interface ChatMessageFile {
 }
 
 export interface ChatMessage {
+  id?: string;
   direction: Direction;
   text: string;
   files: ChatMessageFile[] | null;
   ts: string;
+}
+
+export interface SearchResult {
+  messageId: string;
+  sessionId: string;
+  threadId: string | null;
+  channelType: string | null;
+  messagingGroupId: string | null;
+  direction: string;
+  timestamp: string;
+  snippet: string;
+  rank: number;
 }
 
 export interface TreeEntry {

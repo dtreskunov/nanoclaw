@@ -27,6 +27,10 @@ import {
   pendingApprovals,
   respondingApprovalIds,
   spectatingCurrentGroup,
+  searchQuery,
+  searchResults,
+  searchLoading,
+  searchOpen,
   SYNC_INTERVAL_MS,
 } from './state';
 import { api, postJson } from './api';
@@ -44,6 +48,7 @@ import type {
   PendingFile,
   PendingApprovalDto,
   WsPayload,
+  SearchResult,
 } from './types';
 
 interface ServerMessage {
@@ -145,6 +150,36 @@ function updateActiveThreadTitleFromFirstMessage(text: string): void {
   threads.value = list;
 }
 
+// ── search ──────────────────────────────────────────────────────────
+export async function searchThreads(gid: string, query: string): Promise<void> {
+  if (!query.trim()) {
+    clearSearch();
+    return;
+  }
+  searchLoading.value = true;
+  searchQuery.value = query;
+  try {
+    const { results } = await api<{ results: SearchResult[] }>(
+      `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`,
+    );
+    searchResults.value = results ?? [];
+  } catch (err) {
+    console.error('search failed', err);
+    searchResults.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+}
+
+export function clearSearch(): void {
+  batch(() => {
+    searchQuery.value = '';
+    searchResults.value = null;
+    searchLoading.value = false;
+    searchOpen.value = false;
+  });
+}
+
 // ── chat ────────────────────────────────────────────────────────────
 export function clearChat(): void {
   batch(() => {
@@ -244,7 +279,7 @@ function mergeIncomingMessages(messages: ServerMessage[]): void {
     const key = m.id ? `${direction}:${m.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m.timestamp || '';
-    additions.push({ direction, text: m.text, files: m.files || null, ts });
+    additions.push({ id: m.id, direction, text: m.text, files: m.files || null, ts });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === 'out') maybeNotify(m.text, m.files || []);
@@ -285,7 +320,7 @@ function appendMsg(
   const key = id ? `${direction}:${id}` : null;
   if (key && refs.seenIds.has(key)) return;
   if (key) refs.seenIds.add(key);
-  chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
+  chatMessages.value = chatMessages.value.concat({ id, direction, text, files: files || null, ts });
 }
 
 function normDirection(d: string): Direction {
@@ -302,6 +337,7 @@ async function refetchThreadHistory(appendNewOnly: boolean): Promise<void> {
   if (!Array.isArray(messages)) return;
   if (!appendNewOnly) {
     chatMessages.value = messages.map((m) => ({
+      id: m.id,
       direction: normDirection(m.direction),
       text: m.text,
       files: m.files || null,
@@ -317,7 +353,7 @@ async function refetchThreadHistory(appendNewOnly: boolean): Promise<void> {
     const key = m.id ? `${direction}:${m.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m.timestamp || '';
-    additions.push({ direction, text: m.text, files: m.files || null, ts });
+    additions.push({ id: m.id, direction, text: m.text, files: m.files || null, ts });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === 'out') maybeNotify(m.text, m.files || []);
@@ -390,6 +426,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
         const { messages } = (await r.json()) as { messages: ServerMessage[] };
         batch(() => {
           chatMessages.value = (messages || []).map((m) => ({
+            id: m.id,
             direction: normDirection(m.direction),
             text: m.text,
             files: m.files || null,
@@ -583,6 +620,7 @@ export async function selectGroup(gid: string): Promise<void> {
     treePath.value = '';
     filePath.value = null;
   });
+  clearSearch();
   await loadThreads(gid);
   // Threads list refresh now happens via the unified sync ticker
   // (startSyncPoll), which picks up groupId.value automatically.

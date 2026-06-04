@@ -13,6 +13,7 @@ import type {
   PendingFile,
   PendingApprovalDto,
   ChannelMetaEntry,
+  SearchResult,
 } from './types';
 
 // ── reactive state ──────────────────────────────────────────────────
@@ -96,6 +97,13 @@ export const chatLoading: Signal<boolean> = signal(false);
 export const isTyping: Signal<boolean> = signal(false);
 export const typingHint: Signal<string> = signal('');
 export const pending: Signal<PendingFile[]> = signal<PendingFile[]>([]);
+
+// Search
+export const searchQuery: Signal<string> = signal('');
+export const searchResults: Signal<SearchResult[] | null> = signal<SearchResult[] | null>(null);
+export const searchLoading: Signal<boolean> = signal(false);
+export const searchOpen: Signal<boolean> = signal(false);
+export const highlightMessageId: Signal<string | null> = signal<string | null>(null);
 
 // Panels / drawers
 export const paneOpen: Record<'threads' | 'files', Signal<boolean>> = {

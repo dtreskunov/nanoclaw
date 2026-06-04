@@ -21,14 +21,23 @@ Run `ncl help` for the full list. Common resources:
 | Resource | Verbs | What it is |
 |----------|-------|------------|
 | groups | list, get, create, update, delete, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package | Agent groups (workspace, personality, container config) |
-| sessions | list, get | Active sessions (read-only) |
+| sessions | list, get, search | Active sessions + message history search |
 | destinations | list, add, remove | Where an agent group can send messages |
 | members | list, add, remove | Unprivileged access gate for an agent group |
 
 Additional resources (available under `global` scope only): messaging-groups, wirings, users, roles, user-dms, dropped-messages, approvals.
 
+### Searching past conversations
+
+`ncl sessions search --query "..."` searches your past message history with the current user on the current channel. Results include message IDs, timestamps, and text snippets.
+
+- Supports prefix search (`deploy*`), phrase search (`"deploy to prod"`), and boolean operators (`deploy OR release`)
+- Results are scoped to conversations with your current conversation partner — you cannot see other users' threads
+- Each result includes a `messageId` and `threadId` you can reference in replies using `[[msg:<messageId>|<threadId>]]` format — the chat UI renders these as clickable links that jump to the referenced message
+
 ### When to use
 
+- **Recalling past conversations** — `ncl sessions search --query "that deployment bug"` to find what was discussed.
 - **Looking up your own config** — `ncl groups get` or `ncl groups config get` to see your container config.
 - **Restarting your container** — `ncl groups restart` (with optional `--rebuild` and `--message`).
 - **Checking who's in your group** — `ncl members list`.
@@ -59,6 +68,7 @@ You don't need to poll or retry — the result arrives automatically.
 ncl groups get
 ncl groups config get
 ncl sessions list
+ncl sessions search --query "deployment issue"
 ncl destinations list
 ncl members list
 

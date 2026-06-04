@@ -15534,6 +15534,11 @@ var chatLoading = y3(false);
 var isTyping = y3(false);
 var typingHint = y3("");
 var pending = y3([]);
+var searchQuery = y3("");
+var searchResults = y3(null);
+var searchLoading = y3(false);
+var searchOpen = y3(false);
+var highlightMessageId = y3(null);
 var paneOpen = {
   threads: y3(true),
   files: y3(true)
@@ -16839,6 +16844,31 @@ g4.use({
     }
   }
 });
+g4.use({
+  extensions: [{
+    name: "msgRef",
+    level: "inline",
+    start(src) {
+      return src.indexOf("[[msg:");
+    },
+    tokenizer(src) {
+      const m6 = src.match(/^\[\[msg:([^\]|]+)\|([^\]]+)\]\]/);
+      if (m6) {
+        return {
+          type: "msgRef",
+          raw: m6[0],
+          messageId: m6[1],
+          threadId: m6[2]
+        };
+      }
+      return void 0;
+    },
+    renderer(token) {
+      const { messageId, threadId: threadId2 } = token;
+      return `<a href="#" class="msg-ref" data-msg-id="${messageId}" data-thread-id="${threadId2}" title="Jump to message">\u{1F517} referenced message</a>`;
+    }
+  }]
+});
 function fmtBytes(n3) {
   if (n3 == null) return "";
   if (n3 < 1024) return n3 + " B";
@@ -16897,6 +16927,40 @@ function renderMarkdown(text) {
     return g4.parse(normalizeFileLinks(text || ""), { breaks: true, gfm: true });
   } catch {
     return null;
+  }
+}
+function highlightTextNodes(root, query) {
+  if (!query) return;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${escaped})`, "gi");
+  const skip = /* @__PURE__ */ new Set(["CODE", "PRE", "A", "MARK", "SCRIPT", "STYLE"]);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      let p5 = node.parentElement;
+      while (p5 && p5 !== root) {
+        if (skip.has(p5.tagName)) return NodeFilter.FILTER_REJECT;
+        p5 = p5.parentElement;
+      }
+      return re.test(node.textContent || "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const textNode of nodes) {
+    const frag = document.createDocumentFragment();
+    const parts = textNode.textContent.split(re);
+    for (const part of parts) {
+      if (re.test(part)) {
+        const mark = document.createElement("mark");
+        mark.className = "search-hl";
+        mark.textContent = part;
+        frag.appendChild(mark);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+      re.lastIndex = 0;
+    }
+    textNode.parentNode.replaceChild(frag, textNode);
   }
 }
 function rewriteFileLinks(root, groupId2, onNavFile) {
@@ -17369,6 +17433,33 @@ function updateActiveThreadTitleFromFirstMessage(text) {
   list[idx] = { ...t4, title: clean.slice(0, 60) };
   threads.value = list;
 }
+async function searchThreads(gid, query) {
+  if (!query.trim()) {
+    clearSearch();
+    return;
+  }
+  searchLoading.value = true;
+  searchQuery.value = query;
+  try {
+    const { results } = await api(
+      `api/groups/${encodeURIComponent(gid)}/chat/search?q=${encodeURIComponent(query)}`
+    );
+    searchResults.value = results ?? [];
+  } catch (err) {
+    console.error("search failed", err);
+    searchResults.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+}
+function clearSearch() {
+  n2(() => {
+    searchQuery.value = "";
+    searchResults.value = null;
+    searchLoading.value = false;
+    searchOpen.value = false;
+  });
+}
 function clearChat() {
   n2(() => {
     chatMessages.value = [];
@@ -17436,7 +17527,7 @@ function mergeIncomingMessages(messages) {
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    additions.push({ direction, text: m6.text, files: m6.files || null, ts });
+    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === "out") maybeNotify(m6.text, m6.files || []);
@@ -17466,7 +17557,7 @@ function appendMsg(direction, text, files, ts, id) {
   const key = id ? `${direction}:${id}` : null;
   if (key && refs.seenIds.has(key)) return;
   if (key) refs.seenIds.add(key);
-  chatMessages.value = chatMessages.value.concat({ direction, text, files: files || null, ts });
+  chatMessages.value = chatMessages.value.concat({ id, direction, text, files: files || null, ts });
 }
 function normDirection(d5) {
   return d5 === "in" ? "in" : d5 === "internal" ? "internal" : "out";
@@ -17480,6 +17571,7 @@ async function refetchThreadHistory(appendNewOnly) {
   if (!Array.isArray(messages)) return;
   if (!appendNewOnly) {
     chatMessages.value = messages.map((m6) => ({
+      id: m6.id,
       direction: normDirection(m6.direction),
       text: m6.text,
       files: m6.files || null,
@@ -17495,7 +17587,7 @@ async function refetchThreadHistory(appendNewOnly) {
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    additions.push({ direction, text: m6.text, files: m6.files || null, ts });
+    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === "out") maybeNotify(m6.text, m6.files || []);
@@ -17556,6 +17648,7 @@ async function openChat(gid, resumeTid, opts) {
         const { messages } = await r4.json();
         n2(() => {
           chatMessages.value = (messages || []).map((m6) => ({
+            id: m6.id,
             direction: normDirection(m6.direction),
             text: m6.text,
             files: m6.files || null,
@@ -17735,6 +17828,7 @@ async function selectGroup(gid) {
     treePath.value = "";
     filePath.value = null;
   });
+  clearSearch();
   await loadThreads(gid);
   await loadTree("");
   const latest = threads.value.length > 0 ? threads.value[0] : null;
@@ -18334,8 +18428,67 @@ function ChannelSection({ ct, items, defaultOpen }) {
     open ? /* @__PURE__ */ u4("div", { class: "thread-section-body", children: items.map(renderRow) }) : null
   ] });
 }
+function SearchResultRow({ r: r4 }) {
+  const meta = channelMeta(r4.channelType || "web");
+  const onOpen = () => {
+    if (!groupId.value) return;
+    const msgId = r4.messageId;
+    const tid = r4.threadId || (r4.messagingGroupId ? `__dm:${r4.messagingGroupId}` : null);
+    if (!tid) return;
+    drawerOpen.threads.value = false;
+    const opts = r4.channelType && r4.channelType !== "web" ? { channelType: r4.channelType, messagingGroupId: r4.messagingGroupId, canSend: false } : null;
+    if (threadId.value === tid) {
+      setTimeout(() => {
+        const el = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("highlight-pulse");
+          setTimeout(() => el.classList.remove("highlight-pulse"), 2e3);
+        }
+      }, 100);
+    } else {
+      highlightMessageId.value = msgId;
+      openChat(groupId.value, tid, opts).catch(console.error);
+    }
+  };
+  const raw = r4.snippet || "";
+  const markerPos = raw.indexOf(">>>");
+  const MAX_CHARS = 120;
+  let cropped = raw;
+  if (markerPos > MAX_CHARS / 2) {
+    cropped = "\u2026" + raw.slice(markerPos - Math.floor(MAX_CHARS / 3));
+  }
+  if (cropped.length > MAX_CHARS + 20) {
+    cropped = cropped.slice(0, MAX_CHARS + 20) + "\u2026";
+  }
+  const snippetHtml = cropped.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/&gt;&gt;&gt;/g, "<mark>").replace(/&lt;&lt;&lt;/g, "</mark>");
+  return /* @__PURE__ */ u4("div", { class: "thread search-result", onClick: onOpen, children: [
+    /* @__PURE__ */ u4("div", { class: "title", children: [
+      r4.channelType && r4.channelType !== "web" ? /* @__PURE__ */ u4("span", { class: "ch-pill", title: meta.label, children: meta.icon }) : null,
+      /* @__PURE__ */ u4("span", { class: "dir-pill " + r4.direction, children: r4.direction === "in" ? "\u2190" : "\u2192" }),
+      /* @__PURE__ */ u4("span", { class: "snippet", dangerouslySetInnerHTML: { __html: snippetHtml } })
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "meta", children: /* @__PURE__ */ u4(RelativeTime, { ts: r4.timestamp }) })
+  ] });
+}
+function SearchResults() {
+  const results = searchResults.value;
+  const loading = searchLoading.value;
+  if (loading) return /* @__PURE__ */ u4("div", { class: "empty", children: "Searching\\u2026" });
+  if (!results) return null;
+  if (results.length === 0) return /* @__PURE__ */ u4("div", { class: "empty", children: "No results" });
+  return /* @__PURE__ */ u4("div", { class: "search-results", children: results.map((r4) => /* @__PURE__ */ u4(SearchResultRow, { r: r4 }, r4.messageId)) });
+}
 function ThreadsRail() {
   const list = threads.value;
+  const searchInputRef = A2(null);
+  const isSearching = searchResults.value !== null || searchLoading.value;
+  const searchVisible = searchOpen.value || isSearching;
+  y2(() => {
+    if (searchVisible && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchVisible]);
   const onNewChat = () => {
     if (!groupId.value) return;
     openChat(groupId.value, null, null).then(() => {
@@ -18357,29 +18510,97 @@ function ThreadsRail() {
   for (const s5 of sections) {
     s5.items.sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt));
   }
-  return /* @__PURE__ */ u4(Pane, { paneKey: "threads", name: "threads-rail", label: "Threads", children: [
-    /* @__PURE__ */ u4("div", { class: "threads-actions", children: /* @__PURE__ */ u4("button", { type: "button", id: "btn-new-chat", onClick: onNewChat, children: [
+  const onSearchKeyDown = (ev) => {
+    if (ev.key === "Enter") {
+      const q3 = ev.currentTarget.value.trim();
+      if (q3 && groupId.value) searchThreads(groupId.value, q3).catch(console.error);
+    }
+    if (ev.key === "Escape") {
+      clearSearch();
+      ev.currentTarget.value = "";
+    }
+  };
+  const onSearchClear = () => {
+    clearSearch();
+    if (searchInputRef.current) searchInputRef.current.value = "";
+  };
+  const onSearchToggle = (ev) => {
+    ev.stopPropagation();
+    if (searchVisible) {
+      onSearchClear();
+    } else {
+      searchOpen.value = true;
+    }
+  };
+  const headActions = /* @__PURE__ */ u4("div", { class: "head-actions", children: /* @__PURE__ */ u4(
+    "button",
+    {
+      type: "button",
+      class: "icon-btn search-toggle-btn",
+      title: "Search threads",
+      "aria-label": "Search threads",
+      onClick: onSearchToggle,
+      children: "\u{1F50D}"
+    }
+  ) });
+  return /* @__PURE__ */ u4(Pane, { paneKey: "threads", name: "threads-rail", label: "Threads", headActions, children: [
+    /* @__PURE__ */ u4("div", { class: "threads-actions", children: searchVisible ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4("span", { class: "search-icon", "aria-hidden": "true", children: "\u{1F50D}" }),
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          ref: searchInputRef,
+          type: "text",
+          class: "search-input",
+          placeholder: "Search threads\u2026",
+          onKeyDown: onSearchKeyDown,
+          "aria-label": "Search threads"
+        }
+      ),
+      isSearching ? /* @__PURE__ */ u4("button", { type: "button", class: "search-clear", onClick: onSearchClear, title: "Clear search", children: "\xD7" }) : null
+    ] }) : /* @__PURE__ */ u4("button", { type: "button", id: "btn-new-chat", onClick: onNewChat, children: [
       /* @__PURE__ */ u4("span", { class: "plus", children: "+" }),
       " ",
       /* @__PURE__ */ u4("span", { class: "label", children: "New thread" })
     ] }) }),
-    /* @__PURE__ */ u4("div", { class: "list", id: "threads-list", children: list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No threads yet" }) : sections.map((s5) => /* @__PURE__ */ u4(ChannelSection, { ct: s5.ct, items: s5.items, defaultOpen: s5.ct === "web" }, s5.ct)) })
+    isSearching ? /* @__PURE__ */ u4(SearchResults, {}) : /* @__PURE__ */ u4("div", { class: "list", id: "threads-list", children: list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No threads yet" }) : sections.map((s5) => /* @__PURE__ */ u4(ChannelSection, { ct: s5.ct, items: s5.items, defaultOpen: s5.ct === "web" }, s5.ct)) })
   ] });
 }
 
 // src/components/ChatMain.tsx
 function Message({ m: m6 }) {
   const ref = A2(null);
+  const mdRef = A2(null);
   const md = renderMarkdown(m6.text);
+  const q3 = searchQuery.value;
   y2(() => {
-    if (md != null && ref.current && groupId.value) {
-      rewriteFileLinks(ref.current, groupId.value, (entry) => navFile(entry).catch(console.error));
+    if (md != null && mdRef.current) mdRef.current.innerHTML = md;
+    if (md != null && mdRef.current && groupId.value) {
+      rewriteFileLinks(mdRef.current, groupId.value, (entry) => navFile(entry).catch(console.error));
+      for (const a4 of mdRef.current.querySelectorAll("a.msg-ref")) {
+        a4.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const tid = a4.dataset.threadId;
+          const msgId = a4.dataset.msgId;
+          if (tid && groupId.value) {
+            highlightMessageId.value = msgId || null;
+            if (threadId.value === tid) {
+              setTimeout(() => {
+                highlightMessageId.value = msgId || null;
+              }, 50);
+            } else {
+              openChat(groupId.value, tid, null).catch(console.error);
+            }
+          }
+        });
+      }
     }
-  }, [m6.text, md != null]);
+    if (q3 && ref.current) highlightTextNodes(ref.current, q3);
+  }, [m6.text, md != null, q3]);
   const cls = "msg " + m6.direction + (md != null ? " markdown" : "");
-  return /* @__PURE__ */ u4("div", { class: cls, children: [
+  return /* @__PURE__ */ u4("div", { class: cls, "data-msg-id": m6.id, ref, children: [
     m6.direction === "internal" ? /* @__PURE__ */ u4("div", { class: "internal-label", children: "internal" }) : null,
-    md != null ? /* @__PURE__ */ u4("div", { ref, dangerouslySetInnerHTML: { __html: md } }) : m6.text || "",
+    md != null ? /* @__PURE__ */ u4("div", { ref: mdRef, dangerouslySetInnerHTML: { __html: md } }) : m6.text || "",
     m6.files && m6.files.length ? /* @__PURE__ */ u4("div", { class: "files", children: m6.files.map((f5) => f5.path ? /* @__PURE__ */ u4(
       "button",
       {
@@ -18474,8 +18695,26 @@ function ApprovalsBanner() {
 }
 function MessageLog() {
   const ref = A2(null);
+  const lastHighlightRef = A2(null);
+  const highlight = highlightMessageId.value;
   y2(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    if (!ref.current) return;
+    if (highlight && highlight !== lastHighlightRef.current) {
+      lastHighlightRef.current = highlight;
+      const el = ref.current.querySelector(`[data-msg-id="${CSS.escape(highlight)}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-pulse");
+        setTimeout(() => el.classList.remove("highlight-pulse"), 2e3);
+      }
+      setTimeout(() => {
+        highlightMessageId.value = null;
+        lastHighlightRef.current = null;
+      }, 2100);
+    } else if (!highlight) {
+      lastHighlightRef.current = null;
+      ref.current.scrollTop = ref.current.scrollHeight;
+    }
   });
   const list = chatMessages.value;
   const groups2 = groupMessages(list);

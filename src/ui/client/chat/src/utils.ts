@@ -17,6 +17,36 @@ marked.use({
   },
 });
 
+// Message reference extension: [[msg:messageId|threadId]] → clickable link.
+// The chat UI intercepts clicks on these links to navigate to the thread.
+marked.use({
+  extensions: [
+    {
+      name: 'msgRef',
+      level: 'inline',
+      start(src: string) {
+        return src.indexOf('[[msg:');
+      },
+      tokenizer(src: string) {
+        const m = src.match(/^\[\[msg:([^\]|]+)\|([^\]]+)\]\]/);
+        if (m) {
+          return {
+            type: 'msgRef',
+            raw: m[0],
+            messageId: m[1],
+            threadId: m[2],
+          };
+        }
+        return undefined;
+      },
+      renderer(token) {
+        const { messageId, threadId } = token as unknown as { messageId: string; threadId: string };
+        return `<a href="#" class="msg-ref" data-msg-id="${messageId}" data-thread-id="${threadId}" title="Jump to message">\uD83D\uDD17 referenced message</a>`;
+      },
+    },
+  ],
+});
+
 export function fmtBytes(n: number | null | undefined): string {
   if (n == null) return '';
   if (n < 1024) return n + ' B';
@@ -87,6 +117,49 @@ export function renderMarkdown(text: string | null | undefined): string | null {
     return marked.parse(normalizeFileLinks(text || ''), { breaks: true, gfm: true }) as string;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Walk text nodes inside `root` and wrap case-insensitive matches of `query`
+ * in <mark class="search-hl"> elements. Skips nodes inside <code>, <pre>,
+ * <a>, <mark> to avoid breaking syntax or double-highlighting.
+ */
+export function highlightTextNodes(root: HTMLElement, query: string): void {
+  if (!query) return;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(${escaped})`, 'gi');
+  const skip = new Set(['CODE', 'PRE', 'A', 'MARK', 'SCRIPT', 'STYLE']);
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      let p = node.parentElement;
+      while (p && p !== root) {
+        if (skip.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+        p = p.parentElement;
+      }
+      return re.test(node.textContent || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    },
+  });
+
+  const nodes: Text[] = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+
+  for (const textNode of nodes) {
+    const frag = document.createDocumentFragment();
+    const parts = textNode.textContent!.split(re);
+    for (const part of parts) {
+      if (re.test(part)) {
+        const mark = document.createElement('mark');
+        mark.className = 'search-hl';
+        mark.textContent = part;
+        frag.appendChild(mark);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+      re.lastIndex = 0;
+    }
+    textNode.parentNode!.replaceChild(frag, textNode);
   }
 }
 

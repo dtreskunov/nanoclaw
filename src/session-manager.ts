@@ -36,6 +36,7 @@ import {
   migrateMessagesInTable,
 } from './db/session-db.js';
 import { log } from './log.js';
+import { extractInboundText, indexMessage } from './search-index.js';
 import type { Session } from './types.js';
 
 function isPathInside(parent: string, child: string): boolean {
@@ -252,6 +253,29 @@ export function writeSessionMessage(
     });
   } finally {
     db.close();
+  }
+
+  // Fire-and-forget: index the message text for search.
+  // Only index chat-like messages (skip system, task wake-ups, etc.)
+  if (message.kind === 'chat' || message.kind === 'chat-sdk') {
+    try {
+      const text = extractInboundText(content);
+      if (text) {
+        const session = getSession(sessionId);
+        indexMessage({
+          id: message.id,
+          sessionId,
+          agentGroupId,
+          messagingGroupId: session?.messaging_group_id ?? null,
+          channelType: message.channelType ?? null,
+          threadId: message.threadId ?? null,
+          direction: 'in',
+          timestamp: message.timestamp,
+          text,
+          senderUserId: message.senderUserId ?? null,
+        });
+      }
+    } catch { /* search index failures must never block routing */ }
   }
 
   updateSession(sessionId, { last_active: new Date().toISOString() });

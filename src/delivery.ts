@@ -23,6 +23,7 @@ import {
 import { log } from './log.js';
 import { normalizeOptions } from './channels/ask-question.js';
 import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './session-manager.js';
+import { extractOutboundText, indexMessage } from './search-index.js';
 import { checkTurnEndedAndStop, setTypingAdapter } from './modules/typing/index.js';
 import type { OutboundFile } from './channels/adapter.js';
 import type { Session } from './types.js';
@@ -199,6 +200,28 @@ async function drainSession(session: Session): Promise<void> {
         const platformMsgId = await deliverMessage(msg, session, inDb);
         markDelivered(inDb, msg.id, platformMsgId ?? null);
         deliveryAttempts.delete(msg.id);
+
+        // Fire-and-forget: index outbound chat messages for search.
+        if (msg.kind === 'chat' || msg.kind === 'text') {
+          try {
+            const text = extractOutboundText(msg.content);
+            if (text) {
+              // OutboundMessage interface omits `timestamp` but SELECT * returns it.
+              const ts = (msg as unknown as { timestamp: string }).timestamp || new Date().toISOString();
+              indexMessage({
+                id: msg.id,
+                sessionId: session.id,
+                agentGroupId: session.agent_group_id,
+                messagingGroupId: session.messaging_group_id,
+                channelType: msg.channel_type,
+                threadId: msg.thread_id,
+                direction: 'out',
+                timestamp: ts,
+                text,
+              });
+            }
+          } catch { /* search index failures must never block delivery */ }
+        }
 
         // No post-delivery typing pause: turn_ended_at is now the
         // authoritative "nothing more is coming" signal, checked

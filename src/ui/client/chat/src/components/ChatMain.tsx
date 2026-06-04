@@ -6,31 +6,54 @@ import { useRef, useEffect, useState } from 'preact/hooks';
 import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
-  spectatingCurrentGroup,
+  spectatingCurrentGroup, highlightMessageId, searchQuery,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
-import { renderMarkdown, rewriteFileLinks, fmtBytesShort } from '../utils';
+import { renderMarkdown, rewriteFileLinks, highlightTextNodes, fmtBytesShort } from '../utils';
 import {
   sendChat, addPendingFiles, removePending, clearPending,
   navFile, removePinnedPath, clearPinnedContext, respondApproval,
+  openChat,
 } from '../actions';
 import { RelativeTime } from './RelativeTime';
 import type { ChatMessage } from '../types';
 
 function Message({ m }: { m: ChatMessage }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const mdRef = useRef<HTMLDivElement | null>(null);
   const md = renderMarkdown(m.text);
+  const q = searchQuery.value;
   useEffect(() => {
-    if (md != null && ref.current && groupId.value) {
-      rewriteFileLinks(ref.current, groupId.value, (entry) => navFile(entry).catch(console.error));
+    // Reset markdown DOM before re-processing (handles search query changes).
+    if (md != null && mdRef.current) mdRef.current.innerHTML = md;
+    if (md != null && mdRef.current && groupId.value) {
+      rewriteFileLinks(mdRef.current, groupId.value, (entry) => navFile(entry).catch(console.error));
+      // Handle [[msg:id|threadId]] reference link clicks.
+      for (const a of mdRef.current.querySelectorAll<HTMLAnchorElement>('a.msg-ref')) {
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const tid = a.dataset.threadId;
+          const msgId = a.dataset.msgId;
+          if (tid && groupId.value) {
+            highlightMessageId.value = msgId || null;
+            if (threadId.value === tid) {
+              setTimeout(() => { highlightMessageId.value = msgId || null; }, 50);
+            } else {
+              openChat(groupId.value, tid, null).catch(console.error);
+            }
+          }
+        });
+      }
     }
-  }, [m.text, md != null]);
+    // Highlight search query terms in the rendered message.
+    if (q && ref.current) highlightTextNodes(ref.current, q);
+  }, [m.text, md != null, q]);
   const cls = 'msg ' + m.direction + (md != null ? ' markdown' : '');
   return (
-    <div class={cls}>
+    <div class={cls} data-msg-id={m.id} ref={ref}>
       {m.direction === 'internal' ? <div class="internal-label">internal</div> : null}
       {md != null
-        ? <div ref={ref} dangerouslySetInnerHTML={{ __html: md }} />
+        ? <div ref={mdRef} dangerouslySetInnerHTML={{ __html: md }} />
         : (m.text || '')}
       {m.files && m.files.length
         ? (
@@ -136,8 +159,31 @@ function ApprovalsBanner() {
 
 function MessageLog() {
   const ref = useRef<HTMLDivElement | null>(null);
+  const lastHighlightRef = useRef<string | null>(null);
+  const highlight = highlightMessageId.value;
   useEffect(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    if (!ref.current) return;
+    if (highlight && highlight !== lastHighlightRef.current) {
+      // Scroll to the highlighted message instead of bottom.
+      lastHighlightRef.current = highlight;
+      const el = ref.current.querySelector(`[data-msg-id="${CSS.escape(highlight)}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('highlight-pulse');
+        setTimeout(() => el.classList.remove('highlight-pulse'), 2000);
+      }
+      // Clear the signal after the animation — using setTimeout avoids
+      // a re-render cascade that would scroll back to bottom immediately.
+      setTimeout(() => {
+        highlightMessageId.value = null;
+        lastHighlightRef.current = null;
+      }, 2100);
+    } else if (!highlight) {
+      lastHighlightRef.current = null;
+      ref.current.scrollTop = ref.current.scrollHeight;
+    }
+    // When highlight is set and equals lastRef: preserve scroll position
+    // (animation in progress — don't scroll to bottom).
   });
   const list = chatMessages.value;
   const groups = groupMessages(list);

@@ -18,6 +18,7 @@ import { createDeliveryBridge } from './delivery-bridge.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
 import { ensureVapidKeys } from './modules/push/bootstrap.js';
 import { routeInbound } from './router.js';
+import { initSearchDb, closeSearchDb } from './search-index.js';
 import { log } from './log.js';
 
 // Response + shutdown registries live in response-registry.ts to break the
@@ -78,6 +79,9 @@ async function main(): Promise<void> {
 
   // 1c. One-time filesystem cutover — idempotent, no-op after first run.
   migrateGroupsToClaudeLocal();
+
+  // 1d. Search index (FTS5) — separate search.db, rebuildable.
+  initSearchDb();
 
   // 2. Container runtime
   ensureContainerRuntimeRunning();
@@ -172,6 +176,7 @@ async function shutdown(signal: string): Promise<void> {
   }
   stopDeliveryPolls();
   stopHostSweep();
+  closeSearchDb();
   await stopCliServer();
   await stopUi();
   try {
