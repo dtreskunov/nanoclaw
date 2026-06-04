@@ -1,10 +1,10 @@
-/* Horizontally scrollable group strip. */
+/* Horizontally scrollable group strip (desktop). */
 
 .group-strip {
   display: flex; align-items: stretch; gap: 2px;
   overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: none;          /* Firefox */
-  -ms-overflow-style: none;       /* IE/Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   flex: 1; min-width: 0;
   padding: 0 4px;
 }
@@ -31,9 +31,50 @@
   color: var(--muted); letter-spacing: 0.01em;
 }
 
+/* Mobile: hide the strip and show the single active-group button instead. */
+.active-group-btn { display: none; }
+
 @media (max-width: 720px) {
-  .group-strip { gap: 0; padding: 0 2px; }
-  .group-chip { padding: 6px 10px; min-height: 44px; }
-  .chip-name { font-size: 14px; }
-  .chip-sub { font-size: 11px; }
+  .group-strip.desktop-only { display: none; }
+
+  .active-group-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    flex: 1; min-width: 0; min-height: 44px;
+    padding: 4px 10px; border: 0; border-radius: 6px;
+    background: var(--wash-subtle); color: inherit; cursor: pointer;
+    font-family: inherit; text-align: left;
+  }
+  .active-group-btn:hover { background: var(--wash); }
+  .active-group-btn.admin-only { opacity: 0.7; }
+  .agb-stack {
+    display: flex; flex-direction: column; min-width: 0;
+    flex: 1; overflow: hidden;
+  }
+  .agb-name {
+    font-size: 14px; font-weight: 600; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .agb-sub {
+    font-size: 11px; line-height: 1.2; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .agb-caret { font-size: 12px; color: var(--muted); flex-shrink: 0; }
 }
+
+/* Modal list (mobile group picker). */
+.group-picker-modal .group-picker-list {
+  padding: 8px; display: flex; flex-direction: column; gap: 2px;
+}
+.group-row {
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 10px 12px; border: 0; border-radius: 6px;
+  background: transparent; color: inherit; cursor: pointer;
+  font-family: inherit; text-align: left; width: 100%;
+  min-height: 48px;
+}
+.group-row:hover { background: var(--wash); }
+.group-row.active { background: var(--wash-subtle); }
+.group-row.active .row-name { font-weight: 700; }
+.group-row.admin-only { opacity: 0.7; }
+.row-name { font-size: 14px; font-weight: 500; line-height: 1.3; }
+.row-sub { font-size: 11px; line-height: 1.2; color: var(--muted); margin-top: 2px; }

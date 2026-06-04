@@ -5,7 +5,7 @@ import {
   settingsOpen,
 } from '../state';
 import { BRAND } from '../brand';
-import { GroupStrip } from './GroupPicker';
+import { GroupStrip, ActiveGroupButton } from './GroupPicker';
 
 export function Header() {
   return (
@@ -18,6 +18,7 @@ export function Header() {
       >{'\u2630'}</button>
       <span class="brand">{BRAND.name}</span>
       <GroupStrip />
+      <ActiveGroupButton />
       <button
         type="button"
         class="icon-btn"

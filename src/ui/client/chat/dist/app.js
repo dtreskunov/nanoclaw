@@ -15533,6 +15533,7 @@ var uploadItems = y3([]);
 var me = y3("");
 var notifMutedSig = y3(false);
 var settingsOpen = y3(false);
+var groupPickerOpen = y3(false);
 var shareModalRequest = y3(null);
 var toastMessage = y3(null);
 var previewBlock = y3(null);
@@ -18040,20 +18041,28 @@ async function respondApproval(approvalId, value) {
 }
 
 // src/components/GroupPicker.tsx
+function visibleGroups() {
+  const elevated = isElevatedUser.value;
+  return elevated ? groups.value : groups.value.filter((g6) => g6.hasContent !== false);
+}
+function chipParts(g6, elevated) {
+  const isAdminOnly = elevated && g6.hasContent === false;
+  const parts = [];
+  if (!g6.isAdmin) parts.push("\u{1F512}");
+  if (isAdminOnly) parts.push("\u{1F441}");
+  if (g6.lastActivityAt) parts.push(fmtRelative(g6.lastActivityAt));
+  return { parts, isAdminOnly };
+}
 function GroupStrip() {
   const elevated = isElevatedUser.value;
-  const visible = elevated ? groups.value : groups.value.filter((g6) => g6.hasContent !== false);
+  const visible = visibleGroups();
   nowTick.value;
   const pick = (gid) => {
     if (gid !== groupId.value) selectGroup(gid).catch(console.error);
   };
-  return /* @__PURE__ */ u4("nav", { class: "group-strip", role: "tablist", "aria-label": "Agent groups", children: visible.map((g6) => {
+  return /* @__PURE__ */ u4("nav", { class: "group-strip desktop-only", role: "tablist", "aria-label": "Agent groups", children: visible.map((g6) => {
     const active = g6.id === groupId.value;
-    const isAdminOnly = elevated && g6.hasContent === false;
-    const parts = [];
-    if (!g6.isAdmin) parts.push("\u{1F512}");
-    if (isAdminOnly) parts.push("\u{1F441}");
-    if (g6.lastActivityAt) parts.push(fmtRelative(g6.lastActivityAt));
+    const { parts, isAdminOnly } = chipParts(g6, elevated);
     const subtitle = parts.join(" \xB7 ");
     return /* @__PURE__ */ u4(
       "button",
@@ -18072,6 +18081,93 @@ function GroupStrip() {
       g6.id
     );
   }) });
+}
+function ActiveGroupButton() {
+  nowTick.value;
+  const elevated = isElevatedUser.value;
+  const visible = visibleGroups();
+  const active = visible.find((g6) => g6.id === groupId.value) ?? visible[0];
+  if (!active) return null;
+  const { parts, isAdminOnly } = chipParts(active, elevated);
+  const subtitle = parts.join(" \xB7 ");
+  return /* @__PURE__ */ u4(
+    "button",
+    {
+      type: "button",
+      class: `active-group-btn mobile-only${isAdminOnly ? " admin-only" : ""}`,
+      "aria-label": "Switch agent group",
+      "aria-haspopup": "dialog",
+      onClick: () => {
+        groupPickerOpen.value = true;
+      },
+      children: [
+        /* @__PURE__ */ u4("span", { class: "agb-stack", children: [
+          /* @__PURE__ */ u4("span", { class: "agb-name", children: active.name }),
+          subtitle ? /* @__PURE__ */ u4("span", { class: "agb-sub", children: subtitle }) : null
+        ] }),
+        /* @__PURE__ */ u4("span", { class: "agb-caret", "aria-hidden": "true", children: "\u25BE" })
+      ]
+    }
+  );
+}
+function GroupPickerModal() {
+  const open = groupPickerOpen.value;
+  nowTick.value;
+  y2(() => {
+    if (!open) return;
+    const onKey = (e4) => {
+      if (e4.key === "Escape") groupPickerOpen.value = false;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  if (!open) return null;
+  const elevated = isElevatedUser.value;
+  const visible = visibleGroups();
+  const close = () => {
+    groupPickerOpen.value = false;
+  };
+  const onBackdrop = (e4) => {
+    if (e4.target.classList.contains("settings-backdrop")) close();
+  };
+  const pick = (gid) => {
+    close();
+    if (gid !== groupId.value) selectGroup(gid).catch(console.error);
+  };
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4(
+    "div",
+    {
+      class: "settings-modal group-picker-modal",
+      role: "dialog",
+      "aria-label": "Switch agent group",
+      style: "max-width:480px",
+      children: [
+        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+          /* @__PURE__ */ u4("span", { class: "title", children: "Agent groups" }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-body group-picker-list", children: visible.map((g6) => {
+          const active = g6.id === groupId.value;
+          const { parts, isAdminOnly } = chipParts(g6, elevated);
+          const subtitle = parts.join(" \xB7 ");
+          return /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              class: `group-row${active ? " active" : ""}${isAdminOnly ? " admin-only" : ""}`,
+              "aria-current": active ? "true" : void 0,
+              onClick: () => pick(g6.id),
+              children: [
+                /* @__PURE__ */ u4("span", { class: "row-name", children: g6.name }),
+                subtitle ? /* @__PURE__ */ u4("span", { class: "row-sub", children: subtitle }) : null
+              ]
+            },
+            g6.id
+          );
+        }) })
+      ]
+    }
+  ) });
 }
 
 // src/components/Header.tsx
@@ -18092,6 +18188,7 @@ function Header() {
     ),
     /* @__PURE__ */ u4("span", { class: "brand", children: BRAND.name }),
     /* @__PURE__ */ u4(GroupStrip, {}),
+    /* @__PURE__ */ u4(ActiveGroupButton, {}),
     /* @__PURE__ */ u4(
       "button",
       {
@@ -20396,6 +20493,7 @@ function App() {
     /* @__PURE__ */ u4(ShareLinkModal, {}),
     /* @__PURE__ */ u4(PromptModal, {}),
     /* @__PURE__ */ u4(ConfirmModal, {}),
+    /* @__PURE__ */ u4(GroupPickerModal, {}),
     /* @__PURE__ */ u4(Toast, {})
   ] });
 }
