@@ -159,31 +159,37 @@ function ApprovalsBanner() {
 
 function MessageLog() {
   const ref = useRef<HTMLDivElement | null>(null);
-  const lastHighlightRef = useRef<string | null>(null);
+  const appliedHighlightRef = useRef<string | null>(null);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const highlight = highlightMessageId.value;
   useEffect(() => {
     if (!ref.current) return;
-    if (highlight && highlight !== lastHighlightRef.current) {
-      // Scroll to the highlighted message instead of bottom.
-      lastHighlightRef.current = highlight;
+    if (highlight) {
+      // Cancel any pending clear from a previous highlight.
+      if (clearTimerRef.current) {
+        clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = null;
+      }
+      // If the highlight changed, reset so we can apply the new one.
+      if (appliedHighlightRef.current && appliedHighlightRef.current !== highlight) {
+        appliedHighlightRef.current = null;
+      }
       const el = ref.current.querySelector(`[data-msg-id="${CSS.escape(highlight)}"]`);
-      if (el) {
+      if (el && appliedHighlightRef.current !== highlight) {
+        appliedHighlightRef.current = highlight;
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('highlight-pulse');
         setTimeout(() => el.classList.remove('highlight-pulse'), 2000);
+        clearTimerRef.current = setTimeout(() => {
+          highlightMessageId.value = null;
+          appliedHighlightRef.current = null;
+          clearTimerRef.current = null;
+        }, 2100);
       }
-      // Clear the signal after the animation — using setTimeout avoids
-      // a re-render cascade that would scroll back to bottom immediately.
-      setTimeout(() => {
-        highlightMessageId.value = null;
-        lastHighlightRef.current = null;
-      }, 2100);
-    } else if (!highlight) {
-      lastHighlightRef.current = null;
+    } else {
+      appliedHighlightRef.current = null;
       ref.current.scrollTop = ref.current.scrollHeight;
     }
-    // When highlight is set and equals lastRef: preserve scroll position
-    // (animation in progress — don't scroll to bottom).
   });
   const list = chatMessages.value;
   const groups = groupMessages(list);

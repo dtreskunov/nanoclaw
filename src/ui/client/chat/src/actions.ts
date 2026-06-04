@@ -31,6 +31,7 @@ import {
   searchResults,
   searchLoading,
   searchOpen,
+  highlightMessageId,
   SYNC_INTERVAL_MS,
 } from './state';
 import { api, postJson } from './api';
@@ -451,7 +452,8 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
       // via the visibilitychange handler). The unified ticker is owned at
       // the app level by startSyncPoll().
     }
-    focusComposerSoon();
+    // Don't steal focus from the search view when navigating via search result.
+    if (!highlightMessageId.value) focusComposerSoon();
     return;
   }
 

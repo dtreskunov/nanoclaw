@@ -17672,7 +17672,7 @@ async function openChat(gid, resumeTid, opts) {
     else {
       chatStatus.value = "";
     }
-    focusComposerSoon();
+    if (!highlightMessageId.value) focusComposerSoon();
     return;
   }
   n2(() => {
@@ -18697,24 +18697,33 @@ function ApprovalsBanner() {
 }
 function MessageLog() {
   const ref = A2(null);
-  const lastHighlightRef = A2(null);
+  const appliedHighlightRef = A2(null);
+  const clearTimerRef = A2(null);
   const highlight = highlightMessageId.value;
   y2(() => {
     if (!ref.current) return;
-    if (highlight && highlight !== lastHighlightRef.current) {
-      lastHighlightRef.current = highlight;
+    if (highlight) {
+      if (clearTimerRef.current) {
+        clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = null;
+      }
+      if (appliedHighlightRef.current && appliedHighlightRef.current !== highlight) {
+        appliedHighlightRef.current = null;
+      }
       const el = ref.current.querySelector(`[data-msg-id="${CSS.escape(highlight)}"]`);
-      if (el) {
+      if (el && appliedHighlightRef.current !== highlight) {
+        appliedHighlightRef.current = highlight;
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.classList.add("highlight-pulse");
         setTimeout(() => el.classList.remove("highlight-pulse"), 2e3);
+        clearTimerRef.current = setTimeout(() => {
+          highlightMessageId.value = null;
+          appliedHighlightRef.current = null;
+          clearTimerRef.current = null;
+        }, 2100);
       }
-      setTimeout(() => {
-        highlightMessageId.value = null;
-        lastHighlightRef.current = null;
-      }, 2100);
-    } else if (!highlight) {
-      lastHighlightRef.current = null;
+    } else {
+      appliedHighlightRef.current = null;
       ref.current.scrollTop = ref.current.scrollHeight;
     }
   });
