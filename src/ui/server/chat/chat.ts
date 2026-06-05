@@ -498,6 +498,63 @@ export interface HistoryMessage {
 }
 
 /**
+ * Look up `turn_usage` for a single outbound message id. Used by the live
+ * WS subscriber to push usage to the client as soon as it's written —
+ * without this, usage only appears after the next REST `/history` fetch
+ * (i.e. on page reload).
+ */
+export function readTurnUsageForOutbound(
+  agentGroupId: string,
+  sessionId: string,
+  messageOutId: string,
+): TurnUsageDto | undefined {
+  try {
+    const outDb = openOutboundDb(agentGroupId, sessionId);
+    try {
+      const row = outDb
+        .prepare(
+          `SELECT cost_usd, input_tokens, output_tokens,
+                  cache_read_tokens, cache_write_tokens, reasoning_tokens,
+                  model, context_window, max_output_tokens, duration_ms
+             FROM turn_usage WHERE message_out_id = ?`,
+        )
+        .get(messageOutId) as
+        | {
+            cost_usd: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_read_tokens: number;
+            cache_write_tokens: number;
+            reasoning_tokens: number | null;
+            model: string;
+            context_window: number | null;
+            max_output_tokens: number | null;
+            duration_ms: number | null;
+          }
+        | undefined;
+      if (!row) return undefined;
+      return {
+        cost_usd: row.cost_usd,
+        input_tokens: row.input_tokens,
+        output_tokens: row.output_tokens,
+        cache_read_tokens: row.cache_read_tokens,
+        cache_write_tokens: row.cache_write_tokens,
+        ...(row.reasoning_tokens != null ? { reasoning_tokens: row.reasoning_tokens } : {}),
+        model: row.model,
+        ...(row.context_window != null ? { context_window: row.context_window } : {}),
+        ...(row.max_output_tokens != null ? { max_output_tokens: row.max_output_tokens } : {}),
+        ...(row.duration_ms != null ? { duration_ms: row.duration_ms } : {}),
+      };
+    } finally {
+      outDb.close();
+    }
+  } catch {
+    // outbound DB or turn_usage table may not exist
+    return undefined;
+  }
+}
+
+/**
  * Read merged inbound + outbound history for a (user, group, thread) from
  * the session DBs. Returns [] if no session exists yet.
  *
@@ -1735,6 +1792,44 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
   // WS before calling /start — be defensive.)
   ensureWebMessagingGroup(ctx.userId, ctx.groupId);
 
+  // Lazy-resolved session id for this (user, agentGroup, thread). Cached
+  // once found — used to look up `turn_usage` on each outbound message.
+  // Resolved lazily because the session may not yet exist when the WS
+  // attaches (first message in a brand-new thread creates it).
+  let cachedSessionId: string | undefined;
+  function resolveSessionIdForUsage(): string | undefined {
+    if (cachedSessionId) return cachedSessionId;
+    try {
+      const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, ctx.platformId);
+      if (!mg) return undefined;
+      const isDm = ctx.threadId.startsWith('__dm:');
+      const session = resolveSessionForMode(ctx.groupId, mg.id, 'per-thread', isDm ? '' : ctx.threadId);
+      cachedSessionId = session?.id;
+      return cachedSessionId;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function pushUsageFrame(messageId: string, attempt: number): void {
+    try {
+      const sid = resolveSessionIdForUsage();
+      if (sid) {
+        const usage = readTurnUsageForOutbound(ctx.groupId, sid, messageId);
+        if (usage) {
+          ws.send(JSON.stringify({ kind: 'usage', id: messageId, usage }));
+          return;
+        }
+      }
+      // Race: the host may deliver the outbound row before the container
+      // has flushed the matching `turn_usage` row. One short retry covers
+      // this; on miss the user still sees usage on next reload via /history.
+      if (attempt < 1) setTimeout(() => pushUsageFrame(messageId, attempt + 1), 500);
+    } catch (err) {
+      log.warn('web chat ws usage send failed', { err });
+    }
+  }
+
   const subscriber: WebSubscriber = {
     onOutbound(message) {
       try {
@@ -1761,6 +1856,9 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
         );
       } catch (err) {
         log.warn('web chat ws send failed', { err });
+      }
+      if (message.id && (message.kind === 'chat' || message.kind === 'text')) {
+        pushUsageFrame(message.id, 0);
       }
     },
     onInboundEcho(id, text, files) {

@@ -183,9 +183,9 @@ export interface RouterApi {
   notFound: (msg: string) => void;
 }
 
-// Value sent by the chat WS in `kind: 'inbound'|'outbound'|'typing'|'ready'`.
+// Value sent by the chat WS in `kind: 'inbound'|'outbound'|'typing'|'ready'|'usage'`.
 export interface WsPayload {
-  kind: 'ready' | 'typing' | 'inbound' | 'outbound';
+  kind: 'ready' | 'typing' | 'inbound' | 'outbound' | 'usage';
   on?: boolean;
   hint?: string;
   text?: string;
@@ -194,4 +194,5 @@ export interface WsPayload {
   timestamp?: string;
   id?: string;
   messageKind?: 'internal' | 'final' | string;
+  usage?: TurnUsage;
 }

@@ -17805,6 +17805,22 @@ function connectChatWs() {
       if (dir === "out") maybeNotify(text, payload.files || []);
       return;
     }
+    if (payload.kind === "usage") {
+      const mid = payload.id;
+      const usage = payload.usage;
+      if (!mid || !usage) return;
+      const list = chatMessages.value;
+      let changed = false;
+      const next = list.map((m6) => {
+        if (m6.id === mid && m6.direction === "out") {
+          changed = true;
+          return { ...m6, usage };
+        }
+        return m6;
+      });
+      if (changed) chatMessages.value = next;
+      return;
+    }
   };
 }
 async function sendChat(text, files) {
@@ -18752,11 +18768,7 @@ function fmtDur(ms) {
   return (ms / 1e3).toFixed(1) + "s";
 }
 function shortModel(model) {
-  const m6 = model.match(/claude[- ]?(sonnet|opus|haiku)(?:[- ]?(\d+))?/i);
-  if (m6) return m6[1].toLowerCase() + (m6[2] ? " " + m6[2] : "");
-  const parts = model.split(/[/:-]/);
-  const last = parts[parts.length - 1] || model;
-  return last.length > 20 ? last.slice(0, 20) : last;
+  return model.split("/").pop() || model;
 }
 function UsageMeta({ u: u5 }) {
   const [expanded, setExpanded] = h2(false);

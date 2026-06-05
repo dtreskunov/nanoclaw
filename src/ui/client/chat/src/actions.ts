@@ -605,6 +605,22 @@ function connectChatWs(): void {
       if (dir === 'out') maybeNotify(text, payload.files || []);
       return;
     }
+    if (payload.kind === 'usage') {
+      const mid = payload.id;
+      const usage = payload.usage;
+      if (!mid || !usage) return;
+      const list = chatMessages.value;
+      let changed = false;
+      const next = list.map((m) => {
+        if (m.id === mid && m.direction === 'out') {
+          changed = true;
+          return { ...m, usage };
+        }
+        return m;
+      });
+      if (changed) chatMessages.value = next;
+      return;
+    }
   };
 }
 

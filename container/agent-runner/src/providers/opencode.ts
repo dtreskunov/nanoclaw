@@ -411,9 +411,11 @@ export class OpenCodeProvider implements AgentProvider {
         }
 
         let resultText = '';
+        let lastAssistantId: string | undefined;
         for (const [msgId, role] of roleByMessageId) {
           if (role === 'assistant') {
             resultText = partTextByMessageId.get(msgId) ?? resultText;
+            lastAssistantId = msgId;
           }
         }
         // OpenCode's SSE stream strips the leading '<' from the assistant
@@ -422,6 +424,33 @@ export class OpenCodeProvider implements AgentProvider {
         // followed by '>' or by an attribute (`word="`) — restore the '<'.
         if (resultText && resultText[0] !== '<' && /^[a-zA-Z][\w-]*(\s+[\w-]+="|>)/.test(resultText)) {
           resultText = '<' + resultText;
+        }
+        // Some providers (e.g. gemini-via-openrouter) finalize cost/tokens in a
+        // `message.updated` that arrives *after* `session.idle` ends our loop,
+        // so the values we captured from streaming events are still zero. Do a
+        // one-shot fetch of the assistant message to pick up the final values.
+        if (lastAssistantId) {
+          try {
+            const msgRes = await client.session.message({ path: { id: sessionId, messageID: lastAssistantId } });
+            const info = (msgRes.data?.info ?? msgRes.data) as {
+              cost?: number;
+              tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
+              modelID?: string;
+            } | undefined;
+            if (info && (typeof info.cost === 'number' || info.tokens)) {
+              lastAssistantUsage = {
+                cost_usd: info.cost ?? 0,
+                input_tokens: info.tokens?.input ?? 0,
+                output_tokens: info.tokens?.output ?? 0,
+                cache_read_tokens: info.tokens?.cache?.read ?? 0,
+                cache_write_tokens: info.tokens?.cache?.write ?? 0,
+                reasoning_tokens: info.tokens?.reasoning,
+                model: info.modelID ?? '',
+              };
+            }
+          } catch (err) {
+            log(`Failed to refresh final assistant usage: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
         if (lastAssistantUsage) {
           yield { type: 'usage', data: lastAssistantUsage };

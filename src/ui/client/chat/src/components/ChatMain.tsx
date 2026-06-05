@@ -36,13 +36,9 @@ function fmtDur(ms: number): string {
 }
 
 function shortModel(model: string): string {
-  // Extract the short name from full model IDs like "claude-sonnet-4-20250514"
-  const m = model.match(/claude[- ]?(sonnet|opus|haiku)(?:[- ]?(\d+))?/i);
-  if (m) return m[1].toLowerCase() + (m[2] ? ' ' + m[2] : '');
-  // OpenCode models: try to extract the last meaningful segment
-  const parts = model.split(/[/:-]/);
-  const last = parts[parts.length - 1] || model;
-  return last.length > 20 ? last.slice(0, 20) : last;
+  // Show the last `/`-separated component (e.g. "anthropic/claude-sonnet-4"
+  // -> "claude-sonnet-4", "openai/gpt-4o" -> "gpt-4o"). Plain ids pass through.
+  return model.split('/').pop() || model;
 }
 
 function UsageMeta({ u }: { u: TurnUsage }) {
