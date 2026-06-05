@@ -17094,8 +17094,7 @@ async function applyHash(router2) {
     const latest = threads.value.length > 0 ? threads.value[0] : null;
     if (latest)
       router2.openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error("chat open failed", err));
-    else
-      router2.openChat(parsed.groupId, null, null).catch((err) => console.error("auto-start chat failed", err));
+    else router2.openChat(parsed.groupId, null, null).catch((err) => console.error("auto-start chat failed", err));
   }
   if (parsed.isDir) {
     await router2.loadTree(parsed.path);
