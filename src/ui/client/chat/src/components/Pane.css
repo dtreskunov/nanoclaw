@@ -49,7 +49,7 @@
 #btn-files-toggle::before { content: '›'; }
 .files-pane.collapsed #btn-files-toggle::before { content: '‹'; }
 .nc-pane > .head .title {
-  flex: 1; font-size: 13px; font-weight: 600;
+  flex: 1; font-size: var(--font-base); font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
 }

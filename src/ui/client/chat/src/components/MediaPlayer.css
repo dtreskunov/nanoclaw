@@ -7,7 +7,7 @@
 }
 .media-player audio,
 .media-player video { display: block; width: 100%; }
-.media-player-video video { max-height: 60vh; background: black; border-radius: 3px; }
+.media-player-video video { max-height: 60vh; background: black; border-radius: var(--radius-sm); }
 .media-player-audio audio { height: 36px; }
 
 /* Floating variant: pinned to the bottom of the preview body so it

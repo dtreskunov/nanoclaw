@@ -8,7 +8,7 @@
 }
 .settings-modal {
   background: var(--surface); color: var(--surface-fg);
-  border: 1px solid var(--border); border-radius: 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-xl);
   box-shadow: 0 10px 32px var(--shadow-color-strong);
   width: 100%; max-width: 640px; max-height: calc(100vh - 80px);
   display: flex; flex-direction: column; overflow: hidden;
@@ -18,13 +18,13 @@
   padding: 12px 14px; border-bottom: 1px solid var(--border);
   background: var(--head-tint);
 }
-.settings-head .title { flex: 1; font-weight: 600; font-size: 15px; }
+.settings-head .title { flex: 1; font-weight: 600; font-size: var(--font-xl); }
 .settings-body { padding: 16px; overflow-y: auto; overflow-x: hidden; }
 .settings-body section { margin-bottom: 24px; }
 .settings-body section:last-child { margin-bottom: 0; }
-.settings-body h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-.settings-body h4 { margin: 16px 0 8px; font-size: 13px; font-weight: 600; }
-.settings-body p.muted { margin: 4px 0 12px; color: var(--muted); font-size: 13px; }
+.settings-body h3 { margin: 0 0 8px; font-size: var(--font-lg); font-weight: 600; }
+.settings-body h4 { margin: 16px 0 8px; font-size: var(--font-base); font-weight: 600; }
+.settings-body p.muted { margin: 4px 0 12px; color: var(--muted); font-size: var(--font-base); }
 .settings-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin: 6px 0;
@@ -32,7 +32,7 @@
 .settings-row input[type="text"], .settings-row input:not([type]),
 .settings-row select {
   font: inherit; padding: 6px 8px;
-  border: 1px solid var(--border); border-radius: 4px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
   background: transparent; color: inherit;
 }
 .settings-row input { flex: 1; min-width: 0; }
@@ -40,7 +40,7 @@
 .settings-body button.danger { color: var(--danger); border-color: var(--danger); }
 .settings-body button.danger:hover { background: var(--danger); color: #fff; }
 .settings-body button.ghost { background: transparent; }
-.settings-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; table-layout: auto; }
+.settings-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: var(--font-base); table-layout: auto; }
 .settings-table th, .settings-table td {
   text-align: left; padding: 6px 8px;
   border-bottom: 1px solid var(--border);
@@ -54,7 +54,7 @@
   word-break: normal; overflow-wrap: normal;
 }
 .settings-status {
-  margin-top: 12px; padding: 8px 12px; border-radius: 4px; font-size: 13px;
+  margin-top: 12px; padding: 8px 12px; border-radius: var(--radius-md); font-size: var(--font-base);
 }
 .settings-status.ok { background: rgba(108, 198, 108, 0.15); color: var(--success); }
 .settings-status.err { background: rgba(228, 68, 68, 0.15); color: var(--error); }
@@ -64,12 +64,12 @@
   border-top: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.settings-account-name { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.settings-account-name { font-size: var(--font-base); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 @media (max-width: 720px) {
   .settings-backdrop { padding: 16px 8px; }
   .settings-body { padding: 12px; }
-  .settings-table { font-size: 12px; }
+  .settings-table { font-size: var(--font-sm); }
   .settings-table th, .settings-table td { padding: 6px 4px; }
   .settings-table th:nth-child(3), .settings-table td:nth-child(3) { display: none; }
   .settings-table td:nth-child(2) code { scrollbar-width: none; }

@@ -4,8 +4,8 @@
   margin: 0 0 12px 0;
   background: var(--wash-soft);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
   max-height: 40vh;
   overflow: auto;
   position: relative;
@@ -18,8 +18,8 @@
   padding: 2px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-2xs);
   box-shadow: 0 1px 4px var(--shadow-color);
   z-index: 2;
 }
@@ -40,19 +40,19 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.5;
 }
 .files-pane .preview-lyrics ol.lyrics-synced {
   list-style: none;
   margin: 0;
   padding: 10px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.6;
 }
 .files-pane .preview-lyrics ol.lyrics-synced li {
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 120ms ease;
 }

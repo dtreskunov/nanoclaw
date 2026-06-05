@@ -15,8 +15,8 @@
 .threads-rail .search-toggle-btn {
   background: transparent; border: 1px solid transparent;
   color: var(--muted); cursor: pointer;
-  font-size: 13px; line-height: 1;
-  padding: 2px 6px; border-radius: 3px;
+  font-size: var(--font-base); line-height: 1;
+  padding: 2px 6px; border-radius: var(--radius-sm);
 }
 .threads-rail .search-toggle-btn:hover { color: inherit; background: var(--wash); border-color: var(--border); }
 
@@ -26,7 +26,7 @@
   border-bottom: 1px solid var(--border);
   /* position context for search icon + clear button */
 }
-.threads-rail .threads-actions #btn-new-chat { width: 100%; font-size: 13px; font-weight: 600; height: 32px; }
+.threads-rail .threads-actions #btn-new-chat { width: 100%; font-size: var(--font-base); font-weight: 600; height: 32px; }
 
 .threads-rail .list {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -38,12 +38,12 @@
 .threads-rail .thread { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border); position: relative; }
 .threads-rail .thread:hover { background: var(--wash-soft); }
 .threads-rail .thread.active { background: var(--accent); }
-.threads-rail .thread .title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 18px; }
-.threads-rail .thread .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.threads-rail .thread .title .ch-pill { font-size: 13px; margin-right: 5px; opacity: 0.85; display: inline-block; vertical-align: -1px; }
-.readonly-banner { padding: 10px 12px; border-top: 1px solid var(--border); background: var(--wash-soft); font-size: 12px; color: var(--muted); }
-.chat-subnotice { padding: 4px 12px; border-top: 1px solid var(--border); background: var(--wash-subtle); font-size: 11px; color: var(--muted); }
-.threads-rail .thread .del { position: absolute; top: 6px; right: 6px; padding: 0 5px; border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; display: none; }
+.threads-rail .thread .title { font-size: var(--font-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 18px; }
+.threads-rail .thread .meta { font-size: var(--font-xs); color: var(--muted); margin-top: 2px; }
+.threads-rail .thread .title .ch-pill { font-size: var(--font-base); margin-right: 5px; opacity: 0.85; display: inline-block; vertical-align: -1px; }
+.readonly-banner { padding: 10px 12px; border-top: 1px solid var(--border); background: var(--wash-soft); font-size: var(--font-sm); color: var(--muted); }
+.chat-subnotice { padding: 4px 12px; border-top: 1px solid var(--border); background: var(--wash-subtle); font-size: var(--font-xs); color: var(--muted); }
+.threads-rail .thread .del { position: absolute; top: 6px; right: 6px; padding: 0 5px; border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: var(--font-lg); line-height: 1; display: none; }
 .threads-rail .thread:hover .del { display: block; }
 .threads-rail .thread .del:hover { color: var(--error); }
 
@@ -77,17 +77,17 @@
 .threads-rail .thread-section-header .row {
   display: flex; align-items: center; gap: 6px;
 }
-.threads-rail .thread-section-header .chev { width: 10px; font-size: 10px; color: var(--muted); flex: 0 0 auto; }
-.threads-rail .thread-section-header .ch-pill { font-size: 14px; flex: 0 0 auto; }
-.threads-rail .thread-section-header .label { font-size: 12px; font-weight: 600; flex: 0 0 auto; }
+.threads-rail .thread-section-header .chev { width: 10px; font-size: var(--font-2xs); color: var(--muted); flex: 0 0 auto; }
+.threads-rail .thread-section-header .ch-pill { font-size: var(--font-lg); flex: 0 0 auto; }
+.threads-rail .thread-section-header .label { font-size: var(--font-sm); font-weight: 600; flex: 0 0 auto; }
 .threads-rail .thread-section-header .count {
   margin-left: auto;
   flex: 0 0 auto;
-  font-size: 11px; color: var(--muted);
+  font-size: var(--font-xs); color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 .threads-rail .thread-section-header .handle {
-  font-size: 11px; color: var(--muted);
+  font-size: var(--font-xs); color: var(--muted);
   padding-left: 22px; /* align with label, past chev + pill */
   white-space: nowrap;
   overflow: hidden;
@@ -95,7 +95,7 @@
 }
 .threads-rail .thread-section-body { flex: 1; min-height: 0; overflow-y: auto; }
 
-.threads-rail .thread.dm .title { font-size: 14px; padding-right: 0; }
+.threads-rail .thread.dm .title { font-size: var(--font-lg); padding-right: 0; }
 .threads-rail .thread.dm .title .ch-pill.dm { font-size: 18px; margin-right: 8px; opacity: 1; vertical-align: -2px; }
 
 /* Show delete on touch devices (no hover). */
@@ -107,14 +107,14 @@
 /* ── Search input (inside .threads-actions) ──────────────────────── */
 .threads-rail .threads-actions .search-icon {
   position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-  font-size: 12px; opacity: 0.5; pointer-events: none;
+  font-size: var(--font-sm); opacity: 0.5; pointer-events: none;
 }
 .threads-rail .threads-actions .search-input {
   width: 100%; height: 32px;
   padding: 0 26px 0 28px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  font: inherit; font-size: 12px;
+  border-radius: var(--radius-lg);
+  font: inherit; font-size: var(--font-sm);
   background: var(--bg);
   color: var(--fg);
   outline: none;
@@ -129,7 +129,7 @@
 .threads-rail .threads-actions .search-clear {
   position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
   border: 0; background: transparent; cursor: pointer;
-  color: var(--muted); font-size: 14px; line-height: 1; padding: 2px 4px;
+  color: var(--muted); font-size: var(--font-lg); line-height: 1; padding: 2px 4px;
 }
 .threads-rail .threads-actions .search-clear:hover { color: var(--fg); }
 
@@ -141,16 +141,16 @@
 }
 .threads-rail .search-result .title { display: flex; align-items: baseline; gap: 4px; }
 .threads-rail .search-result .dir-pill {
-  font-size: 10px; opacity: 0.5; flex: 0 0 auto;
+  font-size: var(--font-2xs); opacity: 0.5; flex: 0 0 auto;
 }
 .threads-rail .search-result .snippet {
-  font-size: 12px;
+  font-size: var(--font-sm);
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: normal; word-break: break-word;
 }
 .threads-rail .search-result .snippet mark {
-  background: var(--accent-wash, rgba(255, 200, 0, 0.3));
+  background: var(--highlight);
   color: inherit; border-radius: 2px; padding: 0 1px;
 }
 
@@ -184,9 +184,9 @@
   .threads-rail .threads-actions { position: static !important; }
   .threads-rail .list { position: static !important; flex: 1; }
   .threads-rail .search-results { position: static !important; flex: 1; overflow-y: auto; }
-  .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: 15px; font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .threads-rail .threads-actions #btn-new-chat { min-height: 48px; font-size: var(--font-xl); font-weight: 600; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .threads-rail .threads-actions #btn-new-chat .plus { font-size: 26px; font-weight: 400; line-height: 1; position: relative; top: -1px; }
   .threads-rail .thread { padding: 12px 14px; }
-  .threads-rail .thread .title { font-size: 14px; }
-  .threads-rail .thread .meta { font-size: 12px; }
+  .threads-rail .thread .title { font-size: var(--font-lg); }
+  .threads-rail .thread .meta { font-size: var(--font-sm); }
 }

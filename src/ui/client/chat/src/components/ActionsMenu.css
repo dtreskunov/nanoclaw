@@ -2,7 +2,7 @@
 
 .action-menu { position: relative; display: inline-block; }
 .action-menu .action-trigger {
-  font-size: 14px; line-height: 1; padding: 2px 6px;
+  font-size: var(--font-lg); line-height: 1; padding: 2px 6px;
   border: 1px solid transparent;
 }
 .action-menu.open .action-trigger { border-color: var(--border); background: var(--wash); }
@@ -11,14 +11,14 @@
   min-width: 180px; z-index: 50;
   background: var(--surface); color: var(--surface-fg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 6px 24px var(--shadow-color);
   padding: 4px 0;
 }
 .action-item {
   display: flex; align-items: center; gap: 8px; width: 100%;
   background: transparent; border: 0; cursor: pointer;
-  padding: 6px 12px; font-size: 12px; line-height: 1.4;
+  padding: 6px 12px; font-size: var(--font-sm); line-height: 1.4;
   color: inherit; text-align: left; font-family: inherit;
 }
 .action-item:hover:not(:disabled) { background: var(--wash); }
