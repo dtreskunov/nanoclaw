@@ -1,31 +1,50 @@
-/* Horizontally scrollable group strip (desktop). */
+/* Horizontally scrollable group strip styled as browser-style tabs.
+   Inactive tabs are flat against the header; the active tab "lifts"
+   with a rounded top, a visible background tint, and steps 1px below
+   the strip baseline to overlap the header's bottom border. */
 
 .group-strip {
-  display: flex; align-items: stretch; gap: 2px;
+  display: flex; align-items: flex-end; gap: 2px;
   overflow-x: auto; overflow-y: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
   flex: 1; min-width: 0;
   padding: 0 4px;
+  align-self: stretch;
+  /* Push the chip baseline down to (and 1px past) the header border so
+     the active tab can sit on top of it. 8px header padding + 1px
+     border = 9px. */
+  margin-bottom: -9px;
 }
 .group-strip::-webkit-scrollbar { display: none; }
 
 .group-chip {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 4px 12px; border: 0; border-radius: 4px;
+  padding: 5px 16px 6px; min-height: 36px;
+  border: 1px solid transparent; border-bottom: 0;
+  border-radius: 8px 8px 0 0;
   background: transparent; color: inherit; cursor: pointer;
   font-family: inherit; white-space: nowrap; flex-shrink: 0;
-  border-bottom: 2px solid transparent;
-  transition: background 0.1s;
+  position: relative;
+  transition: background 0.1s, border-color 0.1s;
 }
-.group-chip:hover { background: var(--wash); }
+.group-chip:not(.active):hover {
+  background: var(--wash-soft);
+}
+
 .group-chip.active {
-  border-bottom-color: currentColor;
-  background: var(--wash-subtle);
+  background: var(--wash-strong);
+  border-color: var(--border);
+  /* Step 1px below the strip baseline so the chip overlaps the
+     header's bottom border. */
+  margin-bottom: -1px;
+  padding-bottom: 7px;
+  z-index: 1;
 }
 .group-chip.is-admin-visible { opacity: 0.6; }
 
 .chip-name { font-size: 13px; font-weight: 500; line-height: 1.3; }
+.group-chip.active .chip-name { font-weight: 600; }
 .chip-sub {
   font-size: 10px; line-height: 1.2;
   color: var(--muted); letter-spacing: 0.01em;
