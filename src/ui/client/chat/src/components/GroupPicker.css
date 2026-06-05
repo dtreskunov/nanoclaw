@@ -41,7 +41,11 @@
   padding-bottom: 7px;
   z-index: 1;
 }
-.group-chip.is-admin-visible { opacity: 0.6; }
+
+/* Trailing "More agents…" tab — opens the picker modal filtered to
+   non-member groups. Same chrome as a regular tab; muted text. */
+.group-chip-more { color: var(--muted); }
+.group-chip-more .chip-name { font-weight: 500; }
 
 .chip-name { font-size: var(--font-base); font-weight: 500; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .group-chip.active .chip-name { font-weight: 600; }

@@ -15534,6 +15534,7 @@ var me = y3("");
 var notifMutedSig = y3(false);
 var settingsOpen = y3(false);
 var groupPickerOpen = y3(false);
+var groupPickerMode = y3("all");
 var shareModalRequest = y3(null);
 var toastMessage = y3(null);
 var previewBlock = y3(null);
@@ -18041,52 +18042,84 @@ async function respondApproval(approvalId, value) {
 }
 
 // src/components/GroupPicker.tsx
-function visibleGroups() {
-  const elevated = isElevatedUser.value;
-  return elevated ? groups.value : groups.value.filter((g6) => g6.hasContent !== false);
+function isNonMember(g6) {
+  return g6.hasContent === false;
 }
 function chipParts(g6, elevated) {
-  const isAdminOnly = elevated && g6.hasContent === false;
+  const isAdminOnly = elevated && isNonMember(g6);
   const parts = [];
   if (!g6.isAdmin) parts.push("\u{1F512}");
   if (isAdminOnly) parts.push("\u{1F441}");
   if (g6.lastActivityAt) parts.push(fmtRelative(g6.lastActivityAt));
   return { parts, isAdminOnly };
 }
+function tipFor(g6, isAdminOnly) {
+  const parts = [g6.name];
+  if (isAdminOnly) parts.push("Visible to you as admin");
+  if (g6.lastActivityAt) parts.push(fmtAbsolute(g6.lastActivityAt));
+  return parts.join(" \xB7 ");
+}
+function openModal(mode) {
+  groupPickerMode.value = mode;
+  groupPickerOpen.value = true;
+}
 function GroupStrip() {
   const elevated = isElevatedUser.value;
-  const visible = visibleGroups();
   nowTick.value;
+  const all = groups.value;
+  const memberGroups = all.filter((g6) => !isNonMember(g6));
+  const active = all.find((g6) => g6.id === groupId.value);
+  const hasActiveNonMember = active && isNonMember(active);
+  const stripGroups = hasActiveNonMember ? [...memberGroups, active] : memberGroups;
+  const nonMemberCount = elevated ? all.filter(isNonMember).length : 0;
+  const showMore = nonMemberCount > 0;
   const pick = (gid) => {
     if (gid !== groupId.value) selectGroup(gid).catch(console.error);
   };
-  return /* @__PURE__ */ u4("nav", { class: "group-strip desktop-only", role: "tablist", "aria-label": "Agent groups", children: visible.map((g6) => {
-    const active = g6.id === groupId.value;
-    const { parts, isAdminOnly } = chipParts(g6, elevated);
-    const subtitle = parts.join(" \xB7 ");
-    return /* @__PURE__ */ u4(
+  return /* @__PURE__ */ u4("nav", { class: "group-strip desktop-only", role: "tablist", "aria-label": "Agent groups", children: [
+    stripGroups.map((g6) => {
+      const isActive = g6.id === groupId.value;
+      const isAdminOnly = elevated && isNonMember(g6);
+      const sub = g6.lastActivityAt ? fmtRelative(g6.lastActivityAt) : "";
+      return /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          role: "tab",
+          "aria-selected": isActive,
+          class: `group-chip${isActive ? " active" : ""}`,
+          title: tipFor(g6, isAdminOnly),
+          onClick: () => pick(g6.id),
+          children: [
+            /* @__PURE__ */ u4("span", { class: "chip-name", children: g6.name }),
+            sub ? /* @__PURE__ */ u4("span", { class: "chip-sub", children: sub }) : null
+          ]
+        },
+        g6.id
+      );
+    }),
+    showMore ? /* @__PURE__ */ u4(
       "button",
       {
         type: "button",
-        role: "tab",
-        "aria-selected": active,
-        class: `group-chip${active ? " active" : ""}${isAdminOnly ? " is-admin-visible" : ""}`,
-        title: isAdminOnly ? `Visible to you as admin${g6.lastActivityAt ? " \xB7 " + fmtAbsolute(g6.lastActivityAt) : ""}` : g6.lastActivityAt ? fmtAbsolute(g6.lastActivityAt) : "",
-        onClick: () => pick(g6.id),
-        children: [
-          /* @__PURE__ */ u4("span", { class: "chip-name", children: g6.name }),
-          subtitle ? /* @__PURE__ */ u4("span", { class: "chip-sub", children: subtitle }) : null
-        ]
-      },
-      g6.id
-    );
-  }) });
+        class: "group-chip group-chip-more",
+        title: `Show ${nonMemberCount} more agent group${nonMemberCount === 1 ? "" : "s"} you can administer`,
+        "aria-haspopup": "dialog",
+        onClick: () => openModal("non-members"),
+        children: /* @__PURE__ */ u4("span", { class: "chip-name", children: [
+          "More agents",
+          "\u2026"
+        ] })
+      }
+    ) : null
+  ] });
 }
 function ActiveGroupButton() {
   nowTick.value;
   const elevated = isElevatedUser.value;
-  const visible = visibleGroups();
-  const active = visible.find((g6) => g6.id === groupId.value) ?? visible[0];
+  const all = groups.value;
+  const visible = elevated ? all : all.filter((g6) => !isNonMember(g6));
+  const active = all.find((g6) => g6.id === groupId.value) ?? visible[0];
   if (!active) return null;
   const { parts, isAdminOnly } = chipParts(active, elevated);
   const subtitle = parts.join(" \xB7 ");
@@ -18097,9 +18130,7 @@ function ActiveGroupButton() {
       class: `active-group-btn mobile-only${isAdminOnly ? " is-admin-visible" : ""}`,
       "aria-label": "Switch agent group",
       "aria-haspopup": "dialog",
-      onClick: () => {
-        groupPickerOpen.value = true;
-      },
+      onClick: () => openModal("all"),
       children: [
         /* @__PURE__ */ u4("span", { class: "agb-stack", children: [
           /* @__PURE__ */ u4("span", { class: "agb-name", children: active.name }),
@@ -18112,6 +18143,7 @@ function ActiveGroupButton() {
 }
 function GroupPickerModal() {
   const open = groupPickerOpen.value;
+  const mode = groupPickerMode.value;
   nowTick.value;
   y2(() => {
     if (!open) return;
@@ -18123,7 +18155,12 @@ function GroupPickerModal() {
   }, [open]);
   if (!open) return null;
   const elevated = isElevatedUser.value;
-  const visible = visibleGroups();
+  const all = groups.value;
+  const visible = (() => {
+    if (mode === "non-members") return all.filter(isNonMember);
+    return elevated ? all : all.filter((g6) => !isNonMember(g6));
+  })();
+  const title = mode === "non-members" ? "More agents" : "Agent groups";
   const close = () => {
     groupPickerOpen.value = false;
   };
@@ -18139,23 +18176,24 @@ function GroupPickerModal() {
     {
       class: "settings-modal group-picker-modal",
       role: "dialog",
-      "aria-label": "Switch agent group",
+      "aria-label": title,
       style: "max-width:480px",
       children: [
         /* @__PURE__ */ u4("header", { class: "settings-head", children: [
-          /* @__PURE__ */ u4("span", { class: "title", children: "Agent groups" }),
+          /* @__PURE__ */ u4("span", { class: "title", children: title }),
           /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
         ] }),
         /* @__PURE__ */ u4("div", { class: "settings-body group-picker-list", children: visible.map((g6) => {
-          const active = g6.id === groupId.value;
+          const isActive = g6.id === groupId.value;
           const { parts, isAdminOnly } = chipParts(g6, elevated);
           const subtitle = parts.join(" \xB7 ");
           return /* @__PURE__ */ u4(
             "button",
             {
               type: "button",
-              class: `group-row${active ? " active" : ""}${isAdminOnly ? " is-admin-visible" : ""}`,
-              "aria-current": active ? "true" : void 0,
+              class: `group-row${isActive ? " active" : ""}${isAdminOnly ? " is-admin-visible" : ""}`,
+              "aria-current": isActive ? "true" : void 0,
+              title: tipFor(g6, isAdminOnly),
               onClick: () => pick(g6.id),
               children: [
                 /* @__PURE__ */ u4("span", { class: "row-name", children: g6.name }),

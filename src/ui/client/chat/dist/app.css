@@ -240,8 +240,11 @@ header .mobile-only {
   padding-bottom: 7px;
   z-index: 1;
 }
-.group-chip.is-admin-visible {
-  opacity: 0.6;
+.group-chip-more {
+  color: var(--muted);
+}
+.group-chip-more .chip-name {
+  font-weight: 500;
 }
 .chip-name {
   font-size: var(--font-base);

@@ -86,6 +86,7 @@ export const me: Signal<string> = signal('');
 export const notifMutedSig: Signal<boolean> = signal(false);
 export const settingsOpen: Signal<boolean> = signal(false);
 export const groupPickerOpen: Signal<boolean> = signal(false);
+export const groupPickerMode: Signal<'all' | 'non-members'> = signal('all');
 export const shareModalRequest: Signal<ShareModalRequest | null> = signal<ShareModalRequest | null>(null);
 export const toastMessage: Signal<ToastMessage | null> = signal<ToastMessage | null>(null);
 export const previewBlock: Signal<PreviewBlock | null> = signal<PreviewBlock | null>(null);
