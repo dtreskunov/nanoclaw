@@ -154,6 +154,7 @@ header {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  background: var(--wash-strong);
 }
 header .brand {
   font-size: var(--font-lg);
@@ -233,7 +234,7 @@ header .mobile-only {
   background: var(--wash-soft);
 }
 .group-chip.active {
-  background: var(--wash-strong);
+  background: var(--surface);
   border-color: var(--border);
   margin-bottom: -1px;
   padding-bottom: 7px;

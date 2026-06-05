@@ -33,7 +33,7 @@
 }
 
 .group-chip.active {
-  background: var(--wash-strong);
+  background: var(--surface);
   border-color: var(--border);
   /* Step 1px below the strip baseline so the chip overlaps the
      header's bottom border. */
