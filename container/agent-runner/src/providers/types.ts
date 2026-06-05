@@ -103,11 +103,37 @@ export interface AgentQuery {
   abort(): void;
 }
 
+/**
+ * Per-turn provider usage snapshot. Provider-agnostic — both Claude and
+ * OpenCode (and future providers) emit the same shape. Values are
+ * per-turn deltas, not session-cumulative.
+ */
+export interface TurnUsage {
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  reasoning_tokens?: number;
+  num_turns?: number;
+  duration_ms?: number;
+  duration_api_ms?: number;
+  model: string;
+  context_window?: number;
+  max_output_tokens?: number;
+}
+
 export type ProviderEvent =
   | { type: 'init'; continuation: string }
   | { type: 'result'; text: string | null }
   | { type: 'error'; message: string; retryable: boolean; classification?: string }
   | { type: 'progress'; message: string }
+  /**
+   * Per-turn usage data emitted just before the corresponding `result`
+   * event. The poll-loop stashes this and writes it to `turn_usage` in
+   * outbound.db once the result row is created.
+   */
+  | { type: 'usage'; data: TurnUsage }
   /**
    * Liveness signal. Providers MUST yield this on every underlying SDK
    * event (tool call, thinking, partial message, anything) so the

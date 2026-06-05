@@ -1,6 +1,7 @@
 import { findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
+import { writeTurnUsage } from './db/turn-usage.js';
 import { getInboundDb, getOutboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
 import { clearContinuation, clearFailedTurn, clearProgress, clearTurnEnded, getContinuation, getFailedTurn, migrateLegacyContinuation, setContinuation, setFailedTurn, setProgress, setTurnEnded } from './db/session-state.js';
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
@@ -15,7 +16,7 @@ import {
   type RoutingContext,
 } from './formatter.js';
 import { isUploadTraceCommand, uploadTrace } from './upload-trace.js';
-import type { AgentProvider, AgentQuery, ProviderEvent } from './providers/types.js';
+import type { AgentProvider, AgentQuery, ProviderEvent, TurnUsage } from './providers/types.js';
 
 const POLL_INTERVAL_MS = 1000;
 const ACTIVE_POLL_INTERVAL_MS = 500;
@@ -539,6 +540,7 @@ async function processQuery(
   try { clearTurnEnded(); } catch { /* best-effort */ }
   let lastProviderError: { message: string; classification?: string } | null = null;
   let sentAny = false;
+  let pendingUsage: TurnUsage | null = null;
 
   // Snapshot the outbound seq so the result handler can detect whether MCP
   // tools wrote anything this turn. Without this, an agent that calls
@@ -770,6 +772,8 @@ async function processQuery(
           endedForCommand = true;
           query.end();
         }
+      } else if (event.type === 'usage') {
+        pendingUsage = event.data;
       } else if (event.type === 'result') {
         resultSeen = true;
         // A result — with or without text — means the turn is done. Stop
@@ -823,6 +827,24 @@ async function processQuery(
         if (!persistContinuation) {
           endedForCommand = true;
           query.end();
+        }
+        // Flush pending usage data, linking to the last outbound message
+        // written this turn. If the turn produced no outbound rows (e.g.
+        // scratchpad-only), the usage is still recorded with no message link.
+        if (pendingUsage) {
+          try {
+            const lastOutId = getOutboundDb()
+              .prepare('SELECT id FROM messages_out WHERE seq > ? ORDER BY seq DESC LIMIT 1')
+              .get(outboundMaxAtTurnStart) as { id: string } | undefined;
+            writeTurnUsage(
+              `tu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              lastOutId?.id ?? '',
+              pendingUsage,
+            );
+          } catch (e) {
+            log(`Failed to write turn_usage: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          pendingUsage = null;
         }
         // Reset the per-turn baseline so a follow-up push within the same
         // query starts a fresh "did MCP write anything?" window.
@@ -879,6 +901,9 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
     case 'progress':
       log(`Progress: ${event.message}`);
       try { setProgress(event.message); } catch { /* best-effort */ }
+      break;
+    case 'usage':
+      log(`Usage: ${event.data.model || '?'} $${event.data.cost_usd.toFixed(4)} in=${event.data.input_tokens} out=${event.data.output_tokens}`);
       break;
   }
 }

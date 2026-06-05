@@ -445,6 +445,13 @@ export class ClaudeProvider implements AgentProvider {
 
     async function* translateEvents(): AsyncGenerator<ProviderEvent> {
       let messageCount = 0;
+      // SDK result fields are session-cumulative. Track previous values
+      // to compute per-turn deltas.
+      let prevCost = 0;
+      let prevInput = 0;
+      let prevOutput = 0;
+      let prevCacheRead = 0;
+      let prevCacheWrite = 0;
       for await (const message of sdkResult) {
         if (aborted) return;
         messageCount++;
@@ -457,6 +464,59 @@ export class ClaudeProvider implements AgentProvider {
         } else if (message.type === 'result') {
           const text = 'result' in message ? (message as { result?: string }).result ?? null : null;
           const m = message as { is_error?: boolean; subtype?: string };
+
+          // Extract usage from both success and error result events.
+          const r = message as {
+            total_cost_usd?: number;
+            usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+            modelUsage?: Record<string, { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheCreationInputTokens?: number; costUSD?: number; contextWindow?: number; maxOutputTokens?: number }>;
+            num_turns?: number;
+            duration_ms?: number;
+            duration_api_ms?: number;
+          };
+          if (typeof r.total_cost_usd === 'number' || r.usage) {
+            const curCost = r.total_cost_usd ?? 0;
+            const curInput = r.usage?.input_tokens ?? 0;
+            const curOutput = r.usage?.output_tokens ?? 0;
+            const curCacheRead = r.usage?.cache_read_input_tokens ?? 0;
+            const curCacheWrite = r.usage?.cache_creation_input_tokens ?? 0;
+            // Primary model = key with highest costUSD (or first key).
+            let model = '';
+            let contextWindow: number | undefined;
+            let maxOutputTokens: number | undefined;
+            if (r.modelUsage) {
+              let best = '';
+              let bestCost = -1;
+              for (const [k, v] of Object.entries(r.modelUsage)) {
+                if ((v.costUSD ?? 0) > bestCost) { bestCost = v.costUSD ?? 0; best = k; }
+                if (!contextWindow && v.contextWindow) contextWindow = v.contextWindow;
+                if (!maxOutputTokens && v.maxOutputTokens) maxOutputTokens = v.maxOutputTokens;
+              }
+              model = best;
+            }
+            yield {
+              type: 'usage',
+              data: {
+                cost_usd: Math.max(0, curCost - prevCost),
+                input_tokens: Math.max(0, curInput - prevInput),
+                output_tokens: Math.max(0, curOutput - prevOutput),
+                cache_read_tokens: Math.max(0, curCacheRead - prevCacheRead),
+                cache_write_tokens: Math.max(0, curCacheWrite - prevCacheWrite),
+                num_turns: r.num_turns,
+                duration_ms: r.duration_ms,
+                duration_api_ms: r.duration_api_ms,
+                model,
+                context_window: contextWindow,
+                max_output_tokens: maxOutputTokens,
+              },
+            };
+            prevCost = curCost;
+            prevInput = curInput;
+            prevOutput = curOutput;
+            prevCacheRead = curCacheRead;
+            prevCacheWrite = curCacheWrite;
+          }
+
           if (m.is_error || (m.subtype && m.subtype !== 'success')) {
             const lower = (text || m.subtype || 'unknown error').toLowerCase();
             const classification = /credit|quota|balance|insufficient|payment/.test(lower)

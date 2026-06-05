@@ -17528,7 +17528,7 @@ function mergeIncomingMessages(messages) {
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts });
+    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts, ...m6.usage ? { usage: m6.usage } : {} });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === "out") maybeNotify(m6.text, m6.files || []);
@@ -17574,7 +17574,8 @@ async function refetchThreadHistory(appendNewOnly) {
       direction: normDirection(m6.direction),
       text: m6.text,
       files: m6.files || null,
-      ts: m6.timestamp
+      ts: m6.timestamp,
+      ...m6.usage ? { usage: m6.usage } : {}
     }));
     refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${normDirection(m6.direction)}:${m6.id}`));
     return;
@@ -17586,7 +17587,7 @@ async function refetchThreadHistory(appendNewOnly) {
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts });
+    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts, ...m6.usage ? { usage: m6.usage } : {} });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === "out") maybeNotify(m6.text, m6.files || []);
@@ -17651,7 +17652,8 @@ async function openChat(gid, resumeTid, opts) {
             direction: normDirection(m6.direction),
             text: m6.text,
             files: m6.files || null,
-            ts: m6.timestamp
+            ts: m6.timestamp,
+            ...m6.usage ? { usage: m6.usage } : {}
           }));
           chatLoading.value = false;
         });
@@ -18463,6 +18465,7 @@ function ThreadRow({ t: t4 }) {
   const active = t4.threadId === threadId.value;
   const pillTitle = `${meta.label}${t4.counterparty ? " \xB7 " + t4.counterparty : ""}`;
   const subTrailer = t4.messageCount ? " \xB7 " + t4.messageCount + " msg" : "";
+  const costStr = t4.totalCost != null && t4.totalCost > 0 ? " \xB7 " + (t4.totalCost >= 1 ? "$" + t4.totalCost.toFixed(2) : "$" + t4.totalCost.toFixed(3)) : "";
   const onOpen = (ev) => {
     if (ev.target.classList.contains("del")) return;
     if (groupId.value) openChat(groupId.value, t4.threadId, threadCtxOf2(t4)).catch(console.error);
@@ -18488,7 +18491,8 @@ function ThreadRow({ t: t4 }) {
     ] }),
     /* @__PURE__ */ u4("div", { class: "meta", children: [
       /* @__PURE__ */ u4(RelativeTime, { ts: t4.lastActivityAt }),
-      subTrailer
+      subTrailer,
+      costStr
     ] }),
     ct === "web" ? /* @__PURE__ */ u4("button", { type: "button", class: "del", title: "Delete thread", "aria-label": "Delete thread", onClick: onDel, children: "\xD7" }) : null
   ] });
@@ -18699,6 +18703,47 @@ function ThreadsRail() {
 }
 
 // src/components/ChatMain.tsx
+function fmtTok(n3) {
+  if (n3 >= 1e6) return (n3 / 1e6).toFixed(1) + "M";
+  if (n3 >= 1e3) return (n3 / 1e3).toFixed(1) + "k";
+  return String(n3);
+}
+function fmtCost(usd) {
+  if (usd >= 1) return "$" + usd.toFixed(2);
+  if (usd >= 0.01) return "$" + usd.toFixed(3);
+  return "$" + usd.toFixed(4);
+}
+function fmtDur(ms) {
+  if (ms >= 6e4) return (ms / 6e4).toFixed(1) + "m";
+  return (ms / 1e3).toFixed(1) + "s";
+}
+function shortModel(model) {
+  const m6 = model.match(/claude[- ]?(sonnet|opus|haiku)(?:[- ]?(\d+))?/i);
+  if (m6) return m6[1].toLowerCase() + (m6[2] ? " " + m6[2] : "");
+  const parts = model.split(/[/:-]/);
+  const last = parts[parts.length - 1] || model;
+  return last.length > 20 ? last.slice(0, 20) : last;
+}
+function UsageMeta({ u: u5 }) {
+  const [expanded, setExpanded] = h2(false);
+  const cost = fmtCost(u5.cost_usd);
+  const model = u5.model ? shortModel(u5.model) : "";
+  const tokens = `${fmtTok(u5.input_tokens)}\u2192${fmtTok(u5.output_tokens)}`;
+  const dur = u5.duration_ms ? fmtDur(u5.duration_ms) : "";
+  const cache = [
+    u5.cache_read_tokens > 0 ? `cache read ${fmtTok(u5.cache_read_tokens)}` : "",
+    u5.cache_write_tokens > 0 ? `cache write ${fmtTok(u5.cache_write_tokens)}` : "",
+    u5.reasoning_tokens ? `reasoning ${fmtTok(u5.reasoning_tokens)}` : ""
+  ].filter(Boolean).join(" \xB7 ");
+  const detail = [model, tokens, dur, cache].filter(Boolean).join(" \xB7 ");
+  return /* @__PURE__ */ u4("span", { class: "usage", onClick: (e4) => {
+    e4.stopPropagation();
+    setExpanded((v5) => !v5);
+  }, title: "Click for details", children: [
+    cost,
+    expanded && detail ? ` \xB7 ${detail}` : ""
+  ] });
+}
 function Message({ m: m6 }) {
   const ref = A2(null);
   const mdRef = A2(null);
@@ -18749,7 +18794,10 @@ function Message({ m: m6 }) {
       "\u{1F4CE} ",
       f5.filename
     ] }, f5.filename)) }) : null,
-    m6.ts ? /* @__PURE__ */ u4("div", { class: "meta", children: /* @__PURE__ */ u4(RelativeTime, { ts: m6.ts }) }) : null
+    m6.ts ? /* @__PURE__ */ u4("div", { class: "meta", children: [
+      /* @__PURE__ */ u4(RelativeTime, { ts: m6.ts }),
+      m6.usage && m6.direction === "out" ? /* @__PURE__ */ u4(UsageMeta, { u: m6.usage }) : null
+    ] }) : null
   ] });
 }
 function groupMessages(list) {

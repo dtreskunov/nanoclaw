@@ -291,6 +291,7 @@ export class OpenCodeProvider implements AgentProvider {
 
         const partTextByMessageId = new Map<string, string>();
         const roleByMessageId = new Map<string, string>();
+        let lastAssistantUsage: import('./types.js').TurnUsage | null = null;
         let lastEventAt = Date.now();
         let eventTimedOut = false;
         let timeoutReject: ((err: Error) => void) | undefined;
@@ -324,9 +325,26 @@ export class OpenCodeProvider implements AgentProvider {
 
             switch (ev.type) {
               case 'message.updated': {
-                const info = ev.properties.info as { id?: string; role?: string } | undefined;
+                const info = ev.properties.info as {
+                  id?: string; role?: string;
+                  cost?: number;
+                  tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
+                  modelID?: string;
+                } | undefined;
                 if (info?.id && info?.role) {
                   roleByMessageId.set(info.id, info.role);
+                  // Capture usage from the last assistant message.
+                  if (info.role === 'assistant' && (typeof info.cost === 'number' || info.tokens)) {
+                    lastAssistantUsage = {
+                      cost_usd: info.cost ?? 0,
+                      input_tokens: info.tokens?.input ?? 0,
+                      output_tokens: info.tokens?.output ?? 0,
+                      cache_read_tokens: info.tokens?.cache?.read ?? 0,
+                      cache_write_tokens: info.tokens?.cache?.write ?? 0,
+                      reasoning_tokens: info.tokens?.reasoning,
+                      model: info.modelID ?? '',
+                    };
+                  }
                 }
                 break;
               }
@@ -404,6 +422,10 @@ export class OpenCodeProvider implements AgentProvider {
         // followed by '>' or by an attribute (`word="`) — restore the '<'.
         if (resultText && resultText[0] !== '<' && /^[a-zA-Z][\w-]*(\s+[\w-]+="|>)/.test(resultText)) {
           resultText = '<' + resultText;
+        }
+        if (lastAssistantUsage) {
+          yield { type: 'usage', data: lastAssistantUsage };
+          lastAssistantUsage = null;
         }
         yield { type: 'result', text: resultText || null };
       }

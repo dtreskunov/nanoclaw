@@ -24,6 +24,9 @@ function ThreadRow({ t }: { t: Thread }) {
   const active = t.threadId === threadId.value;
   const pillTitle = `${meta.label}${t.counterparty ? ' · ' + t.counterparty : ''}`;
   const subTrailer = t.messageCount ? ' · ' + t.messageCount + ' msg' : '';
+  const costStr = t.totalCost != null && t.totalCost > 0
+    ? ' · ' + (t.totalCost >= 1 ? '$' + t.totalCost.toFixed(2) : '$' + t.totalCost.toFixed(3))
+    : '';
   const onOpen = (ev: JSX.TargetedMouseEvent<HTMLDivElement>): void => {
     if ((ev.target as HTMLElement).classList.contains('del')) return;
     if (groupId.value) openChat(groupId.value, t.threadId, threadCtxOf(t)).catch(console.error);
@@ -46,7 +49,7 @@ function ThreadRow({ t }: { t: Thread }) {
         {ct !== 'web' ? <span class="ch-pill" title={pillTitle}>{meta.icon}</span> : null}
         {t.title}
       </div>
-      <div class="meta"><RelativeTime ts={t.lastActivityAt} />{subTrailer}</div>
+      <div class="meta"><RelativeTime ts={t.lastActivityAt} />{subTrailer}{costStr}</div>
       {ct === 'web'
         ? <button type="button" class="del" title="Delete thread" aria-label="Delete thread" onClick={onDel}>{'\u00d7'}</button>
         : null}

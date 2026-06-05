@@ -344,18 +344,29 @@ export async function handleChatRequest(
     ensureWebMessagingGroup(userId, m.groupId);
     const platformId = platformIdFor(userId, m.groupId);
     // Spectator guard: if a session already exists for this (agentGroup,
-    // threadId) under a different mg, the sender is trying to write into
-    // someone else's thread. Refuse rather than minting a polluting
-    // session in the sender's mg with a borrowed thread UUID. (Cross-
-    // channel sends are already guarded by userOwnsMessagingGroup inside
-    // sendViaChannelAdapter.)
+    // threadId) but none of them belong to the sender's mg, the sender
+    // is trying to write into someone else's thread. Refuse rather than
+    // minting a polluting session in the sender's mg with a borrowed
+    // thread UUID. (Cross-channel sends are already guarded by
+    // userOwnsMessagingGroup inside sendViaChannelAdapter.)
     const senderMg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
-    const existing = getDb()
-      .prepare('SELECT messaging_group_id FROM sessions WHERE agent_group_id = ? AND thread_id = ? LIMIT 1')
-      .get(m.groupId, m.threadId) as { messaging_group_id: string } | undefined;
-    if (existing && (!senderMg || existing.messaging_group_id !== senderMg.id)) {
-      writeJson(res, 403, { error: 'not_owner_of_thread' });
-      return true;
+    const existingCount = (
+      getDb()
+        .prepare('SELECT count(*) AS n FROM sessions WHERE agent_group_id = ? AND thread_id = ?')
+        .get(m.groupId, m.threadId) as { n: number }
+    ).n;
+    if (existingCount > 0) {
+      const senderOwns = senderMg
+        ? (getDb()
+            .prepare(
+              'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND thread_id = ? AND messaging_group_id = ? LIMIT 1',
+            )
+            .get(m.groupId, m.threadId, senderMg.id) as { x: number } | undefined)
+        : undefined;
+      if (!senderOwns) {
+        writeJson(res, 403, { error: 'not_owner_of_thread' });
+        return true;
+      }
     }
     try {
       const id = await submitWebInbound({
@@ -462,6 +473,19 @@ export async function handleChatRequest(
   return false;
 }
 
+export interface TurnUsageDto {
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  reasoning_tokens?: number;
+  model: string;
+  context_window?: number;
+  max_output_tokens?: number;
+  duration_ms?: number;
+}
+
 export interface HistoryMessage {
   direction: 'in' | 'out' | 'internal';
   // messages_in.id / messages_out.id — stable per-row id the client uses
@@ -470,6 +494,7 @@ export interface HistoryMessage {
   timestamp: string;
   text: string;
   files?: { filename: string; size: number; path?: string }[];
+  usage?: TurnUsageDto;
 }
 
 /**
@@ -568,6 +593,51 @@ export function readChatHistory(
               'SELECT id, timestamp, kind, content FROM messages_out WHERE channel_type = ? AND thread_id = ? ORDER BY seq',
             )
             .all(target.channelType, threadId) as { id: string; timestamp: string; kind: string; content: string }[]);
+
+      // Load turn_usage for all outbound messages in one query.
+      const outIds = rows.filter((r) => r.kind === 'chat' || r.kind === 'text').map((r) => r.id);
+      const usageMap = new Map<string, TurnUsageDto>();
+      if (outIds.length > 0) {
+        try {
+          const usageRows = outDb
+            .prepare(
+              `SELECT message_out_id, cost_usd, input_tokens, output_tokens,
+                      cache_read_tokens, cache_write_tokens, reasoning_tokens,
+                      model, context_window, max_output_tokens, duration_ms
+               FROM turn_usage WHERE message_out_id IN (${outIds.map(() => '?').join(',')})`,
+            )
+            .all(...outIds) as Array<{
+            message_out_id: string;
+            cost_usd: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_read_tokens: number;
+            cache_write_tokens: number;
+            reasoning_tokens: number | null;
+            model: string;
+            context_window: number | null;
+            max_output_tokens: number | null;
+            duration_ms: number | null;
+          }>;
+          for (const u of usageRows) {
+            usageMap.set(u.message_out_id, {
+              cost_usd: u.cost_usd,
+              input_tokens: u.input_tokens,
+              output_tokens: u.output_tokens,
+              cache_read_tokens: u.cache_read_tokens,
+              cache_write_tokens: u.cache_write_tokens,
+              ...(u.reasoning_tokens != null ? { reasoning_tokens: u.reasoning_tokens } : {}),
+              model: u.model,
+              ...(u.context_window != null ? { context_window: u.context_window } : {}),
+              ...(u.max_output_tokens != null ? { max_output_tokens: u.max_output_tokens } : {}),
+              ...(u.duration_ms != null ? { duration_ms: u.duration_ms } : {}),
+            });
+          }
+        } catch {
+          // turn_usage table may not exist in older outbound.db files
+        }
+      }
+
       for (const r of rows) {
         if (r.kind === 'internal') {
           const parsed = parseOutboundContent(r.content);
@@ -582,7 +652,15 @@ export function readChatHistory(
         }
         if (r.kind !== 'chat' && r.kind !== 'text') continue;
         const parsed = parseOutboundContent(r.content);
-        messages.push({ direction: 'out', id: r.id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+        const usage = usageMap.get(r.id);
+        messages.push({
+          direction: 'out',
+          id: r.id,
+          timestamp: r.timestamp,
+          text: parsed.text,
+          files: parsed.files,
+          ...(usage ? { usage } : {}),
+        });
       }
     } finally {
       outDb.close();
@@ -890,6 +968,12 @@ export interface ThreadSummary {
    * sendable from web (yet).
    */
   kind?: 'thread' | 'dm';
+  /** Aggregate cost in USD across all turns in this thread. */
+  totalCost?: number;
+  /** Aggregate input + output tokens across all turns. */
+  totalTokens?: number;
+  /** Number of provider turns that have usage data. */
+  turnCount?: number;
 }
 
 interface UserMessagingContext {
@@ -1212,6 +1296,9 @@ function enumeratePerThread(
       lastActivityAt: stats.maxTs || r.last_active || r.created_at,
       messageCount: stats.count,
       counterparty: isWeb ? undefined : ctx.platformId,
+      ...(stats.turnCount > 0
+        ? { totalCost: stats.totalCost, totalTokens: stats.totalTokens, turnCount: stats.turnCount }
+        : {}),
     });
   }
 }
@@ -1425,6 +1512,26 @@ function collectThreadsFromSharedSession(
           WHERE channel_type = ? AND thread_id = ? AND kind IN ('chat','text')`,
       );
 
+      // Aggregate turn_usage per thread (if the table exists).
+      // Note: for shared sessions the turn_usage table covers all threads
+      // combined. This is a rough approximation; per-thread scoping would
+      // require joining through message_out_id.
+      let usageTotals: { cost: number; tokens: number; turns: number } | undefined;
+      if (outDb) {
+        try {
+          usageTotals = outDb
+            .prepare(
+              `SELECT COALESCE(SUM(cost_usd), 0) AS cost,
+                    COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens,
+                    COUNT(*) AS turns
+             FROM turn_usage`,
+            )
+            .get() as { cost: number; tokens: number; turns: number } | undefined;
+        } catch {
+          // turn_usage table may not exist
+        }
+      }
+
       for (const g of groups) {
         const scope = scopes.find((s) => s.ctx.channelType === g.channel_type && s.ctx.platformId === g.platform_id);
         if (!scope) continue;
@@ -1437,6 +1544,10 @@ function collectThreadsFromSharedSession(
           count += oc.n;
           if (oc.t && (!maxTs || Date.parse(normTs(oc.t)) > Date.parse(normTs(maxTs)))) maxTs = oc.t;
         }
+        const usageProps =
+          usageTotals && usageTotals.turns > 0
+            ? { totalCost: usageTotals.cost, totalTokens: usageTotals.tokens, turnCount: usageTotals.turns }
+            : {};
         out.push({
           threadId: g.thread_id,
           sessionId,
@@ -1448,6 +1559,7 @@ function collectThreadsFromSharedSession(
           lastActivityAt: maxTs || new Date(0).toISOString(),
           messageCount: count,
           counterparty: g.channel_type !== WEB_CHANNEL_TYPE ? g.platform_id : undefined,
+          ...usageProps,
         });
       }
     } finally {
@@ -1467,10 +1579,13 @@ function readThreadStats(
   sessionId: string,
   channelType: string,
   threadId: string,
-): { title: string; count: number; maxTs: string } {
+): { title: string; count: number; maxTs: string; totalCost: number; totalTokens: number; turnCount: number } {
   let title = '';
   let count = 0;
   let maxTs = '';
+  let totalCost = 0;
+  let totalTokens = 0;
+  let turnCount = 0;
   try {
     const inDb = openInboundDb(agentGroupId, sessionId);
     try {
@@ -1499,13 +1614,29 @@ function readThreadStats(
         .get(channelType, threadId) as { n: number; t: string | null };
       count += c.n;
       if (c.t && (!maxTs || Date.parse(normTs(c.t)) > Date.parse(normTs(maxTs)))) maxTs = c.t;
+      // Aggregate turn_usage stats for this thread.
+      try {
+        const u = outDb
+          .prepare(
+            `SELECT COALESCE(SUM(cost_usd), 0) AS cost,
+                    COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens,
+                    COUNT(*) AS turns
+             FROM turn_usage`,
+          )
+          .get() as { cost: number; tokens: number; turns: number };
+        totalCost = u.cost;
+        totalTokens = u.tokens;
+        turnCount = u.turns;
+      } catch {
+        // turn_usage table may not exist in older outbound.db files
+      }
     } finally {
       outDb.close();
     }
   } catch {
     /* outbound db missing */
   }
-  return { title, count, maxTs };
+  return { title, count, maxTs, totalCost, totalTokens, turnCount };
 }
 
 /**

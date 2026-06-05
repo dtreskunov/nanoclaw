@@ -16,7 +16,53 @@ import {
   openChat,
 } from '../actions';
 import { RelativeTime } from './RelativeTime';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, TurnUsage } from '../types';
+
+function fmtTok(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
+  return String(n);
+}
+
+function fmtCost(usd: number): string {
+  if (usd >= 1) return '$' + usd.toFixed(2);
+  if (usd >= 0.01) return '$' + usd.toFixed(3);
+  return '$' + usd.toFixed(4);
+}
+
+function fmtDur(ms: number): string {
+  if (ms >= 60_000) return (ms / 60_000).toFixed(1) + 'm';
+  return (ms / 1_000).toFixed(1) + 's';
+}
+
+function shortModel(model: string): string {
+  // Extract the short name from full model IDs like "claude-sonnet-4-20250514"
+  const m = model.match(/claude[- ]?(sonnet|opus|haiku)(?:[- ]?(\d+))?/i);
+  if (m) return m[1].toLowerCase() + (m[2] ? ' ' + m[2] : '');
+  // OpenCode models: try to extract the last meaningful segment
+  const parts = model.split(/[/:-]/);
+  const last = parts[parts.length - 1] || model;
+  return last.length > 20 ? last.slice(0, 20) : last;
+}
+
+function UsageMeta({ u }: { u: TurnUsage }) {
+  const [expanded, setExpanded] = useState(false);
+  const cost = fmtCost(u.cost_usd);
+  const model = u.model ? shortModel(u.model) : '';
+  const tokens = `${fmtTok(u.input_tokens)}\u2192${fmtTok(u.output_tokens)}`;
+  const dur = u.duration_ms ? fmtDur(u.duration_ms) : '';
+  const cache = [
+    u.cache_read_tokens > 0 ? `cache read ${fmtTok(u.cache_read_tokens)}` : '',
+    u.cache_write_tokens > 0 ? `cache write ${fmtTok(u.cache_write_tokens)}` : '',
+    u.reasoning_tokens ? `reasoning ${fmtTok(u.reasoning_tokens)}` : '',
+  ].filter(Boolean).join(' \u00b7 ');
+  const detail = [model, tokens, dur, cache].filter(Boolean).join(' \u00b7 ');
+  return (
+    <span class="usage" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }} title="Click for details">
+      {cost}{expanded && detail ? ` \u00b7 ${detail}` : ''}
+    </span>
+  );
+}
 
 function Message({ m }: { m: ChatMessage }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -72,7 +118,10 @@ function Message({ m }: { m: ChatMessage }) {
           </div>
         )
         : null}
-      {m.ts ? <div class="meta"><RelativeTime ts={m.ts} /></div> : null}
+      {m.ts ? <div class="meta">
+        <RelativeTime ts={m.ts} />
+        {m.usage && m.direction === 'out' ? <UsageMeta u={m.usage} /> : null}
+      </div> : null}
     </div>
   );
 }

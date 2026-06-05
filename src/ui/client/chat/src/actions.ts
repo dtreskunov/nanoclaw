@@ -57,6 +57,7 @@ interface ServerMessage {
   text: string;
   files?: ChatMessageFile[] | null;
   timestamp: string;
+  usage?: import('./types').TurnUsage;
 }
 
 /**
@@ -294,7 +295,14 @@ function mergeIncomingMessages(messages: ServerMessage[]): void {
     const key = m.id ? `${direction}:${m.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m.timestamp || '';
-    additions.push({ id: m.id, direction, text: m.text, files: m.files || null, ts });
+    additions.push({
+      id: m.id,
+      direction,
+      text: m.text,
+      files: m.files || null,
+      ts,
+      ...(m.usage ? { usage: m.usage } : {}),
+    });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === 'out') maybeNotify(m.text, m.files || []);
@@ -354,6 +362,7 @@ async function refetchThreadHistory(appendNewOnly: boolean): Promise<void> {
       text: m.text,
       files: m.files || null,
       ts: m.timestamp,
+      ...(m.usage ? { usage: m.usage } : {}),
     }));
     refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${normDirection(m.direction)}:${m.id}`));
     return;
@@ -365,7 +374,14 @@ async function refetchThreadHistory(appendNewOnly: boolean): Promise<void> {
     const key = m.id ? `${direction}:${m.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m.timestamp || '';
-    additions.push({ id: m.id, direction, text: m.text, files: m.files || null, ts });
+    additions.push({
+      id: m.id,
+      direction,
+      text: m.text,
+      files: m.files || null,
+      ts,
+      ...(m.usage ? { usage: m.usage } : {}),
+    });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === 'out') maybeNotify(m.text, m.files || []);
@@ -443,6 +459,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
             text: m.text,
             files: m.files || null,
             ts: m.timestamp,
+            ...(m.usage ? { usage: m.usage } : {}),
           }));
           chatLoading.value = false;
         });

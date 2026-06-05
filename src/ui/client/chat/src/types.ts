@@ -45,6 +45,9 @@ export interface Thread {
   kind?: 'dm' | 'thread';
   counterparty?: string;
   canSend?: boolean;
+  totalCost?: number;
+  totalTokens?: number;
+  turnCount?: number;
 }
 
 export interface ThreadCtx {
@@ -61,12 +64,26 @@ export interface ChatMessageFile {
   path?: string | null;
 }
 
+export interface TurnUsage {
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  reasoning_tokens?: number;
+  model: string;
+  context_window?: number;
+  max_output_tokens?: number;
+  duration_ms?: number;
+}
+
 export interface ChatMessage {
   id?: string;
   direction: Direction;
   text: string;
   files: ChatMessageFile[] | null;
   ts: string;
+  usage?: TurnUsage;
 }
 
 export interface SearchResult {
