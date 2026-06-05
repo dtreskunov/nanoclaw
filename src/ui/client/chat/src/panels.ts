@@ -1,28 +1,13 @@
 // Pane state persistence + body/main class side-effects.
-import { paneOpen, drawerOpen, isMobile, MOBILE_MQ } from './state';
-
-const KEYS = { threads: 'nc:pane:threads', files: 'nc:pane:files' } as const;
+import { drawerOpen, isMobile, MOBILE_MQ } from './state';
 
 export function restorePanelState(): void {
-  try {
-    const t = localStorage.getItem(KEYS.threads);
-    const f = localStorage.getItem(KEYS.files);
-    if (t === '0') paneOpen.threads.value = false;
-    if (t === '1') paneOpen.threads.value = true;
-    if (f === '0') paneOpen.files.value = false;
-    if (f === '1') paneOpen.files.value = true;
-  } catch {
-    /* ignore */
-  }
+  // Desktop panes intentionally always start collapsed — see paneOpen
+  // defaults in state.ts. No restore from localStorage.
 }
 
 export function persistPanelState(): void {
-  try {
-    localStorage.setItem(KEYS.threads, paneOpen.threads.value ? '1' : '0');
-    localStorage.setItem(KEYS.files, paneOpen.files.value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
+  // No-op: pane open/closed state is not persisted across loads.
 }
 
 export function applyPanelClasses(): void {

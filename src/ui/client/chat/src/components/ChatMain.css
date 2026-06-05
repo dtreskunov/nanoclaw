@@ -1,7 +1,18 @@
 /* Chat main: message log, message bubbles, status, context chips,
    pending uploads tray, composer form, and the typing indicator. */
 
-.chat-main { display: grid; grid-template-rows: 1fr auto auto auto auto; min-height: 0; position: relative; }
+.chat-main {
+  display: grid;
+  grid-template-rows: 1fr auto auto auto auto;
+  min-height: 0;
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  justify-self: center;
+}
+@media (max-width: 720px) {
+  .chat-main { max-width: none; }
+}
 .chat-main .log { overflow: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
 .chat-main .msg { padding: 6px 10px; border-radius: var(--radius-lg); max-width: 78%; white-space: pre-wrap; word-break: break-word; font-size: var(--font-base); }
 .chat-main .msg.in { align-self: flex-end; background: var(--accent); }

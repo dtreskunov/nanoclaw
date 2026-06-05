@@ -1136,6 +1136,14 @@ header .mobile-only {
   grid-template-rows: 1fr auto auto auto auto;
   min-height: 0;
   position: relative;
+  width: 100%;
+  max-width: 960px;
+  justify-self: center;
+}
+@media (max-width: 720px) {
+  .chat-main {
+    max-width: none;
+  }
 }
 .chat-main .log {
   overflow: auto;

@@ -15521,8 +15521,8 @@ var searchLoading = y3(false);
 var searchOpen = y3(false);
 var highlightMessageId = y3(null);
 var paneOpen = {
-  threads: y3(true),
-  files: y3(true)
+  threads: y3(false),
+  files: y3(false)
 };
 var drawerOpen = {
   threads: y3(false),
@@ -17094,7 +17094,8 @@ async function applyHash(router2) {
     const latest = threads.value.length > 0 ? threads.value[0] : null;
     if (latest)
       router2.openChat(parsed.groupId, latest.threadId, threadCtx(latest)).catch((err) => console.error("chat open failed", err));
-    else router2.clearChat();
+    else
+      router2.openChat(parsed.groupId, null, null).catch((err) => console.error("auto-start chat failed", err));
   }
   if (parsed.isDir) {
     await router2.loadTree(parsed.path);
@@ -20467,24 +20468,9 @@ function ShareLinkModal() {
 }
 
 // src/panels.ts
-var KEYS = { threads: "nc:pane:threads", files: "nc:pane:files" };
 function restorePanelState() {
-  try {
-    const t4 = localStorage.getItem(KEYS.threads);
-    const f5 = localStorage.getItem(KEYS.files);
-    if (t4 === "0") paneOpen.threads.value = false;
-    if (t4 === "1") paneOpen.threads.value = true;
-    if (f5 === "0") paneOpen.files.value = false;
-    if (f5 === "1") paneOpen.files.value = true;
-  } catch {
-  }
 }
 function persistPanelState() {
-  try {
-    localStorage.setItem(KEYS.threads, paneOpen.threads.value ? "1" : "0");
-    localStorage.setItem(KEYS.files, paneOpen.files.value ? "1" : "0");
-  } catch {
-  }
 }
 function applyPanelClasses() {
   const mobile = MOBILE_MQ.matches;

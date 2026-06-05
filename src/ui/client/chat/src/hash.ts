@@ -104,7 +104,7 @@ export async function applyHash(router: RouterApi): Promise<void> {
       router
         .openChat(parsed.groupId, latest.threadId, threadCtx(latest))
         .catch((err) => console.error('chat open failed', err));
-    else router.clearChat();
+    else router.openChat(parsed.groupId, null, null).catch((err) => console.error('auto-start chat failed', err));
   }
   if (parsed.isDir) {
     await router.loadTree(parsed.path);

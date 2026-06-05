@@ -68,9 +68,12 @@ export const searchOpen: Signal<boolean> = signal(false);
 export const highlightMessageId: Signal<string | null> = signal<string | null>(null);
 
 // Panels / drawers
+// Desktop panes default to collapsed on every load — the user wanted a
+// composer-first initial state. Toggling during a session is not
+// persisted (see panels.ts).
 export const paneOpen: Record<'threads' | 'files', Signal<boolean>> = {
-  threads: signal(true),
-  files: signal(true),
+  threads: signal(false),
+  files: signal(false),
 };
 export const drawerOpen: Record<'threads' | 'files', Signal<boolean>> = {
   threads: signal(false),
