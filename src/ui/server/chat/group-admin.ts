@@ -36,6 +36,7 @@ import {
 import type { ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
 import { recordAdminAction } from './audit.js';
+import { listModelsForProvider } from './models-catalog.js';
 
 // ── allowed scalar config fields (mirrors ncl groups config update) ───────
 
@@ -144,6 +145,8 @@ async function dispatch(
   }
 
   if (rest === '/users-search' && method === 'GET') return handleUsersSearch(req, res);
+
+  if (rest === '/models' && method === 'GET') return handleListModels(req, res);
 
   writeJson(res, 404, { error: 'not_found' });
 }
@@ -503,6 +506,19 @@ function handleUsersSearch(req: http.IncomingMessage, res: http.ServerResponse):
     if (matches.length >= limit) break;
   }
   writeJson(res, 200, { users: matches });
+}
+
+// ── model catalog (for the model dropdown) ────────────────────────────────
+
+async function handleListModels(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const provider = (url.searchParams.get('provider') || '').trim();
+  if (!provider) throw new BadRequest('provider query parameter is required');
+  if (!VALID_PROVIDERS.includes(provider as (typeof VALID_PROVIDERS)[number])) {
+    throw new BadRequest(`provider must be one of: ${VALID_PROVIDERS.join(', ')}`);
+  }
+  const result = await listModelsForProvider(provider);
+  writeJson(res, 200, result);
 }
 
 // ── tiny local helpers (kept private to avoid widening routes.ts surface) ─

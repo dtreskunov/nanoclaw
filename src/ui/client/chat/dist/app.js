@@ -20616,6 +20616,7 @@ function SettingsTab({ gid }) {
   const [draft, setDraft] = h2(null);
   const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
+  const [models, setModels] = h2(null);
   async function refresh() {
     const r4 = await call(apiPath(gid, "/settings"));
     if (!r4.ok) {
@@ -20629,6 +20630,22 @@ function SettingsTab({ gid }) {
   y2(() => {
     refresh();
   }, [gid]);
+  const provider = draft?.provider ?? null;
+  y2(() => {
+    if (!provider) {
+      setModels(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const r4 = await call(apiPath(gid, `/models?provider=${encodeURIComponent(provider)}`));
+      if (cancelled) return;
+      setModels(r4.ok ? r4.data : { models: [], source: "unavailable", prefix: null });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [provider, gid]);
   if (!data || !draft) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
   function update(k4, v5) {
     setDraft((d5) => d5 ? { ...d5, [k4]: v5 } : d5);
@@ -20697,13 +20714,14 @@ function SettingsTab({ gid }) {
       }
     ) }),
     /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
-      "input",
+      ModelField,
       {
-        type: "text",
-        value: draft.model ?? "",
-        disabled: busy,
-        onInput: (e4) => update("model", e4.currentTarget.value || null),
-        placeholder: "provider-specific"
+        gid,
+        provider: draft.provider,
+        value: draft.model,
+        busy,
+        models,
+        onChange: (v5) => update("model", v5)
       }
     ) }),
     /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
@@ -20769,6 +20787,61 @@ function Field({ label, children }) {
   return /* @__PURE__ */ u4("div", { class: "settings-row group-admin-field", children: [
     /* @__PURE__ */ u4("label", { class: "group-admin-label", children: label }),
     /* @__PURE__ */ u4("div", { class: "group-admin-control", children })
+  ] });
+}
+function ModelField({
+  gid,
+  provider,
+  value,
+  busy,
+  models,
+  onChange
+}) {
+  const listId = `models-${gid}`;
+  const placeholder = (() => {
+    if (provider === "opencode" && models?.prefix) return `${models.prefix}/model-id`;
+    if (provider === "claude") return "claude-sonnet-4-6";
+    return "provider-specific";
+  })();
+  const helpText = (() => {
+    if (provider === "mock") return null;
+    if (!models) return null;
+    if (models.source === "unavailable") {
+      return "Model catalog unavailable \u2014 type the model id manually.";
+    }
+    if (provider === "opencode" && !models.prefix) {
+      return "OPENCODE_PROVIDER not set in .env \u2014 no suggestions; type the full provider/model id manually.";
+    }
+    if (provider === "opencode" && models.models.length === 0) {
+      return `No models found in catalog for OPENCODE_PROVIDER="${models.prefix}". Type manually.`;
+    }
+    if (provider === "opencode" && models.prefix) {
+      return `Format: ${models.prefix}/<model-id>. ${models.models.length} suggestions from models.dev.`;
+    }
+    if (provider === "claude" && models.models.length > 0) {
+      return `${models.models.length} suggestions from models.dev.`;
+    }
+    return null;
+  })();
+  return /* @__PURE__ */ u4("div", { class: "group-admin-model-wrap", children: [
+    /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        list: models && models.models.length > 0 ? listId : void 0,
+        value: value ?? "",
+        disabled: busy,
+        onInput: (e4) => onChange(e4.currentTarget.value || null),
+        placeholder,
+        autocomplete: "off",
+        spellcheck: false
+      }
+    ),
+    models && models.models.length > 0 ? /* @__PURE__ */ u4("datalist", { id: listId, children: models.models.map((m6) => /* @__PURE__ */ u4("option", { value: m6.value, children: [
+      m6.label,
+      m6.detail ? ` \u2014 ${m6.detail}` : ""
+    ] }, m6.value)) }) : null,
+    helpText ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: helpText }) : null
   ] });
 }
 function MembersTab({ gid }) {

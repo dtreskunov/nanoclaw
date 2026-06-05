@@ -63,6 +63,18 @@ interface UserSearchDto {
   primaryChannel: string | null;
 }
 
+interface ModelSuggestion {
+  value: string;
+  label: string;
+  detail?: string;
+}
+
+interface ModelsResponse {
+  models: ModelSuggestion[];
+  source: 'models.dev' | 'unavailable';
+  prefix: string | null;
+}
+
 function apiPath(gid: string, sub: string): string {
   return `/ui/chat/api/groups/${encodeURIComponent(gid)}/admin${sub}`;
 }
@@ -145,6 +157,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
+  const [models, setModels] = useState<ModelsResponse | null>(null);
 
   async function refresh(): Promise<void> {
     const r = await call<SettingsResponse>(apiPath(gid, '/settings'));
@@ -155,6 +168,20 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   }
 
   useEffect(() => { refresh(); }, [gid]);
+
+  // Refetch model suggestions whenever the provider changes (including the
+  // initial load). Cheap: server caches the upstream catalog.
+  const provider = draft?.provider ?? null;
+  useEffect(() => {
+    if (!provider) { setModels(null); return; }
+    let cancelled = false;
+    (async () => {
+      const r = await call<ModelsResponse>(apiPath(gid, `/models?provider=${encodeURIComponent(provider)}`));
+      if (cancelled) return;
+      setModels(r.ok ? r.data : { models: [], source: 'unavailable', prefix: null });
+    })();
+    return () => { cancelled = true; };
+  }, [provider, gid]);
 
   if (!data || !draft) return <p class="muted">Loading…</p>;
 
@@ -224,12 +251,13 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
       </Field>
 
       <Field label="Model">
-        <input
-          type="text"
-          value={draft.model ?? ''}
-          disabled={busy}
-          onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => update('model', e.currentTarget.value || null)}
-          placeholder="provider-specific"
+        <ModelField
+          gid={gid}
+          provider={draft.provider}
+          value={draft.model}
+          busy={busy}
+          models={models}
+          onChange={(v) => update('model', v)}
         />
       </Field>
 
@@ -301,6 +329,77 @@ function Field({ label, children }: { label: string; children: preact.ComponentC
     <div class="settings-row group-admin-field">
       <label class="group-admin-label">{label}</label>
       <div class="group-admin-control">{children}</div>
+    </div>
+  );
+}
+
+function ModelField({
+  gid,
+  provider,
+  value,
+  busy,
+  models,
+  onChange,
+}: {
+  gid: string;
+  provider: string | null;
+  value: string | null;
+  busy: boolean;
+  models: ModelsResponse | null;
+  onChange: (v: string | null) => void;
+}): JSX.Element {
+  const listId = `models-${gid}`;
+  // Placeholder shows the expected wire format. For opencode this is
+  // "<OPENCODE_PROVIDER>/<model>" (the prefix comes from the server because
+  // OPENCODE_PROVIDER lives in the host .env, not per-group).
+  const placeholder = (() => {
+    if (provider === 'opencode' && models?.prefix) return `${models.prefix}/model-id`;
+    if (provider === 'claude') return 'claude-sonnet-4-6';
+    return 'provider-specific';
+  })();
+  const helpText = (() => {
+    if (provider === 'mock') return null;
+    if (!models) return null;
+    if (models.source === 'unavailable') {
+      return 'Model catalog unavailable — type the model id manually.';
+    }
+    if (provider === 'opencode' && !models.prefix) {
+      return 'OPENCODE_PROVIDER not set in .env — no suggestions; type the full provider/model id manually.';
+    }
+    if (provider === 'opencode' && models.models.length === 0) {
+      return `No models found in catalog for OPENCODE_PROVIDER="${models.prefix}". Type manually.`;
+    }
+    if (provider === 'opencode' && models.prefix) {
+      return `Format: ${models.prefix}/<model-id>. ${models.models.length} suggestions from models.dev.`;
+    }
+    if (provider === 'claude' && models.models.length > 0) {
+      return `${models.models.length} suggestions from models.dev.`;
+    }
+    return null;
+  })();
+  return (
+    <div class="group-admin-model-wrap">
+      <input
+        type="text"
+        list={models && models.models.length > 0 ? listId : undefined}
+        value={value ?? ''}
+        disabled={busy}
+        onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => onChange(e.currentTarget.value || null)}
+        placeholder={placeholder}
+        autocomplete="off"
+        spellcheck={false}
+      />
+      {models && models.models.length > 0 ? (
+        <datalist id={listId}>
+          {models.models.map((m) => (
+            <option value={m.value} key={m.value}>
+              {m.label}
+              {m.detail ? ` — ${m.detail}` : ''}
+            </option>
+          ))}
+        </datalist>
+      ) : null}
+      {helpText ? <p class="group-admin-help">{helpText}</p> : null}
     </div>
   );
 }

@@ -52,6 +52,20 @@
   color: inherit;
 }
 
+.group-admin-model-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.group-admin-model-wrap input { width: 100%; }
+.group-admin-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
 .group-admin-badge {
   display: inline-block;
   margin-left: 6px;
