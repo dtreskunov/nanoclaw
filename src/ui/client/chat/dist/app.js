@@ -147,10 +147,10 @@ var require_dist = __commonJS({
     function compile2(path, options = {}) {
       const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
       const data = typeof path === "object" ? path : parse(path, options);
-      const fn = tokensToFunction(data.tokens, delimiter, encode);
+      const fn2 = tokensToFunction(data.tokens, delimiter, encode);
       return function path2(params = {}) {
         const missing = [];
-        const path3 = fn(params, missing);
+        const path3 = fn2(params, missing);
         if (missing.length) {
           throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
         }
@@ -171,10 +171,10 @@ var require_dist = __commonJS({
       if (token.type === "text")
         return () => token.value;
       if (token.type === "group") {
-        const fn = tokensToFunction(token.tokens, delimiter, encode);
+        const fn2 = tokensToFunction(token.tokens, delimiter, encode);
         return (data, missing) => {
           const len = missing.length;
-          const value = fn(data, missing);
+          const value = fn2(data, missing);
           if (missing.length === len)
             return value;
           missing.length = len;
@@ -344,16 +344,16 @@ var require_dist = __commonJS({
       }
       return result;
     }
-    function negate(a4, b4) {
-      if (b4.length > a4.length)
-        return negate(b4, a4);
-      if (a4 === b4)
-        b4 = "";
-      if (b4.length > 1)
-        return `(?:(?!${escape(a4)}|${escape(b4)})[^])`;
+    function negate(a4, b5) {
+      if (b5.length > a4.length)
+        return negate(b5, a4);
+      if (a4 === b5)
+        b5 = "";
+      if (b5.length > 1)
+        return `(?:(?!${escape(a4)}|${escape(b5)})[^])`;
       if (a4.length > 1)
-        return `(?:(?!${escape(a4)})[^${escape(b4)}])`;
-      return `[^${escape(a4 + b4)}]`;
+        return `(?:(?!${escape(a4)})[^${escape(b5)}])`;
+      return `[^${escape(a4 + b5)}]`;
     }
     function stringifyTokens(tokens, index) {
       let value = "";
@@ -459,7 +459,7 @@ var require_core = __commonJS({
         const pieces = name.split(".");
         return [
           `${prefix}${pieces.shift()}`,
-          ...pieces.map((x5, i5) => `${x5}${"_".repeat(i5 + 1)}`)
+          ...pieces.map((x6, i5) => `${x6}${"_".repeat(i5 + 1)}`)
         ].join(" ");
       }
       return `${prefix}${name}`;
@@ -649,7 +649,7 @@ var require_core = __commonJS({
       return concat("(?:", re, ")?");
     }
     function concat(...args) {
-      const joined = args.map((x5) => source(x5)).join("");
+      const joined = args.map((x6) => source(x6)).join("");
       return joined;
     }
     function stripOptionsFromArgs(args) {
@@ -663,7 +663,7 @@ var require_core = __commonJS({
     }
     function either(...args) {
       const opts = stripOptionsFromArgs(args);
-      const joined = "(" + (opts.capture ? "" : "?:") + args.map((x5) => source(x5)).join("|") + ")";
+      const joined = "(" + (opts.capture ? "" : "?:") + args.map((x6) => source(x6)).join("|") + ")";
       return joined;
     }
     function countMatchGroups(re) {
@@ -993,7 +993,7 @@ var require_core = __commonJS({
       return compiledKeywords;
       function compileList(scopeName2, keywordList) {
         if (caseInsensitive) {
-          keywordList = keywordList.map((x5) => x5.toLowerCase());
+          keywordList = keywordList.map((x6) => x6.toLowerCase());
         }
         keywordList.forEach(function(keyword) {
           const pair = keyword.split("|");
@@ -1701,12 +1701,12 @@ var require_core = __commonJS({
           (name) => _highlight(name, code, false)
         );
         results.unshift(plaintext);
-        const sorted = results.sort((a4, b4) => {
-          if (a4.relevance !== b4.relevance) return b4.relevance - a4.relevance;
-          if (a4.language && b4.language) {
-            if (getLanguage(a4.language).supersetOf === b4.language) {
+        const sorted = results.sort((a4, b5) => {
+          if (a4.relevance !== b5.relevance) return b5.relevance - a4.relevance;
+          if (a4.language && b5.language) {
+            if (getLanguage(a4.language).supersetOf === b5.language) {
               return 1;
-            } else if (getLanguage(b4.language).supersetOf === a4.language) {
+            } else if (getLanguage(b5.language).supersetOf === a4.language) {
               return -1;
             }
           }
@@ -5854,7 +5854,7 @@ var require_java = __commonJS({
     };
     function recurRegex(re, substitution, depth) {
       if (depth === -1) return "";
-      return re.replace(substitution, (_5) => {
+      return re.replace(substitution, (_6) => {
         return recurRegex(re, substitution, depth - 1);
       });
     }
@@ -6573,7 +6573,7 @@ var require_javascript = __commonJS({
             ...BUILT_IN_GLOBALS,
             "super",
             "import"
-          ].map((x5) => `${x5}\\s*\\(`)),
+          ].map((x6) => `${x6}\\s*\\(`)),
           IDENT_RE$1,
           regex.lookahead(/\s*\(/)
         ),
@@ -12231,7 +12231,7 @@ var require_sql = __commonJS({
         illegal: /[{}]|<\//,
         keywords: {
           $pattern: /\b[\w\.]+/,
-          keyword: reduceRelevancy(KEYWORDS, { when: (x5) => x5.length < 3 }),
+          keyword: reduceRelevancy(KEYWORDS, { when: (x6) => x6.length < 3 }),
           literal: LITERALS,
           type: TYPES,
           built_in: POSSIBLE_WITHOUT_PARENS
@@ -12269,7 +12269,7 @@ var require_swift = __commonJS({
       return concat("(?=", re, ")");
     }
     function concat(...args) {
-      const joined = args.map((x5) => source(x5)).join("");
+      const joined = args.map((x6) => source(x6)).join("");
       return joined;
     }
     function stripOptionsFromArgs(args) {
@@ -12283,7 +12283,7 @@ var require_swift = __commonJS({
     }
     function either(...args) {
       const opts = stripOptionsFromArgs(args);
-      const joined = "(" + (opts.capture ? "" : "?:") + args.map((x5) => source(x5)).join("|") + ")";
+      const joined = "(" + (opts.capture ? "" : "?:") + args.map((x6) => source(x6)).join("|") + ")";
       return joined;
     }
     var keywordWrapper = (keyword) => concat(
@@ -13834,7 +13834,7 @@ var require_typescript = __commonJS({
             ...BUILT_IN_GLOBALS,
             "super",
             "import"
-          ].map((x5) => `${x5}\\s*\\(`)),
+          ].map((x6) => `${x6}\\s*\\(`)),
           IDENT_RE$1,
           regex.lookahead(/\s*\(/)
         ),
@@ -14537,8 +14537,8 @@ function P() {
   P.__r = 0;
 }
 function $(n3, l7, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
-  var a4, h5, y5, d5, w5, _5, g6 = t4 && t4.__k || v, m6 = l7.length;
-  for (f5 = I(u5, l7, g6, f5, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u5.__k[a4]) && (h5 = -1 === y5.__i ? p : g6[y5.__i] || p, y5.__i = a4, _5 = j(n3, y5, h5, i5, r4, o4, e4, f5, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f5 = A(y5, f5, n3) : "function" == typeof y5.type && void 0 !== _5 ? f5 = _5 : d5 && (f5 = d5.nextSibling), y5.__u &= -7);
+  var a4, h5, y5, d5, w5, _6, g8 = t4 && t4.__k || v, m6 = l7.length;
+  for (f5 = I(u5, l7, g8, f5, m6), a4 = 0; a4 < m6; a4++) null != (y5 = u5.__k[a4]) && (h5 = -1 === y5.__i ? p : g8[y5.__i] || p, y5.__i = a4, _6 = j(n3, y5, h5, i5, r4, o4, e4, f5, c4, s5), d5 = y5.__e, y5.ref && h5.ref != y5.ref && (h5.ref && V(h5.ref, null, y5), s5.push(y5.ref, y5.__c || d5, y5)), null == w5 && null != d5 && (w5 = d5), 4 & y5.__u || h5.__k === y5.__k ? f5 = A(y5, f5, n3) : "function" == typeof y5.type && void 0 !== _6 ? f5 = _6 : d5 && (f5 = d5.nextSibling), y5.__u &= -7);
   return u5.__e = w5, f5;
 }
 function I(n3, l7, u5, t4, i5) {
@@ -14558,6 +14558,11 @@ function A(n3, l7, u5) {
     l7 = l7 && l7.nextSibling;
   } while (null != l7 && 8 == l7.nodeType);
   return l7;
+}
+function H(n3, l7) {
+  return l7 = l7 || [], null == n3 || "boolean" == typeof n3 || (d(n3) ? n3.some(function(n4) {
+    H(n4, l7);
+  }) : l7.push(n3)), l7;
 }
 function L(n3, l7, u5, t4) {
   var i5, r4, o4 = n3.key, e4 = n3.type, f5 = l7[u5];
@@ -14606,35 +14611,35 @@ function O(n3) {
   };
 }
 function j(n3, u5, t4, i5, r4, o4, e4, f5, c4, s5) {
-  var a4, h5, p5, v5, y5, g6, m6, b4, C3, S3, M3, P3, I3, A5, H2, L3, T4, F3 = u5.type;
+  var a4, h5, p5, v5, y5, g8, m6, b5, C3, S3, M3, P5, I3, A6, H4, L3, T5, F5 = u5.type;
   if (void 0 !== u5.constructor) return null;
   128 & t4.__u && (c4 = !!(32 & t4.__u), o4 = [f5 = u5.__e = t4.__e]), (a4 = l.__b) && a4(u5);
-  n: if ("function" == typeof F3) try {
-    if (b4 = u5.props, C3 = "prototype" in F3 && F3.prototype.render, S3 = (a4 = F3.contextType) && i5[a4.__c], M3 = a4 ? S3 ? S3.props.value : a4.__ : i5, t4.__c ? m6 = (h5 = u5.__c = t4.__c).__ = h5.__E : (C3 ? u5.__c = h5 = new F3(b4, M3) : (u5.__c = h5 = new x(b4, M3), h5.constructor = F3, h5.render = B), S3 && S3.sub(h5), h5.props = b4, h5.state || (h5.state = {}), h5.context = M3, h5.__n = i5, p5 = h5.__d = true, h5.__h = [], h5._sb = []), C3 && null == h5.__s && (h5.__s = h5.state), C3 && null != F3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = w({}, h5.__s)), w(h5.__s, F3.getDerivedStateFromProps(b4, h5.__s))), v5 = h5.props, y5 = h5.state, h5.__v = u5, p5) C3 && null == F3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), C3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
+  n: if ("function" == typeof F5) try {
+    if (b5 = u5.props, C3 = "prototype" in F5 && F5.prototype.render, S3 = (a4 = F5.contextType) && i5[a4.__c], M3 = a4 ? S3 ? S3.props.value : a4.__ : i5, t4.__c ? m6 = (h5 = u5.__c = t4.__c).__ = h5.__E : (C3 ? u5.__c = h5 = new F5(b5, M3) : (u5.__c = h5 = new x(b5, M3), h5.constructor = F5, h5.render = B), S3 && S3.sub(h5), h5.props = b5, h5.state || (h5.state = {}), h5.context = M3, h5.__n = i5, p5 = h5.__d = true, h5.__h = [], h5._sb = []), C3 && null == h5.__s && (h5.__s = h5.state), C3 && null != F5.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = w({}, h5.__s)), w(h5.__s, F5.getDerivedStateFromProps(b5, h5.__s))), v5 = h5.props, y5 = h5.state, h5.__v = u5, p5) C3 && null == F5.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), C3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
     else {
-      if (C3 && null == F3.getDerivedStateFromProps && b4 !== v5 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(b4, M3), !h5.__e && (null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(b4, h5.__s, M3) || u5.__v == t4.__v)) {
-        for (u5.__v != t4.__v && (h5.props = b4, h5.state = h5.__s, h5.__d = false), u5.__e = t4.__e, u5.__k = t4.__k, u5.__k.some(function(n4) {
+      if (C3 && null == F5.getDerivedStateFromProps && b5 !== v5 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(b5, M3), !h5.__e && (null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(b5, h5.__s, M3) || u5.__v == t4.__v)) {
+        for (u5.__v != t4.__v && (h5.props = b5, h5.state = h5.__s, h5.__d = false), u5.__e = t4.__e, u5.__k = t4.__k, u5.__k.some(function(n4) {
           n4 && (n4.__ = u5);
-        }), P3 = 0; P3 < h5._sb.length; P3++) h5.__h.push(h5._sb[P3]);
+        }), P5 = 0; P5 < h5._sb.length; P5++) h5.__h.push(h5._sb[P5]);
         h5._sb = [], h5.__h.length && e4.push(h5);
         break n;
       }
-      null != h5.componentWillUpdate && h5.componentWillUpdate(b4, h5.__s, M3), C3 && null != h5.componentDidUpdate && h5.__h.push(function() {
-        h5.componentDidUpdate(v5, y5, g6);
+      null != h5.componentWillUpdate && h5.componentWillUpdate(b5, h5.__s, M3), C3 && null != h5.componentDidUpdate && h5.__h.push(function() {
+        h5.componentDidUpdate(v5, y5, g8);
       });
     }
-    if (h5.context = M3, h5.props = b4, h5.__P = n3, h5.__e = false, I3 = l.__r, A5 = 0, C3) {
-      for (h5.state = h5.__s, h5.__d = false, I3 && I3(u5), a4 = h5.render(h5.props, h5.state, h5.context), H2 = 0; H2 < h5._sb.length; H2++) h5.__h.push(h5._sb[H2]);
+    if (h5.context = M3, h5.props = b5, h5.__P = n3, h5.__e = false, I3 = l.__r, A6 = 0, C3) {
+      for (h5.state = h5.__s, h5.__d = false, I3 && I3(u5), a4 = h5.render(h5.props, h5.state, h5.context), H4 = 0; H4 < h5._sb.length; H4++) h5.__h.push(h5._sb[H4]);
       h5._sb = [];
     } else do {
       h5.__d = false, I3 && I3(u5), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
-    } while (h5.__d && ++A5 < 25);
-    h5.state = h5.__s, null != h5.getChildContext && (i5 = w(w({}, i5), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g6 = h5.getSnapshotBeforeUpdate(v5, y5)), f5 = $(n3, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u5, t4, i5, r4, o4, e4, f5, c4, s5), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
+    } while (h5.__d && ++A6 < 25);
+    h5.state = h5.__s, null != h5.getChildContext && (i5 = w(w({}, i5), h5.getChildContext())), C3 && !p5 && null != h5.getSnapshotBeforeUpdate && (g8 = h5.getSnapshotBeforeUpdate(v5, y5)), f5 = $(n3, d(L3 = null != a4 && a4.type === k && null == a4.key ? a4.props.children : a4) ? L3 : [L3], u5, t4, i5, r4, o4, e4, f5, c4, s5), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), m6 && (h5.__E = h5.__ = null);
   } catch (n4) {
     if (u5.__v = null, c4 || null != o4) if (n4.then) {
       for (u5.__u |= c4 ? 160 : 128; f5 && 8 == f5.nodeType && f5.nextSibling; ) f5 = f5.nextSibling;
       o4[o4.indexOf(f5)] = null, u5.__e = f5;
-    } else for (T4 = o4.length; T4--; ) _(o4[T4]);
+    } else for (T5 = o4.length; T5--; ) _(o4[T5]);
     else u5.__e = t4.__e, u5.__k = t4.__k;
     l.__e(n4, u5, t4);
   }
@@ -14654,30 +14659,30 @@ function z(n3, u5, t4) {
   });
 }
 function N(u5, t4, i5, r4, o4, e4, f5, c4, s5) {
-  var a4, h5, v5, y5, w5, g6, m6, b4 = i5.props, k4 = t4.props, x5 = t4.type;
-  if ("svg" == x5 ? o4 = "http://www.w3.org/2000/svg" : "math" == x5 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
-    for (a4 = 0; a4 < e4.length; a4++) if ((w5 = e4[a4]) && "setAttribute" in w5 == !!x5 && (x5 ? w5.localName == x5 : 3 == w5.nodeType)) {
+  var a4, h5, v5, y5, w5, g8, m6, b5 = i5.props, k4 = t4.props, x6 = t4.type;
+  if ("svg" == x6 ? o4 = "http://www.w3.org/2000/svg" : "math" == x6 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
+    for (a4 = 0; a4 < e4.length; a4++) if ((w5 = e4[a4]) && "setAttribute" in w5 == !!x6 && (x6 ? w5.localName == x6 : 3 == w5.nodeType)) {
       u5 = w5, e4[a4] = null;
       break;
     }
   }
   if (null == u5) {
-    if (null == x5) return document.createTextNode(k4);
-    u5 = document.createElementNS(o4, x5, k4.is && k4), c4 && (l.__m && l.__m(t4, e4), c4 = false), e4 = null;
+    if (null == x6) return document.createTextNode(k4);
+    u5 = document.createElementNS(o4, x6, k4.is && k4), c4 && (l.__m && l.__m(t4, e4), c4 = false), e4 = null;
   }
-  if (null === x5) b4 === k4 || c4 && u5.data === k4 || (u5.data = k4);
+  if (null === x6) b5 === k4 || c4 && u5.data === k4 || (u5.data = k4);
   else {
-    if (e4 = e4 && n.call(u5.childNodes), b4 = i5.props || p, !c4 && null != e4) for (b4 = {}, a4 = 0; a4 < u5.attributes.length; a4++) b4[(w5 = u5.attributes[a4]).name] = w5.value;
-    for (a4 in b4) if (w5 = b4[a4], "children" == a4) ;
+    if (e4 = e4 && n.call(u5.childNodes), b5 = i5.props || p, !c4 && null != e4) for (b5 = {}, a4 = 0; a4 < u5.attributes.length; a4++) b5[(w5 = u5.attributes[a4]).name] = w5.value;
+    for (a4 in b5) if (w5 = b5[a4], "children" == a4) ;
     else if ("dangerouslySetInnerHTML" == a4) v5 = w5;
     else if (!(a4 in k4)) {
       if ("value" == a4 && "defaultValue" in k4 || "checked" == a4 && "defaultChecked" in k4) continue;
       F(u5, a4, null, w5, o4);
     }
-    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g6 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b4[a4] === w5 || F(u5, a4, w5, b4[a4], o4);
+    for (a4 in k4) w5 = k4[a4], "children" == a4 ? y5 = w5 : "dangerouslySetInnerHTML" == a4 ? h5 = w5 : "value" == a4 ? g8 = w5 : "checked" == a4 ? m6 = w5 : c4 && "function" != typeof w5 || b5[a4] === w5 || F(u5, a4, w5, b5[a4], o4);
     if (h5) c4 || v5 && (h5.__html === v5.__html || h5.__html === u5.innerHTML) || (u5.innerHTML = h5.__html), t4.__k = [];
-    else if (v5 && (u5.innerHTML = ""), $(u5, d(y5) ? y5 : [y5], t4, i5, r4, "foreignObject" == x5 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && C(i5, 0), c4, s5), null != e4) for (a4 = e4.length; a4--; ) _(e4[a4]);
-    c4 || (a4 = "value", "progress" == x5 && null == g6 ? u5.removeAttribute("value") : void 0 !== g6 && (g6 !== u5[a4] || "progress" == x5 && !g6 || "option" == x5 && g6 !== b4[a4]) && F(u5, a4, g6, b4[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u5[a4] && F(u5, a4, m6, b4[a4], o4));
+    else if (v5 && (u5.innerHTML = ""), $(u5, d(y5) ? y5 : [y5], t4, i5, r4, "foreignObject" == x6 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && C(i5, 0), c4, s5), null != e4) for (a4 = e4.length; a4--; ) _(e4[a4]);
+    c4 || (a4 = "value", "progress" == x6 && null == g8 ? u5.removeAttribute("value") : void 0 !== g8 && (g8 !== u5[a4] || "progress" == x6 && !g8 || "option" == x6 && g8 !== b5[a4]) && F(u5, a4, g8, b5[a4], o4), a4 = "checked", void 0 !== m6 && m6 !== u5[a4] && F(u5, a4, m6, b5[a4], o4));
   }
   return u5;
 }
@@ -15490,8 +15495,8 @@ var groupId = y3(null);
 var isAdmin = g2(() => {
   const id = groupId.value;
   if (!id) return false;
-  const g6 = groups.value.find((x5) => x5.id === id);
-  return !!(g6 && g6.isAdmin);
+  const g8 = groups.value.find((x6) => x6.id === id);
+  return !!(g8 && g8.isAdmin);
 });
 if (typeof document !== "undefined") {
   j3(() => {
@@ -15633,14 +15638,14 @@ var $e = /^[^\n]+/;
 var U = /(?!\s*\])(?:\\[\s\S]|[^\[\]\\])+/;
 var Le = d4(/^ {0,3}\[(label)\]: *(?:\n[ \t]*)?([^<\s][^\s]*|<.*?>)(?:(?: +(?:\n[ \t]*)?| *\n[ \t]*)(title))? *(?:\n+|$)/).replace("label", U).replace("title", /(?:"(?:\\"?|[^"\\])*"|'[^'\n]*(?:\n[^'\n]+)*\n?'|\([^()]*\))/).getRegex();
 var _e = d4(/^(bull)([ \t][^\n]+?)?(?:\n|$)/).replace(/bull/g, j4).getRegex();
-var H = "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+var H2 = "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
 var K = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
-var ze = d4("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", K).replace("tag", H).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
-var le = d4(F2).replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H).getRegex();
+var ze = d4("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", K).replace("tag", H2).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
+var le = d4(F2).replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H2).getRegex();
 var Me = d4(/^( {0,3}> ?(paragraph|[^\n]*)(?:\n|$))+/).replace("paragraph", le).getRegex();
 var W = { blockquote: Me, code: we, def: Le, fences: ye, heading: Pe, hr: B3, html: ze, lheading: ae, list: _e, newline: Oe, paragraph: le, table: _4, text: $e };
-var se = d4("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H).getRegex();
-var Ee = { ...W, lheading: Se, table: se, paragraph: d4(F2).replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", se).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H).getRegex() };
+var se = d4("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H2).getRegex();
+var Ee = { ...W, lheading: Se, table: se, paragraph: d4(F2).replace("hr", B3).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", se).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", H2).getRegex() };
 var Ie = { ...W, html: d4(`^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))`).replace("comment", K).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: _4, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: d4(F2).replace("hr", B3).replace("heading", ` *#{1,6} *[^
 ]`).replace("lheading", ae).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex() };
 var Ae = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
@@ -15861,9 +15866,9 @@ ${p5}` : p5;
 `, e4 = e4.substring(h5.length + 1), a4 = true), !a4) {
           let S3 = this.rules.other.nextBulletRegex(f5), te = this.rules.other.hrRegex(f5), ne = this.rules.other.fencesBeginRegex(f5), re = this.rules.other.headingBeginRegex(f5), be = this.rules.other.htmlBeginRegex(f5), Re = this.rules.other.blockquoteBeginRegex(f5);
           for (; e4; ) {
-            let G = e4.split(`
+            let G3 = e4.split(`
 `, 1)[0], C3;
-            if (h5 = G, this.options.pedantic ? (h5 = h5.replace(this.rules.other.listReplaceNesting, "  "), C3 = h5) : C3 = h5.replace(this.rules.other.tabCharGlobal, "    "), ne.test(h5) || re.test(h5) || be.test(h5) || Re.test(h5) || S3.test(h5) || te.test(h5)) break;
+            if (h5 = G3, this.options.pedantic ? (h5 = h5.replace(this.rules.other.listReplaceNesting, "  "), C3 = h5) : C3 = h5.replace(this.rules.other.tabCharGlobal, "    "), ne.test(h5) || re.test(h5) || be.test(h5) || Re.test(h5) || S3.test(h5) || te.test(h5)) break;
             if (C3.search(this.rules.other.nonSpaceChar) >= f5 || !h5.trim()) p5 += `
 ` + C3.slice(f5);
             else {
@@ -15871,8 +15876,8 @@ ${p5}` : p5;
               p5 += `
 ` + h5;
             }
-            R = !h5.trim(), c4 += G + `
-`, e4 = e4.substring(G.length + 1), k4 = C3.slice(f5);
+            R = !h5.trim(), c4 += G3 + `
+`, e4 = e4.substring(G3.length + 1), k4 = C3.slice(f5);
           }
         }
         r4.loose || (o4 ? r4.loose = true : this.rules.other.doubleBlankLine.test(c4) && (o4 = true)), r4.items.push({ type: "list_item", raw: c4, task: !!this.options.gfm && this.rules.other.listIsTask.test(p5), loose: false, text: p5, tokens: [] }), r4.raw += c4;
@@ -17079,7 +17084,7 @@ async function applyHash(router2) {
     if (groups.value.length) await router2.selectGroup(groups.value[0].id);
     return;
   }
-  if (!groups.value.find((g6) => g6.id === parsed.groupId)) {
+  if (!groups.value.find((g8) => g8.id === parsed.groupId)) {
     router2.notFound("No access to group " + parsed.groupId);
     return;
   }
@@ -17392,7 +17397,7 @@ async function deleteThread(tid) {
     chatStatus.value = "delete failed: " + m6;
     return;
   }
-  threads.value = threads.value.filter((x5) => x5.threadId !== tid);
+  threads.value = threads.value.filter((x6) => x6.threadId !== tid);
   if (threadId.value === tid) {
     const latest = threads.value.length > 0 ? threads.value[0] : null;
     if (latest) openChat(groupId.value, latest.threadId, threadCtxOf(latest)).catch(console.error);
@@ -17406,7 +17411,7 @@ function threadCtxOf(t4) {
 function bumpActiveThread(maxTs) {
   if (!threadId.value) return;
   const list = threads.value.slice();
-  const idx = list.findIndex((x5) => x5.threadId === threadId.value);
+  const idx = list.findIndex((x6) => x6.threadId === threadId.value);
   if (idx < 0) {
     if (groupId.value) loadThreads(groupId.value);
     return;
@@ -17421,7 +17426,7 @@ function bumpActiveThread(maxTs) {
 function updateActiveThreadTitleFromFirstMessage(text) {
   if (!threadId.value) return;
   const list = threads.value.slice();
-  const idx = list.findIndex((x5) => x5.threadId === threadId.value);
+  const idx = list.findIndex((x6) => x6.threadId === threadId.value);
   if (idx < 0) return;
   const t4 = list[idx];
   if (t4.title !== "(new thread)") return;
@@ -17549,7 +17554,7 @@ function mergeIncomingMessages(messages) {
 function historyUrl(gid, tid) {
   let u5 = `api/groups/${encodeURIComponent(gid)}/chat/${encodeURIComponent(tid)}/history`;
   const params = new URLSearchParams();
-  const t4 = threads.value.find((x5) => x5.threadId === tid);
+  const t4 = threads.value.find((x6) => x6.threadId === tid);
   const ct = t4?.channelType || channelType.value;
   const mg = t4?.messagingGroupId || messagingGroupId.value;
   if (mg && ct !== "web") {
@@ -17634,7 +17639,7 @@ async function openChat(gid, resumeTid, opts) {
     mg = opts.messagingGroupId || null;
     cs = !!opts.canSend;
   } else if (resumeTid) {
-    const t4 = threads.value.find((x5) => x5.threadId === resumeTid);
+    const t4 = threads.value.find((x6) => x6.threadId === resumeTid);
     if (t4 && t4.channelType && t4.channelType !== "web") {
       ct = t4.channelType;
       mg = t4.messagingGroupId || null;
@@ -17835,8 +17840,8 @@ async function sendChat(text, files) {
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try {
-        const j5 = await res.json();
-        if (j5 && j5.error) detail = j5.error + (j5.detail ? ` (${j5.detail})` : "");
+        const j6 = await res.json();
+        if (j6 && j6.error) detail = j6.error + (j6.detail ? ` (${j6.detail})` : "");
       } catch {
       }
       chatStatus.value = `send failed: ${detail}`;
@@ -18080,21 +18085,21 @@ async function respondApproval(approvalId, value) {
 }
 
 // src/components/GroupPicker.tsx
-function isNonMember(g6) {
-  return g6.hasContent === false;
+function isNonMember(g8) {
+  return g8.hasContent === false;
 }
-function chipParts(g6, elevated) {
-  const isAdminOnly = elevated && isNonMember(g6);
+function chipParts(g8, elevated) {
+  const isAdminOnly = elevated && isNonMember(g8);
   const parts = [];
-  if (!g6.isAdmin) parts.push("\u{1F512}");
+  if (!g8.isAdmin) parts.push("\u{1F512}");
   if (isAdminOnly) parts.push("\u{1F441}");
-  if (g6.lastActivityAt) parts.push(fmtRelative(g6.lastActivityAt));
+  if (g8.lastActivityAt) parts.push(fmtRelative(g8.lastActivityAt));
   return { parts, isAdminOnly };
 }
-function tipFor(g6, isAdminOnly) {
-  const parts = [g6.name];
+function tipFor(g8, isAdminOnly) {
+  const parts = [g8.name];
   if (isAdminOnly) parts.push("Visible to you as admin");
-  if (g6.lastActivityAt) parts.push(fmtAbsolute(g6.lastActivityAt));
+  if (g8.lastActivityAt) parts.push(fmtAbsolute(g8.lastActivityAt));
   return parts.join(" \xB7 ");
 }
 function openModal(mode) {
@@ -18105,8 +18110,8 @@ function GroupStrip() {
   const elevated = isElevatedUser.value;
   nowTick.value;
   const all = groups.value;
-  const memberGroups = all.filter((g6) => !isNonMember(g6));
-  const active = all.find((g6) => g6.id === groupId.value);
+  const memberGroups = all.filter((g8) => !isNonMember(g8));
+  const active = all.find((g8) => g8.id === groupId.value);
   const hasActiveNonMember = active && isNonMember(active);
   const stripGroups = hasActiveNonMember ? [...memberGroups, active] : memberGroups;
   const nonMemberCount = elevated ? all.filter(isNonMember).length : 0;
@@ -18115,10 +18120,10 @@ function GroupStrip() {
     if (gid !== groupId.value) selectGroup(gid).catch(console.error);
   };
   return /* @__PURE__ */ u4("nav", { class: "group-strip desktop-only", role: "tablist", "aria-label": "Agent groups", children: [
-    stripGroups.map((g6) => {
-      const isActive = g6.id === groupId.value;
-      const isAdminOnly = elevated && isNonMember(g6);
-      const sub = g6.lastActivityAt ? fmtRelative(g6.lastActivityAt) : "";
+    stripGroups.map((g8) => {
+      const isActive = g8.id === groupId.value;
+      const isAdminOnly = elevated && isNonMember(g8);
+      const sub = g8.lastActivityAt ? fmtRelative(g8.lastActivityAt) : "";
       return /* @__PURE__ */ u4(
         "button",
         {
@@ -18126,14 +18131,14 @@ function GroupStrip() {
           role: "tab",
           "aria-selected": isActive,
           class: `group-chip${isActive ? " active" : ""}`,
-          title: tipFor(g6, isAdminOnly),
-          onClick: () => pick(g6.id),
+          title: tipFor(g8, isAdminOnly),
+          onClick: () => pick(g8.id),
           children: [
-            /* @__PURE__ */ u4("span", { class: "chip-name", children: g6.name }),
+            /* @__PURE__ */ u4("span", { class: "chip-name", children: g8.name }),
             sub ? /* @__PURE__ */ u4("span", { class: "chip-sub", children: sub }) : null
           ]
         },
-        g6.id
+        g8.id
       );
     }),
     showMore ? /* @__PURE__ */ u4(
@@ -18156,8 +18161,8 @@ function ActiveGroupButton() {
   nowTick.value;
   const elevated = isElevatedUser.value;
   const all = groups.value;
-  const visible = elevated ? all : all.filter((g6) => !isNonMember(g6));
-  const active = all.find((g6) => g6.id === groupId.value) ?? visible[0];
+  const visible = elevated ? all : all.filter((g8) => !isNonMember(g8));
+  const active = all.find((g8) => g8.id === groupId.value) ?? visible[0];
   if (!active) return null;
   const { parts, isAdminOnly } = chipParts(active, elevated);
   const subtitle = parts.join(" \xB7 ");
@@ -18196,7 +18201,7 @@ function GroupPickerModal() {
   const all = groups.value;
   const visible = (() => {
     if (mode === "non-members") return all.filter(isNonMember);
-    return elevated ? all : all.filter((g6) => !isNonMember(g6));
+    return elevated ? all : all.filter((g8) => !isNonMember(g8));
   })();
   const title = mode === "non-members" ? "More agents" : "Agent groups";
   const close = () => {
@@ -18221,9 +18226,9 @@ function GroupPickerModal() {
           /* @__PURE__ */ u4("span", { class: "title", children: title }),
           /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
         ] }),
-        /* @__PURE__ */ u4("div", { class: "settings-body group-picker-list", children: visible.map((g6) => {
-          const isActive = g6.id === groupId.value;
-          const { parts, isAdminOnly } = chipParts(g6, elevated);
+        /* @__PURE__ */ u4("div", { class: "settings-body group-picker-list", children: visible.map((g8) => {
+          const isActive = g8.id === groupId.value;
+          const { parts, isAdminOnly } = chipParts(g8, elevated);
           const subtitle = parts.join(" \xB7 ");
           return /* @__PURE__ */ u4(
             "button",
@@ -18231,14 +18236,14 @@ function GroupPickerModal() {
               type: "button",
               class: `group-row${isActive ? " active" : ""}${isAdminOnly ? " is-admin-visible" : ""}`,
               "aria-current": isActive ? "true" : void 0,
-              title: tipFor(g6, isAdminOnly),
-              onClick: () => pick(g6.id),
+              title: tipFor(g8, isAdminOnly),
+              onClick: () => pick(g8.id),
               children: [
-                /* @__PURE__ */ u4("span", { class: "row-name", children: g6.name }),
+                /* @__PURE__ */ u4("span", { class: "row-name", children: g8.name }),
                 subtitle ? /* @__PURE__ */ u4("span", { class: "row-sub", children: subtitle }) : null
               ]
             },
-            g6.id
+            g8.id
           );
         }) })
       ]
@@ -18666,18 +18671,18 @@ function ThreadsRail() {
     if (!buckets.has(ct)) buckets.set(ct, []);
     buckets.get(ct).push(t4);
   }
-  const sections = Array.from(buckets.entries()).map(([ct, items]) => ({ ct, label: channelMeta(ct).label, items })).sort((a4, b4) => {
-    if (a4.ct === "web" && b4.ct !== "web") return -1;
-    if (b4.ct === "web" && a4.ct !== "web") return 1;
-    return a4.label.localeCompare(b4.label);
+  const sections = Array.from(buckets.entries()).map(([ct, items]) => ({ ct, label: channelMeta(ct).label, items })).sort((a4, b5) => {
+    if (a4.ct === "web" && b5.ct !== "web") return -1;
+    if (b5.ct === "web" && a4.ct !== "web") return 1;
+    return a4.label.localeCompare(b5.label);
   });
   for (const s5 of sections) {
-    s5.items.sort((a4, b4) => tsKey(b4.lastActivityAt) - tsKey(a4.lastActivityAt));
+    s5.items.sort((a4, b5) => tsKey(b5.lastActivityAt) - tsKey(a4.lastActivityAt));
   }
   const onSearchKeyDown = (ev) => {
     if (ev.key === "Enter") {
-      const q3 = ev.currentTarget.value.trim();
-      if (q3 && groupId.value) searchThreads(groupId.value, q3).catch(console.error);
+      const q5 = ev.currentTarget.value.trim();
+      if (q5 && groupId.value) searchThreads(groupId.value, q5).catch(console.error);
     }
     if (ev.key === "Escape") {
       clearSearch();
@@ -18777,7 +18782,7 @@ function Message({ m: m6 }) {
   const ref = A2(null);
   const mdRef = A2(null);
   const md = renderMarkdown(m6.text);
-  const q3 = searchQuery.value;
+  const q5 = searchQuery.value;
   y2(() => {
     if (md != null && mdRef.current) mdRef.current.innerHTML = md;
     if (md != null && mdRef.current && groupId.value) {
@@ -18800,8 +18805,8 @@ function Message({ m: m6 }) {
         });
       }
     }
-    if (q3 && ref.current) highlightTextNodes(ref.current, q3);
-  }, [m6.text, md != null, q3]);
+    if (q5 && ref.current) highlightTextNodes(ref.current, q5);
+  }, [m6.text, md != null, q5]);
   const cls = "msg " + m6.direction + (md != null ? " markdown" : "");
   return /* @__PURE__ */ u4("div", { class: cls, "data-msg-id": m6.id, ref, children: [
     m6.direction === "internal" ? /* @__PURE__ */ u4("div", { class: "internal-label", children: "internal" }) : null,
@@ -18927,7 +18932,7 @@ function MessageLog() {
   const groups2 = groupMessages(list);
   const typing = isTyping.value && threadId.value && !chatLoading.value;
   return /* @__PURE__ */ u4("div", { class: "log", id: "chat-log", ref, children: [
-    chatLoading.value ? null : !threadId.value ? /* @__PURE__ */ u4("div", { class: "empty", children: "Pick or start a chat." }) : list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No messages yet." }) : groups2.map((g6, i5) => g6.kind === "thoughts" ? /* @__PURE__ */ u4(ThoughtGroup, { thoughts: g6.thoughts, answer: g6.answer }, i5) : /* @__PURE__ */ u4(Message, { m: g6.m }, i5)),
+    chatLoading.value ? null : !threadId.value ? /* @__PURE__ */ u4("div", { class: "empty", children: "Pick or start a chat." }) : list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No messages yet." }) : groups2.map((g8, i5) => g8.kind === "thoughts" ? /* @__PURE__ */ u4(ThoughtGroup, { thoughts: g8.thoughts, answer: g8.answer }, i5) : /* @__PURE__ */ u4(Message, { m: g8.m }, i5)),
     typing ? /* @__PURE__ */ u4("div", { class: "typing", "aria-live": "polite", children: [
       /* @__PURE__ */ u4("span", {}),
       /* @__PURE__ */ u4("span", {}),
@@ -19071,7 +19076,7 @@ function Subnotice() {
   const showComposer = isWeb || canSend.value;
   if (!(showComposer && !isWeb)) return /* @__PURE__ */ u4("div", { class: "chat-subnotice", hidden: true });
   const meta = channelMeta(channelType.value);
-  const t4 = threads.value.find((x5) => x5.threadId === threadId.value);
+  const t4 = threads.value.find((x6) => x6.threadId === threadId.value);
   const cp = t4 && t4.counterparty ? ` \xB7 ${t4.counterparty}` : "";
   return /* @__PURE__ */ u4("div", { class: "chat-subnotice", children: [
     meta.icon,
@@ -19545,7 +19550,7 @@ function parseLyrics(text) {
     for (const t4 of times) lines.push({ t: t4, text: content });
   }
   if (!sawTimestamp) return { synced: false, lines, offset: 0 };
-  const synced = lines.filter((l7) => l7.t != null).sort((a4, b4) => a4.t - b4.t);
+  const synced = lines.filter((l7) => l7.t != null).sort((a4, b5) => a4.t - b5.t);
   return { synced: true, lines: synced, offset };
 }
 function findActiveIdx(lines, t4) {
@@ -19953,8 +19958,8 @@ function FilesPane() {
     if (!body || !zone) return void 0;
     let depth = 0;
     const hasFiles = (ev) => !!ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes("Files");
-    const highlight = (on) => {
-      zone.classList.toggle("drag-over", !!on);
+    const highlight = (on2) => {
+      zone.classList.toggle("drag-over", !!on2);
     };
     const onEnter = (ev) => {
       if (!isAdmin.value || !hasFiles(ev)) return;
@@ -20543,6 +20548,282 @@ function ShareLinkModal() {
   ] }) });
 }
 
+// node_modules/preact/compat/dist/compat.module.js
+function g7(n3, t4) {
+  for (var e4 in t4) n3[e4] = t4[e4];
+  return n3;
+}
+function E4(n3, t4) {
+  for (var e4 in n3) if ("__source" !== e4 && !(e4 in t4)) return true;
+  for (var r4 in t4) if ("__source" !== r4 && n3[r4] !== t4[r4]) return true;
+  return false;
+}
+function N3(n3, t4) {
+  this.props = n3, this.context = t4;
+}
+(N3.prototype = new x()).isPureReactComponent = true, N3.prototype.shouldComponentUpdate = function(n3, t4) {
+  return E4(this.props, n3) || E4(this.state, t4);
+};
+var T4 = l.__b;
+l.__b = function(n3) {
+  n3.type && n3.type.__f && n3.ref && (n3.props.ref = n3.ref, n3.ref = null), T4 && T4(n3);
+};
+var A5 = "undefined" != typeof Symbol && Symbol.for && Symbol.for("react.forward_ref") || 3911;
+var F4 = l.__e;
+l.__e = function(n3, t4, e4, r4) {
+  if (n3.then) {
+    for (var u5, o4 = t4; o4 = o4.__; ) if ((u5 = o4.__c) && u5.__c) return null == t4.__e && (t4.__e = e4.__e, t4.__k = e4.__k), u5.__c(n3, t4);
+  }
+  F4(n3, t4, e4, r4);
+};
+var U2 = l.unmount;
+function V3(n3, t4, e4) {
+  return n3 && (n3.__c && n3.__c.__H && (n3.__c.__H.__.forEach(function(n4) {
+    "function" == typeof n4.__c && n4.__c();
+  }), n3.__c.__H = null), null != (n3 = g7({}, n3)).__c && (n3.__c.__P === e4 && (n3.__c.__P = t4), n3.__c = null), n3.__k = n3.__k && n3.__k.map(function(n4) {
+    return V3(n4, t4, e4);
+  })), n3;
+}
+function W2(n3, t4, e4) {
+  return n3 && e4 && (n3.__v = null, n3.__k = n3.__k && n3.__k.map(function(n4) {
+    return W2(n4, t4, e4);
+  }), n3.__c && n3.__c.__P === t4 && (n3.__e && e4.appendChild(n3.__e), n3.__c.__e = true, n3.__c.__P = e4)), n3;
+}
+function P4() {
+  this.__u = 0, this.o = null, this.__b = null;
+}
+function j5(n3) {
+  var t4 = n3.__.__c;
+  return t4 && t4.__a && t4.__a(n3);
+}
+function B4() {
+  this.i = null, this.l = null;
+}
+l.unmount = function(n3) {
+  var t4 = n3.__c;
+  t4 && t4.__R && t4.__R(), t4 && 32 & n3.__u && (n3.type = null), U2 && U2(n3);
+}, (P4.prototype = new x()).__c = function(n3, t4) {
+  var e4 = t4.__c, r4 = this;
+  null == r4.o && (r4.o = []), r4.o.push(e4);
+  var u5 = j5(r4.__v), o4 = false, i5 = function() {
+    o4 || (o4 = true, e4.__R = null, u5 ? u5(c4) : c4());
+  };
+  e4.__R = i5;
+  var c4 = function() {
+    if (!--r4.__u) {
+      if (r4.state.__a) {
+        var n4 = r4.state.__a;
+        r4.__v.__k[0] = W2(n4, n4.__c.__P, n4.__c.__O);
+      }
+      var t5;
+      for (r4.setState({ __a: r4.__b = null }); t5 = r4.o.pop(); ) t5.forceUpdate();
+    }
+  };
+  r4.__u++ || 32 & t4.__u || r4.setState({ __a: r4.__b = r4.__v.__k[0] }), n3.then(i5, i5);
+}, P4.prototype.componentWillUnmount = function() {
+  this.o = [];
+}, P4.prototype.render = function(n3, e4) {
+  if (this.__b) {
+    if (this.__v.__k) {
+      var r4 = document.createElement("div"), o4 = this.__v.__k[0].__c;
+      this.__v.__k[0] = V3(this.__b, r4, o4.__O = o4.__P);
+    }
+    this.__b = null;
+  }
+  var i5 = e4.__a && g(k, null, n3.fallback);
+  return i5 && (i5.__u &= -33), [g(k, null, e4.__a ? null : n3.children), i5];
+};
+var H3 = function(n3, t4, e4) {
+  if (++e4[1] === e4[0] && n3.l.delete(t4), n3.props.revealOrder && ("t" !== n3.props.revealOrder[0] || !n3.l.size)) for (e4 = n3.i; e4; ) {
+    for (; e4.length > 3; ) e4.pop()();
+    if (e4[1] < e4[0]) break;
+    n3.i = e4 = e4[2];
+  }
+};
+function Z2(n3) {
+  return this.getChildContext = function() {
+    return n3.context;
+  }, n3.children;
+}
+function Y2(n3) {
+  var e4 = this, r4 = n3.h;
+  e4.componentWillUnmount = function() {
+    D(null, e4.v), e4.v = null, e4.h = null;
+  }, e4.h && e4.h !== r4 && e4.componentWillUnmount(), e4.v || (e4.h = r4, e4.v = { nodeType: 1, parentNode: r4, childNodes: [], contains: function() {
+    return true;
+  }, appendChild: function(n4) {
+    this.childNodes.push(n4), e4.h.appendChild(n4);
+  }, insertBefore: function(n4, t4) {
+    this.childNodes.push(n4), e4.h.insertBefore(n4, t4);
+  }, removeChild: function(n4) {
+    this.childNodes.splice(this.childNodes.indexOf(n4) >>> 1, 1), e4.h.removeChild(n4);
+  } }), D(g(Z2, { context: e4.context }, n3.__v), e4.v);
+}
+function $3(n3, e4) {
+  var r4 = g(Y2, { __v: n3, h: e4 });
+  return r4.containerInfo = e4, r4;
+}
+(B4.prototype = new x()).__a = function(n3) {
+  var t4 = this, e4 = j5(t4.__v), r4 = t4.l.get(n3);
+  return r4[0]++, function(u5) {
+    var o4 = function() {
+      t4.props.revealOrder ? (r4.push(u5), H3(t4, n3, r4)) : u5();
+    };
+    e4 ? e4(o4) : o4();
+  };
+}, B4.prototype.render = function(n3) {
+  this.i = null, this.l = /* @__PURE__ */ new Map();
+  var t4 = H(n3.children);
+  n3.revealOrder && "b" === n3.revealOrder[0] && t4.reverse();
+  for (var e4 = t4.length; e4--; ) this.l.set(t4[e4], this.i = [1, 0, this.i]);
+  return n3.children;
+}, B4.prototype.componentDidUpdate = B4.prototype.componentDidMount = function() {
+  var n3 = this;
+  this.l.forEach(function(t4, e4) {
+    H3(n3, e4, t4);
+  });
+};
+var q4 = "undefined" != typeof Symbol && Symbol.for && Symbol.for("react.element") || 60103;
+var G2 = /^(?:accent|alignment|arabic|baseline|cap|clip(?!PathU)|color|dominant|fill|flood|font|glyph(?!R)|horiz|image(!S)|letter|lighting|marker(?!H|W|U)|overline|paint|pointer|shape|stop|strikethrough|stroke|text(?!L)|transform|underline|unicode|units|v|vector|vert|word|writing|x(?!C))[A-Z]/;
+var J3 = /^on(Ani|Tra|Tou|BeforeInp|Compo)/;
+var K2 = /[A-Z0-9]/g;
+var Q2 = "undefined" != typeof document;
+var X2 = function(n3) {
+  return ("undefined" != typeof Symbol && "symbol" == typeof Symbol() ? /fil|che|rad/ : /fil|che|ra/).test(n3);
+};
+x.prototype.isReactComponent = {}, ["componentWillMount", "componentWillReceiveProps", "componentWillUpdate"].forEach(function(t4) {
+  Object.defineProperty(x.prototype, t4, { configurable: true, get: function() {
+    return this["UNSAFE_" + t4];
+  }, set: function(n3) {
+    Object.defineProperty(this, t4, { configurable: true, writable: true, value: n3 });
+  } });
+});
+var en = l.event;
+function rn() {
+}
+function un() {
+  return this.cancelBubble;
+}
+function on() {
+  return this.defaultPrevented;
+}
+l.event = function(n3) {
+  return en && (n3 = en(n3)), n3.persist = rn, n3.isPropagationStopped = un, n3.isDefaultPrevented = on, n3.nativeEvent = n3;
+};
+var cn;
+var ln = { enumerable: false, configurable: true, get: function() {
+  return this.class;
+} };
+var fn = l.vnode;
+l.vnode = function(n3) {
+  "string" == typeof n3.type && function(n4) {
+    var t4 = n4.props, e4 = n4.type, u5 = {}, o4 = -1 === e4.indexOf("-");
+    for (var i5 in t4) {
+      var c4 = t4[i5];
+      if (!("value" === i5 && "defaultValue" in t4 && null == c4 || Q2 && "children" === i5 && "noscript" === e4 || "class" === i5 || "className" === i5)) {
+        var l7 = i5.toLowerCase();
+        "defaultValue" === i5 && "value" in t4 && null == t4.value ? i5 = "value" : "download" === i5 && true === c4 ? c4 = "" : "translate" === l7 && "no" === c4 ? c4 = false : "o" === l7[0] && "n" === l7[1] ? "ondoubleclick" === l7 ? i5 = "ondblclick" : "onchange" !== l7 || "input" !== e4 && "textarea" !== e4 || X2(t4.type) ? "onfocus" === l7 ? i5 = "onfocusin" : "onblur" === l7 ? i5 = "onfocusout" : J3.test(i5) && (i5 = l7) : l7 = i5 = "oninput" : o4 && G2.test(i5) ? i5 = i5.replace(K2, "-$&").toLowerCase() : null === c4 && (c4 = void 0), "oninput" === l7 && u5[i5 = l7] && (i5 = "oninputCapture"), u5[i5] = c4;
+      }
+    }
+    "select" == e4 && u5.multiple && Array.isArray(u5.value) && (u5.value = H(t4.children).forEach(function(n5) {
+      n5.props.selected = -1 != u5.value.indexOf(n5.props.value);
+    })), "select" == e4 && null != u5.defaultValue && (u5.value = H(t4.children).forEach(function(n5) {
+      n5.props.selected = u5.multiple ? -1 != u5.defaultValue.indexOf(n5.props.value) : u5.defaultValue == n5.props.value;
+    })), t4.class && !t4.className ? (u5.class = t4.class, Object.defineProperty(u5, "className", ln)) : (t4.className && !t4.class || t4.class && t4.className) && (u5.class = u5.className = t4.className), n4.props = u5;
+  }(n3), n3.$$typeof = q4, fn && fn(n3);
+};
+var an = l.__r;
+l.__r = function(n3) {
+  an && an(n3), cn = n3.__c;
+};
+var sn = l.diffed;
+l.diffed = function(n3) {
+  sn && sn(n3);
+  var t4 = n3.props, e4 = n3.__e;
+  null != e4 && "textarea" === n3.type && "value" in t4 && t4.value !== e4.value && (e4.value = null == t4.value ? "" : t4.value), cn = null;
+};
+
+// src/components/Tooltip.tsx
+var BUBBLE_MARGIN = 6;
+var BUBBLE_MAX_WIDTH = 320;
+var VIEWPORT_PADDING = 8;
+function Tooltip({ text, children, side = "top" }) {
+  const [pos, setPos] = h2(null);
+  const wrapRef = A2(null);
+  const bubbleRef = A2(null);
+  function computePos() {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    const preferTop = side === "top";
+    const roomAbove = wrapRect.top;
+    const roomBelow = window.innerHeight - wrapRect.bottom;
+    const useTop = preferTop ? roomAbove >= 80 || roomBelow < roomAbove : roomBelow < 80;
+    const actualSide = useTop ? "top" : "bottom";
+    const bubble = bubbleRef.current;
+    const bubbleWidth = bubble?.offsetWidth ?? Math.min(BUBBLE_MAX_WIDTH, window.innerWidth - 2 * VIEWPORT_PADDING);
+    const bubbleHeight = bubble?.offsetHeight ?? 120;
+    const centerX = wrapRect.left + wrapRect.width / 2;
+    let left = centerX - bubbleWidth / 2;
+    left = Math.max(VIEWPORT_PADDING, Math.min(window.innerWidth - bubbleWidth - VIEWPORT_PADDING, left));
+    const top = actualSide === "top" ? wrapRect.top - BUBBLE_MARGIN - bubbleHeight : wrapRect.bottom + BUBBLE_MARGIN;
+    setPos({ top, left, side: actualSide });
+  }
+  function open() {
+    computePos();
+  }
+  function close() {
+    setPos(null);
+  }
+  y2(() => {
+    if (pos) {
+      const t4 = setTimeout(() => computePos(), 0);
+      return () => clearTimeout(t4);
+    }
+    return void 0;
+  }, [pos !== null]);
+  y2(() => {
+    if (!pos) return void 0;
+    const onChange = () => close();
+    window.addEventListener("scroll", onChange, true);
+    window.addEventListener("resize", onChange);
+    return () => {
+      window.removeEventListener("scroll", onChange, true);
+      window.removeEventListener("resize", onChange);
+    };
+  }, [pos !== null]);
+  return /* @__PURE__ */ u4(
+    "span",
+    {
+      ref: wrapRef,
+      class: "tooltip-wrap",
+      onMouseEnter: open,
+      onMouseLeave: close,
+      onFocusIn: open,
+      onFocusOut: close,
+      children: [
+        children,
+        pos ? $3(
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              ref: bubbleRef,
+              class: `tooltip-bubble tooltip-${pos.side}`,
+              role: "tooltip",
+              style: { top: pos.top + "px", left: pos.left + "px" },
+              children: text.split("\n").map((line, i5) => /* @__PURE__ */ u4("span", { class: "tooltip-line", children: line }, i5))
+            }
+          ),
+          document.body
+        ) : null
+      ]
+    }
+  );
+}
+function InfoIcon({ text }) {
+  return /* @__PURE__ */ u4(Tooltip, { text, children: /* @__PURE__ */ u4("span", { class: "info-icon", tabindex: 0, "aria-label": "More info", children: "i" }) });
+}
+
 // src/components/Combobox.tsx
 function Combobox({
   value,
@@ -20563,11 +20844,14 @@ function Combobox({
   y2(() => {
     if (!open) return void 0;
     const onDoc = (e4) => {
-      if (!rootRef.current?.contains(e4.target)) setOpen(false);
+      if (!rootRef.current?.contains(e4.target)) {
+        setOpen(false);
+        if (!freeform) setText(value ?? "");
+      }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+  }, [open, freeform, value]);
   const trimmed = text.trim();
   const showAll = !trimmed || trimmed === (value ?? "").trim();
   const filterText = trimmed.toLowerCase();
@@ -20656,60 +20940,19 @@ function Combobox({
             /* @__PURE__ */ u4("span", { class: "combobox-option-label", children: o4.label }),
             o4.detail ? /* @__PURE__ */ u4("span", { class: "combobox-option-detail", children: o4.detail }) : null
           ] }),
-          o4.tooltip ? /* @__PURE__ */ u4(OptionInfo, { text: o4.tooltip }) : null
+          o4.tooltip ? /* @__PURE__ */ u4(
+            "span",
+            {
+              class: "combobox-option-info",
+              onMouseDown: (e4) => e4.preventDefault(),
+              children: /* @__PURE__ */ u4(InfoIcon, { text: o4.tooltip })
+            }
+          ) : null
         ]
       },
       o4.value
     )) }) : null
   ] });
-}
-function OptionInfo({ text }) {
-  const [open, setOpen] = h2(false);
-  return /* @__PURE__ */ u4(
-    "span",
-    {
-      class: "combobox-option-info",
-      onMouseEnter: () => setOpen(true),
-      onMouseLeave: () => setOpen(false),
-      onMouseDown: (e4) => e4.preventDefault(),
-      children: [
-        /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }),
-        open ? /* @__PURE__ */ u4("span", { class: "tooltip-bubble tooltip-top", role: "tooltip", children: text.split("\n").map((line, i5) => /* @__PURE__ */ u4("span", { class: "tooltip-line", children: line }, i5)) }) : null
-      ]
-    }
-  );
-}
-
-// src/components/Tooltip.tsx
-function Tooltip({ text, children, side = "top" }) {
-  const [open, setOpen] = h2(false);
-  const [actualSide, setActualSide] = h2(side);
-  const wrapRef = A2(null);
-  y2(() => {
-    if (!open || !wrapRef.current) return;
-    const rect = wrapRef.current.getBoundingClientRect();
-    if (side === "top" && rect.top < 200) setActualSide("bottom");
-    else if (side === "bottom" && window.innerHeight - rect.bottom < 200) setActualSide("top");
-    else setActualSide(side);
-  }, [open, side]);
-  return /* @__PURE__ */ u4(
-    "span",
-    {
-      ref: wrapRef,
-      class: "tooltip-wrap",
-      onMouseEnter: () => setOpen(true),
-      onMouseLeave: () => setOpen(false),
-      onFocusIn: () => setOpen(true),
-      onFocusOut: () => setOpen(false),
-      children: [
-        children,
-        open ? /* @__PURE__ */ u4("span", { class: `tooltip-bubble tooltip-${actualSide}`, role: "tooltip", children: text.split("\n").map((line, i5) => /* @__PURE__ */ u4("span", { class: "tooltip-line", children: line }, i5)) }) : null
-      ]
-    }
-  );
-}
-function InfoIcon({ text }) {
-  return /* @__PURE__ */ u4(Tooltip, { text, children: /* @__PURE__ */ u4("span", { class: "info-icon", tabindex: 0, "aria-label": "More info", children: "i" }) });
 }
 
 // src/components/GroupAdmin.tsx
@@ -20774,7 +21017,7 @@ function GroupAdmin() {
     setTab("settings");
   }, [open, gid]);
   if (!open || !gid) return null;
-  const group = groups.value.find((g6) => g6.id === gid);
+  const group = groups.value.find((g8) => g8.id === gid);
   const title = group ? `Admin \xB7 ${group.name}` : "Admin";
   function close() {
     groupAdminOpen.value = false;
@@ -20942,12 +21185,18 @@ function SettingsTab({ gid }) {
         label: "Provider",
         info: draft.provider ? PROVIDER_INFO[draft.provider] : void 0,
         children: /* @__PURE__ */ u4(
-          "select",
+          Combobox,
           {
-            value: draft.provider ?? "",
+            value: draft.provider,
+            options: data.validProviders.map((p5) => ({
+              value: p5,
+              label: p5,
+              tooltip: PROVIDER_INFO[p5]
+            })),
+            placeholder: "pick a provider",
             disabled: busy,
-            onChange: (e4) => update("provider", e4.currentTarget.value || null),
-            children: data.validProviders.map((p5) => /* @__PURE__ */ u4("option", { value: p5, children: p5 }, p5))
+            freeform: false,
+            onChange: (v5) => update("provider", v5)
           }
         )
       }
@@ -21058,12 +21307,14 @@ function SettingsTab({ gid }) {
         label: "CLI scope",
         info: "Controls which `ncl` commands an agent in this group can run.\ndisabled = no CLI access.\ngroup = limited to the group's own resources.\nglobal = unrestricted (use sparingly).",
         children: /* @__PURE__ */ u4(
-          "select",
+          Combobox,
           {
-            value: draft.cli_scope ?? "",
+            value: draft.cli_scope,
+            options: data.validCliScopes.map((s5) => ({ value: s5, label: s5 })),
+            placeholder: "pick a scope",
             disabled: busy,
-            onChange: (e4) => update("cli_scope", e4.currentTarget.value || null),
-            children: data.validCliScopes.map((s5) => /* @__PURE__ */ u4("option", { value: s5, children: s5 }, s5))
+            freeform: false,
+            onChange: (v5) => update("cli_scope", v5)
           }
         )
       }
@@ -21272,7 +21523,7 @@ function UserPicker({
   disabled,
   onPick
 }) {
-  const [q3, setQ] = h2("");
+  const [q5, setQ] = h2("");
   const [results, setResults] = h2([]);
   const [searching, setSearching] = h2(false);
   y2(() => {
@@ -21281,7 +21532,7 @@ function UserPicker({
       setSearching(true);
       try {
         const r4 = await call(
-          apiPath(gid, `/users-search?q=${encodeURIComponent(q3)}`)
+          apiPath(gid, `/users-search?q=${encodeURIComponent(q5)}`)
         );
         if (!cancelled && r4.ok) setResults(r4.data.users);
       } finally {
@@ -21292,7 +21543,7 @@ function UserPicker({
       cancelled = true;
       clearTimeout(t4);
     };
-  }, [q3, gid]);
+  }, [q5, gid]);
   const visible = results.filter((u5) => !excludeUserIds.has(u5.userId)).slice(0, 20);
   return /* @__PURE__ */ u4(k, { children: [
     /* @__PURE__ */ u4("div", { class: "settings-row", children: /* @__PURE__ */ u4(
@@ -21300,7 +21551,7 @@ function UserPicker({
       {
         type: "text",
         placeholder: "Search name, handle, or user id",
-        value: q3,
+        value: q5,
         onInput: (e4) => setQ(e4.currentTarget.value),
         disabled
       }
@@ -21319,7 +21570,7 @@ function UserPicker({
         ]
       }
     ) }, u5.userId)) }) : null,
-    !searching && q3 && visible.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No matches." }) : null
+    !searching && q5 && visible.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No matches." }) : null
   ] });
 }
 
@@ -21402,16 +21653,16 @@ function App() {
 
 // src/index.tsx
 function sortGroups(list) {
-  return list.slice().sort((a4, b4) => {
+  return list.slice().sort((a4, b5) => {
     const parseTs = (s5) => {
       if (!s5) return 0;
       const norm = s5.includes("T") ? s5 : s5.replace(" ", "T") + "Z";
       return Date.parse(norm) || 0;
     };
     const ta = parseTs(a4.lastActivityAt);
-    const tb = parseTs(b4.lastActivityAt);
+    const tb = parseTs(b5.lastActivityAt);
     if (tb !== ta) return tb - ta;
-    return a4.name.localeCompare(b4.name);
+    return a4.name.localeCompare(b5.name);
   });
 }
 function setupViewportFit() {
@@ -21496,8 +21747,8 @@ async function init() {
     if (sp.get("settings") === "1") {
       settingsOpen.value = true;
       sp.delete("settings");
-      const q3 = sp.toString();
-      const url = window.location.pathname + (q3 ? "?" + q3 : "") + window.location.hash;
+      const q5 = sp.toString();
+      const url = window.location.pathname + (q5 ? "?" + q5 : "") + window.location.hash;
       window.history.replaceState(null, "", url);
     }
     handleShareTarget();

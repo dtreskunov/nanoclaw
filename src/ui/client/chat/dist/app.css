@@ -2758,10 +2758,8 @@ body.is-admin .files-pane.collapsed .admin-only {
   align-items: center;
 }
 .tooltip-bubble {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
+  position: fixed;
+  z-index: 1000;
   min-width: 200px;
   max-width: 320px;
   padding: 8px 10px;
@@ -2775,12 +2773,6 @@ body.is-admin .files-pane.collapsed .admin-only {
   text-align: left;
   white-space: normal;
   pointer-events: none;
-}
-.tooltip-bubble.tooltip-top {
-  bottom: calc(100% + 6px);
-}
-.tooltip-bubble.tooltip-bottom {
-  top: calc(100% + 6px);
 }
 .tooltip-line {
   display: block;

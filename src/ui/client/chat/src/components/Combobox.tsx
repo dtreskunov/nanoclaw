@@ -1,4 +1,4 @@
-// Custom combobox / typeahead. Renders a text input with a popup list of
+// Custom typeahead / combobox. Renders a text input with a popup list of
 // options that filters by substring as the user types. The list has a solid
 // surface background (not transparent) and each item highlights on hover.
 //
@@ -8,6 +8,8 @@
 import './Combobox.css';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
+
+import { InfoIcon } from './Tooltip';
 
 export interface ComboboxOption {
   /** Wire value committed when the user picks this row. */
@@ -51,11 +53,16 @@ export function Combobox({
   useEffect(() => {
     if (!open) return undefined;
     const onDoc = (e: MouseEvent): void => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        // If we don't allow free-form input, reset any typed-but-uncommitted
+        // text back to the actual saved value when the popup closes.
+        if (!freeform) setText(value ?? '');
+      }
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
+  }, [open, freeform, value]);
 
   // Filter: when the user has typed something *different from the selected
   // value*, narrow by substring; otherwise show everything. This makes
@@ -151,34 +158,18 @@ export function Combobox({
                 <span class="combobox-option-label">{o.label}</span>
                 {o.detail ? <span class="combobox-option-detail">{o.detail}</span> : null}
               </span>
-              {o.tooltip ? <OptionInfo text={o.tooltip} /> : null}
+              {o.tooltip ? (
+                <span
+                  class="combobox-option-info"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <InfoIcon text={o.tooltip} />
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
     </div>
-  );
-}
-
-// Inline info icon used inside option rows — separate so it doesn't pull in
-// the full Tooltip wrapper (which would compete with the row's click).
-function OptionInfo({ text }: { text: string }): JSX.Element {
-  const [open, setOpen] = useState(false);
-  return (
-    <span
-      class="combobox-option-info"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      <span class="info-icon" aria-label="More info">i</span>
-      {open ? (
-        <span class="tooltip-bubble tooltip-top" role="tooltip">
-          {text.split('\n').map((line, i) => (
-            <span key={i} class="tooltip-line">{line}</span>
-          ))}
-        </span>
-      ) : null}
-    </span>
   );
 }

@@ -331,13 +331,18 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         label="Provider"
         info={draft.provider ? PROVIDER_INFO[draft.provider] : undefined}
       >
-        <select
-          value={draft.provider ?? ''}
+        <Combobox
+          value={draft.provider}
+          options={data.validProviders.map((p) => ({
+            value: p,
+            label: p,
+            tooltip: PROVIDER_INFO[p],
+          }))}
+          placeholder="pick a provider"
           disabled={busy}
-          onChange={(e: JSX.TargetedEvent<HTMLSelectElement>) => update('provider', e.currentTarget.value || null)}
-        >
-          {(data.validProviders).map((p) => <option value={p} key={p}>{p}</option>)}
-        </select>
+          freeform={false}
+          onChange={(v) => update('provider', v)}
+        />
       </Field>
 
       <Field label="Model">
@@ -446,13 +451,14 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
           'group = limited to the group\'s own resources.\n' +
           'global = unrestricted (use sparingly).'}
       >
-        <select
-          value={draft.cli_scope ?? ''}
+        <Combobox
+          value={draft.cli_scope}
+          options={data.validCliScopes.map((s) => ({ value: s, label: s }))}
+          placeholder="pick a scope"
           disabled={busy}
-          onChange={(e: JSX.TargetedEvent<HTMLSelectElement>) => update('cli_scope', e.currentTarget.value || null)}
-        >
-          {(data.validCliScopes).map((s) => <option value={s} key={s}>{s}</option>)}
-        </select>
+          freeform={false}
+          onChange={(v) => update('cli_scope', v)}
+        />
       </Field>
 
       <div class="settings-row" style="margin-top:16px">
