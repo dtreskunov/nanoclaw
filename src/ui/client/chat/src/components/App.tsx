@@ -10,6 +10,7 @@ import { ShareLinkModal } from './ShareLinkModal';
 import { PromptModal, ConfirmModal } from './PromptModal';
 import { Toast } from './Toast';
 import { GroupPickerModal } from './GroupPicker';
+import { GroupAdmin } from './GroupAdmin';
 import { persistPanelState, applyPanelClasses } from '../panels';
 import { applyHash } from '../hash';
 import { router } from '../router';
@@ -52,6 +53,7 @@ export function App() {
       <PromptModal />
       <ConfirmModal />
       <GroupPickerModal />
+      <GroupAdmin />
       <Toast />
     </>
   );

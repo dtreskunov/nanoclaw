@@ -15533,6 +15533,7 @@ var uploadItems = y3([]);
 var me = y3("");
 var notifMutedSig = y3(false);
 var settingsOpen = y3(false);
+var groupAdminOpen = y3(false);
 var groupPickerOpen = y3(false);
 var groupPickerMode = y3("all");
 var shareModalRequest = y3(null);
@@ -17528,7 +17529,14 @@ function mergeIncomingMessages(messages) {
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts, ...m6.usage ? { usage: m6.usage } : {} });
+    additions.push({
+      id: m6.id,
+      direction,
+      text: m6.text,
+      files: m6.files || null,
+      ts,
+      ...m6.usage ? { usage: m6.usage } : {}
+    });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === "out") maybeNotify(m6.text, m6.files || []);
@@ -17587,7 +17595,14 @@ async function refetchThreadHistory(appendNewOnly) {
     const key = m6.id ? `${direction}:${m6.id}` : null;
     if (key && refs.seenIds.has(key)) continue;
     const ts = m6.timestamp || "";
-    additions.push({ id: m6.id, direction, text: m6.text, files: m6.files || null, ts, ...m6.usage ? { usage: m6.usage } : {} });
+    additions.push({
+      id: m6.id,
+      direction,
+      text: m6.text,
+      files: m6.files || null,
+      ts,
+      ...m6.usage ? { usage: m6.usage } : {}
+    });
     if (key) refs.seenIds.add(key);
     if (ts > maxTs) maxTs = ts;
     if (direction === "out") maybeNotify(m6.text, m6.files || []);
@@ -18233,6 +18248,7 @@ function GroupPickerModal() {
 
 // src/components/Header.tsx
 function Header() {
+  const admin = isAdmin.value;
   return /* @__PURE__ */ u4("header", { children: [
     /* @__PURE__ */ u4(
       "button",
@@ -18250,6 +18266,19 @@ function Header() {
     /* @__PURE__ */ u4("span", { class: "brand", children: BRAND.name }),
     /* @__PURE__ */ u4(GroupStrip, {}),
     /* @__PURE__ */ u4(ActiveGroupButton, {}),
+    admin ? /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "icon-btn",
+        "aria-label": "Group admin",
+        title: "Group admin",
+        onClick: () => {
+          groupAdminOpen.value = !groupAdminOpen.value;
+        },
+        children: "\u{1F6E0}\uFE0F"
+      }
+    ) : null,
     /* @__PURE__ */ u4(
       "button",
       {
@@ -20514,6 +20543,468 @@ function ShareLinkModal() {
   ] }) });
 }
 
+// src/components/GroupAdmin.tsx
+function apiPath(gid, sub) {
+  return `/ui/chat/api/groups/${encodeURIComponent(gid)}/admin${sub}`;
+}
+async function call(url, method = "GET", body) {
+  const r4 = await fetch(url, {
+    method,
+    credentials: "same-origin",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : void 0
+  });
+  let data = {};
+  try {
+    data = await r4.json();
+  } catch {
+  }
+  return { ok: r4.ok, status: r4.status, data };
+}
+function errMsg(d5, fallback) {
+  const e4 = d5?.error;
+  return typeof e4 === "string" && e4 ? e4 : fallback;
+}
+function userLabel(u5) {
+  if (u5.displayName) return u5.displayName;
+  if (u5.primaryHandle) return `${u5.primaryChannel ?? "?"}:${u5.primaryHandle}`;
+  return u5.userId;
+}
+function GroupAdmin() {
+  const open = groupAdminOpen.value;
+  const gid = groupId.value;
+  const [tab, setTab] = h2("settings");
+  y2(() => {
+    setTab("settings");
+  }, [open, gid]);
+  if (!open || !gid) return null;
+  const group = groups.value.find((g6) => g6.id === gid);
+  const title = group ? `Admin \xB7 ${group.name}` : "Admin";
+  function close() {
+    groupAdminOpen.value = false;
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close();
+  }
+  function onKey(e4) {
+    if (e4.key === "Escape") close();
+  }
+  y2(() => {
+    if (!open) return void 0;
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4("div", { class: "settings-modal", role: "dialog", "aria-label": title, children: [
+    /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+      /* @__PURE__ */ u4("span", { class: "title", children: title }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+    ] }),
+    /* @__PURE__ */ u4("nav", { class: "group-admin-tabs", children: [
+      /* @__PURE__ */ u4("button", { type: "button", class: tab === "settings" ? "active" : "", onClick: () => setTab("settings"), children: "Settings" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: tab === "members" ? "active" : "", onClick: () => setTab("members"), children: "Members" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" })
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+      tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid }) : null,
+      tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
+      tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null
+    ] })
+  ] }) });
+}
+function SettingsTab({ gid }) {
+  const [data, setData] = h2(null);
+  const [draft, setDraft] = h2(null);
+  const [status, setStatus] = h2(null);
+  const [busy, setBusy] = h2(false);
+  async function refresh() {
+    const r4 = await call(apiPath(gid, "/settings"));
+    if (!r4.ok) {
+      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      return;
+    }
+    setData(r4.data);
+    setDraft({ ...r4.data.config });
+    setStatus(null);
+  }
+  y2(() => {
+    refresh();
+  }, [gid]);
+  if (!data || !draft) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
+  function update(k4, v5) {
+    setDraft((d5) => d5 ? { ...d5, [k4]: v5 } : d5);
+  }
+  function changed() {
+    if (!data || !draft) return false;
+    for (const k4 of Object.keys(draft)) {
+      if (draft[k4] !== data.config[k4]) return true;
+    }
+    return false;
+  }
+  async function save() {
+    if (!draft) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await call(apiPath(gid, "/settings"), "PATCH", draft);
+      if (!r4.ok) {
+        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        return;
+      }
+      setData(r4.data);
+      setDraft({ ...r4.data.config });
+      setStatus({ ok: r4.data.runningSessionCount > 0 ? `Saved. Restart the group to apply (${r4.data.runningSessionCount} running session${r4.data.runningSessionCount === 1 ? "" : "s"}).` : "Saved." });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function restart(rebuild) {
+    const label = rebuild ? "Restart with rebuild" : "Restart";
+    const ok = await requestConfirm({
+      title: label,
+      message: rebuild ? "Rebuild the container image, then restart all running sessions for this group?" : "Restart all running sessions for this group?",
+      okLabel: label,
+      danger: false
+    });
+    if (!ok) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await call(apiPath(gid, "/restart"), "POST", { rebuild });
+      if (!r4.ok) {
+        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        return;
+      }
+      setStatus({ ok: `Restarted ${r4.data.restarted} session${r4.data.restarted === 1 ? "" : "s"}${rebuild ? " (rebuilt image)." : "."}` });
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return /* @__PURE__ */ u4("section", { children: [
+    /* @__PURE__ */ u4("p", { class: "muted", children: [
+      "Folder ",
+      /* @__PURE__ */ u4("code", { children: data.folder }),
+      data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
+      data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
+    ] }),
+    /* @__PURE__ */ u4(Field, { label: "Provider", children: /* @__PURE__ */ u4(
+      "select",
+      {
+        value: draft.provider ?? "",
+        disabled: busy,
+        onChange: (e4) => update("provider", e4.currentTarget.value || null),
+        children: data.validProviders.map((p5) => /* @__PURE__ */ u4("option", { value: p5, children: p5 }, p5))
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        value: draft.model ?? "",
+        disabled: busy,
+        onInput: (e4) => update("model", e4.currentTarget.value || null),
+        placeholder: "provider-specific"
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        value: draft.effort ?? "",
+        disabled: busy,
+        onInput: (e4) => update("effort", e4.currentTarget.value || null),
+        placeholder: "provider-specific (e.g. high)"
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Image tag", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        value: draft.image_tag ?? "",
+        disabled: busy,
+        onInput: (e4) => update("image_tag", e4.currentTarget.value || null)
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        value: draft.assistant_name ?? "",
+        disabled: busy,
+        onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Max messages / prompt", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "number",
+        min: 1,
+        max: 1e3,
+        value: draft.max_messages_per_prompt ?? "",
+        disabled: busy,
+        onInput: (e4) => {
+          const v5 = e4.currentTarget.value;
+          update("max_messages_per_prompt", v5 ? Number(v5) : null);
+        }
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "CLI scope", children: /* @__PURE__ */ u4(
+      "select",
+      {
+        value: draft.cli_scope ?? "",
+        disabled: busy,
+        onChange: (e4) => update("cli_scope", e4.currentTarget.value || null),
+        children: data.validCliScopes.map((s5) => /* @__PURE__ */ u4("option", { value: s5, children: s5 }, s5))
+      }
+    ) }),
+    /* @__PURE__ */ u4("div", { class: "settings-row", style: "margin-top:16px", children: [
+      /* @__PURE__ */ u4("button", { type: "button", onClick: save, disabled: busy || !changed(), children: "Save" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(false), disabled: busy, children: "Restart" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(true), disabled: busy, children: "Restart + rebuild image" })
+    ] }),
+    status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+  ] });
+}
+function Field({ label, children }) {
+  return /* @__PURE__ */ u4("div", { class: "settings-row group-admin-field", children: [
+    /* @__PURE__ */ u4("label", { class: "group-admin-label", children: label }),
+    /* @__PURE__ */ u4("div", { class: "group-admin-control", children })
+  ] });
+}
+function MembersTab({ gid }) {
+  const [members, setMembers] = h2(null);
+  const [status, setStatus] = h2(null);
+  const [busy, setBusy] = h2(false);
+  async function refresh() {
+    const r4 = await call(apiPath(gid, "/members"));
+    if (!r4.ok) {
+      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      return;
+    }
+    setMembers(r4.data.members);
+    setStatus(null);
+  }
+  y2(() => {
+    refresh();
+  }, [gid]);
+  async function add(userId) {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await call(apiPath(gid, "/members"), "POST", { userId });
+      if (!r4.ok) {
+        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        return;
+      }
+      showToast("Member added");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(m6) {
+    const ok = await requestConfirm({
+      title: "Remove member",
+      message: `Remove ${userLabel(m6)} from this group?`,
+      okLabel: "Remove",
+      danger: true
+    });
+    if (!ok) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await call(apiPath(gid, `/members/${encodeURIComponent(m6.userId)}`), "DELETE");
+      if (!r4.ok) {
+        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        return;
+      }
+      showToast("Member removed");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!members) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
+  return /* @__PURE__ */ u4("section", { children: [
+    /* @__PURE__ */ u4("p", { class: "muted", children: 'Members can interact with this group when channel routing requires "known" senders. Admins of the group are implicit members (shown below for context).' }),
+    members.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No members yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+      /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("th", { children: "Name" }),
+        /* @__PURE__ */ u4("th", { children: "Identity" }),
+        /* @__PURE__ */ u4("th", {})
+      ] }) }),
+      /* @__PURE__ */ u4("tbody", { children: members.map((m6) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("td", { children: [
+          m6.displayName || /* @__PURE__ */ u4("span", { class: "muted", children: "(no name)" }),
+          m6.isAdmin ? /* @__PURE__ */ u4("span", { class: "group-admin-badge", title: "Admin of this group", children: "admin" }) : null
+        ] }),
+        /* @__PURE__ */ u4("td", { children: m6.primaryHandle ? /* @__PURE__ */ u4("code", { children: [
+          m6.primaryChannel,
+          ":",
+          m6.primaryHandle
+        ] }) : /* @__PURE__ */ u4("code", { class: "muted", children: m6.userId }) }),
+        /* @__PURE__ */ u4("td", { children: m6.isExplicitMember && !m6.isAdmin ? /* @__PURE__ */ u4("button", { type: "button", class: "danger", disabled: busy, onClick: () => remove(m6), children: "Remove" }) : /* @__PURE__ */ u4("span", { class: "muted", children: m6.isAdmin ? "implicit" : "" }) })
+      ] }, m6.userId)) })
+    ] }),
+    /* @__PURE__ */ u4("h4", { children: "Add a member" }),
+    /* @__PURE__ */ u4(
+      UserPicker,
+      {
+        gid,
+        excludeUserIds: new Set(members.map((m6) => m6.userId)),
+        disabled: busy,
+        onPick: add
+      }
+    ),
+    status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+  ] });
+}
+function RolesTab({ gid }) {
+  const [admins, setAdmins] = h2(null);
+  const [status, setStatus] = h2(null);
+  const [busy, setBusy] = h2(false);
+  async function refresh() {
+    const r4 = await call(apiPath(gid, "/roles"));
+    if (!r4.ok) {
+      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      return;
+    }
+    setAdmins(r4.data.admins);
+    setStatus(null);
+  }
+  y2(() => {
+    refresh();
+  }, [gid]);
+  async function grant(userId) {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await call(
+        apiPath(gid, "/roles"),
+        "POST",
+        { userId }
+      );
+      if (!r4.ok) {
+        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        return;
+      }
+      showToast(r4.data.alreadyGranted ? "Already an admin" : "Admin granted");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function revoke(a4) {
+    const ok = await requestConfirm({
+      title: "Revoke admin",
+      message: `Revoke admin role from ${userLabel(a4)} on this group?`,
+      okLabel: "Revoke",
+      danger: true
+    });
+    if (!ok) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const r4 = await call(apiPath(gid, `/roles/${encodeURIComponent(a4.userId)}`), "DELETE");
+      if (!r4.ok) {
+        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        return;
+      }
+      showToast("Admin revoked");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!admins) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
+  return /* @__PURE__ */ u4("section", { children: [
+    /* @__PURE__ */ u4("p", { class: "muted", children: "Admins of this group can change its settings, manage members, and grant/revoke admin on this group only. Global owner and global admins are not shown here \u2014 they manage all groups system-wide." }),
+    admins.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No scoped admins. (Global admins still have full access.)" }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+      /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("th", { children: "Name" }),
+        /* @__PURE__ */ u4("th", { children: "Identity" }),
+        /* @__PURE__ */ u4("th", {})
+      ] }) }),
+      /* @__PURE__ */ u4("tbody", { children: admins.map((a4) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("td", { children: a4.displayName || /* @__PURE__ */ u4("span", { class: "muted", children: "(no name)" }) }),
+        /* @__PURE__ */ u4("td", { children: a4.primaryHandle ? /* @__PURE__ */ u4("code", { children: [
+          a4.primaryChannel,
+          ":",
+          a4.primaryHandle
+        ] }) : /* @__PURE__ */ u4("code", { class: "muted", children: a4.userId }) }),
+        /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("button", { type: "button", class: "danger", disabled: busy, onClick: () => revoke(a4), children: "Revoke" }) })
+      ] }, a4.userId)) })
+    ] }),
+    /* @__PURE__ */ u4("h4", { children: "Grant admin" }),
+    /* @__PURE__ */ u4(
+      UserPicker,
+      {
+        gid,
+        excludeUserIds: new Set(admins.map((a4) => a4.userId)),
+        disabled: busy,
+        onPick: grant
+      }
+    ),
+    status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+  ] });
+}
+function UserPicker({
+  gid,
+  excludeUserIds,
+  disabled,
+  onPick
+}) {
+  const [q3, setQ] = h2("");
+  const [results, setResults] = h2([]);
+  const [searching, setSearching] = h2(false);
+  y2(() => {
+    let cancelled = false;
+    const t4 = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r4 = await call(
+          apiPath(gid, `/users-search?q=${encodeURIComponent(q3)}`)
+        );
+        if (!cancelled && r4.ok) setResults(r4.data.users);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t4);
+    };
+  }, [q3, gid]);
+  const visible = results.filter((u5) => !excludeUserIds.has(u5.userId)).slice(0, 20);
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("div", { class: "settings-row", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        placeholder: "Search name, handle, or user id",
+        value: q3,
+        onInput: (e4) => setQ(e4.currentTarget.value),
+        disabled
+      }
+    ) }),
+    searching && visible.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "Searching\u2026" }) : null,
+    visible.length > 0 ? /* @__PURE__ */ u4("ul", { class: "group-admin-search-results", children: visible.map((u5) => /* @__PURE__ */ u4("li", { children: /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "group-admin-search-row",
+        disabled,
+        onClick: () => onPick(u5.userId),
+        children: [
+          /* @__PURE__ */ u4("span", { class: "group-admin-search-name", children: u5.displayName || u5.userId }),
+          /* @__PURE__ */ u4("span", { class: "group-admin-search-handle", children: u5.primaryHandle ? `${u5.primaryChannel}:${u5.primaryHandle}` : u5.kind })
+        ]
+      }
+    ) }, u5.userId)) }) : null,
+    !searching && q3 && visible.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No matches." }) : null
+  ] });
+}
+
 // src/panels.ts
 function restorePanelState() {
 }
@@ -20586,6 +21077,7 @@ function App() {
     /* @__PURE__ */ u4(PromptModal, {}),
     /* @__PURE__ */ u4(ConfirmModal, {}),
     /* @__PURE__ */ u4(GroupPickerModal, {}),
+    /* @__PURE__ */ u4(GroupAdmin, {}),
     /* @__PURE__ */ u4(Toast, {})
   ] });
 }

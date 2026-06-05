@@ -2,12 +2,15 @@
 import './Header.css';
 import {
   drawerOpen,
+  groupAdminOpen,
+  isAdmin,
   settingsOpen,
 } from '../state';
 import { BRAND } from '../brand';
 import { GroupStrip, ActiveGroupButton } from './GroupPicker';
 
 export function Header() {
+  const admin = isAdmin.value;
   return (
     <header>
       <button
@@ -19,6 +22,15 @@ export function Header() {
       <span class="brand">{BRAND.name}</span>
       <GroupStrip />
       <ActiveGroupButton />
+      {admin ? (
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Group admin"
+          title="Group admin"
+          onClick={() => { groupAdminOpen.value = !groupAdminOpen.value; }}
+        >{'\uD83D\uDEE0\uFE0F'}</button>
+      ) : null}
       <button
         type="button"
         class="icon-btn"

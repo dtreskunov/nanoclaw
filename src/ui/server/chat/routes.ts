@@ -35,6 +35,7 @@ import {
   viewerHasContent,
 } from './chat.js';
 import type { ThreadSummary, HistoryMessage } from './chat.js';
+import { handleGroupAdminRequest } from './group-admin.js';
 import { handleWriteRequest } from './write.js';
 
 export { handleChatUpgrade };
@@ -81,6 +82,7 @@ export async function handle(req: http.IncomingMessage, res: http.ServerResponse
     // dispatch. Try them before returning 404.
     const session = authenticate(req);
     if (!session) return json(ctx, 401, { error: 'unauthorized' });
+    if (await handleGroupAdminRequest(req, res, pathname)) return;
     if (await handleChatRequest(req, res, pathname, session.userId)) return;
     if (await handleWriteRequest(req, res, url, pathname, session.userId)) return;
     return json(ctx, 404, { error: 'not_found' });

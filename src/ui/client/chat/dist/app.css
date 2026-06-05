@@ -2460,4 +2460,124 @@ body.is-admin .files-pane.collapsed .admin-only {
   background: var(--accent);
   font-weight: 500;
 }
+
+/* src/components/GroupAdmin.css */
+.group-admin-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--head-tint);
+  padding: 0 8px;
+}
+.group-admin-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px 14px;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--font-base);
+  cursor: pointer;
+}
+.group-admin-tabs button:hover {
+  color: var(--surface-fg);
+}
+.group-admin-tabs button.active {
+  color: var(--surface-fg);
+  border-bottom-color: var(--accent, var(--surface-fg));
+}
+.group-admin-field {
+  align-items: baseline;
+  gap: 12px;
+  margin: 8px 0;
+}
+.group-admin-label {
+  flex: none;
+  width: 180px;
+  color: var(--muted);
+  font-size: var(--font-base);
+}
+.group-admin-control {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+}
+.group-admin-control input,
+.group-admin-control select {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+}
+.group-admin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--head-tint);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  vertical-align: middle;
+}
+.group-admin-search-results {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.group-admin-search-results li {
+  border-bottom: 1px solid var(--border);
+}
+.group-admin-search-results li:last-child {
+  border-bottom: 0;
+}
+.group-admin-search-row {
+  display: flex;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 8px 10px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  align-items: baseline;
+  gap: 10px;
+}
+.group-admin-search-row:hover {
+  background: var(--head-tint);
+}
+.group-admin-search-row[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.group-admin-search-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-admin-search-handle {
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+@media (max-width: 720px) {
+  .group-admin-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .group-admin-label {
+    width: auto;
+  }
+}
 /*# sourceMappingURL=app.css.map */
