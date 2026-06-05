@@ -7,6 +7,7 @@ import { clearContinuation, clearFailedTurn, clearProgress, clearTurnEnded, getC
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
 import {
   formatMessages,
+  extractFileAttachments,
   extractRouting,
   categorizeMessage,
   isClearCommand,
@@ -291,12 +292,14 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // local transcript is gone), clear the continuation and retry once
     // with a fresh session — silently, so the user never sees the error.
     let attempt = 0;
+    const files = extractFileAttachments(keep);
     try {
       while (true) {
         const query = config.provider.query({
           prompt,
           continuation,
           cwd: config.cwd,
+          files: files.length > 0 ? files : undefined,
           systemContext: config.systemContext,
         });
         try {

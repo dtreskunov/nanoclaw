@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess } from 'child_process';
+import fs from 'fs';
 
 import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk';
 
 import { registerProvider } from './provider-registry.js';
-import type { AgentProvider, AgentQuery, ProviderEvent, ProviderOptions, QueryInput } from './types.js';
+import type { AgentProvider, AgentQuery, FileAttachment, ProviderEvent, ProviderOptions, QueryInput } from './types.js';
 import { mcpServersToOpenCodeConfig } from './mcp-to-opencode.js';
 
 function log(msg: string): void {
@@ -235,6 +236,7 @@ export class OpenCodeProvider implements AgentProvider {
     let waiting: (() => void) | null = null;
     let ended = false;
     let aborted = false;
+    let initialFiles: FileAttachment[] | undefined = input.files;
 
     const systemInstructions = input.systemContext?.instructions;
     pending.push(wrapPromptWithContext(input.prompt, systemInstructions));
@@ -280,9 +282,26 @@ export class OpenCodeProvider implements AgentProvider {
           initYielded = true;
         }
 
+        // Build prompt parts: text + any inline file attachments (first turn only).
+        const parts: Array<{ type: string; text?: string; mime?: string; url?: string; filename?: string }> = [
+          { type: 'text', text },
+        ];
+        if (initialFiles && initialFiles.length > 0) {
+          for (const file of initialFiles) {
+            try {
+              const data = fs.readFileSync(file.path);
+              const b64 = data.toString('base64');
+              parts.push({ type: 'file', mime: file.mime, url: `data:${file.mime};base64,${b64}`, filename: file.filename });
+            } catch (err) {
+              log(`Failed to read attachment ${file.path}: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          }
+          initialFiles = undefined; // Only send on first prompt
+        }
+
         const promptRes = await client.session.promptAsync({
           path: { id: sessionId },
-          body: { parts: [{ type: 'text', text }] },
+          body: { parts: parts as any },
         });
         if (promptRes.error) {
           self.activeSessionId = undefined;

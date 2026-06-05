@@ -1,5 +1,6 @@
 import { findByRouting } from './destinations.js';
 import type { MessageInRow } from './db/messages-in.js';
+import type { FileAttachment } from './providers/types.js';
 import { TIMEZONE, formatLocalTime } from './timezone.js';
 
 /**
@@ -251,6 +252,48 @@ function formatReplyContext(replyTo: any): string {
   const text = replyTo.text;
   if (!sender || !text) return '';
   return `\n  <quoted_message from="${escapeXml(sender)}">${escapeXml(text)}</quoted_message>\n`;
+}
+
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  json: 'application/json',
+  csv: 'text/csv',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
+  mp4: 'video/mp4',
+};
+
+/**
+ * Extract file attachments from a batch of messages. Returns absolute
+ * container paths + MIME types suitable for passing to multimodal models.
+ */
+export function extractFileAttachments(messages: MessageInRow[]): FileAttachment[] {
+  const files: FileAttachment[] = [];
+  for (const msg of messages) {
+    const content = parseContent(msg.content);
+    const attachments = content.attachments;
+    if (!Array.isArray(attachments)) continue;
+    for (const a of attachments) {
+      if (!a.localPath) continue;
+      const ext = (a.name || a.filename || '').split('.').pop()?.toLowerCase() || '';
+      const mime = a.mimeType || a.mime || EXT_TO_MIME[ext];
+      if (!mime) continue;
+      files.push({
+        path: `/workspace/${a.localPath}`,
+        mime,
+        filename: a.name || a.filename || 'attachment',
+      });
+    }
+  }
+  return files;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

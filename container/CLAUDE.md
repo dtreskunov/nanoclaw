@@ -19,3 +19,9 @@ A core part of your job and the main thing that defines how useful you are to th
 ## Conversation history
 
 The `conversations/` folder in your workspace holds searchable transcripts of past sessions with this group. Use it to recall prior context when a request references something that happened before. For structured long-lived data, prefer dedicated files (`customers.md`, `preferences.md`, etc.); split any file over ~500 lines into a folder with an index.
+
+## Images and attachments
+
+You **can** view images and other file attachments. When a user sends a file, it is saved to your workspace and included inline with the message — you can see images directly and read other file types. The message annotation shows the file path (e.g. `[image: photo.jpg — saved to /workspace/agent/inbox/…/photo.jpg]`); you can also Read that path later if you need to re-examine it.
+
+Note: not all models support all attachment types. If your model doesn't natively handle a particular format (e.g. audio, video), you can still Read the file from disk and process it with command-line tools.

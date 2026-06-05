@@ -52,6 +52,16 @@ export interface ProviderOptions {
   effort?: string;
 }
 
+/** A file attachment to include inline alongside the text prompt. */
+export interface FileAttachment {
+  /** Absolute path inside the container (e.g. /workspace/agent/inbox/msg-id/photo.jpg). */
+  path: string;
+  /** MIME type (e.g. image/jpeg, application/pdf). */
+  mime: string;
+  /** Display name shown to the user. */
+  filename: string;
+}
+
 export interface QueryInput {
   /** Initial prompt (already formatted by agent-runner). */
   prompt: string;
@@ -64,6 +74,12 @@ export interface QueryInput {
 
   /** Working directory inside the container. */
   cwd: string;
+
+  /**
+   * File attachments to include inline with the prompt. Providers that
+   * support multimodal input pass these as native file content parts.
+   */
+  files?: FileAttachment[];
 
   /**
    * System context to inject. Providers translate this into whatever their
