@@ -104,6 +104,7 @@ export interface Refs {
   seenIds: Set<string>;
   suppressHashCount: number;
   uploadDragDepth: number;
+  newChatInFlight: boolean;
 }
 
 export const refs: Refs = {
@@ -114,6 +115,7 @@ export const refs: Refs = {
   seenIds: new Set<string>(),
   suppressHashCount: 0,
   uploadDragDepth: 0,
+  newChatInFlight: false,
 };
 
 // ── constants ───────────────────────────────────────────────────────

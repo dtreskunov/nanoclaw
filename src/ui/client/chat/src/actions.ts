@@ -256,7 +256,23 @@ export async function runSync(): Promise<void> {
     return;
   }
   if (Array.isArray(res.approvals)) pendingApprovals.value = res.approvals;
-  if (gid && groupId.value === gid && Array.isArray(res.threads)) threads.value = res.threads;
+  if (gid && groupId.value === gid && Array.isArray(res.threads)) {
+    // Preserve any client-only "(new thread)" entries — they have no
+    // server session yet (no inbound message has been sent), so they
+    // won't appear in res.threads. Without this, sync would silently
+    // drop the user's just-created blank thread and a subsequent
+    // "New thread" click would mint yet another UUID instead of
+    // reusing the blank one.
+    const serverIds = new Set(res.threads.map((t) => t.threadId));
+    const ephemeral = threads.value.filter(
+      (t) =>
+        !serverIds.has(t.threadId) &&
+        (t.channelType || 'web') === 'web' &&
+        t.title === '(new thread)' &&
+        !t.messageCount,
+    );
+    threads.value = ephemeral.length > 0 ? [...ephemeral, ...res.threads] : res.threads;
+  }
   if (
     gid &&
     groupId.value === gid &&
@@ -452,7 +468,25 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
     return;
   }
 
-  // New web chat.
+  // New web chat. If there's already an empty web thread (the user
+  // clicked "New thread" without sending anything in the last one,
+  // or double-clicked), reuse it instead of minting another one —
+  // otherwise we leave a trail of empty "(new thread)" entries.
+  const empty = threads.value.find(
+    (t) => (t.channelType || 'web') === 'web' && t.title === '(new thread)' && !t.messageCount,
+  );
+  if (empty) {
+    threadId.value = empty.threadId;
+    writeHash();
+    connectChatWs();
+    focusComposerSoon();
+    return;
+  }
+  // Guard against rapid double-clicks while POST /chat/start is in
+  // flight (the empty-thread check above can't catch this race since
+  // the new thread isn't in `threads.value` yet).
+  if (refs.newChatInFlight) return;
+  refs.newChatInFlight = true;
   batch(() => {
     channelType.value = 'web';
     messagingGroupId.value = null;
@@ -470,6 +504,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
   } catch (err) {
     const m = err instanceof Error ? err.message : String(err);
     chatStatus.value = 'failed to start chat: ' + m;
+    refs.newChatInFlight = false;
     return;
   }
   threadId.value = started.threadId;
@@ -489,6 +524,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
   writeHash();
   connectChatWs();
   focusComposerSoon();
+  refs.newChatInFlight = false;
 }
 
 function connectChatWs(): void {

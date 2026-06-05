@@ -15549,7 +15549,8 @@ var refs = {
   syncTimer: null,
   seenIds: /* @__PURE__ */ new Set(),
   suppressHashCount: 0,
-  uploadDragDepth: 0
+  uploadDragDepth: 0,
+  newChatInFlight: false
 };
 var SYNC_INTERVAL_MS = 1e4;
 var UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -17508,7 +17509,13 @@ async function runSync() {
     return;
   }
   if (Array.isArray(res.approvals)) pendingApprovals.value = res.approvals;
-  if (gid && groupId.value === gid && Array.isArray(res.threads)) threads.value = res.threads;
+  if (gid && groupId.value === gid && Array.isArray(res.threads)) {
+    const serverIds = new Set(res.threads.map((t4) => t4.threadId));
+    const ephemeral = threads.value.filter(
+      (t4) => !serverIds.has(t4.threadId) && (t4.channelType || "web") === "web" && t4.title === "(new thread)" && !t4.messageCount
+    );
+    threads.value = ephemeral.length > 0 ? [...ephemeral, ...res.threads] : res.threads;
+  }
   if (gid && groupId.value === gid && tid && threadId.value === tid && ct === channelType.value && ct !== "web" && Array.isArray(res.threadMessages)) {
     mergeIncomingMessages(res.threadMessages);
   }
@@ -17665,6 +17672,18 @@ async function openChat(gid, resumeTid, opts) {
     if (!highlightMessageId.value) focusComposerSoon();
     return;
   }
+  const empty = threads.value.find(
+    (t4) => (t4.channelType || "web") === "web" && t4.title === "(new thread)" && !t4.messageCount
+  );
+  if (empty) {
+    threadId.value = empty.threadId;
+    writeHash();
+    connectChatWs();
+    focusComposerSoon();
+    return;
+  }
+  if (refs.newChatInFlight) return;
+  refs.newChatInFlight = true;
   n2(() => {
     channelType.value = "web";
     messagingGroupId.value = null;
@@ -17682,6 +17701,7 @@ async function openChat(gid, resumeTid, opts) {
   } catch (err) {
     const m6 = err instanceof Error ? err.message : String(err);
     chatStatus.value = "failed to start chat: " + m6;
+    refs.newChatInFlight = false;
     return;
   }
   threadId.value = started.threadId;
@@ -17701,6 +17721,7 @@ async function openChat(gid, resumeTid, opts) {
   writeHash();
   connectChatWs();
   focusComposerSoon();
+  refs.newChatInFlight = false;
 }
 function connectChatWs() {
   if (!groupId.value || !threadId.value) return;
