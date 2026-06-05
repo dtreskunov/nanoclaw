@@ -37,6 +37,7 @@ import {
 } from '../../../modules/permissions/db/user-roles.js';
 import type { ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
+import { SELECTABLE_AGENT_PROVIDERS, VALID_AGENT_PROVIDERS } from './agent-providers.js';
 import { recordAdminAction } from './audit.js';
 import { listImages } from './image-catalog.js';
 import { bareIdForResponse, dbValueFromBareId, getModelDetails, listModelsForProvider } from './models-catalog.js';
@@ -53,14 +54,14 @@ const SCALAR_FIELDS = [
   'cli_scope',
 ] as const;
 
-// Keep in sync with REQUIRED_PROVIDER_MODULES + OPTIONAL_PROVIDER_MODULES in
-// container/agent-runner/src/providers/index.ts. Surface to the client via
-// GET /settings so the dropdown stays correct.
-// `mock` is accepted server-side (existing groups may have it set via the
-// CLI) but is excluded from the picker the client shows — see
-// `selectableProviders` in the GET /settings response.
-const VALID_PROVIDERS = ['claude', 'mock', 'opencode'] as const;
-const SELECTABLE_PROVIDERS = ['claude', 'opencode'] as const;
+// Provider list is parsed once at startup from the agent-runner's
+// registration barrel (container/agent-runner/src/providers/index.ts) so the
+// admin UI and server validation stay in sync with whatever providers the
+// runtime actually loads — see ./agent-providers.ts. `mock` is accepted
+// server-side (existing groups may have it set via the CLI) but is excluded
+// from the picker the client shows.
+const VALID_PROVIDERS = VALID_AGENT_PROVIDERS;
+const SELECTABLE_PROVIDERS = SELECTABLE_AGENT_PROVIDERS;
 const VALID_CLI_SCOPES = ['disabled', 'group', 'global'] as const;
 
 // ── dispatcher ────────────────────────────────────────────────────────────
@@ -264,7 +265,7 @@ async function handlePatchSettings(
         continue;
       }
       const v = String(raw);
-      if (!VALID_PROVIDERS.includes(v as (typeof VALID_PROVIDERS)[number])) {
+      if (!VALID_PROVIDERS.includes(v)) {
         throw new BadRequest(`provider must be one of: ${VALID_PROVIDERS.join(', ')}`);
       }
       updates.provider = v;
@@ -566,7 +567,7 @@ async function handleListModels(req: http.IncomingMessage, res: http.ServerRespo
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const provider = (url.searchParams.get('provider') || '').trim();
   if (!provider) throw new BadRequest('provider query parameter is required');
-  if (!VALID_PROVIDERS.includes(provider as (typeof VALID_PROVIDERS)[number])) {
+  if (!VALID_PROVIDERS.includes(provider)) {
     throw new BadRequest(`provider must be one of: ${VALID_PROVIDERS.join(', ')}`);
   }
   const result = await listModelsForProvider(provider);
