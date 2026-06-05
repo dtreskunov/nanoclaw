@@ -1137,7 +1137,18 @@ function collectThreadsForContexts(
   for (const t of out) t.canSend = canSendByChannel.get(t.channelType) === true;
 
   out.sort((a, b) => Date.parse(normTs(b.lastActivityAt)) - Date.parse(normTs(a.lastActivityAt)));
-  return out;
+
+  // Deduplicate by threadId — keep the entry with the latest activity.
+  // This can happen when the same thread_id exists under multiple
+  // messaging groups (e.g. user logged in via two identities).
+  const seen = new Set<string>();
+  const deduped: ThreadSummary[] = [];
+  for (const t of out) {
+    if (seen.has(t.threadId)) continue;
+    seen.add(t.threadId);
+    deduped.push(t);
+  }
+  return deduped;
 }
 
 function hasSharedSession(agentGroupId: string, mgId: string): boolean {
