@@ -20835,33 +20835,38 @@ function Combobox({
 }) {
   const [open, setOpen] = h2(false);
   const [text, setText] = h2(value ?? "");
+  const [filtering, setFiltering] = h2(false);
   const [highlight, setHighlight] = h2(-1);
   const rootRef = A2(null);
   const inputRef = A2(null);
   y2(() => {
-    setText(value ?? "");
+    const v5 = value ?? "";
+    if (v5 !== text) {
+      setText(v5);
+      setFiltering(false);
+    }
   }, [value]);
   y2(() => {
     if (!open) return void 0;
     const onDoc = (e4) => {
       if (!rootRef.current?.contains(e4.target)) {
         setOpen(false);
+        setFiltering(false);
         if (!freeform) setText(value ?? "");
       }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open, freeform, value]);
-  const trimmed = text.trim();
-  const showAll = !trimmed || trimmed === (value ?? "").trim();
-  const filterText = trimmed.toLowerCase();
-  const matches = showAll ? options : options.filter(
+  const filterText = text.trim().toLowerCase();
+  const matches = filtering && filterText ? options.filter(
     (o4) => o4.value.toLowerCase().includes(filterText) || o4.label.toLowerCase().includes(filterText)
-  );
+  ) : options;
   function commit(next) {
     setText(next);
     onChange(freeform ? next || null : next || null);
     setOpen(false);
+    setFiltering(false);
     setHighlight(-1);
   }
   function onKeyDown(e4) {
@@ -20882,6 +20887,7 @@ function Combobox({
       }
     } else if (e4.key === "Escape") {
       setOpen(false);
+      setFiltering(false);
       setHighlight(-1);
     }
   }
@@ -20903,6 +20909,7 @@ function Combobox({
           setText(v5);
           if (freeform) onChange(v5 || null);
           setOpen(true);
+          setFiltering(true);
           setHighlight(-1);
         },
         onKeyDown
@@ -20919,7 +20926,7 @@ function Combobox({
         onMouseDown: (e4) => {
           e4.preventDefault();
           setOpen((o4) => !o4);
-          inputRef.current?.focus();
+          setFiltering(false);
         },
         children: "\u25BE"
       }

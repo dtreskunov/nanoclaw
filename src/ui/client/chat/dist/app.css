@@ -2750,6 +2750,11 @@ body.is-admin .files-pane.collapsed .admin-only {
   display: inline-flex;
   align-items: center;
 }
+@media (max-width: 720px) {
+  .combobox-option-info {
+    display: none;
+  }
+}
 
 /* src/components/Tooltip.css */
 .tooltip-wrap {

@@ -102,3 +102,10 @@
   display: inline-flex;
   align-items: center;
 }
+
+/* Mobile: drop the per-option info icon. Tooltips are hover-only and there
+   is no hover on touch; the row's detail line still surfaces the key bits
+   (context window, cost, age, etc.). */
+@media (max-width: 720px) {
+  .combobox-option-info { display: none; }
+}

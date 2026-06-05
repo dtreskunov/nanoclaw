@@ -42,12 +42,25 @@ export function Combobox({
 }: ComboboxProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(value ?? '');
+  // True when the user is actively typing to filter — disables the
+  // "show-all-when-text-matches-value" optimisation so each keystroke
+  // narrows the list, even in freeform mode where text === value.
+  const [filtering, setFiltering] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Track external value changes (e.g. provider switch resets model).
-  useEffect(() => { setText(value ?? ''); }, [value]);
+  // In freeform mode the parent value echoes our text on every keystroke;
+  // only resync (and exit filtering mode) when the external value actually
+  // differs from what we're showing.
+  useEffect(() => {
+    const v = value ?? '';
+    if (v !== text) {
+      setText(v);
+      setFiltering(false);
+    }
+  }, [value]);
 
   // Close on outside click.
   useEffect(() => {
@@ -55,6 +68,7 @@ export function Combobox({
     const onDoc = (e: MouseEvent): void => {
       if (!rootRef.current?.contains(e.target as Node)) {
         setOpen(false);
+        setFiltering(false);
         // If we don't allow free-form input, reset any typed-but-uncommitted
         // text back to the actual saved value when the popup closes.
         if (!freeform) setText(value ?? '');
@@ -64,23 +78,21 @@ export function Combobox({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open, freeform, value]);
 
-  // Filter: when the user has typed something *different from the selected
-  // value*, narrow by substring; otherwise show everything. This makes
-  // "click caret to browse" feel natural — opening the popup on a saved
-  // selection shows the whole list, not just the one already-picked row.
-  const trimmed = text.trim();
-  const showAll = !trimmed || trimmed === (value ?? '').trim();
-  const filterText = trimmed.toLowerCase();
-  const matches = showAll
-    ? options
-    : options.filter((o) =>
+  // Filter: only narrow when the user is actively typing. Otherwise show
+  // everything so opening the popup from a saved selection lets the user
+  // browse the full list.
+  const filterText = text.trim().toLowerCase();
+  const matches = filtering && filterText
+    ? options.filter((o) =>
         o.value.toLowerCase().includes(filterText) || o.label.toLowerCase().includes(filterText),
-      );
+      )
+    : options;
 
   function commit(next: string): void {
     setText(next);
     onChange(freeform ? next || null : next || null);
     setOpen(false);
+    setFiltering(false);
     setHighlight(-1);
   }
 
@@ -102,6 +114,7 @@ export function Combobox({
       }
     } else if (e.key === 'Escape') {
       setOpen(false);
+      setFiltering(false);
       setHighlight(-1);
     }
   }
@@ -123,6 +136,7 @@ export function Combobox({
           setText(v);
           if (freeform) onChange(v || null);
           setOpen(true);
+          setFiltering(true);
           setHighlight(-1);
         }}
         onKeyDown={onKeyDown}
@@ -134,10 +148,12 @@ export function Combobox({
         aria-label="Show options"
         disabled={disabled}
         onMouseDown={(e) => {
-          // Prevent input blur so the popup stays put.
+          // Prevent the caret from stealing focus from the input — but also
+          // don't grab focus ourselves; on mobile that would pop up the
+          // virtual keyboard just for a "browse" action.
           e.preventDefault();
           setOpen((o) => !o);
-          inputRef.current?.focus();
+          setFiltering(false);
         }}
       >▾</button>
       {open && matches.length > 0 ? (
