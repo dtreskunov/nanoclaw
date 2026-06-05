@@ -204,6 +204,7 @@ export function GroupAdmin(): JSX.Element | null {
 function SettingsTab({ gid }: { gid: string }): JSX.Element {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
+  const [draftName, setDraftName] = useState('');
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [models, setModels] = useState<ModelsResponse | null>(null);
@@ -214,6 +215,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
     if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
     setData(r.data);
     setDraft({ ...r.data.config });
+    setDraftName(r.data.name);
     setStatus(null);
   }
 
@@ -250,10 +252,15 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
 
   async function save(): Promise<{ ok: boolean; data?: SettingsResponse }> {
     if (!draft) return { ok: false };
-    const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', draft);
+    const body: Record<string, unknown> = { ...draft };
+    if (data && draftName.trim() !== data.name) body.name = draftName.trim();
+    const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', body);
     if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return { ok: false }; }
     setData(r.data);
     setDraft({ ...r.data.config });
+    setDraftName(r.data.name);
+    // Propagate name change to the sidebar/header group list.
+    groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: r.data.name } : g);
     return { ok: true, data: r.data };
   }
 
@@ -266,6 +273,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   function reset(): void {
     if (!data) return;
     setDraft({ ...data.config });
+    setDraftName(data.name);
     setStatus(null);
   }
 
@@ -279,6 +287,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   function changedFields(): Set<string> {
     const out = new Set<string>();
     if (!data || !draft) return out;
+    if (draftName.trim() !== data.name) out.add('name');
     for (const k of Object.keys(draft) as (keyof SettingsResponse['config'])[]) {
       if (draft[k] !== data.config[k]) out.add(k);
     }
@@ -358,8 +367,10 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
           ? `rebuilt image and restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}`
           : `restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}`);
       }
-      setStatus({ ok: steps.length ? steps.join(', ') + '.' : 'Nothing to do.' });
-      refresh();
+      if (steps.length) {
+        setStatus({ ok: steps.join(', ') + '.' });
+        refresh();
+      }
     } finally { setBusy(false); }
   }
 
@@ -399,6 +410,16 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         Folder <code>{data.folder}</code>{data.updatedAt ? ` · last updated ${new Date(data.updatedAt).toLocaleString()}` : ''}
         {data.runningSessionCount > 0 ? ` · ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? '' : 's'}` : ' · no running sessions'}
       </p>
+
+      <Field label="Name">
+        <input
+          type="text"
+          value={draftName}
+          disabled={busy}
+          maxLength={100}
+          onInput={(e) => setDraftName((e.target as HTMLInputElement).value)}
+        />
+      </Field>
 
       <Field
         label="Provider"

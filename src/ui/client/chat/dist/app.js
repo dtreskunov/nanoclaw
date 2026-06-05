@@ -21092,6 +21092,7 @@ function GroupAdmin() {
 function SettingsTab({ gid }) {
   const [data, setData] = h2(null);
   const [draft, setDraft] = h2(null);
+  const [draftName, setDraftName] = h2("");
   const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
   const [models, setModels] = h2(null);
@@ -21104,6 +21105,7 @@ function SettingsTab({ gid }) {
     }
     setData(r4.data);
     setDraft({ ...r4.data.config });
+    setDraftName(r4.data.name);
     setStatus(null);
   }
   y2(() => {
@@ -21141,13 +21143,17 @@ function SettingsTab({ gid }) {
   }
   async function save() {
     if (!draft) return { ok: false };
-    const r4 = await call(apiPath(gid, "/settings"), "PATCH", draft);
+    const body = { ...draft };
+    if (data && draftName.trim() !== data.name) body.name = draftName.trim();
+    const r4 = await call(apiPath(gid, "/settings"), "PATCH", body);
     if (!r4.ok) {
       setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
       return { ok: false };
     }
     setData(r4.data);
     setDraft({ ...r4.data.config });
+    setDraftName(r4.data.name);
+    groups.value = groups.value.map((g8) => g8.id === gid ? { ...g8, name: r4.data.name } : g8);
     return { ok: true, data: r4.data };
   }
   async function runRestart(rebuild) {
@@ -21161,6 +21167,7 @@ function SettingsTab({ gid }) {
   function reset() {
     if (!data) return;
     setDraft({ ...data.config });
+    setDraftName(data.name);
     setStatus(null);
   }
   const RESTART_REQUIRING_FIELDS = /* @__PURE__ */ new Set([
@@ -21174,6 +21181,7 @@ function SettingsTab({ gid }) {
   function changedFields() {
     const out = /* @__PURE__ */ new Set();
     if (!data || !draft) return out;
+    if (draftName.trim() !== data.name) out.add("name");
     for (const k4 of Object.keys(draft)) {
       if (draft[k4] !== data.config[k4]) out.add(k4);
     }
@@ -21235,8 +21243,10 @@ function SettingsTab({ gid }) {
         if (!r4.ok) return;
         steps.push(effectiveRebuild ? `rebuilt image and restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}` : `restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}`);
       }
-      setStatus({ ok: steps.length ? steps.join(", ") + "." : "Nothing to do." });
-      refresh();
+      if (steps.length) {
+        setStatus({ ok: steps.join(", ") + "." });
+        refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -21273,6 +21283,16 @@ function SettingsTab({ gid }) {
       data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
       data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
     ] }),
+    /* @__PURE__ */ u4(Field, { label: "Name", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        value: draftName,
+        disabled: busy,
+        maxLength: 100,
+        onInput: (e4) => setDraftName(e4.target.value)
+      }
+    ) }),
     /* @__PURE__ */ u4(
       Field,
       {

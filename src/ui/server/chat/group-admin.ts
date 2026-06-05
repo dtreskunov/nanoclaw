@@ -16,7 +16,7 @@ import { URL } from 'url';
 import { buildAgentGroupImage } from '../../../container-runner.js';
 import { restartAgentGroupContainers } from '../../../container-restart.js';
 import { getDb } from '../../../db/connection.js';
-import { getAgentGroup } from '../../../db/agent-groups.js';
+import { getAgentGroup, updateAgentGroup } from '../../../db/agent-groups.js';
 import { getContainerConfig, updateContainerConfigScalars } from '../../../db/container-configs.js';
 import { log } from '../../../log.js';
 import {
@@ -255,6 +255,16 @@ async function handlePatchSettings(
   > = {};
   const isElevated = isOwner(actorUserId) || isGlobalAdmin(actorUserId);
 
+  // Group name lives in agent_groups, not container_configs.
+  let nameUpdate: string | undefined;
+  if ('name' in body) {
+    const raw = body['name'];
+    const trimmed = String(raw ?? '').trim();
+    if (!trimmed) throw new BadRequest('name cannot be empty');
+    if (trimmed.length > 100) throw new BadRequest('name must be 100 characters or fewer');
+    nameUpdate = trimmed;
+  }
+
   for (const key of SCALAR_FIELDS) {
     if (!(key in body)) continue;
     const raw = body[key];
@@ -311,17 +321,22 @@ async function handlePatchSettings(
     updates.model = dbValueFromBareId(effectiveProvider, updates.model ?? null);
   }
 
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(updates).length === 0 && nameUpdate === undefined) {
     throw new BadRequest('no editable fields supplied');
   }
 
-  updateContainerConfigScalars(gid, updates);
+  if (nameUpdate !== undefined) {
+    updateAgentGroup(gid, { name: nameUpdate });
+  }
+  if (Object.keys(updates).length > 0) {
+    updateContainerConfigScalars(gid, updates);
+  }
   recordAdminAction({
     actorUserId,
     action: 'group_config_update',
     targetKind: 'agent_group',
     targetId: gid,
-    payload: updates as Record<string, unknown>,
+    payload: { ...(nameUpdate !== undefined ? { name: nameUpdate } : {}), ...updates } as Record<string, unknown>,
   });
   await handleGetSettings(res, gid, actorUserId);
 }
