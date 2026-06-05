@@ -56,7 +56,11 @@ const SCALAR_FIELDS = [
 // Keep in sync with REQUIRED_PROVIDER_MODULES + OPTIONAL_PROVIDER_MODULES in
 // container/agent-runner/src/providers/index.ts. Surface to the client via
 // GET /settings so the dropdown stays correct.
+// `mock` is accepted server-side (existing groups may have it set via the
+// CLI) but is excluded from the picker the client shows — see
+// `selectableProviders` in the GET /settings response.
 const VALID_PROVIDERS = ['claude', 'mock', 'opencode'] as const;
+const SELECTABLE_PROVIDERS = ['claude', 'opencode'] as const;
 const VALID_CLI_SCOPES = ['disabled', 'group', 'global'] as const;
 
 // ── dispatcher ────────────────────────────────────────────────────────────
@@ -222,7 +226,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
       max_messages_per_prompt: cfg.max_messages_per_prompt,
       cli_scope: cfg.cli_scope,
     },
-    validProviders: VALID_PROVIDERS,
+    validProviders: SELECTABLE_PROVIDERS,
     validCliScopes: VALID_CLI_SCOPES,
     runningSessionCount: running.n,
     selectedModelDetail,

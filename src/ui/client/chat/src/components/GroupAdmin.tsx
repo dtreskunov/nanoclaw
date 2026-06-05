@@ -96,7 +96,6 @@ interface ImagesResponse {
 const PROVIDER_INFO: Record<string, string> = {
   claude: 'Claude — Anthropic models via the official SDK. Uses your OneCLI-injected Anthropic API key.',
   opencode: 'OpenCode — multi-provider gateway (OpenRouter, DeepSeek, OpenCode Zen, Anthropic, etc.) selected by host OPENCODE_PROVIDER. Wire prefix is handled automatically.',
-  mock: 'Mock provider — returns canned responses. Used for testing only.',
 };
 
 function formatAge(iso: string | null): string | null {
@@ -330,15 +329,24 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
 
       <Field
         label="Provider"
-        info={draft.provider ? PROVIDER_INFO[draft.provider] : undefined}
+        info={draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : undefined}
       >
         <Combobox
           value={draft.provider}
-          options={data.validProviders.map((p) => ({
-            value: p,
-            label: p,
-            tooltip: PROVIDER_INFO[p],
-          }))}
+          options={(() => {
+            const selectable = data.validProviders.slice();
+            // If the saved provider isn't in the selectable list (e.g. legacy
+            // 'mock'), keep it visible so the user can see their state and
+            // still switch away to a supported value.
+            if (draft.provider && !selectable.includes(draft.provider)) {
+              selectable.push(draft.provider);
+            }
+            return selectable.map((p) => ({
+              value: p,
+              label: p,
+              tooltip: PROVIDER_INFO[p],
+            }));
+          })()}
           placeholder="pick a provider"
           disabled={busy}
           freeform={false}
@@ -351,7 +359,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
           <Combobox
             value={draft.model}
             options={modelOptions}
-            placeholder={provider === 'mock' ? 'any value' : 'pick or type a model id'}
+            placeholder="pick or type a model id"
             disabled={busy || !provider}
             onChange={(v) => update('model', v)}
           />

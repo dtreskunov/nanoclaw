@@ -20965,8 +20965,7 @@ function Combobox({
 // src/components/GroupAdmin.tsx
 var PROVIDER_INFO = {
   claude: "Claude \u2014 Anthropic models via the official SDK. Uses your OneCLI-injected Anthropic API key.",
-  opencode: "OpenCode \u2014 multi-provider gateway (OpenRouter, DeepSeek, OpenCode Zen, Anthropic, etc.) selected by host OPENCODE_PROVIDER. Wire prefix is handled automatically.",
-  mock: "Mock provider \u2014 returns canned responses. Used for testing only."
+  opencode: "OpenCode \u2014 multi-provider gateway (OpenRouter, DeepSeek, OpenCode Zen, Anthropic, etc.) selected by host OPENCODE_PROVIDER. Wire prefix is handled automatically."
 };
 function formatAge(iso) {
   if (!iso) return null;
@@ -21190,16 +21189,22 @@ function SettingsTab({ gid }) {
       Field,
       {
         label: "Provider",
-        info: draft.provider ? PROVIDER_INFO[draft.provider] : void 0,
+        info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
         children: /* @__PURE__ */ u4(
           Combobox,
           {
             value: draft.provider,
-            options: data.validProviders.map((p5) => ({
-              value: p5,
-              label: p5,
-              tooltip: PROVIDER_INFO[p5]
-            })),
+            options: (() => {
+              const selectable = data.validProviders.slice();
+              if (draft.provider && !selectable.includes(draft.provider)) {
+                selectable.push(draft.provider);
+              }
+              return selectable.map((p5) => ({
+                value: p5,
+                label: p5,
+                tooltip: PROVIDER_INFO[p5]
+              }));
+            })(),
             placeholder: "pick a provider",
             disabled: busy,
             freeform: false,
@@ -21214,7 +21219,7 @@ function SettingsTab({ gid }) {
         {
           value: draft.model,
           options: modelOptions,
-          placeholder: provider === "mock" ? "any value" : "pick or type a model id",
+          placeholder: "pick or type a model id",
           disabled: busy || !provider,
           onChange: (v5) => update("model", v5)
         }

@@ -12,7 +12,7 @@
  *                verbatim, so the prefix is required at storage time.
  *                See src/providers/opencode.ts. The client always works
  *                with the bare id.
- *   - mock     → no catalog; passthrough.
+ *   - mock     → no UI catalog; not exposed by the admin endpoint.
  *
  * Catalog cached in memory (~1h TTL + brief negative cache on failure).
  */
@@ -151,6 +151,9 @@ export interface ModelCatalogResult {
 
 /** Returns suggestions whose `id` is the bare model id (no prefix). */
 export async function listModelsForProvider(agentProvider: string): Promise<ModelCatalogResult> {
+  // mock is intentionally not surfaced through the admin UI — it's a
+  // test-only provider and the dropdown shouldn't tempt users into picking
+  // it. If you need it, set via `ncl groups config update --provider mock`.
   if (agentProvider === 'mock') {
     return { models: [], source: 'models.dev', upstream: null };
   }
