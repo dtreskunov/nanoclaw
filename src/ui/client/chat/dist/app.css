@@ -203,7 +203,7 @@ header .mobile-only {
   border-bottom-color: currentColor;
   background: var(--wash-subtle);
 }
-.group-chip.admin-only {
+.group-chip.is-admin-visible {
   opacity: 0.6;
 }
 .chip-name {
@@ -243,7 +243,7 @@ header .mobile-only {
   .active-group-btn:hover {
     background: var(--wash);
   }
-  .active-group-btn.admin-only {
+  .active-group-btn.is-admin-visible {
     opacity: 0.7;
   }
   .agb-stack {
@@ -305,7 +305,7 @@ header .mobile-only {
 .group-row.active .row-name {
   font-weight: 700;
 }
-.group-row.admin-only {
+.group-row.is-admin-visible {
   opacity: 0.7;
 }
 .row-name {

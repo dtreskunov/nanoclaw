@@ -18070,7 +18070,7 @@ function GroupStrip() {
         type: "button",
         role: "tab",
         "aria-selected": active,
-        class: `group-chip${active ? " active" : ""}${isAdminOnly ? " admin-only" : ""}`,
+        class: `group-chip${active ? " active" : ""}${isAdminOnly ? " is-admin-visible" : ""}`,
         title: isAdminOnly ? `Visible to you as admin${g6.lastActivityAt ? " \xB7 " + fmtAbsolute(g6.lastActivityAt) : ""}` : g6.lastActivityAt ? fmtAbsolute(g6.lastActivityAt) : "",
         onClick: () => pick(g6.id),
         children: [
@@ -18094,7 +18094,7 @@ function ActiveGroupButton() {
     "button",
     {
       type: "button",
-      class: `active-group-btn mobile-only${isAdminOnly ? " admin-only" : ""}`,
+      class: `active-group-btn mobile-only${isAdminOnly ? " is-admin-visible" : ""}`,
       "aria-label": "Switch agent group",
       "aria-haspopup": "dialog",
       onClick: () => {
@@ -18154,7 +18154,7 @@ function GroupPickerModal() {
             "button",
             {
               type: "button",
-              class: `group-row${active ? " active" : ""}${isAdminOnly ? " admin-only" : ""}`,
+              class: `group-row${active ? " active" : ""}${isAdminOnly ? " is-admin-visible" : ""}`,
               "aria-current": active ? "true" : void 0,
               onClick: () => pick(g6.id),
               children: [

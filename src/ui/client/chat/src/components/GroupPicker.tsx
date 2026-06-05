@@ -58,7 +58,7 @@ export function GroupStrip() {
             key={g.id}
             role="tab"
             aria-selected={active}
-            class={`group-chip${active ? ' active' : ''}${isAdminOnly ? ' admin-only' : ''}`}
+            class={`group-chip${active ? ' active' : ''}${isAdminOnly ? ' is-admin-visible' : ''}`}
             title={isAdminOnly
               ? `Visible to you as admin${g.lastActivityAt ? ' \u00B7 ' + fmtAbsolute(g.lastActivityAt) : ''}`
               : g.lastActivityAt ? fmtAbsolute(g.lastActivityAt) : ''}
@@ -86,7 +86,7 @@ export function ActiveGroupButton() {
   return (
     <button
       type="button"
-      class={`active-group-btn mobile-only${isAdminOnly ? ' admin-only' : ''}`}
+      class={`active-group-btn mobile-only${isAdminOnly ? ' is-admin-visible' : ''}`}
       aria-label="Switch agent group"
       aria-haspopup="dialog"
       onClick={() => { groupPickerOpen.value = true; }}
@@ -148,7 +148,7 @@ export function GroupPickerModal() {
               <button
                 type="button"
                 key={g.id}
-                class={`group-row${active ? ' active' : ''}${isAdminOnly ? ' admin-only' : ''}`}
+                class={`group-row${active ? ' active' : ''}${isAdminOnly ? ' is-admin-visible' : ''}`}
                 aria-current={active ? 'true' : undefined}
                 onClick={() => pick(g.id)}
               >

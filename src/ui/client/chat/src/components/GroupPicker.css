@@ -23,7 +23,7 @@
   border-bottom-color: currentColor;
   background: var(--wash-subtle);
 }
-.group-chip.admin-only { opacity: 0.6; }
+.group-chip.is-admin-visible { opacity: 0.6; }
 
 .chip-name { font-size: 13px; font-weight: 500; line-height: 1.3; }
 .chip-sub {
@@ -45,7 +45,7 @@
     font-family: inherit; text-align: left;
   }
   .active-group-btn:hover { background: var(--wash); }
-  .active-group-btn.admin-only { opacity: 0.7; }
+  .active-group-btn.is-admin-visible { opacity: 0.7; }
   .agb-stack {
     display: flex; flex-direction: column; min-width: 0;
     flex: 1; overflow: hidden;
@@ -75,6 +75,6 @@
 .group-row:hover { background: var(--wash); }
 .group-row.active { background: var(--wash-subtle); }
 .group-row.active .row-name { font-weight: 700; }
-.group-row.admin-only { opacity: 0.7; }
+.group-row.is-admin-visible { opacity: 0.7; }
 .row-name { font-size: 14px; font-weight: 500; line-height: 1.3; }
 .row-sub { font-size: 11px; line-height: 1.2; color: var(--muted); margin-top: 2px; }
