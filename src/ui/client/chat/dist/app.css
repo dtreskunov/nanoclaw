@@ -198,10 +198,7 @@ header .mobile-only {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow: hidden;
   flex: 1;
   min-width: 0;
   padding: 0 4px;
@@ -216,7 +213,7 @@ header .mobile-only {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 5px 16px 6px;
+  padding: 5px 12px 6px;
   min-height: 36px;
   border: 1px solid transparent;
   border-bottom: 0;
@@ -226,9 +223,11 @@ header .mobile-only {
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 48px;
   position: relative;
   transition: background 0.1s, border-color 0.1s;
+  overflow: hidden;
 }
 .group-chip:not(.active):hover {
   background: var(--wash-soft);
@@ -236,6 +235,7 @@ header .mobile-only {
 .group-chip.active {
   background: var(--surface);
   border-color: var(--border);
+  flex-shrink: 0;
   margin-bottom: -1px;
   padding-bottom: 7px;
   z-index: 1;
@@ -247,6 +247,9 @@ header .mobile-only {
   font-size: var(--font-base);
   font-weight: 500;
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .group-chip.active .chip-name {
   font-weight: 600;
@@ -256,6 +259,9 @@ header .mobile-only {
   line-height: 1.2;
   color: var(--muted);
   letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .active-group-btn {
   display: none;
