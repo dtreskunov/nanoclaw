@@ -36,7 +36,8 @@ import {
 import type { ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
 import { recordAdminAction } from './audit.js';
-import { listModelsForProvider } from './models-catalog.js';
+import { listImages } from './image-catalog.js';
+import { bareIdForResponse, dbValueFromBareId, getModelDetails, listModelsForProvider } from './models-catalog.js';
 
 // ── allowed scalar config fields (mirrors ncl groups config update) ───────
 
@@ -147,6 +148,7 @@ async function dispatch(
   if (rest === '/users-search' && method === 'GET') return handleUsersSearch(req, res);
 
   if (rest === '/models' && method === 'GET') return handleListModels(req, res);
+  if (rest === '/images' && method === 'GET') return handleListImages(res);
 
   writeJson(res, 404, { error: 'not_found' });
 }
@@ -166,9 +168,12 @@ interface SettingsResponse {
   validProviders: readonly string[];
   validCliScopes: readonly string[];
   runningSessionCount: number;
+  /** Tooltip / detail / age for the currently-selected model and image. */
+  selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
+  selectedImageDetail: { label: string; createdAt: string | null; size: number | null } | null;
 }
 
-function handleGetSettings(res: http.ServerResponse, gid: string): void {
+async function handleGetSettings(res: http.ServerResponse, gid: string): Promise<void> {
   const group = getAgentGroup(gid)!; // already validated by caller
   const cfg = getContainerConfig(gid);
   if (!cfg) {
@@ -178,6 +183,25 @@ function handleGetSettings(res: http.ServerResponse, gid: string): void {
   const running = getDb()
     .prepare("SELECT COUNT(*) AS n FROM sessions WHERE agent_group_id = ? AND status = 'active'")
     .get(gid) as { n: number };
+
+  // Translate DB model value → bare id for the wire. Client never sees the
+  // OPENCODE_PROVIDER prefix.
+  const bareModelId = bareIdForResponse(cfg.provider, cfg.model);
+
+  let selectedModelDetail: SettingsResponse['selectedModelDetail'] = null;
+  if (cfg.provider && bareModelId) {
+    const m = await getModelDetails(cfg.provider, bareModelId);
+    if (m) selectedModelDetail = { label: m.label, detail: m.detail, tooltip: m.tooltip };
+  }
+
+  let selectedImageDetail: SettingsResponse['selectedImageDetail'] = null;
+  if (cfg.image_tag) {
+    const match = listImages().find((i) => i.value === cfg.image_tag);
+    if (match) {
+      selectedImageDetail = { label: match.label, createdAt: match.createdAt, size: match.size };
+    }
+  }
+
   const body: SettingsResponse = {
     id: group.id,
     name: group.name,
@@ -186,7 +210,7 @@ function handleGetSettings(res: http.ServerResponse, gid: string): void {
     updatedAt: cfg.updated_at ?? null,
     config: {
       provider: cfg.provider,
-      model: cfg.model,
+      model: bareModelId,
       effort: cfg.effort,
       image_tag: cfg.image_tag,
       assistant_name: cfg.assistant_name,
@@ -196,6 +220,8 @@ function handleGetSettings(res: http.ServerResponse, gid: string): void {
     validProviders: VALID_PROVIDERS,
     validCliScopes: VALID_CLI_SCOPES,
     runningSessionCount: running.n,
+    selectedModelDetail,
+    selectedImageDetail,
   };
   writeJson(res, 200, body);
 }
@@ -258,6 +284,15 @@ async function handlePatchSettings(
     }
   }
 
+  // Translate the bare model id back to the DB wire value once provider is
+  // known. If provider is also being patched, use the new value so the
+  // prefix matches the user's intent.
+  if ('model' in updates) {
+    const existing = getContainerConfig(gid);
+    const effectiveProvider = updates.provider ?? existing?.provider ?? null;
+    updates.model = dbValueFromBareId(effectiveProvider, updates.model ?? null);
+  }
+
   if (Object.keys(updates).length === 0) {
     throw new BadRequest('no editable fields supplied');
   }
@@ -270,7 +305,7 @@ async function handlePatchSettings(
     targetId: gid,
     payload: updates as Record<string, unknown>,
   });
-  handleGetSettings(res, gid);
+  await handleGetSettings(res, gid);
 }
 
 async function handleRestart(
@@ -519,6 +554,12 @@ async function handleListModels(req: http.IncomingMessage, res: http.ServerRespo
   }
   const result = await listModelsForProvider(provider);
   writeJson(res, 200, result);
+}
+
+// ── image catalog (for the image_tag dropdown) ────────────────────────────
+
+function handleListImages(res: http.ServerResponse): void {
+  writeJson(res, 200, { images: listImages() });
 }
 
 // ── tiny local helpers (kept private to avoid widening routes.ts surface) ─

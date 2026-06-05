@@ -2464,27 +2464,48 @@ body.is-admin .files-pane.collapsed .admin-only {
 /* src/components/GroupAdmin.css */
 .group-admin-tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--head-tint);
+  align-items: flex-end;
+  gap: 2px;
   padding: 0 8px;
+  background: var(--head-tint);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
 }
 .group-admin-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
   background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  padding: 10px 14px;
   color: var(--muted);
   font: inherit;
   font-size: var(--font-base);
+  font-weight: 500;
   cursor: pointer;
+  transition:
+    background 0.1s,
+    border-color 0.1s,
+    color 0.1s;
 }
-.group-admin-tabs button:hover {
+.group-admin-tabs button:not(.active):hover {
+  background: var(--wash-soft);
   color: var(--surface-fg);
 }
 .group-admin-tabs button.active {
+  background: var(--surface);
+  border-color: var(--border);
   color: var(--surface-fg);
-  border-bottom-color: var(--accent, var(--surface-fg));
+  font-weight: 600;
+  margin-bottom: -1px;
+  padding-bottom: 7px;
+  z-index: 2;
 }
 .group-admin-field {
   align-items: baseline;
@@ -2494,6 +2515,9 @@ body.is-admin .files-pane.collapsed .admin-only {
 .group-admin-label {
   flex: none;
   width: 180px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-size: var(--font-base);
 }
@@ -2503,8 +2527,9 @@ body.is-admin .files-pane.collapsed .admin-only {
   display: flex;
   gap: 8px;
 }
-.group-admin-control input,
-.group-admin-control select {
+.group-admin-control > input[type=text],
+.group-admin-control > input[type=number],
+.group-admin-control > select {
   flex: 1;
   min-width: 0;
   font: inherit;
@@ -2514,15 +2539,36 @@ body.is-admin .files-pane.collapsed .admin-only {
   background: transparent;
   color: inherit;
 }
-.group-admin-model-wrap {
+.group-admin-stack {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.group-admin-model-wrap input {
-  width: 100%;
+.group-admin-selected-info {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--wash-subtle);
+  font-size: var(--font-sm);
+}
+.group-admin-selected-info .selected-title {
+  font-weight: 600;
+  font-size: var(--font-base);
+  margin-bottom: 4px;
+}
+.group-admin-selected-info .selected-detail {
+  color: var(--muted);
+  font-weight: 400;
+}
+.group-admin-selected-info .selected-tooltip {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  white-space: pre-wrap;
+  line-height: 1.4;
 }
 .group-admin-help {
   margin: 0;
@@ -2547,6 +2593,7 @@ body.is-admin .files-pane.collapsed .admin-only {
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  background: var(--surface);
 }
 .group-admin-search-results li {
   border-bottom: 1px solid var(--border);
@@ -2568,7 +2615,7 @@ body.is-admin .files-pane.collapsed .admin-only {
   gap: 10px;
 }
 .group-admin-search-row:hover {
-  background: var(--head-tint);
+  background: var(--wash);
 }
 .group-admin-search-row[disabled] {
   opacity: 0.5;
@@ -2594,5 +2641,178 @@ body.is-admin .files-pane.collapsed .admin-only {
   .group-admin-label {
     width: auto;
   }
+}
+
+/* src/components/Combobox.css */
+.combobox {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+.combobox[data-open=true] {
+  border-color: var(--border-strong, var(--border));
+}
+.combobox-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.combobox-caret {
+  flex: none;
+  width: 28px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.combobox-caret:hover {
+  color: var(--surface-fg);
+}
+.combobox-caret:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+  color: var(--surface-fg);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 18px var(--shadow-color-strong, rgba(0, 0, 0, 0.18));
+}
+.combobox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: transparent;
+}
+.combobox-option.highlight,
+.combobox-option:hover {
+  background: var(--wash);
+}
+.combobox-option.selected {
+  background: var(--accent);
+}
+.combobox-option.selected.highlight,
+.combobox-option.selected:hover {
+  background: var(--accent-strong);
+}
+.combobox-option-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.combobox-option-label {
+  font-size: var(--font-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combobox-option-detail {
+  font-size: var(--font-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combobox-option-info {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* src/components/Tooltip.css */
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.tooltip-bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--surface-fg);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px var(--shadow-color-strong, rgba(0, 0, 0, 0.18));
+  font-size: var(--font-sm);
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+.tooltip-bubble.tooltip-top {
+  bottom: calc(100% + 6px);
+}
+.tooltip-bubble.tooltip-bottom {
+  top: calc(100% + 6px);
+}
+.tooltip-line {
+  display: block;
+}
+.tooltip-line:first-child {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 600;
+  font-family: serif;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  flex-shrink: 0;
+}
+.info-icon:hover,
+.info-icon:focus-visible {
+  border-color: var(--surface-fg);
+  color: var(--surface-fg);
+  outline: none;
 }
 /*# sourceMappingURL=app.css.map */

@@ -1,26 +1,49 @@
 /* Per-group admin modal — extends Settings modal chrome. */
 
+/* Tab strip styled like the top group rail: flat inactive tabs,
+   lifted active tab that overlaps the bottom border. */
 .group-admin-tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--head-tint);
+  align-items: flex-end;
+  gap: 2px;
   padding: 0 8px;
+  background: var(--head-tint);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
 }
 .group-admin-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
   background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  padding: 10px 14px;
   color: var(--muted);
   font: inherit;
   font-size: var(--font-base);
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
-.group-admin-tabs button:hover { color: var(--surface-fg); }
-.group-admin-tabs button.active {
+.group-admin-tabs button:not(.active):hover {
+  background: var(--wash-soft);
   color: var(--surface-fg);
-  border-bottom-color: var(--accent, var(--surface-fg));
+}
+.group-admin-tabs button.active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--surface-fg);
+  font-weight: 600;
+  /* Step 1px below the strip baseline so the chip overlaps the border. */
+  margin-bottom: -1px;
+  padding-bottom: 7px;
+  z-index: 2;
 }
 
 .group-admin-field {
@@ -31,6 +54,9 @@
 .group-admin-label {
   flex: none;
   width: 180px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-size: var(--font-base);
 }
@@ -40,8 +66,9 @@
   display: flex;
   gap: 8px;
 }
-.group-admin-control input,
-.group-admin-control select {
+.group-admin-control > input[type="text"],
+.group-admin-control > input[type="number"],
+.group-admin-control > select {
   flex: 1;
   min-width: 0;
   font: inherit;
@@ -52,14 +79,39 @@
   color: inherit;
 }
 
-.group-admin-model-wrap {
+.group-admin-stack {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.group-admin-model-wrap input { width: 100%; }
+
+.group-admin-selected-info {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--wash-subtle);
+  font-size: var(--font-sm);
+}
+.group-admin-selected-info .selected-title {
+  font-weight: 600;
+  font-size: var(--font-base);
+  margin-bottom: 4px;
+}
+.group-admin-selected-info .selected-detail {
+  color: var(--muted);
+  font-weight: 400;
+}
+.group-admin-selected-info .selected-tooltip {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
 .group-admin-help {
   margin: 0;
   color: var(--muted);
@@ -85,6 +137,7 @@
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  background: var(--surface);
 }
 .group-admin-search-results li {
   border-bottom: 1px solid var(--border);
@@ -104,7 +157,7 @@
   gap: 10px;
 }
 .group-admin-search-row:hover {
-  background: var(--head-tint);
+  background: var(--wash);
 }
 .group-admin-search-row[disabled] {
   opacity: 0.5;

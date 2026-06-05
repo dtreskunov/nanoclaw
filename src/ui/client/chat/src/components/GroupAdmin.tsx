@@ -10,6 +10,8 @@ import {
   groupId,
   groups,
 } from '../state';
+import { Combobox, type ComboboxOption } from './Combobox';
+import { InfoIcon } from './Tooltip';
 import { showToast } from './Toast';
 import { requestConfirm } from './PromptModal';
 
@@ -35,6 +37,8 @@ interface SettingsResponse {
   validProviders: string[];
   validCliScopes: string[];
   runningSessionCount: number;
+  selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
+  selectedImageDetail: { label: string; createdAt: string | null; size: number | null } | null;
 }
 
 interface MemberDto {
@@ -64,15 +68,58 @@ interface UserSearchDto {
 }
 
 interface ModelSuggestion {
-  value: string;
+  id: string;
   label: string;
   detail?: string;
+  tooltip?: string;
 }
 
 interface ModelsResponse {
   models: ModelSuggestion[];
   source: 'models.dev' | 'unavailable';
-  prefix: string | null;
+  upstream: string | null;
+}
+
+interface ImageSuggestion {
+  value: string;
+  label: string;
+  createdAt: string | null;
+  size: number | null;
+  isDefault: boolean;
+}
+
+interface ImagesResponse {
+  images: ImageSuggestion[];
+}
+
+const PROVIDER_INFO: Record<string, string> = {
+  claude: 'Claude — Anthropic models via the official SDK. Uses your OneCLI-injected Anthropic API key.',
+  opencode: 'OpenCode — multi-provider gateway (OpenRouter, DeepSeek, OpenCode Zen, Anthropic, etc.) selected by host OPENCODE_PROVIDER. Wire prefix is handled automatically.',
+  mock: 'Mock provider — returns canned responses. Used for testing only.',
+};
+
+function formatAge(iso: string | null): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const diffMs = Date.now() - t;
+  const day = 24 * 3600 * 1000;
+  const hour = 3600 * 1000;
+  if (diffMs < hour) return 'just now';
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
+  const days = Math.floor(diffMs / day);
+  if (days < 7) return `${days}d ago`;
+  if (days < 60) return `${Math.floor(days / 7)}w ago`;
+  if (days < 730) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
+function formatSize(bytes: number | null): string | null {
+  if (bytes == null) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 function apiPath(gid: string, sub: string): string {
@@ -158,6 +205,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [models, setModels] = useState<ModelsResponse | null>(null);
+  const [images, setImages] = useState<ImagesResponse | null>(null);
 
   async function refresh(): Promise<void> {
     const r = await call<SettingsResponse>(apiPath(gid, '/settings'));
@@ -169,8 +217,17 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
 
   useEffect(() => { refresh(); }, [gid]);
 
-  // Refetch model suggestions whenever the provider changes (including the
-  // initial load). Cheap: server caches the upstream catalog.
+  // Image list is global (not per-provider) — fetch once when the modal opens.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await call<ImagesResponse>(apiPath(gid, '/images'));
+      if (!cancelled) setImages(r.ok ? r.data : { images: [] });
+    })();
+    return () => { cancelled = true; };
+  }, [gid]);
+
+  // Refetch model suggestions whenever the provider changes.
   const provider = draft?.provider ?? null;
   useEffect(() => {
     if (!provider) { setModels(null); return; }
@@ -178,7 +235,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
     (async () => {
       const r = await call<ModelsResponse>(apiPath(gid, `/models?provider=${encodeURIComponent(provider)}`));
       if (cancelled) return;
-      setModels(r.ok ? r.data : { models: [], source: 'unavailable', prefix: null });
+      setModels(r.ok ? r.data : { models: [], source: 'unavailable', upstream: null });
     })();
     return () => { cancelled = true; };
   }, [provider, gid]);
@@ -233,6 +290,36 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
     } finally { setBusy(false); }
   }
 
+  // Model options for the combobox; reflects current selection's detail/tooltip.
+  const modelOptions: ComboboxOption[] = (models?.models ?? []).map((m) => ({
+    value: m.id,
+    label: m.label,
+    detail: m.detail,
+    tooltip: m.tooltip,
+  }));
+
+  const imageOptions: ComboboxOption[] = (images?.images ?? []).map((i) => {
+    const age = formatAge(i.createdAt);
+    const size = formatSize(i.size);
+    const detailParts = [age, size, i.isDefault ? 'default' : null].filter(Boolean) as string[];
+    return {
+      value: i.value,
+      label: i.label,
+      detail: detailParts.length ? detailParts.join(' · ') : undefined,
+      tooltip: [
+        i.value,
+        i.createdAt ? `Created: ${new Date(i.createdAt).toLocaleString()}` : null,
+        size ? `Size: ${size}` : null,
+        i.isDefault ? 'Install default image (used when image_tag is unset).' : null,
+      ].filter(Boolean).join('\n'),
+    };
+  });
+
+  // Find the selected image's metadata for the "underneath the box" panel.
+  const selectedImg = images?.images.find((i) => i.value === draft.image_tag) ?? null;
+  const selectedImgAge = formatAge(selectedImg?.createdAt ?? null);
+  const selectedImgSize = formatSize(selectedImg?.size ?? null);
+
   return (
     <section>
       <p class="muted">
@@ -240,7 +327,10 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         {data.runningSessionCount > 0 ? ` · ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? '' : 's'}` : ' · no running sessions'}
       </p>
 
-      <Field label="Provider">
+      <Field
+        label="Provider"
+        info={draft.provider ? PROVIDER_INFO[draft.provider] : undefined}
+      >
         <select
           value={draft.provider ?? ''}
           disabled={busy}
@@ -251,14 +341,38 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
       </Field>
 
       <Field label="Model">
-        <ModelField
-          gid={gid}
-          provider={draft.provider}
-          value={draft.model}
-          busy={busy}
-          models={models}
-          onChange={(v) => update('model', v)}
-        />
+        <div class="group-admin-stack">
+          <Combobox
+            value={draft.model}
+            options={modelOptions}
+            placeholder={provider === 'mock' ? 'any value' : 'pick or type a model id'}
+            disabled={busy || !provider}
+            onChange={(v) => update('model', v)}
+          />
+          {(() => {
+            const matched = modelOptions.find((o) => o.value === draft.model);
+            if (matched) {
+              return (
+                <div class="group-admin-selected-info">
+                  <div class="selected-title">
+                    {matched.label}
+                    {matched.detail ? <span class="selected-detail"> · {matched.detail}</span> : null}
+                  </div>
+                  {matched.tooltip ? (
+                    <pre class="selected-tooltip">{matched.tooltip.split('\n').slice(1).join('\n')}</pre>
+                  ) : null}
+                </div>
+              );
+            }
+            if (models?.source === 'unavailable') {
+              return <p class="group-admin-help">Catalog unavailable — saved as-is.</p>;
+            }
+            if (draft.model) {
+              return <p class="group-admin-help">Not in catalog — saved as a custom value.</p>;
+            }
+            return null;
+          })()}
+        </div>
       </Field>
 
       <Field label="Effort">
@@ -272,12 +386,31 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
       </Field>
 
       <Field label="Image tag">
-        <input
-          type="text"
-          value={draft.image_tag ?? ''}
-          disabled={busy}
-          onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => update('image_tag', e.currentTarget.value || null)}
-        />
+        <div class="group-admin-stack">
+          <Combobox
+            value={draft.image_tag}
+            options={imageOptions}
+            placeholder="pick an image"
+            disabled={busy}
+            onChange={(v) => update('image_tag', v)}
+          />
+          {selectedImg ? (
+            <div class="group-admin-selected-info">
+              <div class="selected-title">
+                {selectedImg.label}
+                {(selectedImgAge || selectedImgSize) ? (
+                  <span class="selected-detail"> · {[selectedImgAge, selectedImgSize].filter(Boolean).join(' · ')}</span>
+                ) : null}
+                {selectedImg.isDefault ? <span class="selected-detail"> · default</span> : null}
+              </div>
+              {selectedImg.createdAt ? (
+                <pre class="selected-tooltip">Created: {new Date(selectedImg.createdAt).toLocaleString()}</pre>
+              ) : null}
+            </div>
+          ) : draft.image_tag ? (
+            <p class="group-admin-help">Tag not in local image list — will fail at container start if not pulled.</p>
+          ) : null}
+        </div>
       </Field>
 
       <Field label="Assistant name">
@@ -289,7 +422,10 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         />
       </Field>
 
-      <Field label="Max messages / prompt">
+      <Field
+        label="Max messages / prompt"
+        info="Hard cap on how many history messages get included in each model call. Higher = more context but more cost; lower = faster + cheaper but the agent forgets sooner. Leave blank for the provider default."
+      >
         <input
           type="number"
           min={1}
@@ -303,7 +439,13 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         />
       </Field>
 
-      <Field label="CLI scope">
+      <Field
+        label="CLI scope"
+        info={'Controls which `ncl` commands an agent in this group can run.\n' +
+          'disabled = no CLI access.\n' +
+          'group = limited to the group\'s own resources.\n' +
+          'global = unrestricted (use sparingly).'}
+      >
         <select
           value={draft.cli_scope ?? ''}
           disabled={busy}
@@ -324,82 +466,22 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   );
 }
 
-function Field({ label, children }: { label: string; children: preact.ComponentChildren }): JSX.Element {
+function Field({
+  label,
+  info,
+  children,
+}: {
+  label: string;
+  info?: string;
+  children: preact.ComponentChildren;
+}): JSX.Element {
   return (
     <div class="settings-row group-admin-field">
-      <label class="group-admin-label">{label}</label>
+      <label class="group-admin-label">
+        {label}
+        {info ? <InfoIcon text={info} /> : null}
+      </label>
       <div class="group-admin-control">{children}</div>
-    </div>
-  );
-}
-
-function ModelField({
-  gid,
-  provider,
-  value,
-  busy,
-  models,
-  onChange,
-}: {
-  gid: string;
-  provider: string | null;
-  value: string | null;
-  busy: boolean;
-  models: ModelsResponse | null;
-  onChange: (v: string | null) => void;
-}): JSX.Element {
-  const listId = `models-${gid}`;
-  // Placeholder shows the expected wire format. For opencode this is
-  // "<OPENCODE_PROVIDER>/<model>" (the prefix comes from the server because
-  // OPENCODE_PROVIDER lives in the host .env, not per-group).
-  const placeholder = (() => {
-    if (provider === 'opencode' && models?.prefix) return `${models.prefix}/model-id`;
-    if (provider === 'claude') return 'claude-sonnet-4-6';
-    return 'provider-specific';
-  })();
-  const helpText = (() => {
-    if (provider === 'mock') return null;
-    if (!models) return null;
-    if (models.source === 'unavailable') {
-      return 'Model catalog unavailable — type the model id manually.';
-    }
-    if (provider === 'opencode' && !models.prefix) {
-      return 'OPENCODE_PROVIDER not set in .env — no suggestions; type the full provider/model id manually.';
-    }
-    if (provider === 'opencode' && models.models.length === 0) {
-      return `No models found in catalog for OPENCODE_PROVIDER="${models.prefix}". Type manually.`;
-    }
-    if (provider === 'opencode' && models.prefix) {
-      return `Format: ${models.prefix}/<model-id>. ${models.models.length} suggestions from models.dev.`;
-    }
-    if (provider === 'claude' && models.models.length > 0) {
-      return `${models.models.length} suggestions from models.dev.`;
-    }
-    return null;
-  })();
-  return (
-    <div class="group-admin-model-wrap">
-      <input
-        type="text"
-        list={models && models.models.length > 0 ? listId : undefined}
-        value={value ?? ''}
-        disabled={busy}
-        onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => onChange(e.currentTarget.value || null)}
-        placeholder={placeholder}
-        autocomplete="off"
-        spellcheck={false}
-      />
-      {models && models.models.length > 0 ? (
-        <datalist id={listId}>
-          {models.models.map((m) => (
-            <option value={m.value} key={m.value}>
-              {m.label}
-              {m.detail ? ` — ${m.detail}` : ''}
-            </option>
-          ))}
-        </datalist>
-      ) : null}
-      {helpText ? <p class="group-admin-help">{helpText}</p> : null}
     </div>
   );
 }

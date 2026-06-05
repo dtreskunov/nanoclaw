@@ -20543,7 +20543,203 @@ function ShareLinkModal() {
   ] }) });
 }
 
+// src/components/Combobox.tsx
+function Combobox({
+  value,
+  options,
+  placeholder,
+  disabled,
+  freeform = true,
+  onChange
+}) {
+  const [open, setOpen] = h2(false);
+  const [text, setText] = h2(value ?? "");
+  const [highlight, setHighlight] = h2(-1);
+  const rootRef = A2(null);
+  const inputRef = A2(null);
+  y2(() => {
+    setText(value ?? "");
+  }, [value]);
+  y2(() => {
+    if (!open) return void 0;
+    const onDoc = (e4) => {
+      if (!rootRef.current?.contains(e4.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const trimmed = text.trim();
+  const showAll = !trimmed || trimmed === (value ?? "").trim();
+  const filterText = trimmed.toLowerCase();
+  const matches = showAll ? options : options.filter(
+    (o4) => o4.value.toLowerCase().includes(filterText) || o4.label.toLowerCase().includes(filterText)
+  );
+  function commit(next) {
+    setText(next);
+    onChange(freeform ? next || null : next || null);
+    setOpen(false);
+    setHighlight(-1);
+  }
+  function onKeyDown(e4) {
+    if (disabled) return;
+    if (e4.key === "ArrowDown") {
+      e4.preventDefault();
+      setOpen(true);
+      setHighlight((h5) => Math.min(h5 + 1, matches.length - 1));
+    } else if (e4.key === "ArrowUp") {
+      e4.preventDefault();
+      setHighlight((h5) => Math.max(h5 - 1, 0));
+    } else if (e4.key === "Enter") {
+      if (open && highlight >= 0 && matches[highlight]) {
+        e4.preventDefault();
+        commit(matches[highlight].value);
+      } else if (freeform) {
+        commit(text);
+      }
+    } else if (e4.key === "Escape") {
+      setOpen(false);
+      setHighlight(-1);
+    }
+  }
+  return /* @__PURE__ */ u4("div", { ref: rootRef, class: "combobox", "data-open": open, children: [
+    /* @__PURE__ */ u4(
+      "input",
+      {
+        ref: inputRef,
+        type: "text",
+        class: "combobox-input",
+        value: text,
+        placeholder,
+        disabled,
+        autocomplete: "off",
+        spellcheck: false,
+        onFocus: () => setOpen(true),
+        onInput: (e4) => {
+          const v5 = e4.currentTarget.value;
+          setText(v5);
+          if (freeform) onChange(v5 || null);
+          setOpen(true);
+          setHighlight(-1);
+        },
+        onKeyDown
+      }
+    ),
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "combobox-caret",
+        tabIndex: -1,
+        "aria-label": "Show options",
+        disabled,
+        onMouseDown: (e4) => {
+          e4.preventDefault();
+          setOpen((o4) => !o4);
+          inputRef.current?.focus();
+        },
+        children: "\u25BE"
+      }
+    ),
+    open && matches.length > 0 ? /* @__PURE__ */ u4("ul", { class: "combobox-list", role: "listbox", children: matches.map((o4, i5) => /* @__PURE__ */ u4(
+      "li",
+      {
+        role: "option",
+        "aria-selected": o4.value === value,
+        class: "combobox-option" + (i5 === highlight ? " highlight" : "") + (o4.value === value ? " selected" : ""),
+        onMouseEnter: () => setHighlight(i5),
+        onMouseDown: (e4) => {
+          e4.preventDefault();
+          commit(o4.value);
+        },
+        children: [
+          /* @__PURE__ */ u4("span", { class: "combobox-option-main", children: [
+            /* @__PURE__ */ u4("span", { class: "combobox-option-label", children: o4.label }),
+            o4.detail ? /* @__PURE__ */ u4("span", { class: "combobox-option-detail", children: o4.detail }) : null
+          ] }),
+          o4.tooltip ? /* @__PURE__ */ u4(OptionInfo, { text: o4.tooltip }) : null
+        ]
+      },
+      o4.value
+    )) }) : null
+  ] });
+}
+function OptionInfo({ text }) {
+  const [open, setOpen] = h2(false);
+  return /* @__PURE__ */ u4(
+    "span",
+    {
+      class: "combobox-option-info",
+      onMouseEnter: () => setOpen(true),
+      onMouseLeave: () => setOpen(false),
+      onMouseDown: (e4) => e4.preventDefault(),
+      children: [
+        /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }),
+        open ? /* @__PURE__ */ u4("span", { class: "tooltip-bubble tooltip-top", role: "tooltip", children: text.split("\n").map((line, i5) => /* @__PURE__ */ u4("span", { class: "tooltip-line", children: line }, i5)) }) : null
+      ]
+    }
+  );
+}
+
+// src/components/Tooltip.tsx
+function Tooltip({ text, children, side = "top" }) {
+  const [open, setOpen] = h2(false);
+  const [actualSide, setActualSide] = h2(side);
+  const wrapRef = A2(null);
+  y2(() => {
+    if (!open || !wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    if (side === "top" && rect.top < 200) setActualSide("bottom");
+    else if (side === "bottom" && window.innerHeight - rect.bottom < 200) setActualSide("top");
+    else setActualSide(side);
+  }, [open, side]);
+  return /* @__PURE__ */ u4(
+    "span",
+    {
+      ref: wrapRef,
+      class: "tooltip-wrap",
+      onMouseEnter: () => setOpen(true),
+      onMouseLeave: () => setOpen(false),
+      onFocusIn: () => setOpen(true),
+      onFocusOut: () => setOpen(false),
+      children: [
+        children,
+        open ? /* @__PURE__ */ u4("span", { class: `tooltip-bubble tooltip-${actualSide}`, role: "tooltip", children: text.split("\n").map((line, i5) => /* @__PURE__ */ u4("span", { class: "tooltip-line", children: line }, i5)) }) : null
+      ]
+    }
+  );
+}
+function InfoIcon({ text }) {
+  return /* @__PURE__ */ u4(Tooltip, { text, children: /* @__PURE__ */ u4("span", { class: "info-icon", tabindex: 0, "aria-label": "More info", children: "i" }) });
+}
+
 // src/components/GroupAdmin.tsx
+var PROVIDER_INFO = {
+  claude: "Claude \u2014 Anthropic models via the official SDK. Uses your OneCLI-injected Anthropic API key.",
+  opencode: "OpenCode \u2014 multi-provider gateway (OpenRouter, DeepSeek, OpenCode Zen, Anthropic, etc.) selected by host OPENCODE_PROVIDER. Wire prefix is handled automatically.",
+  mock: "Mock provider \u2014 returns canned responses. Used for testing only."
+};
+function formatAge(iso) {
+  if (!iso) return null;
+  const t4 = Date.parse(iso);
+  if (Number.isNaN(t4)) return null;
+  const diffMs = Date.now() - t4;
+  const day = 24 * 3600 * 1e3;
+  const hour = 3600 * 1e3;
+  if (diffMs < hour) return "just now";
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
+  const days = Math.floor(diffMs / day);
+  if (days < 7) return `${days}d ago`;
+  if (days < 60) return `${Math.floor(days / 7)}w ago`;
+  if (days < 730) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+function formatSize(bytes) {
+  if (bytes == null) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 function apiPath(gid, sub) {
   return `/ui/chat/api/groups/${encodeURIComponent(gid)}/admin${sub}`;
 }
@@ -20617,6 +20813,7 @@ function SettingsTab({ gid }) {
   const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
   const [models, setModels] = h2(null);
+  const [images, setImages] = h2(null);
   async function refresh() {
     const r4 = await call(apiPath(gid, "/settings"));
     if (!r4.ok) {
@@ -20630,6 +20827,16 @@ function SettingsTab({ gid }) {
   y2(() => {
     refresh();
   }, [gid]);
+  y2(() => {
+    let cancelled = false;
+    (async () => {
+      const r4 = await call(apiPath(gid, "/images"));
+      if (!cancelled) setImages(r4.ok ? r4.data : { images: [] });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gid]);
   const provider = draft?.provider ?? null;
   y2(() => {
     if (!provider) {
@@ -20640,7 +20847,7 @@ function SettingsTab({ gid }) {
     (async () => {
       const r4 = await call(apiPath(gid, `/models?provider=${encodeURIComponent(provider)}`));
       if (cancelled) return;
-      setModels(r4.ok ? r4.data : { models: [], source: "unavailable", prefix: null });
+      setModels(r4.ok ? r4.data : { models: [], source: "unavailable", upstream: null });
     })();
     return () => {
       cancelled = true;
@@ -20697,6 +20904,31 @@ function SettingsTab({ gid }) {
       setBusy(false);
     }
   }
+  const modelOptions = (models?.models ?? []).map((m6) => ({
+    value: m6.id,
+    label: m6.label,
+    detail: m6.detail,
+    tooltip: m6.tooltip
+  }));
+  const imageOptions = (images?.images ?? []).map((i5) => {
+    const age = formatAge(i5.createdAt);
+    const size = formatSize(i5.size);
+    const detailParts = [age, size, i5.isDefault ? "default" : null].filter(Boolean);
+    return {
+      value: i5.value,
+      label: i5.label,
+      detail: detailParts.length ? detailParts.join(" \xB7 ") : void 0,
+      tooltip: [
+        i5.value,
+        i5.createdAt ? `Created: ${new Date(i5.createdAt).toLocaleString()}` : null,
+        size ? `Size: ${size}` : null,
+        i5.isDefault ? "Install default image (used when image_tag is unset)." : null
+      ].filter(Boolean).join("\n")
+    };
+  });
+  const selectedImg = images?.images.find((i5) => i5.value === draft.image_tag) ?? null;
+  const selectedImgAge = formatAge(selectedImg?.createdAt ?? null);
+  const selectedImgSize = formatSize(selectedImg?.size ?? null);
   return /* @__PURE__ */ u4("section", { children: [
     /* @__PURE__ */ u4("p", { class: "muted", children: [
       "Folder ",
@@ -20704,26 +20936,56 @@ function SettingsTab({ gid }) {
       data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
       data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
     ] }),
-    /* @__PURE__ */ u4(Field, { label: "Provider", children: /* @__PURE__ */ u4(
-      "select",
+    /* @__PURE__ */ u4(
+      Field,
       {
-        value: draft.provider ?? "",
-        disabled: busy,
-        onChange: (e4) => update("provider", e4.currentTarget.value || null),
-        children: data.validProviders.map((p5) => /* @__PURE__ */ u4("option", { value: p5, children: p5 }, p5))
+        label: "Provider",
+        info: draft.provider ? PROVIDER_INFO[draft.provider] : void 0,
+        children: /* @__PURE__ */ u4(
+          "select",
+          {
+            value: draft.provider ?? "",
+            disabled: busy,
+            onChange: (e4) => update("provider", e4.currentTarget.value || null),
+            children: data.validProviders.map((p5) => /* @__PURE__ */ u4("option", { value: p5, children: p5 }, p5))
+          }
+        )
       }
-    ) }),
-    /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
-      ModelField,
-      {
-        gid,
-        provider: draft.provider,
-        value: draft.model,
-        busy,
-        models,
-        onChange: (v5) => update("model", v5)
-      }
-    ) }),
+    ),
+    /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+      /* @__PURE__ */ u4(
+        Combobox,
+        {
+          value: draft.model,
+          options: modelOptions,
+          placeholder: provider === "mock" ? "any value" : "pick or type a model id",
+          disabled: busy || !provider,
+          onChange: (v5) => update("model", v5)
+        }
+      ),
+      (() => {
+        const matched = modelOptions.find((o4) => o4.value === draft.model);
+        if (matched) {
+          return /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
+            /* @__PURE__ */ u4("div", { class: "selected-title", children: [
+              matched.label,
+              matched.detail ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
+                " \xB7 ",
+                matched.detail
+              ] }) : null
+            ] }),
+            matched.tooltip ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: matched.tooltip.split("\n").slice(1).join("\n") }) : null
+          ] });
+        }
+        if (models?.source === "unavailable") {
+          return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Catalog unavailable \u2014 saved as-is." });
+        }
+        if (draft.model) {
+          return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Not in catalog \u2014 saved as a custom value." });
+        }
+        return null;
+      })()
+    ] }) }),
     /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
       "input",
       {
@@ -20734,15 +20996,32 @@ function SettingsTab({ gid }) {
         placeholder: "provider-specific (e.g. high)"
       }
     ) }),
-    /* @__PURE__ */ u4(Field, { label: "Image tag", children: /* @__PURE__ */ u4(
-      "input",
-      {
-        type: "text",
-        value: draft.image_tag ?? "",
-        disabled: busy,
-        onInput: (e4) => update("image_tag", e4.currentTarget.value || null)
-      }
-    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Image tag", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+      /* @__PURE__ */ u4(
+        Combobox,
+        {
+          value: draft.image_tag,
+          options: imageOptions,
+          placeholder: "pick an image",
+          disabled: busy,
+          onChange: (v5) => update("image_tag", v5)
+        }
+      ),
+      selectedImg ? /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
+        /* @__PURE__ */ u4("div", { class: "selected-title", children: [
+          selectedImg.label,
+          selectedImgAge || selectedImgSize ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
+            " \xB7 ",
+            [selectedImgAge, selectedImgSize].filter(Boolean).join(" \xB7 ")
+          ] }) : null,
+          selectedImg.isDefault ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: " \xB7 default" }) : null
+        ] }),
+        selectedImg.createdAt ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: [
+          "Created: ",
+          new Date(selectedImg.createdAt).toLocaleString()
+        ] }) : null
+      ] }) : draft.image_tag ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
+    ] }) }),
     /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
       "input",
       {
@@ -20752,29 +21031,43 @@ function SettingsTab({ gid }) {
         onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
       }
     ) }),
-    /* @__PURE__ */ u4(Field, { label: "Max messages / prompt", children: /* @__PURE__ */ u4(
-      "input",
+    /* @__PURE__ */ u4(
+      Field,
       {
-        type: "number",
-        min: 1,
-        max: 1e3,
-        value: draft.max_messages_per_prompt ?? "",
-        disabled: busy,
-        onInput: (e4) => {
-          const v5 = e4.currentTarget.value;
-          update("max_messages_per_prompt", v5 ? Number(v5) : null);
-        }
+        label: "Max messages / prompt",
+        info: "Hard cap on how many history messages get included in each model call. Higher = more context but more cost; lower = faster + cheaper but the agent forgets sooner. Leave blank for the provider default.",
+        children: /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "number",
+            min: 1,
+            max: 1e3,
+            value: draft.max_messages_per_prompt ?? "",
+            disabled: busy,
+            onInput: (e4) => {
+              const v5 = e4.currentTarget.value;
+              update("max_messages_per_prompt", v5 ? Number(v5) : null);
+            }
+          }
+        )
       }
-    ) }),
-    /* @__PURE__ */ u4(Field, { label: "CLI scope", children: /* @__PURE__ */ u4(
-      "select",
+    ),
+    /* @__PURE__ */ u4(
+      Field,
       {
-        value: draft.cli_scope ?? "",
-        disabled: busy,
-        onChange: (e4) => update("cli_scope", e4.currentTarget.value || null),
-        children: data.validCliScopes.map((s5) => /* @__PURE__ */ u4("option", { value: s5, children: s5 }, s5))
+        label: "CLI scope",
+        info: "Controls which `ncl` commands an agent in this group can run.\ndisabled = no CLI access.\ngroup = limited to the group's own resources.\nglobal = unrestricted (use sparingly).",
+        children: /* @__PURE__ */ u4(
+          "select",
+          {
+            value: draft.cli_scope ?? "",
+            disabled: busy,
+            onChange: (e4) => update("cli_scope", e4.currentTarget.value || null),
+            children: data.validCliScopes.map((s5) => /* @__PURE__ */ u4("option", { value: s5, children: s5 }, s5))
+          }
+        )
       }
-    ) }),
+    ),
     /* @__PURE__ */ u4("div", { class: "settings-row", style: "margin-top:16px", children: [
       /* @__PURE__ */ u4("button", { type: "button", onClick: save, disabled: busy || !changed(), children: "Save" }),
       /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(false), disabled: busy, children: "Restart" }),
@@ -20783,65 +21076,17 @@ function SettingsTab({ gid }) {
     status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
   ] });
 }
-function Field({ label, children }) {
-  return /* @__PURE__ */ u4("div", { class: "settings-row group-admin-field", children: [
-    /* @__PURE__ */ u4("label", { class: "group-admin-label", children: label }),
-    /* @__PURE__ */ u4("div", { class: "group-admin-control", children })
-  ] });
-}
-function ModelField({
-  gid,
-  provider,
-  value,
-  busy,
-  models,
-  onChange
+function Field({
+  label,
+  info,
+  children
 }) {
-  const listId = `models-${gid}`;
-  const placeholder = (() => {
-    if (provider === "opencode" && models?.prefix) return `${models.prefix}/model-id`;
-    if (provider === "claude") return "claude-sonnet-4-6";
-    return "provider-specific";
-  })();
-  const helpText = (() => {
-    if (provider === "mock") return null;
-    if (!models) return null;
-    if (models.source === "unavailable") {
-      return "Model catalog unavailable \u2014 type the model id manually.";
-    }
-    if (provider === "opencode" && !models.prefix) {
-      return "OPENCODE_PROVIDER not set in .env \u2014 no suggestions; type the full provider/model id manually.";
-    }
-    if (provider === "opencode" && models.models.length === 0) {
-      return `No models found in catalog for OPENCODE_PROVIDER="${models.prefix}". Type manually.`;
-    }
-    if (provider === "opencode" && models.prefix) {
-      return `Format: ${models.prefix}/<model-id>. ${models.models.length} suggestions from models.dev.`;
-    }
-    if (provider === "claude" && models.models.length > 0) {
-      return `${models.models.length} suggestions from models.dev.`;
-    }
-    return null;
-  })();
-  return /* @__PURE__ */ u4("div", { class: "group-admin-model-wrap", children: [
-    /* @__PURE__ */ u4(
-      "input",
-      {
-        type: "text",
-        list: models && models.models.length > 0 ? listId : void 0,
-        value: value ?? "",
-        disabled: busy,
-        onInput: (e4) => onChange(e4.currentTarget.value || null),
-        placeholder,
-        autocomplete: "off",
-        spellcheck: false
-      }
-    ),
-    models && models.models.length > 0 ? /* @__PURE__ */ u4("datalist", { id: listId, children: models.models.map((m6) => /* @__PURE__ */ u4("option", { value: m6.value, children: [
-      m6.label,
-      m6.detail ? ` \u2014 ${m6.detail}` : ""
-    ] }, m6.value)) }) : null,
-    helpText ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: helpText }) : null
+  return /* @__PURE__ */ u4("div", { class: "settings-row group-admin-field", children: [
+    /* @__PURE__ */ u4("label", { class: "group-admin-label", children: [
+      label,
+      info ? /* @__PURE__ */ u4(InfoIcon, { text: info }) : null
+    ] }),
+    /* @__PURE__ */ u4("div", { class: "group-admin-control", children })
   ] });
 }
 function MembersTab({ gid }) {

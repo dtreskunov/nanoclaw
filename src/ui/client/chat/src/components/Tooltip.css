@@ -1,0 +1,64 @@
+/* Tooltip bubble + the small "i" info icon. */
+
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tooltip-bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--surface-fg);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px var(--shadow-color-strong, rgba(0, 0, 0, 0.18));
+  font-size: var(--font-sm);
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+.tooltip-bubble.tooltip-top { bottom: calc(100% + 6px); }
+.tooltip-bubble.tooltip-bottom { top: calc(100% + 6px); }
+
+.tooltip-line {
+  display: block;
+}
+.tooltip-line:first-child {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 600;
+  font-family: serif;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  flex-shrink: 0;
+}
+.info-icon:hover,
+.info-icon:focus-visible {
+  border-color: var(--surface-fg);
+  color: var(--surface-fg);
+  outline: none;
+}

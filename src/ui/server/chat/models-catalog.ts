@@ -1,20 +1,20 @@
 /**
  * Model catalog backed by models.dev.
  *
- * Returns model suggestions in the wire format the runtime expects for each
- * agent provider:
- *   - claude   → bare model id (`claude-sonnet-4-6`), Anthropic SDK input.
- *   - opencode → `<OPENCODE_PROVIDER>/<bare-id>` from .env, e.g.
- *                `openrouter/anthropic/claude-sonnet-4.6` or
- *                `anthropic/claude-sonnet-4-20250514`. The opencode container
- *                provider sets OPENCODE_MODEL to whatever the per-group
- *                config holds, so the string must include the OPENCODE_PROVIDER
- *                prefix (see src/providers/opencode.ts).
- *   - mock     → no catalog.
+ * Wire format is opaque to the client. The host translates between the bare
+ * model id (what users see and pick) and the on-disk `container_configs.model`
+ * value at the API boundary:
  *
- * The full models.dev payload is large (~hundreds of providers); cached in
- * memory with a TTL. Network failures fall back to an empty list — callers
- * surface the input as plain text in that case.
+ *   - claude   → DB value === bare id. No translation.
+ *   - opencode → DB value === `<OPENCODE_PROVIDER>/<bare-id>` (e.g.
+ *                `openrouter/anthropic/claude-sonnet-4.6`). The opencode
+ *                container provider sets OPENCODE_MODEL from the DB value
+ *                verbatim, so the prefix is required at storage time.
+ *                See src/providers/opencode.ts. The client always works
+ *                with the bare id.
+ *   - mock     → no catalog; passthrough.
+ *
+ * Catalog cached in memory (~1h TTL + brief negative cache on failure).
  */
 import { log } from '../../../log.js';
 import { readEnvFile } from '../../../env.js';
@@ -23,17 +23,33 @@ const MODELS_DEV_URL = 'https://models.dev/api.json';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export interface ModelSuggestion {
-  /** Full wire value to store as container_configs.model. */
-  value: string;
-  /** Human-friendly label (id or name from models.dev). */
+  /** Bare model id (what the user sees and the input stores). */
+  id: string;
+  /** Human-friendly display name. */
   label: string;
-  /** Optional secondary line — context window, cost, etc. */
+  /** Short summary (context window + cost), shown next to the id. */
   detail?: string;
+  /** Full description for the tooltip. */
+  tooltip?: string;
+  /** Numeric facets (for rendering / future filters). */
+  contextWindow?: number;
+  inputCostPerMTok?: number;
+  outputCostPerMTok?: number;
+  knowledgeCutoff?: string;
+  releaseDate?: string;
+  modalitiesIn?: string[];
+  modalitiesOut?: string[];
 }
 
 interface ModelsDevModel {
   id: string;
   name?: string;
+  family?: string;
+  reasoning?: boolean;
+  tool_call?: boolean;
+  knowledge?: string;
+  release_date?: string;
+  modalities?: { input?: string[]; output?: string[] };
   limit?: { context?: number; output?: number };
   cost?: { input?: number; output?: number };
 }
@@ -69,7 +85,6 @@ async function fetchCatalog(): Promise<ModelsDevCatalog | null> {
       return json;
     } catch (err) {
       log.warn('models.dev fetch failed', { err: String(err) });
-      // Cache the failure briefly to avoid hammering on repeated requests.
       cache = { fetchedAt: Date.now(), catalog: null };
       return null;
     } finally {
@@ -80,71 +95,124 @@ async function fetchCatalog(): Promise<ModelsDevCatalog | null> {
 }
 
 function formatDetail(m: ModelsDevModel): string | undefined {
-  const ctx = m.limit?.context;
-  const cost = m.cost;
   const parts: string[] = [];
+  const ctx = m.limit?.context;
   if (ctx) parts.push(`${Math.round(ctx / 1024)}k ctx`);
-  if (cost?.input != null && cost.output != null) {
-    parts.push(`$${cost.input}/$${cost.output} per Mtok`);
+  if (m.cost?.input != null && m.cost?.output != null) {
+    parts.push(`$${m.cost.input}/$${m.cost.output} per Mtok`);
   }
   return parts.length ? parts.join(' · ') : undefined;
 }
 
-/**
- * Returns model suggestions for the given agent provider.
- * `prefix` (for opencode) identifies which models.dev provider to query and
- * what wire prefix to apply.
- */
-export async function listModelsForProvider(agentProvider: string): Promise<{
+function formatTooltip(m: ModelsDevModel, providerLabel: string): string {
+  const lines: string[] = [];
+  lines.push(`${providerLabel} · ${m.name?.trim() || m.id}`);
+  if (m.family && m.family !== m.id) lines.push(`Family: ${m.family}`);
+  if (m.limit?.context) {
+    const out = m.limit.output ? ` · output up to ${m.limit.output.toLocaleString()}` : '';
+    lines.push(`Context: ${m.limit.context.toLocaleString()} tokens${out}`);
+  }
+  if (m.cost?.input != null && m.cost?.output != null) {
+    lines.push(`Cost: $${m.cost.input} in · $${m.cost.output} out (per Mtok)`);
+  }
+  if (m.knowledge) lines.push(`Knowledge cutoff: ${m.knowledge}`);
+  if (m.release_date) lines.push(`Released: ${m.release_date}`);
+  if (m.modalities?.input?.length) lines.push(`Input: ${m.modalities.input.join(', ')}`);
+  if (m.modalities?.output?.length) lines.push(`Output: ${m.modalities.output.join(', ')}`);
+  const caps: string[] = [];
+  if (m.tool_call) caps.push('tools');
+  if (m.reasoning) caps.push('reasoning');
+  if (caps.length) lines.push(`Capabilities: ${caps.join(', ')}`);
+  return lines.join('\n');
+}
+
+function mapModel(m: ModelsDevModel, providerLabel: string): ModelSuggestion {
+  return {
+    id: m.id,
+    label: m.name?.trim() || m.id,
+    detail: formatDetail(m),
+    tooltip: formatTooltip(m, providerLabel),
+    contextWindow: m.limit?.context,
+    inputCostPerMTok: m.cost?.input,
+    outputCostPerMTok: m.cost?.output,
+    knowledgeCutoff: m.knowledge,
+    releaseDate: m.release_date,
+    modalitiesIn: m.modalities?.input,
+    modalitiesOut: m.modalities?.output,
+  };
+}
+
+export interface ModelCatalogResult {
   models: ModelSuggestion[];
   source: 'models.dev' | 'unavailable';
-  /** For opencode: the OPENCODE_PROVIDER value used to pick the catalog. */
-  prefix: string | null;
-}> {
+  /** Label for the upstream catalog (e.g. "openrouter", "anthropic"). */
+  upstream: string | null;
+}
+
+/** Returns suggestions whose `id` is the bare model id (no prefix). */
+export async function listModelsForProvider(agentProvider: string): Promise<ModelCatalogResult> {
   if (agentProvider === 'mock') {
-    return { models: [], source: 'models.dev', prefix: null };
+    return { models: [], source: 'models.dev', upstream: null };
   }
 
   const catalog = await fetchCatalog();
-  if (!catalog) return { models: [], source: 'unavailable', prefix: null };
+  if (!catalog) return { models: [], source: 'unavailable', upstream: null };
 
-  if (agentProvider === 'claude') {
-    const p = catalog['anthropic'];
-    if (!p) return { models: [], source: 'models.dev', prefix: null };
-    return {
-      models: Object.values(p.models)
-        .map((m) => ({
-          value: m.id,
-          label: m.name?.trim() || m.id,
-          detail: formatDetail(m),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-      source: 'models.dev',
-      prefix: null,
-    };
-  }
+  let upstreamKey: string | null = null;
+  if (agentProvider === 'claude') upstreamKey = 'anthropic';
+  else if (agentProvider === 'opencode') upstreamKey = opencodeUpstream();
 
+  if (!upstreamKey) return { models: [], source: 'models.dev', upstream: null };
+  const p = catalog[upstreamKey];
+  if (!p) return { models: [], source: 'models.dev', upstream: upstreamKey };
+
+  const providerLabel = p.name?.trim() || upstreamKey;
+  return {
+    models: Object.values(p.models)
+      .map((m) => mapModel(m, providerLabel))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    source: 'models.dev',
+    upstream: upstreamKey,
+  };
+}
+
+/** Look up details for a specific bare id (used for the "current selection" panel). */
+export async function getModelDetails(agentProvider: string, bareId: string): Promise<ModelSuggestion | null> {
+  const result = await listModelsForProvider(agentProvider);
+  return result.models.find((m) => m.id === bareId) ?? null;
+}
+
+// ── prefix translation (opencode opaqueness boundary) ─────────────────────
+
+function opencodeUpstream(): string | null {
+  const env = readEnvFile(['OPENCODE_PROVIDER']);
+  const v = (env.OPENCODE_PROVIDER || '').trim();
+  return v || null;
+}
+
+/** Translate a stored DB model value to the bare id the user sees. */
+export function bareIdForResponse(agentProvider: string | null, dbValue: string | null): string | null {
+  if (!dbValue) return dbValue;
   if (agentProvider === 'opencode') {
-    // The OPENCODE_PROVIDER env var picks which catalog section applies
-    // and what wire prefix the per-group model string must carry. Without
-    // it we can't suggest anything meaningful — fall back to empty.
-    const env = readEnvFile(['OPENCODE_PROVIDER']);
-    const prefix = (env.OPENCODE_PROVIDER || '').trim();
-    if (!prefix) return { models: [], source: 'models.dev', prefix: null };
-    const p = catalog[prefix];
-    if (!p) return { models: [], source: 'models.dev', prefix };
-    return {
-      models: Object.values(p.models)
-        .map((m) => ({
-          value: `${prefix}/${m.id}`,
-          label: m.name?.trim() || m.id,
-          detail: formatDetail(m),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-      source: 'models.dev',
-      prefix,
-    };
+    const prefix = opencodeUpstream();
+    if (prefix && dbValue.startsWith(prefix + '/')) {
+      return dbValue.slice(prefix.length + 1);
+    }
   }
+  return dbValue;
+}
 
-  return { models: [], source: 'models.dev', prefix: null };
+/** Translate a bare id (from the user) back to the DB wire value. */
+export function dbValueFromBareId(agentProvider: string | null, bareId: string | null): string | null {
+  if (bareId == null || bareId === '') return null;
+  if (agentProvider === 'opencode') {
+    const prefix = opencodeUpstream();
+    if (prefix) {
+      // Be tolerant — if the user pasted a value already containing the
+      // prefix, accept it as-is.
+      if (bareId.startsWith(prefix + '/')) return bareId;
+      return `${prefix}/${bareId}`;
+    }
+  }
+  return bareId;
 }
