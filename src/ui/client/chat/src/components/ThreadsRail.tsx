@@ -110,7 +110,7 @@ function ChannelSection({ ct, items, defaultOpen }: { ct: string; items: Thread[
           <span class="label">{meta.label}</span>
           <span class="count">
             {lastActivityAt ? <><RelativeTime ts={lastActivityAt} />{' \u00b7 '}</> : null}
-            {items.length} thr {'\u00b7'} {totalMsgs} msg
+            {items.length} threads {'\u00b7'} {totalMsgs} msg
           </span>
         </span>
         {handleStr

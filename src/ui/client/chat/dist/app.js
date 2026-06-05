@@ -18545,7 +18545,7 @@ function ChannelSection({ ct, items, defaultOpen }) {
                 " \xB7 "
               ] }) : null,
               items.length,
-              " thr ",
+              " threads ",
               "\xB7",
               " ",
               totalMsgs,
