@@ -4,7 +4,7 @@ import { initTestSessionDb, closeSessionDb, getInboundDb, getOutboundDb } from '
 import { getPendingMessages, markCompleted } from './db/messages-in.js';
 import { getUndeliveredMessages } from './db/messages-out.js';
 import { formatMessages, extractRouting } from './formatter.js';
-import { isCorruptionError, isMissingDbError } from './poll-loop.js';
+import { isCorruptionError, isMissingDbError, friendlyProviderErrorFallback } from './poll-loop.js';
 import { MockProvider } from './providers/mock.js';
 
 beforeEach(() => {
@@ -407,5 +407,42 @@ describe('isMissingDbError', () => {
     expect(isMissingDbError('database is locked')).toBe(false);
     expect(isMissingDbError('database disk image is malformed')).toBe(false);
     expect(isMissingDbError('')).toBe(false);
+  });
+});
+
+describe('friendlyProviderErrorFallback', () => {
+  it('extracts message from JSON-formatted error', () => {
+    const err = '{"type":"error","message":"Rate limit exceeded","code":429}';
+    expect(friendlyProviderErrorFallback(err)).toBe(
+      'Your message couldn\'t be processed: "Rate limit exceeded". You may want to rephrase and try again.',
+    );
+  });
+
+  it('surfaces short plain-text errors directly', () => {
+    const err = 'Budget limit exceeded (weekly limit). Contact your org admin.';
+    expect(friendlyProviderErrorFallback(err)).toBe(
+      `Your message couldn't be processed: "${err}". You may want to rephrase and try again.`,
+    );
+  });
+
+  it('falls back to generic message for long errors', () => {
+    const err = 'x'.repeat(201);
+    expect(friendlyProviderErrorFallback(err)).toBe(
+      "Your message couldn't be processed due to a provider error. You may want to rephrase and try again.",
+    );
+  });
+
+  it('falls back to generic message for JSON blobs without "message" key', () => {
+    const err = '{"error": {"type": "server_error", "details": "something broke internally"}}';
+    expect(friendlyProviderErrorFallback(err)).toBe(
+      "Your message couldn't be processed due to a provider error. You may want to rephrase and try again.",
+    );
+  });
+
+  it('falls back to generic message for stack traces', () => {
+    const err = 'TypeError: Cannot read properties\n    at Object.<anonymous> (file.js:1:1)';
+    expect(friendlyProviderErrorFallback(err)).toBe(
+      "Your message couldn't be processed due to a provider error. You may want to rephrase and try again.",
+    );
   });
 });
