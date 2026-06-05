@@ -35,24 +35,36 @@ export function Tooltip({ text, children, side = 'top' }: TooltipProps): JSX.Ele
     const wrap = wrapRef.current;
     if (!wrap) return;
     const wrapRect = wrap.getBoundingClientRect();
-    // Decide side based on available room. Default to preferred; flip if cramped.
-    const preferTop = side === 'top';
-    const roomAbove = wrapRect.top;
-    const roomBelow = window.innerHeight - wrapRect.bottom;
-    const useTop = preferTop ? roomAbove >= 80 || roomBelow < roomAbove : roomBelow < 80;
-    const actualSide: 'top' | 'bottom' = useTop ? 'top' : 'bottom';
 
-    // Bubble width — measured if mounted, otherwise fall back to max.
+    // Bubble dimensions — measured if mounted, otherwise reasonable fallback.
     const bubble = bubbleRef.current;
     const bubbleWidth = bubble?.offsetWidth ?? Math.min(BUBBLE_MAX_WIDTH, window.innerWidth - 2 * VIEWPORT_PADDING);
     const bubbleHeight = bubble?.offsetHeight ?? 120;
 
+    // Pick whichever side has more room. Preferred side wins ties.
+    const roomAbove = wrapRect.top - VIEWPORT_PADDING - BUBBLE_MARGIN;
+    const roomBelow = window.innerHeight - wrapRect.bottom - VIEWPORT_PADDING - BUBBLE_MARGIN;
+    const topFits = roomAbove >= bubbleHeight;
+    const bottomFits = roomBelow >= bubbleHeight;
+    let actualSide: 'top' | 'bottom';
+    if (side === 'top') {
+      actualSide = topFits || roomAbove >= roomBelow ? 'top' : 'bottom';
+    } else {
+      actualSide = bottomFits || roomBelow >= roomAbove ? 'bottom' : 'top';
+    }
+
+    // Horizontal: centered on the trigger, clamped to viewport.
     const centerX = wrapRect.left + wrapRect.width / 2;
     let left = centerX - bubbleWidth / 2;
     left = Math.max(VIEWPORT_PADDING, Math.min(window.innerWidth - bubbleWidth - VIEWPORT_PADDING, left));
-    const top = actualSide === 'top'
+
+    // Vertical: anchor on the chosen side, then clamp so the bubble stays
+    // in the viewport even if neither side has full room.
+    let top = actualSide === 'top'
       ? wrapRect.top - BUBBLE_MARGIN - bubbleHeight
       : wrapRect.bottom + BUBBLE_MARGIN;
+    top = Math.max(VIEWPORT_PADDING, Math.min(window.innerHeight - bubbleHeight - VIEWPORT_PADDING, top));
+
     setPos({ top, left, side: actualSide });
   }
 

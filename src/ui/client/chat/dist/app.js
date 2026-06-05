@@ -20755,18 +20755,24 @@ function Tooltip({ text, children, side = "top" }) {
     const wrap = wrapRef.current;
     if (!wrap) return;
     const wrapRect = wrap.getBoundingClientRect();
-    const preferTop = side === "top";
-    const roomAbove = wrapRect.top;
-    const roomBelow = window.innerHeight - wrapRect.bottom;
-    const useTop = preferTop ? roomAbove >= 80 || roomBelow < roomAbove : roomBelow < 80;
-    const actualSide = useTop ? "top" : "bottom";
     const bubble = bubbleRef.current;
     const bubbleWidth = bubble?.offsetWidth ?? Math.min(BUBBLE_MAX_WIDTH, window.innerWidth - 2 * VIEWPORT_PADDING);
     const bubbleHeight = bubble?.offsetHeight ?? 120;
+    const roomAbove = wrapRect.top - VIEWPORT_PADDING - BUBBLE_MARGIN;
+    const roomBelow = window.innerHeight - wrapRect.bottom - VIEWPORT_PADDING - BUBBLE_MARGIN;
+    const topFits = roomAbove >= bubbleHeight;
+    const bottomFits = roomBelow >= bubbleHeight;
+    let actualSide;
+    if (side === "top") {
+      actualSide = topFits || roomAbove >= roomBelow ? "top" : "bottom";
+    } else {
+      actualSide = bottomFits || roomBelow >= roomAbove ? "bottom" : "top";
+    }
     const centerX = wrapRect.left + wrapRect.width / 2;
     let left = centerX - bubbleWidth / 2;
     left = Math.max(VIEWPORT_PADDING, Math.min(window.innerWidth - bubbleWidth - VIEWPORT_PADDING, left));
-    const top = actualSide === "top" ? wrapRect.top - BUBBLE_MARGIN - bubbleHeight : wrapRect.bottom + BUBBLE_MARGIN;
+    let top = actualSide === "top" ? wrapRect.top - BUBBLE_MARGIN - bubbleHeight : wrapRect.bottom + BUBBLE_MARGIN;
+    top = Math.max(VIEWPORT_PADDING, Math.min(window.innerHeight - bubbleHeight - VIEWPORT_PADDING, top));
     setPos({ top, left, side: actualSide });
   }
   function open() {
@@ -21131,7 +21137,7 @@ function SettingsTab({ gid }) {
     }
   }
   async function restart(rebuild) {
-    const label = rebuild ? "Restart with rebuild" : "Restart";
+    const label = rebuild ? "Rebuild image + restart" : "Restart";
     const ok = await requestConfirm({
       title: label,
       message: rebuild ? "Rebuild the container image, then restart all running sessions for this group?" : "Restart all running sessions for this group?",
@@ -21335,10 +21341,10 @@ function SettingsTab({ gid }) {
         )
       }
     ),
-    /* @__PURE__ */ u4("div", { class: "settings-row", style: "margin-top:16px", children: [
-      /* @__PURE__ */ u4("button", { type: "button", onClick: save, disabled: busy || !changed(), children: "Save" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(false), disabled: busy, children: "Restart" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(true), disabled: busy, children: "Restart + rebuild image" })
+    /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: [
+      /* @__PURE__ */ u4(Tooltip, { text: "Persist the changes above to the database.\nProvider, model, effort, assistant name, max messages, and CLI scope take effect on the next session restart. Image tag also needs a restart. Saving alone does not interrupt running sessions.", children: /* @__PURE__ */ u4("button", { type: "button", onClick: save, disabled: busy || !changed(), children: "Save" }) }),
+      /* @__PURE__ */ u4(Tooltip, { text: "Stop and respawn all running container sessions for this group.\nUse after saving provider / model / effort / image-tag / CLI-scope changes so they take effect. Active conversations resume on the next user message.", children: /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(false), disabled: busy, children: "Restart" }) }),
+      /* @__PURE__ */ u4(Tooltip, { text: "Rebuild the container image first (picks up packages, MCP servers, container layer changes), then restart the sessions.\nUse after `ncl groups config add-package` / `add-mcp-server`, after the base image changes, or to recover from a corrupted image. Takes minutes, not seconds.", children: /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(true), disabled: busy, children: "Rebuild image + restart" }) })
     ] }),
     status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
   ] });

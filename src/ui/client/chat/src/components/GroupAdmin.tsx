@@ -11,7 +11,7 @@ import {
   groups,
 } from '../state';
 import { Combobox, type ComboboxOption } from './Combobox';
-import { InfoIcon } from './Tooltip';
+import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { requestConfirm } from './PromptModal';
 
@@ -270,7 +270,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   }
 
   async function restart(rebuild: boolean): Promise<void> {
-    const label = rebuild ? 'Restart with rebuild' : 'Restart';
+    const label = rebuild ? 'Rebuild image + restart' : 'Restart';
     const ok = await requestConfirm({
       title: label,
       message: rebuild
@@ -481,10 +481,16 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         />
       </Field>
 
-      <div class="settings-row" style="margin-top:16px">
-        <button type="button" onClick={save} disabled={busy || !changed()}>Save</button>
-        <button type="button" class="ghost" onClick={() => restart(false)} disabled={busy}>Restart</button>
-        <button type="button" class="ghost" onClick={() => restart(true)} disabled={busy}>Restart + rebuild image</button>
+      <div class="settings-row group-admin-actions" style="margin-top:16px">
+        <Tooltip text={'Persist the changes above to the database.\nProvider, model, effort, assistant name, max messages, and CLI scope take effect on the next session restart. Image tag also needs a restart. Saving alone does not interrupt running sessions.'}>
+          <button type="button" onClick={save} disabled={busy || !changed()}>Save</button>
+        </Tooltip>
+        <Tooltip text={'Stop and respawn all running container sessions for this group.\nUse after saving provider / model / effort / image-tag / CLI-scope changes so they take effect. Active conversations resume on the next user message.'}>
+          <button type="button" class="ghost" onClick={() => restart(false)} disabled={busy}>Restart</button>
+        </Tooltip>
+        <Tooltip text={'Rebuild the container image first (picks up packages, MCP servers, container layer changes), then restart the sessions.\nUse after `ncl groups config add-package` / `add-mcp-server`, after the base image changes, or to recover from a corrupted image. Takes minutes, not seconds.'}>
+          <button type="button" class="ghost" onClick={() => restart(true)} disabled={busy}>Rebuild image + restart</button>
+        </Tooltip>
       </div>
 
       {status ? <div class={'settings-status ' + (status.err ? 'err' : 'ok')}>{status.err || status.ok}</div> : null}
