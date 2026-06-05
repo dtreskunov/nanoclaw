@@ -18,6 +18,11 @@
   min-width: 0;
   padding: 6px 8px;
   border: 0;
+  /* Browsers (notably Safari/iOS) apply a default rounded corner to
+     <input type="text"> via -webkit-appearance. Force square right edges
+     so the input meets the caret button cleanly. */
+  -webkit-appearance: none;
+  appearance: none;
   border-radius: var(--radius-md) 0 0 var(--radius-md);
   background: transparent;
   color: inherit;

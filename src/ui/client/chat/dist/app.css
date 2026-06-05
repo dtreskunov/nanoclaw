@@ -2662,6 +2662,8 @@ body.is-admin .files-pane.collapsed .admin-only {
   min-width: 0;
   padding: 6px 8px;
   border: 0;
+  -webkit-appearance: none;
+  appearance: none;
   border-radius: var(--radius-md) 0 0 var(--radius-md);
   background: transparent;
   color: inherit;
