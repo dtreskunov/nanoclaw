@@ -94,8 +94,7 @@ registerResource({
           postCommit: ({ agentGroupId, row: r }) => {
             if (!agentGroupId || overrideGroupId) return;
             const folder = userAgentGroupFolder(r.provider, r.sub);
-            const name = r.display_name || r.email || folder;
-            initPerUserAgentGroupFs(agentGroupId, folder, name);
+            initPerUserAgentGroupFs(agentGroupId, folder);
           },
         });
 

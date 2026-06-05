@@ -33,10 +33,12 @@
  */
 import { normalizeOptions, type RawOption } from '../../channels/ask-question.js';
 import { createAgentGroup } from '../../db/agent-groups.js';
+import { updateContainerConfigScalars } from '../../db/container-configs.js';
 import { getDeliveryAdapter } from '../../delivery.js';
 import { initGroupFilesystem } from '../../group-init.js';
 import { log } from '../../log.js';
 import { registerResponseHandler, type ResponsePayload } from '../../response-registry.js';
+import { getBranding } from '../../ui/server/branding.js';
 import { pickApprovalDelivery, pickApprover } from '../approvals/primitive.js';
 import { getIdentity } from './db/identities.js';
 import {
@@ -69,6 +71,15 @@ export function userAgentGroupFolder(provider: string, sub: string): string {
   return `${provider}-${safeSub}`;
 }
 
+/**
+ * Display name applied to every auto-provisioned per-user agent group.
+ * Kept generic so the user sees a neutral label in the UI sidebar — they
+ * can rename it later via Group admin. The OIDC display name / email
+ * still feed the {@link userAgentGroupFolder} slug for stable on-disk
+ * paths, but the human-visible name is intentionally not personalized.
+ */
+export const AUTO_PROVISIONED_GROUP_NAME = 'My Agent';
+
 // ── Agent group provisioning ─────────────────────────────────────────────
 
 export interface ScaffoldPerUserAgentGroupInput {
@@ -92,32 +103,45 @@ export interface ScaffoldPerUserAgentGroupInput {
  */
 export function scaffoldPerUserAgentGroupDb(input: ScaffoldPerUserAgentGroupInput): string {
   const folder = userAgentGroupFolder(input.provider, input.sub);
-  const name = input.displayName || input.email || folder;
   const id = `ag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   createAgentGroup({
     id,
-    name,
+    name: AUTO_PROVISIONED_GROUP_NAME,
     folder,
     agent_provider: null,
     created_at: new Date().toISOString(),
   });
-  log.info('Per-user agent group created', { id, folder, name, provider: input.provider, sub: input.sub });
+  log.info('Per-user agent group created', {
+    id,
+    folder,
+    name: AUTO_PROVISIONED_GROUP_NAME,
+    provider: input.provider,
+    sub: input.sub,
+  });
   return id;
 }
 
 /**
- * Initialize the on-disk state for a per-user agent group. Idempotent.
- * Called from the postCommit hook in {@link approvePendingUser} so a
- * filesystem failure does not strand a half-committed user record.
+ * Initialize the on-disk state for a per-user agent group and seed its
+ * container_config with the brand short-name as the assistant name (so a
+ * freshly provisioned agent introduces itself with the operator's brand,
+ * not the upstream model's default persona). Idempotent. Called from the
+ * postCommit hook in {@link approvePendingUser} so a filesystem failure
+ * does not strand a half-committed user record.
  */
-export function initPerUserAgentGroupFs(agentGroupId: string, folder: string, name: string): void {
+export function initPerUserAgentGroupFs(agentGroupId: string, folder: string): void {
   initGroupFilesystem({
     id: agentGroupId,
-    name,
+    name: AUTO_PROVISIONED_GROUP_NAME,
     folder,
     agent_provider: null,
     created_at: new Date().toISOString(),
   });
+  // initGroupFilesystem -> ensureContainerConfig already inserted the row.
+  const assistantName = getBranding().shortName;
+  if (assistantName) {
+    updateContainerConfigScalars(agentGroupId, { assistant_name: assistantName });
+  }
 }
 
 // ── Approval card delivery ───────────────────────────────────────────────
@@ -257,8 +281,7 @@ async function handleUserApprovalResponse(payload: ResponsePayload): Promise<boo
         postCommit: ({ agentGroupId, row: r }) => {
           if (!agentGroupId) return;
           const folder = userAgentGroupFolder(r.provider, r.sub);
-          const name = r.display_name || r.email || folder;
-          initPerUserAgentGroupFs(agentGroupId, folder, name);
+          initPerUserAgentGroupFs(agentGroupId, folder);
         },
       });
     } catch (err) {
