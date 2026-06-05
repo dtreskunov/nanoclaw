@@ -21112,48 +21112,103 @@ function SettingsTab({ gid }) {
   function update(k4, v5) {
     setDraft((d5) => d5 ? { ...d5, [k4]: v5 } : d5);
   }
-  function changed() {
-    if (!data || !draft) return false;
-    for (const k4 of Object.keys(draft)) {
-      if (draft[k4] !== data.config[k4]) return true;
-    }
-    return false;
-  }
   async function save() {
-    if (!draft) return;
-    setBusy(true);
-    setStatus(null);
-    try {
-      const r4 = await call(apiPath(gid, "/settings"), "PATCH", draft);
-      if (!r4.ok) {
-        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
-        return;
-      }
-      setData(r4.data);
-      setDraft({ ...r4.data.config });
-      setStatus({ ok: r4.data.runningSessionCount > 0 ? `Saved. Restart the group to apply (${r4.data.runningSessionCount} running session${r4.data.runningSessionCount === 1 ? "" : "s"}).` : "Saved." });
-    } finally {
-      setBusy(false);
+    if (!draft) return { ok: false };
+    const r4 = await call(apiPath(gid, "/settings"), "PATCH", draft);
+    if (!r4.ok) {
+      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      return { ok: false };
     }
+    setData(r4.data);
+    setDraft({ ...r4.data.config });
+    return { ok: true, data: r4.data };
   }
-  async function restart(rebuild) {
-    const label = rebuild ? "Rebuild image + restart" : "Restart";
-    const ok = await requestConfirm({
-      title: label,
-      message: rebuild ? "Rebuild the container image, then restart all running sessions for this group?" : "Restart all running sessions for this group?",
-      okLabel: label,
-      danger: false
-    });
-    if (!ok) return;
+  async function runRestart(rebuild) {
+    const r4 = await call(apiPath(gid, "/restart"), "POST", { rebuild });
+    if (!r4.ok) {
+      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      return { ok: false };
+    }
+    return { ok: true, restarted: r4.data.restarted };
+  }
+  function reset() {
+    if (!data) return;
+    setDraft({ ...data.config });
+    setStatus(null);
+  }
+  const RESTART_REQUIRING_FIELDS = /* @__PURE__ */ new Set([
+    "provider",
+    "model",
+    "effort",
+    "image_tag",
+    "assistant_name",
+    "max_messages_per_prompt"
+  ]);
+  function changedFields() {
+    const out = /* @__PURE__ */ new Set();
+    if (!data || !draft) return out;
+    for (const k4 of Object.keys(draft)) {
+      if (draft[k4] !== data.config[k4]) out.add(k4);
+    }
+    return out;
+  }
+  const pending2 = changedFields();
+  const changed = pending2.size > 0;
+  const needsRestart = [...pending2].some((f5) => RESTART_REQUIRING_FIELDS.has(f5));
+  const needsRebuild = pending2.has("image_tag") && draft.image_tag != null && !!images && !images.images.some((i5) => i5.value === draft.image_tag);
+  const [restartChecked, setRestartChecked] = h2(false);
+  const [rebuildChecked, setRebuildChecked] = h2(false);
+  const [restartTouched, setRestartTouched] = h2(false);
+  const [rebuildTouched, setRebuildTouched] = h2(false);
+  y2(() => {
+    if (!restartTouched) setRestartChecked(needsRestart || needsRebuild);
+  }, [needsRestart, needsRebuild, restartTouched]);
+  y2(() => {
+    if (!rebuildTouched) setRebuildChecked(needsRebuild);
+  }, [needsRebuild, rebuildTouched]);
+  y2(() => {
+    if (!changed) {
+      setRestartTouched(false);
+      setRebuildTouched(false);
+    }
+  }, [changed]);
+  const effectiveRestart = restartChecked || rebuildChecked;
+  const effectiveRebuild = rebuildChecked;
+  function applyLabel() {
+    if (!changed && !effectiveRestart && !effectiveRebuild) return "Save";
+    const parts = changed ? ["Save"] : [];
+    if (effectiveRebuild) parts.push("rebuild");
+    if (effectiveRestart) parts.push("restart");
+    if (parts.length === 0) return "Apply";
+    return parts.map((p5, i5) => i5 === 0 ? p5[0].toUpperCase() + p5.slice(1) : p5).join(parts.length > 2 ? ", " : " and ");
+  }
+  async function apply2() {
     setBusy(true);
     setStatus(null);
+    const steps = [];
     try {
-      const r4 = await call(apiPath(gid, "/restart"), "POST", { rebuild });
-      if (!r4.ok) {
-        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
-        return;
+      if (changed) {
+        const r4 = await save();
+        if (!r4.ok) return;
+        steps.push("Saved");
       }
-      setStatus({ ok: `Restarted ${r4.data.restarted} session${r4.data.restarted === 1 ? "" : "s"}${rebuild ? " (rebuilt image)." : "."}` });
+      if (effectiveRebuild || effectiveRestart) {
+        const label = effectiveRebuild ? "Rebuild image + restart" : "Restart";
+        const ok = await requestConfirm({
+          title: label,
+          message: effectiveRebuild ? `Rebuild the container image, then restart ${data?.runningSessionCount ?? 0} running session(s)?` : `Restart ${data?.runningSessionCount ?? 0} running session(s)?`,
+          okLabel: label,
+          danger: false
+        });
+        if (!ok) {
+          if (steps.length) setStatus({ ok: `${steps.join(", ")} (restart skipped).` });
+          return;
+        }
+        const r4 = await runRestart(effectiveRebuild);
+        if (!r4.ok) return;
+        steps.push(effectiveRebuild ? `rebuilt image and restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}` : `restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}`);
+      }
+      setStatus({ ok: steps.length ? steps.join(", ") + "." : "Nothing to do." });
       refresh();
     } finally {
       setBusy(false);
@@ -21342,9 +21397,49 @@ function SettingsTab({ gid }) {
       }
     ),
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: [
-      /* @__PURE__ */ u4(Tooltip, { text: "Persist the changes above to the database.\nProvider, model, effort, assistant name, max messages, and CLI scope take effect on the next session restart. Image tag also needs a restart. Saving alone does not interrupt running sessions.", children: /* @__PURE__ */ u4("button", { type: "button", onClick: save, disabled: busy || !changed(), children: "Save" }) }),
-      /* @__PURE__ */ u4(Tooltip, { text: "Stop and respawn all running container sessions for this group.\nUse after saving provider / model / effort / image-tag / CLI-scope changes so they take effect. Active conversations resume on the next user message.", children: /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(false), disabled: busy, children: "Restart" }) }),
-      /* @__PURE__ */ u4(Tooltip, { text: "Rebuild the container image first (picks up packages, MCP servers, container layer changes), then restart the sessions.\nUse after `ncl groups config add-package` / `add-mcp-server`, after the base image changes, or to recover from a corrupted image. Takes minutes, not seconds.", children: /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: () => restart(true), disabled: busy, children: "Rebuild image + restart" }) })
+      /* @__PURE__ */ u4(Tooltip, { text: "Discard pending edits. Reverts every field back to the saved value.", children: /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: reset, disabled: busy || !changed, children: "Reset" }) }),
+      /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "checkbox",
+            checked: restartChecked,
+            disabled: busy || rebuildChecked,
+            onChange: (e4) => {
+              setRestartChecked(e4.target.checked);
+              setRestartTouched(true);
+            }
+          }
+        ),
+        /* @__PURE__ */ u4("span", { children: "Restart sessions" }),
+        /* @__PURE__ */ u4(Tooltip, { text: "Stop and respawn all running container sessions for this group so they pick up the saved config.\nAuto-selected when you change provider, model, effort, image tag, assistant name, or max messages per prompt. CLI scope alone does not need a restart \u2014 it is re-read on every CLI call.\nActive conversations resume on the next user message.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
+      ] }),
+      /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "checkbox",
+            checked: rebuildChecked,
+            disabled: busy,
+            onChange: (e4) => {
+              setRebuildChecked(e4.target.checked);
+              setRebuildTouched(true);
+            }
+          }
+        ),
+        /* @__PURE__ */ u4("span", { children: "Rebuild image" }),
+        /* @__PURE__ */ u4(Tooltip, { text: "Rebuild the container image before restarting.\nAuto-selected when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change \u2014 that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
+      ] }),
+      /* @__PURE__ */ u4("div", { style: "flex:1" }),
+      /* @__PURE__ */ u4(Tooltip, { text: changed ? "Persist pending edits to the database, then run any actions ticked above." : effectiveRestart || effectiveRebuild ? "Run the actions ticked above. No DB edits to save." : "Nothing to do \u2014 no pending edits and no actions ticked.", children: /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          onClick: apply2,
+          disabled: busy || !changed && !effectiveRestart && !effectiveRebuild,
+          children: applyLabel()
+        }
+      ) })
     ] }),
     status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
   ] });

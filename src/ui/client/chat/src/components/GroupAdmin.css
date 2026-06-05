@@ -118,6 +118,31 @@
   font-size: var(--font-sm);
 }
 
+.group-admin-actions {
+  align-items: center;
+  gap: 12px;
+}
+.group-admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-base);
+  color: var(--surface-fg);
+  cursor: pointer;
+  user-select: none;
+}
+.group-admin-check input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.group-admin-check input[disabled] {
+  cursor: default;
+  opacity: 0.5;
+}
+.group-admin-check input[disabled] ~ span {
+  opacity: 0.6;
+}
+
 .group-admin-badge {
   display: inline-block;
   margin-left: 6px;

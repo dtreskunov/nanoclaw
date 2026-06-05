@@ -246,46 +246,117 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
     setDraft((d) => (d ? { ...d, [k]: v } : d));
   }
 
-  function changed(): boolean {
-    if (!data || !draft) return false;
+  async function save(): Promise<{ ok: boolean; data?: SettingsResponse }> {
+    if (!draft) return { ok: false };
+    const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', draft);
+    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return { ok: false }; }
+    setData(r.data);
+    setDraft({ ...r.data.config });
+    return { ok: true, data: r.data };
+  }
+
+  async function runRestart(rebuild: boolean): Promise<{ ok: boolean; restarted?: number }> {
+    const r = await call<{ restarted: number; rebuilt: boolean }>(apiPath(gid, '/restart'), 'POST', { rebuild });
+    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return { ok: false }; }
+    return { ok: true, restarted: r.data.restarted };
+  }
+
+  function reset(): void {
+    if (!data) return;
+    setDraft({ ...data.config });
+    setStatus(null);
+  }
+
+  // Which fields actually require a container restart to take effect?
+  // cli_scope is re-read per CLI dispatch (src/cli/dispatch.ts) so saving
+  // it alone is enough. Everything else is baked in at container spawn.
+  const RESTART_REQUIRING_FIELDS = new Set([
+    'provider', 'model', 'effort', 'image_tag', 'assistant_name', 'max_messages_per_prompt',
+  ]);
+
+  function changedFields(): Set<string> {
+    const out = new Set<string>();
+    if (!data || !draft) return out;
     for (const k of Object.keys(draft) as (keyof SettingsResponse['config'])[]) {
-      if (draft[k] !== data.config[k]) return true;
+      if (draft[k] !== data.config[k]) out.add(k);
     }
-    return false;
+    return out;
+  }
+  const pending = changedFields();
+  const changed = pending.size > 0;
+  // Restart needed if any restart-requiring field changed.
+  const needsRestart = [...pending].some((f) => RESTART_REQUIRING_FIELDS.has(f));
+  // Rebuild is auto-suggested only when the new image_tag isn't in the
+  // local image list (the only common "rebuild from this UI" scenario —
+  // package / MCP / Dockerfile changes go through the CLI).
+  const needsRebuild = pending.has('image_tag')
+    && draft.image_tag != null
+    && !!images
+    && !images.images.some((i) => i.value === draft.image_tag);
+
+  // Action checkboxes — auto-set from `needsRestart` / `needsRebuild`, but
+  // the user can override (e.g. tick Restart even when only cli_scope
+  // changed, to force agents to pick up the new scope sooner).
+  const [restartChecked, setRestartChecked] = useState(false);
+  const [rebuildChecked, setRebuildChecked] = useState(false);
+  // Keep the suggested defaults in sync with what's pending; once the user
+  // toggles a checkbox manually we treat it as sticky for this draft.
+  const [restartTouched, setRestartTouched] = useState(false);
+  const [rebuildTouched, setRebuildTouched] = useState(false);
+  useEffect(() => { if (!restartTouched) setRestartChecked(needsRestart || needsRebuild); }, [needsRestart, needsRebuild, restartTouched]);
+  useEffect(() => { if (!rebuildTouched) setRebuildChecked(needsRebuild); }, [needsRebuild, rebuildTouched]);
+  useEffect(() => {
+    // After a save round-trip, draft === data again, so pending is empty;
+    // reset the manual-override flag so the next edit picks suggestions
+    // fresh.
+    if (!changed) { setRestartTouched(false); setRebuildTouched(false); }
+  }, [changed]);
+
+  // Rebuild implies restart. Force it on if the user ticks rebuild.
+  const effectiveRestart = restartChecked || rebuildChecked;
+  const effectiveRebuild = rebuildChecked;
+
+  function applyLabel(): string {
+    if (!changed && !effectiveRestart && !effectiveRebuild) return 'Save';
+    const parts: string[] = changed ? ['Save'] : [];
+    if (effectiveRebuild) parts.push('rebuild');
+    if (effectiveRestart) parts.push('restart');
+    // Capitalize first word.
+    if (parts.length === 0) return 'Apply';
+    return parts.map((p, i) => i === 0 ? p[0]!.toUpperCase() + p.slice(1) : p).join(parts.length > 2 ? ', ' : ' and ');
   }
 
-  async function save(): Promise<void> {
-    if (!draft) return;
+  async function apply(): Promise<void> {
     setBusy(true);
     setStatus(null);
+    const steps: string[] = [];
     try {
-      const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', draft);
-      if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
-      setData(r.data);
-      setDraft({ ...r.data.config });
-      setStatus({ ok: r.data.runningSessionCount > 0
-        ? `Saved. Restart the group to apply (${r.data.runningSessionCount} running session${r.data.runningSessionCount === 1 ? '' : 's'}).`
-        : 'Saved.' });
-    } finally { setBusy(false); }
-  }
-
-  async function restart(rebuild: boolean): Promise<void> {
-    const label = rebuild ? 'Rebuild image + restart' : 'Restart';
-    const ok = await requestConfirm({
-      title: label,
-      message: rebuild
-        ? 'Rebuild the container image, then restart all running sessions for this group?'
-        : 'Restart all running sessions for this group?',
-      okLabel: label,
-      danger: false,
-    });
-    if (!ok) return;
-    setBusy(true);
-    setStatus(null);
-    try {
-      const r = await call<{ restarted: number; rebuilt: boolean }>(apiPath(gid, '/restart'), 'POST', { rebuild });
-      if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
-      setStatus({ ok: `Restarted ${r.data.restarted} session${r.data.restarted === 1 ? '' : 's'}${rebuild ? ' (rebuilt image).' : '.'}` });
+      if (changed) {
+        const r = await save();
+        if (!r.ok) return;
+        steps.push('Saved');
+      }
+      if (effectiveRebuild || effectiveRestart) {
+        const label = effectiveRebuild ? 'Rebuild image + restart' : 'Restart';
+        const ok = await requestConfirm({
+          title: label,
+          message: effectiveRebuild
+            ? `Rebuild the container image, then restart ${data?.runningSessionCount ?? 0} running session(s)?`
+            : `Restart ${data?.runningSessionCount ?? 0} running session(s)?`,
+          okLabel: label,
+          danger: false,
+        });
+        if (!ok) {
+          if (steps.length) setStatus({ ok: `${steps.join(', ')} (restart skipped).` });
+          return;
+        }
+        const r = await runRestart(effectiveRebuild);
+        if (!r.ok) return;
+        steps.push(effectiveRebuild
+          ? `rebuilt image and restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}`
+          : `restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}`);
+      }
+      setStatus({ ok: steps.length ? steps.join(', ') + '.' : 'Nothing to do.' });
       refresh();
     } finally { setBusy(false); }
   }
@@ -482,14 +553,50 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
       </Field>
 
       <div class="settings-row group-admin-actions" style="margin-top:16px">
-        <Tooltip text={'Persist the changes above to the database.\nProvider, model, effort, assistant name, max messages, and CLI scope take effect on the next session restart. Image tag also needs a restart. Saving alone does not interrupt running sessions.'}>
-          <button type="button" onClick={save} disabled={busy || !changed()}>Save</button>
+        <Tooltip text={'Discard pending edits. Reverts every field back to the saved value.'}>
+          <button type="button" class="ghost" onClick={reset} disabled={busy || !changed}>Reset</button>
         </Tooltip>
-        <Tooltip text={'Stop and respawn all running container sessions for this group.\nUse after saving provider / model / effort / image-tag / CLI-scope changes so they take effect. Active conversations resume on the next user message.'}>
-          <button type="button" class="ghost" onClick={() => restart(false)} disabled={busy}>Restart</button>
-        </Tooltip>
-        <Tooltip text={'Rebuild the container image first (picks up packages, MCP servers, container layer changes), then restart the sessions.\nUse after `ncl groups config add-package` / `add-mcp-server`, after the base image changes, or to recover from a corrupted image. Takes minutes, not seconds.'}>
-          <button type="button" class="ghost" onClick={() => restart(true)} disabled={busy}>Rebuild image + restart</button>
+        <label class="group-admin-check">
+          <input
+            type="checkbox"
+            checked={restartChecked}
+            disabled={busy || rebuildChecked /* rebuild always restarts */}
+            onChange={(e) => {
+              setRestartChecked((e.target as HTMLInputElement).checked);
+              setRestartTouched(true);
+            }}
+          />
+          <span>Restart sessions</span>
+          <Tooltip text={'Stop and respawn all running container sessions for this group so they pick up the saved config.\nAuto-selected when you change provider, model, effort, image tag, assistant name, or max messages per prompt. CLI scope alone does not need a restart — it is re-read on every CLI call.\nActive conversations resume on the next user message.'}>
+            <span class="info-icon" aria-label="More info">i</span>
+          </Tooltip>
+        </label>
+        <label class="group-admin-check">
+          <input
+            type="checkbox"
+            checked={rebuildChecked}
+            disabled={busy}
+            onChange={(e) => {
+              setRebuildChecked((e.target as HTMLInputElement).checked);
+              setRebuildTouched(true);
+            }}
+          />
+          <span>Rebuild image</span>
+          <Tooltip text={'Rebuild the container image before restarting.\nAuto-selected when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change — that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.'}>
+            <span class="info-icon" aria-label="More info">i</span>
+          </Tooltip>
+        </label>
+        <div style="flex:1"></div>
+        <Tooltip text={changed
+          ? 'Persist pending edits to the database, then run any actions ticked above.'
+          : (effectiveRestart || effectiveRebuild)
+            ? 'Run the actions ticked above. No DB edits to save.'
+            : 'Nothing to do — no pending edits and no actions ticked.'}>
+          <button
+            type="button"
+            onClick={apply}
+            disabled={busy || (!changed && !effectiveRestart && !effectiveRebuild)}
+          >{applyLabel()}</button>
         </Tooltip>
       </div>
 
