@@ -21305,12 +21305,16 @@ function SettingsTab({ gid }) {
       Field,
       {
         label: "CLI scope",
-        info: "Controls which `ncl` commands an agent in this group can run.\ndisabled = no CLI access.\ngroup = limited to the group's own resources.\nglobal = unrestricted (use sparingly).",
+        info: "Controls which `ncl` commands an agent in this group can run.\ndisabled = no CLI access.\ngroup = limited to the group's own resources.\nglobal = unrestricted (owner / global admin only \u2014 use sparingly).",
         children: /* @__PURE__ */ u4(
           Combobox,
           {
             value: draft.cli_scope,
-            options: data.validCliScopes.map((s5) => ({ value: s5, label: s5 })),
+            options: data.validCliScopes.filter((s5) => s5 !== "global" || data.actorIsElevated || draft.cli_scope === "global").map((s5) => ({
+              value: s5,
+              label: s5,
+              tooltip: s5 === "global" && !data.actorIsElevated ? "Owner / global admin only." : void 0
+            })),
             placeholder: "pick a scope",
             disabled: busy,
             freeform: false,

@@ -32,6 +32,8 @@ import {
   grantRole,
   hasAdminPrivilege,
   isAdminOfAgentGroup,
+  isGlobalAdmin,
+  isOwner,
 } from '../../../modules/permissions/db/user-roles.js';
 import type { ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
@@ -127,7 +129,7 @@ async function dispatch(
 ): Promise<void> {
   const { method, rest } = route;
 
-  if (rest === '/settings' && method === 'GET') return handleGetSettings(res, gid);
+  if (rest === '/settings' && method === 'GET') return handleGetSettings(res, gid, actorUserId);
   if (rest === '/settings' && method === 'PATCH') return handlePatchSettings(req, res, actorUserId, gid);
   if (rest === '/restart' && method === 'POST') return handleRestart(req, res, actorUserId, gid);
 
@@ -171,9 +173,12 @@ interface SettingsResponse {
   /** Tooltip / detail / age for the currently-selected model and image. */
   selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
   selectedImageDetail: { label: string; createdAt: string | null; size: number | null } | null;
+  /** True iff the acting admin is owner or global admin (controls UI gating
+   * of privilege-escalating options like cli_scope=global). */
+  actorIsElevated: boolean;
 }
 
-async function handleGetSettings(res: http.ServerResponse, gid: string): Promise<void> {
+async function handleGetSettings(res: http.ServerResponse, gid: string, actorUserId: string): Promise<void> {
   const group = getAgentGroup(gid)!; // already validated by caller
   const cfg = getContainerConfig(gid);
   if (!cfg) {
@@ -222,6 +227,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string): Promise
     runningSessionCount: running.n,
     selectedModelDetail,
     selectedImageDetail,
+    actorIsElevated: isOwner(actorUserId) || isGlobalAdmin(actorUserId),
   };
   writeJson(res, 200, body);
 }
@@ -242,6 +248,7 @@ async function handlePatchSettings(
       'provider' | 'model' | 'effort' | 'image_tag' | 'assistant_name' | 'max_messages_per_prompt' | 'cli_scope'
     >
   > = {};
+  const isElevated = isOwner(actorUserId) || isGlobalAdmin(actorUserId);
 
   for (const key of SCALAR_FIELDS) {
     if (!(key in body)) continue;
@@ -266,6 +273,12 @@ async function handlePatchSettings(
       const v = String(raw);
       if (!VALID_CLI_SCOPES.includes(v as (typeof VALID_CLI_SCOPES)[number])) {
         throw new BadRequest(`cli_scope must be one of: ${VALID_CLI_SCOPES.join(', ')}`);
+      }
+      // Setting cli_scope=global grants the agent unrestricted `ncl` access
+      // — system-wide control. Reserve to owner / global admin so a scoped
+      // admin can't escalate via their own group's agent.
+      if (v === 'global' && !isElevated) {
+        throw new BadRequest('only owner or global admin may set cli_scope to "global"');
       }
       updates.cli_scope = v;
     } else if (key === 'max_messages_per_prompt') {
@@ -305,7 +318,7 @@ async function handlePatchSettings(
     targetId: gid,
     payload: updates as Record<string, unknown>,
   });
-  await handleGetSettings(res, gid);
+  await handleGetSettings(res, gid, actorUserId);
 }
 
 async function handleRestart(

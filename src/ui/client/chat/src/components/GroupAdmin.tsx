@@ -39,6 +39,7 @@ interface SettingsResponse {
   runningSessionCount: number;
   selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
   selectedImageDetail: { label: string; createdAt: string | null; size: number | null } | null;
+  actorIsElevated: boolean;
 }
 
 interface MemberDto {
@@ -449,11 +450,22 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
         info={'Controls which `ncl` commands an agent in this group can run.\n' +
           'disabled = no CLI access.\n' +
           'group = limited to the group\'s own resources.\n' +
-          'global = unrestricted (use sparingly).'}
+          'global = unrestricted (owner / global admin only — use sparingly).'}
       >
         <Combobox
           value={draft.cli_scope}
-          options={data.validCliScopes.map((s) => ({ value: s, label: s }))}
+          options={data.validCliScopes
+            // `global` is privilege escalation for a scoped admin (the agent
+            // can run any `ncl` command system-wide), so hide it from
+            // non-elevated admins. Server enforces independently.
+            .filter((s) => s !== 'global' || data.actorIsElevated || draft.cli_scope === 'global')
+            .map((s) => ({
+              value: s,
+              label: s,
+              tooltip: s === 'global' && !data.actorIsElevated
+                ? 'Owner / global admin only.'
+                : undefined,
+            }))}
           placeholder="pick a scope"
           disabled={busy}
           freeform={false}
