@@ -14,6 +14,7 @@ import { Combobox, type ComboboxOption } from './Combobox';
 import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { requestConfirm } from './PromptModal';
+import { useBackButtonCloses } from '../modalBackButton';
 
 type Tab = 'settings' | 'members' | 'roles';
 
@@ -158,6 +159,7 @@ export function GroupAdmin(): JSX.Element | null {
   const gid = groupId.value;
   const [tab, setTab] = useState<Tab>('settings');
   useEffect(() => { setTab('settings'); }, [open, gid]);
+  useBackButtonCloses(open, () => { groupAdminOpen.value = false; });
 
   if (!open || !gid) return null;
   const group = groups.value.find((g) => g.id === gid);

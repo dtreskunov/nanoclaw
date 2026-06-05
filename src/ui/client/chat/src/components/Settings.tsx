@@ -5,6 +5,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { settingsOpen, notifMutedSig, CHANNEL_META, me } from '../state';
 import { toggleMute, shouldShowIosInstallHint } from '../notify';
 import { installAvailable, installCompleted, triggerInstall } from '../install';
+import { useBackButtonCloses } from '../modalBackButton';
 import { showToast } from './Toast';
 import { requestConfirm } from './PromptModal';
 import { BRAND } from '../brand';
@@ -170,6 +171,8 @@ export function Settings() {
     if ((e.target as HTMLElement).classList.contains('settings-backdrop')) close();
   }
   function onKey(e: KeyboardEvent): void { if (e.key === 'Escape') close(); }
+
+  useBackButtonCloses(open, close);
 
   useEffect(() => {
     if (!open) return undefined;

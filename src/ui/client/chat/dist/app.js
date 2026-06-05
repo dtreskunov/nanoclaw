@@ -20086,6 +20086,29 @@ function isStandalone() {
   return navigator.standalone === true;
 }
 
+// src/modalBackButton.ts
+var MARKER = "__modal_back__";
+function useBackButtonCloses(open, onClose) {
+  const pushedRef = A2(false);
+  y2(() => {
+    if (!open) {
+      if (pushedRef.current) {
+        pushedRef.current = false;
+        history.back();
+      }
+      return void 0;
+    }
+    history.pushState({ [MARKER]: true }, "", location.href);
+    pushedRef.current = true;
+    const onPop = () => {
+      pushedRef.current = false;
+      onClose();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open]);
+}
+
 // src/components/Settings.tsx
 var API = "/ui/settings/api";
 async function jget(p5) {
@@ -20235,6 +20258,7 @@ function Settings() {
   function onKey(e4) {
     if (e4.key === "Escape") close();
   }
+  useBackButtonCloses(open, close);
   y2(() => {
     if (!open) return void 0;
     window.addEventListener("keydown", onKey);
@@ -21028,6 +21052,9 @@ function GroupAdmin() {
   y2(() => {
     setTab("settings");
   }, [open, gid]);
+  useBackButtonCloses(open, () => {
+    groupAdminOpen.value = false;
+  });
   if (!open || !gid) return null;
   const group = groups.value.find((g8) => g8.id === gid);
   const title = group ? `Admin \xB7 ${group.name}` : "Admin";
