@@ -668,12 +668,13 @@ async function processQuery(
 
         const keptIds = keep.map((m) => m.id);
         const prompt = formatMessages(keep);
+        const followUpFiles = extractFileAttachments(keep);
         log(`Pushing ${keep.length} follow-up message(s) into active query`);
         unwrappedNudged = false;
         if (promptTracker) promptTracker.latest = prompt;
         turnActive = true;
         try { clearTurnEnded(); } catch { /* best-effort */ }
-        query.push(prompt);
+        query.push(prompt, followUpFiles.length > 0 ? followUpFiles : undefined);
         markCompleted(keptIds);
       } catch (err) {
         // Without this catch the rejection escapes the void IIFE and Node

@@ -107,7 +107,7 @@ export type McpServerConfig = McpStdioServerConfig | McpHttpServerConfig;
 
 export interface AgentQuery {
   /** Push a follow-up message into the active query. */
-  push(message: string): void;
+  push(message: string, files?: FileAttachment[]): void;
 
   /** Signal that no more input will be sent. */
   end(): void;

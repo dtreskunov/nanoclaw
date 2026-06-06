@@ -269,6 +269,19 @@ const EXT_TO_MIME: Record<string, string> = {
   ogg: 'audio/ogg',
   wav: 'audio/wav',
   mp4: 'video/mp4',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  flac: 'audio/flac',
+  webm: 'audio/webm',
+};
+
+/**
+ * Normalize audio MIME types that providers (e.g. OpenRouter) don't accept.
+ * Maps unsupported container MIME types to their closest accepted equivalent.
+ */
+const AUDIO_MIME_NORMALIZE: Record<string, string> = {
+  'audio/webm': 'audio/ogg',   // Opus in WebM → treat as Ogg (same codec)
+  'audio/x-m4a': 'audio/mp4',  // Non-standard m4a MIME → standard
 };
 
 /**
@@ -284,8 +297,9 @@ export function extractFileAttachments(messages: MessageInRow[]): FileAttachment
     for (const a of attachments) {
       if (!a.localPath) continue;
       const ext = (a.name || a.filename || '').split('.').pop()?.toLowerCase() || '';
-      const mime = a.mimeType || a.mime || EXT_TO_MIME[ext];
-      if (!mime) continue;
+      const rawMime = a.mimeType || a.mime || EXT_TO_MIME[ext];
+      if (!rawMime) continue;
+      const mime = AUDIO_MIME_NORMALIZE[rawMime] || rawMime;
       files.push({
         path: `/workspace/${a.localPath}`,
         mime,

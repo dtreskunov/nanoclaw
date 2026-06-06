@@ -86,7 +86,7 @@ function wrapPromptWithContext(text: string, systemInstructions?: string): strin
 
 function buildOpenCodeConfig(options: ProviderOptions): Record<string, unknown> {
   const provider = process.env.OPENCODE_PROVIDER || 'anthropic';
-  const model = process.env.OPENCODE_MODEL;
+  const model = options.model || process.env.OPENCODE_MODEL;
   const smallModel = process.env.OPENCODE_SMALL_MODEL;
   const proxyUrl = process.env.ANTHROPIC_BASE_URL;
 
@@ -151,7 +151,7 @@ let sharedInit: Promise<SharedRuntime> | null = null;
 function runtimeConfigKey(options: ProviderOptions): string {
   return JSON.stringify({
     mcp: mcpServersToOpenCodeConfig(options.mcpServers),
-    model: process.env.OPENCODE_MODEL,
+    model: options.model || process.env.OPENCODE_MODEL,
     small: process.env.OPENCODE_SMALL_MODEL,
     op: process.env.OPENCODE_PROVIDER,
   });
@@ -480,8 +480,12 @@ export class OpenCodeProvider implements AgentProvider {
     }
 
     return {
-      push: (message: string) => {
+      push: (message: string, files?: FileAttachment[]) => {
         pending.push(wrapPromptWithContext(message, systemInstructions));
+        if (files && files.length > 0) {
+          // Re-arm initialFiles so the next prompt loop iteration picks them up.
+          initialFiles = files;
+        }
         kick();
       },
       end: () => {
