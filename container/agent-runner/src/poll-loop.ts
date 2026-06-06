@@ -394,9 +394,12 @@ async function transcribeAudioFiles(
   files: FileAttachment[],
   prompt: string,
 ): Promise<{ prompt: string; files: FileAttachment[] }> {
+  const cfg = getConfig();
+  if (cfg.voiceMode !== 'transcribe') return { prompt, files };
+
   const nonAudio: FileAttachment[] = [];
   const transcripts: string[] = [];
-  const model = getConfig().transcriptionModel;
+  const model = cfg.transcriptionModel;
   for (const file of files) {
     if (!isAudioMime(file.mime)) {
       nonAudio.push(file);

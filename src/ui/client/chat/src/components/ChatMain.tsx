@@ -388,7 +388,8 @@ function Composer() {
   // ── PTT logic ──────────────────────────────────────────────────────
   const vm = voiceMode.value;
   const hasPending = pending.value.length > 0;
-  const showMic = vm !== 'off' && !inputHasText && !hasPending && !wsDown && hasGetUserMedia();
+  const showMic = vm !== 'off' && hasGetUserMedia();
+  const micDisabled = inputHasText || hasPending || wsDown;
   const recording = isRecording.value;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdModeRef = useRef(false);
@@ -404,11 +405,10 @@ function Composer() {
       return;
     }
     if (vm === 'transcribe') {
-      // Prefer client-side transcript if available; otherwise use server
+      // Prefer client-side transcript if available; otherwise use server.
       if (result.transcript) {
         sendChat(result.transcript, null).catch(console.error);
       } else {
-        // Server-side streaming transcription
         if (!groupId.value || !threadId.value) return;
         transcribingRef.current = true;
         setTranscribeStatus('transcribing…');
@@ -431,15 +431,15 @@ function Composer() {
           },
         });
       }
-    } else {
-      // Strip codec params from mime type (e.g. "audio/mp4;codecs=opus" → "audio/mp4")
-      // since providers may not recognize the parameterized form.
+    } else if (vm === 'audio') {
       const rawType = result.blob.type.split(';')[0] || 'audio/mp4';
-      const ext = rawType.includes('ogg') ? 'ogg' : rawType.includes('mp4') ? 'm4a' : 'webm';
-      const file = new File([result.blob], `recording-${Date.now()}.${ext}`, { type: rawType });
+      const ext = rawType.includes('ogg') ? 'ogg' : rawType.includes('mp4') ? 'm4a' : rawType.includes('wav') ? 'wav' : 'webm';
+      const file = new File([result.blob], `voice-${Date.now()}.${ext}`, { type: rawType });
       sendChat('', [{ name: file.name, size: file.size, file }]).catch(console.error);
     }
   };
+
+  const shouldUseClientSpeech = vm === 'transcribe';
 
   const onMicPointerDown = (ev: PointerEvent): void => {
     ev.preventDefault();
@@ -448,7 +448,7 @@ function Composer() {
     holdTimerRef.current = setTimeout(() => {
       // Held > 300ms → hold mode
       holdModeRef.current = true;
-      startRecording(vm === 'transcribe').catch(console.error);
+      startRecording(shouldUseClientSpeech).catch(console.error);
     }, 300);
   };
 
@@ -466,7 +466,7 @@ function Composer() {
       finishRecording().catch(console.error);
     } else {
       // Short tap → toggle mode start
-      startRecording(vm === 'transcribe').catch(console.error);
+      startRecording(shouldUseClientSpeech).catch(console.error);
     }
   };
 
@@ -531,8 +531,17 @@ function Composer() {
           type="button"
           id="chat-mic"
           class={recording ? 'active' : ''}
-          title={recording ? 'Release to send' : 'Hold to record, tap to toggle'}
+          title={recording
+            ? 'Release to send'
+            : wsDown
+              ? 'Disconnected'
+              : inputHasText
+                ? 'Clear the message to record voice'
+                : hasPending
+                  ? 'Remove pending files to record voice'
+                  : 'Hold to record, tap to toggle'}
           aria-label={recording ? 'Stop recording' : 'Record voice message'}
+          disabled={micDisabled && !recording}
           onPointerDown={onMicPointerDown as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
           onPointerUp={onMicPointerUp as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
           onPointerCancel={onMicPointerCancel as unknown as JSX.PointerEventHandler<HTMLButtonElement>}

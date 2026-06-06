@@ -354,8 +354,9 @@ async function refetchThreadHistory(appendNewOnly: boolean): Promise<void> {
   if (!gid || !tid) return;
   const r = await fetch(historyUrl(gid, tid), { credentials: 'same-origin', cache: 'no-store' });
   if (!r.ok) return;
-  const { messages } = (await r.json()) as { messages: ServerMessage[] };
+  const { messages, voiceMode: nextVoiceMode } = (await r.json()) as { messages: ServerMessage[]; voiceMode?: string };
   if (!Array.isArray(messages)) return;
+  if (nextVoiceMode) voiceMode.value = nextVoiceMode as typeof voiceMode.value;
   if (!appendNewOnly) {
     chatMessages.value = messages.map((m) => ({
       id: m.id,

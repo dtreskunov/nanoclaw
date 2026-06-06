@@ -43,6 +43,7 @@ import { SELECTABLE_AGENT_PROVIDERS, VALID_AGENT_PROVIDERS } from './agent-provi
 import { recordAdminAction } from './audit.js';
 import { listImages } from './image-catalog.js';
 import { bareIdForResponse, dbValueFromBareId, getModelDetails, listModelsForProvider } from './models-catalog.js';
+import { deriveVoiceMode } from './voice-mode.js';
 
 // ── allowed scalar config fields (mirrors ncl groups config update) ───────
 
@@ -54,7 +55,6 @@ const SCALAR_FIELDS = [
   'assistant_name',
   'max_messages_per_prompt',
   'cli_scope',
-  'voice_mode',
   'transcription_model',
 ] as const;
 
@@ -348,16 +348,6 @@ async function handlePatchSettings(
         throw new BadRequest('max_messages_per_prompt must be a number between 1 and 1000');
       }
       updates.max_messages_per_prompt = Math.floor(n);
-    } else if (key === 'voice_mode') {
-      if (isCleared) {
-        updates.voice_mode = 'off';
-        continue;
-      }
-      const v = String(raw);
-      if (!VALID_VOICE_MODES.includes(v as (typeof VALID_VOICE_MODES)[number])) {
-        throw new BadRequest(`voice_mode must be one of: ${VALID_VOICE_MODES.join(', ')}`);
-      }
-      updates.voice_mode = v;
     } else {
       // model, effort, image_tag, assistant_name — nullable strings
       updates[key] = isCleared ? null : String(raw);
@@ -373,9 +363,20 @@ async function handlePatchSettings(
     updates.model = dbValueFromBareId(effectiveProvider, updates.model ?? null);
   }
 
-  // Auto-derive voice_mode from transcription_model: set → transcribe, cleared → off.
-  if ('transcription_model' in updates) {
-    updates.voice_mode = updates.transcription_model ? 'transcribe' : 'off';
+  if ('transcription_model' in updates || 'provider' in updates || 'model' in updates) {
+    const existing = getContainerConfig(gid);
+    const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL']);
+    const effectiveProvider = updates.provider ?? existing?.provider ?? envDefaults.DEFAULT_PROVIDER ?? 'claude';
+    const effectiveModel =
+      'model' in updates
+        ? updates.model
+        : (existing?.model ??
+          (envDefaults.DEFAULT_MODEL ? dbValueFromBareId(effectiveProvider, envDefaults.DEFAULT_MODEL) : null));
+    const effectiveTranscriptionModel =
+      'transcription_model' in updates
+        ? (updates.transcription_model ?? null)
+        : (existing?.transcription_model ?? null);
+    updates.voice_mode = await deriveVoiceMode(effectiveProvider, effectiveModel ?? null, effectiveTranscriptionModel);
   }
 
   if (Object.keys(updates).length === 0 && nameUpdate === undefined) {

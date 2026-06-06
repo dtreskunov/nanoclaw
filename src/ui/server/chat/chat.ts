@@ -52,7 +52,15 @@ import { setResendPendingWebOverride } from '../../../channels/resend.js';
 import type { OutboundMessage } from '../../../channels/adapter.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
 import { streamTranscribe } from './voice-transcribe.js';
+import { reconcileVoiceMode } from './voice-mode.js';
 import fs from 'fs';
+
+function appendTranscriptDelta(text: string, delta: string): string {
+  if (!text || !delta) return text + delta;
+  if (/\s$/.test(text) || /^\s/.test(delta)) return text + delta;
+  if (/[\p{L}\p{N}]$/u.test(text) && /^[\p{L}\p{N}]/u.test(delta)) return `${text} ${delta}`;
+  return text + delta;
+}
 
 /** Map (userId, agentGroupId) → deterministic web platform_id. */
 function platformIdFor(userId: string, agentGroupId: string): string {
@@ -414,8 +422,12 @@ export async function handleChatRequest(
       return true;
     }
     const cfg = getContainerConfig(m.groupId);
-    if (!cfg || cfg.voice_mode === 'off') {
+    if (!cfg || cfg.voice_mode !== 'transcribe') {
       writeJson(res, 400, { error: 'voice_disabled' });
+      return true;
+    }
+    if (!userOwnsWebThread(userId, m.groupId, m.threadId)) {
+      writeJson(res, 403, { error: 'not_owner_of_thread' });
       return true;
     }
     try {
@@ -434,8 +446,10 @@ export async function handleChatRequest(
       let fullText = '';
       try {
         for await (const delta of streamTranscribe(file.buffer, file.contentType, cfg.transcription_model)) {
-          fullText += delta;
-          res.write(`event: partial\ndata: ${JSON.stringify({ text: delta })}\n\n`);
+          const nextText = appendTranscriptDelta(fullText, delta);
+          const normalizedDelta = nextText.slice(fullText.length);
+          fullText = nextText;
+          res.write(`event: partial\ndata: ${JSON.stringify({ text: normalizedDelta })}\n\n`);
         }
         res.write(`event: done\ndata: ${JSON.stringify({ text: fullText })}\n\n`);
         res.end();
@@ -487,9 +501,10 @@ export async function handleChatRequest(
     const qMg = q.get('mg') || undefined;
     const override = qChannel && qMg ? { channelType: qChannel, messagingGroupId: qMg } : undefined;
     try {
-      const messages = readChatHistory(userId, m.groupId, m.threadId, override);
       const cfg = getContainerConfig(m.groupId);
-      writeJson(res, 200, { messages, voiceMode: cfg?.voice_mode ?? 'off' });
+      const voiceMode = await reconcileVoiceMode(m.groupId, cfg);
+      const messages = readChatHistory(userId, m.groupId, m.threadId, override);
+      writeJson(res, 200, { messages, voiceMode });
     } catch (err) {
       log.warn('web chat history read failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
       writeJson(res, 200, { messages: [], voiceMode: 'off' });

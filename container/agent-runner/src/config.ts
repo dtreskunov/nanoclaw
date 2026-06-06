@@ -20,6 +20,7 @@ export interface RunnerConfig {
   mcpServers: Record<string, McpServerConfig>;
   model?: string;
   effort?: string;
+  voiceMode: 'off' | 'transcribe' | 'audio';
   transcriptionModel?: string;
 }
 
@@ -50,6 +51,7 @@ export function loadConfig(): RunnerConfig {
     mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
     model: (raw.model as string) || undefined,
     effort: (raw.effort as string) || undefined,
+    voiceMode: raw.voiceMode === 'transcribe' || raw.voiceMode === 'audio' ? raw.voiceMode : 'off',
     transcriptionModel: (raw.transcriptionModel as string) || undefined,
   };
 

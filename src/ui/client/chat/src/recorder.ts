@@ -25,6 +25,13 @@ export function hasSpeechRecognition(): boolean {
   );
 }
 
+function appendTranscriptDelta(text: string, delta: string): string {
+  if (!text || !delta) return text + delta;
+  if (/\s$/.test(text) || /^\s/.test(delta)) return text + delta;
+  if (/[\p{L}\p{N}]$/u.test(text) && /^[\p{L}\p{N}]/u.test(delta)) return `${text} ${delta}`;
+  return text + delta;
+}
+
 // ── Internals ───────────────────────────────────────────────────────
 
 let mediaRecorder: MediaRecorder | null = null;
@@ -35,6 +42,7 @@ let recognition: any = null;
 let transcript = '';
 let durationTimer: ReturnType<typeof setInterval> | null = null;
 let startTime = 0;
+let recordingToken = 0;
 
 const MIN_DURATION_MS = 2000;
 
@@ -56,11 +64,21 @@ export async function startRecording(transcribe: boolean): Promise<boolean> {
 
   if (!hasGetUserMedia()) return false;
 
+  const token = ++recordingToken;
+  let nextStream: MediaStream;
+
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    nextStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
     return false;
   }
+
+  if (token !== recordingToken) {
+    for (const track of nextStream.getTracks()) track.stop();
+    return false;
+  }
+
+  stream = nextStream;
 
   audioChunks = [];
   transcript = '';
@@ -190,6 +208,7 @@ export function cancelRecording(): void {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function cleanup(): void {
+  recordingToken++;
   if (durationTimer) {
     clearInterval(durationTimer);
     durationTimer = null;
@@ -261,8 +280,10 @@ export function transcribeViaServer(
             try {
               const parsed = JSON.parse(data) as { text?: string; error?: string };
               if (eventType === 'partial' && parsed.text) {
-                fullText += parsed.text;
-                callbacks.onPartial(parsed.text);
+                const nextText = appendTranscriptDelta(fullText, parsed.text);
+                const normalizedDelta = nextText.slice(fullText.length);
+                fullText = nextText;
+                callbacks.onPartial(normalizedDelta);
               } else if (eventType === 'done' && parsed.text) {
                 callbacks.onDone(parsed.text);
               } else if (eventType === 'error') {
