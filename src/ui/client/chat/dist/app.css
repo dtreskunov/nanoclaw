@@ -1259,6 +1259,30 @@ header .mobile-only {
   background: var(--wash-strong);
   color: var(--muted);
 }
+.chat-main .msg .inline-media {
+  display: grid;
+  gap: 4px;
+  min-width: min(280px, 62vw);
+  max-width: 100%;
+}
+.chat-main .msg .inline-media audio,
+.chat-main .msg .inline-media video {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+.chat-main .msg .inline-media video {
+  max-height: 320px;
+  background: #000;
+}
+.chat-main .msg .inline-media-name {
+  font-size: var(--font-2xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .chat-main .msg .meta {
   font-size: var(--font-2xs);
   color: var(--muted);
@@ -2661,22 +2685,26 @@ body.is-admin .files-pane.collapsed .admin-only {
 .group-admin-check input[disabled] ~ span {
   opacity: 0.6;
 }
-.group-admin-confirm {
+.ga-confirm-options {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  padding: 8px 12px;
-  margin-top: 6px;
+}
+.ga-confirm-warn {
+  margin: 12px 0 0;
+  padding: 6px 10px;
   border-radius: var(--radius-sm, 4px);
   background: var(--head-tint);
   border: 1px solid var(--border);
+  color: var(--muted);
   font-size: var(--font-sm);
 }
-.group-admin-confirm-actions {
+.ga-confirm-foot {
   display: flex;
-  gap: 6px;
-  margin-left: auto;
-  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
 }
 .group-admin-toolbar {
   display: flex;

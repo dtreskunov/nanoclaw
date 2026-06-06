@@ -17580,8 +17580,9 @@ async function refetchThreadHistory(appendNewOnly) {
   if (!gid || !tid) return;
   const r4 = await fetch(historyUrl(gid, tid), { credentials: "same-origin", cache: "no-store" });
   if (!r4.ok) return;
-  const { messages } = await r4.json();
+  const { messages, voiceMode: nextVoiceMode } = await r4.json();
   if (!Array.isArray(messages)) return;
+  if (nextVoiceMode) voiceMode.value = nextVoiceMode;
   if (!appendNewOnly) {
     chatMessages.value = messages.map((m6) => ({
       id: m6.id,
@@ -18764,6 +18765,12 @@ function hasGetUserMedia() {
 function hasSpeechRecognition() {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
+function appendTranscriptDelta(text, delta) {
+  if (!text || !delta) return text + delta;
+  if (/\s$/.test(text) || /^\s/.test(delta)) return text + delta;
+  if (/[\p{L}\p{N}]$/u.test(text) && /^[\p{L}\p{N}]/u.test(delta)) return `${text} ${delta}`;
+  return text + delta;
+}
 var mediaRecorder = null;
 var audioChunks = [];
 var stream = null;
@@ -18771,15 +18778,23 @@ var recognition = null;
 var transcript = "";
 var durationTimer = null;
 var startTime = 0;
+var recordingToken = 0;
 var MIN_DURATION_MS = 2e3;
 async function startRecording(transcribe) {
   if (isRecording.value) return true;
   if (!hasGetUserMedia()) return false;
+  const token = ++recordingToken;
+  let nextStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    nextStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
     return false;
   }
+  if (token !== recordingToken) {
+    for (const track of nextStream.getTracks()) track.stop();
+    return false;
+  }
+  stream = nextStream;
   audioChunks = [];
   transcript = "";
   const mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus") ? "audio/ogg;codecs=opus" : MediaRecorder.isTypeSupported("audio/mp4;codecs=opus") ? "audio/mp4;codecs=opus" : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
@@ -18863,6 +18878,7 @@ function cancelRecording() {
   cleanup();
 }
 function cleanup() {
+  recordingToken++;
   if (durationTimer) {
     clearInterval(durationTimer);
     durationTimer = null;
@@ -18913,8 +18929,10 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
           try {
             const parsed = JSON.parse(data);
             if (eventType === "partial" && parsed.text) {
-              fullText += parsed.text;
-              callbacks.onPartial(parsed.text);
+              const nextText = appendTranscriptDelta(fullText, parsed.text);
+              const normalizedDelta = nextText.slice(fullText.length);
+              fullText = nextText;
+              callbacks.onPartial(normalizedDelta);
             } else if (eventType === "done" && parsed.text) {
               callbacks.onDone(parsed.text);
             } else if (eventType === "error") {
@@ -18954,6 +18972,14 @@ function fmtDur(ms) {
 }
 function shortModel(model) {
   return model.split("/").pop() || model;
+}
+function mediaKind(filename, contentType) {
+  if (contentType?.startsWith("audio/")) return "audio";
+  if (contentType?.startsWith("video/")) return "video";
+  const ext = filename.toLowerCase().split(".").pop() || "";
+  if (["webm", "m4a", "mp3", "ogg", "wav", "aac", "flac"].includes(ext)) return "audio";
+  if (["mp4", "mov", "m4v", "ogv"].includes(ext)) return "video";
+  return null;
 }
 function UsageMeta({ u: u5 }) {
   const [expanded, setExpanded] = h2(false);
@@ -19005,10 +19031,16 @@ function Message({ m: m6 }) {
     if (q5 && ref.current) highlightTextNodes(ref.current, q5);
   }, [m6.text, md != null, q5]);
   const cls = "msg " + m6.direction + (md != null ? " markdown" : "");
+  const singleFile = m6.files?.length === 1 ? m6.files[0] : null;
+  const singleMediaKind = singleFile?.url && !m6.text.trim() ? mediaKind(singleFile.filename, singleFile.contentType) : null;
   return /* @__PURE__ */ u4("div", { class: cls, "data-msg-id": m6.id, ref, children: [
     m6.direction === "internal" ? /* @__PURE__ */ u4("div", { class: "internal-label", children: "internal" }) : null,
     md != null ? /* @__PURE__ */ u4("div", { ref: mdRef, dangerouslySetInnerHTML: { __html: md } }) : m6.text || "",
-    m6.files && m6.files.length ? /* @__PURE__ */ u4("div", { class: "files", children: m6.files.map((f5) => f5.path ? /* @__PURE__ */ u4(
+    singleFile && singleMediaKind ? /* @__PURE__ */ u4("div", { class: "inline-media", children: [
+      singleMediaKind === "audio" ? /* @__PURE__ */ u4("audio", { controls: true, preload: "metadata", src: singleFile.url, title: singleFile.filename }) : /* @__PURE__ */ u4("video", { controls: true, preload: "metadata", src: singleFile.url, title: singleFile.filename }),
+      /* @__PURE__ */ u4("div", { class: "inline-media-name", children: singleFile.filename })
+    ] }) : null,
+    m6.files && m6.files.length && !singleMediaKind ? /* @__PURE__ */ u4("div", { class: "files", children: m6.files.map((f5) => f5.path ? /* @__PURE__ */ u4(
       "button",
       {
         type: "button",
@@ -19221,7 +19253,8 @@ function Composer() {
   };
   const vm = voiceMode.value;
   const hasPending = pending.value.length > 0;
-  const showMic = vm !== "off" && !inputHasText && !hasPending && !wsDown && hasGetUserMedia();
+  const showMic = vm !== "off" && hasGetUserMedia();
+  const micDisabled = inputHasText || hasPending || wsDown;
   const recording = isRecording.value;
   const holdTimerRef = A2(null);
   const holdModeRef = A2(false);
@@ -19264,20 +19297,21 @@ function Composer() {
           }
         });
       }
-    } else {
+    } else if (vm === "audio") {
       const rawType = result.blob.type.split(";")[0] || "audio/mp4";
-      const ext = rawType.includes("ogg") ? "ogg" : rawType.includes("mp4") ? "m4a" : "webm";
-      const file = new File([result.blob], `recording-${Date.now()}.${ext}`, { type: rawType });
+      const ext = rawType.includes("ogg") ? "ogg" : rawType.includes("mp4") ? "m4a" : rawType.includes("wav") ? "wav" : "webm";
+      const file = new File([result.blob], `voice-${Date.now()}.${ext}`, { type: rawType });
       sendChat("", [{ name: file.name, size: file.size, file }]).catch(console.error);
     }
   };
+  const shouldUseClientSpeech = vm === "transcribe";
   const onMicPointerDown = (ev) => {
     ev.preventDefault();
     ev.currentTarget.setPointerCapture(ev.pointerId);
     holdModeRef.current = false;
     holdTimerRef.current = setTimeout(() => {
       holdModeRef.current = true;
-      startRecording(vm === "transcribe").catch(console.error);
+      startRecording(shouldUseClientSpeech).catch(console.error);
     }, 300);
   };
   const onMicPointerUp = () => {
@@ -19291,7 +19325,7 @@ function Composer() {
     } else if (recording) {
       finishRecording().catch(console.error);
     } else {
-      startRecording(vm === "transcribe").catch(console.error);
+      startRecording(shouldUseClientSpeech).catch(console.error);
     }
   };
   const onMicPointerCancel = () => {
@@ -19354,8 +19388,9 @@ function Composer() {
             type: "button",
             id: "chat-mic",
             class: recording ? "active" : "",
-            title: recording ? "Release to send" : "Hold to record, tap to toggle",
+            title: recording ? "Release to send" : wsDown ? "Disconnected" : inputHasText ? "Clear the message to record voice" : hasPending ? "Remove pending files to record voice" : "Hold to record, tap to toggle",
             "aria-label": recording ? "Stop recording" : "Record voice message",
+            disabled: micDisabled && !recording,
             onPointerDown: onMicPointerDown,
             onPointerUp: onMicPointerUp,
             onPointerCancel: onMicPointerCancel,
@@ -21188,6 +21223,7 @@ function Combobox({
     if (!open) return void 0;
     const onDoc = (e4) => {
       if (!rootRef.current?.contains(e4.target)) {
+        if (freeform) commitText(text);
         setOpen(false);
         setFiltering(false);
         if (!freeform) setText(valueRef.current ?? "");
@@ -21195,17 +21231,26 @@ function Combobox({
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open, freeform]);
+  }, [open, freeform, text]);
   const filterText = text.trim().toLowerCase();
   const matches = filtering && filterText ? options.filter(
     (o4) => o4.value.toLowerCase().includes(filterText) || o4.label.toLowerCase().includes(filterText)
   ) : options;
-  function commit(next) {
+  function finishCommit(next) {
     setText(next);
-    onChange(freeform ? next || null : next || null);
     setOpen(false);
     setFiltering(false);
     setHighlight(-1);
+  }
+  function commitOption(next) {
+    onChange(next || null);
+    finishCommit(next);
+  }
+  function commitText(next) {
+    if (!freeform) return;
+    const trimmed = next.trim();
+    onChange(trimmed || null);
+    finishCommit(trimmed);
   }
   function onKeyDown(e4) {
     if (disabled) return;
@@ -21219,9 +21264,9 @@ function Combobox({
     } else if (e4.key === "Enter") {
       if (open && highlight >= 0 && matches[highlight]) {
         e4.preventDefault();
-        commit(matches[highlight].value);
+        commitOption(matches[highlight].value);
       } else if (freeform) {
-        commit(text);
+        commitText(text);
       }
     } else if (e4.key === "Escape") {
       setOpen(false);
@@ -21245,7 +21290,6 @@ function Combobox({
         onInput: (e4) => {
           const v5 = e4.currentTarget.value;
           setText(v5);
-          if (freeform) onChange(v5 || null);
           setOpen(true);
           setFiltering(true);
           setHighlight(-1);
@@ -21278,7 +21322,7 @@ function Combobox({
         onMouseEnter: () => setHighlight(i5),
         onMouseDown: (e4) => {
           e4.preventDefault();
-          commit(o4.value);
+          commitOption(o4.value);
         },
         children: [
           /* @__PURE__ */ u4("span", { class: "combobox-option-main", children: [
@@ -21547,30 +21591,23 @@ function SettingsTab({ gid, onClose, onActions }) {
   const changed = pending2.size > 0;
   const needsRestart = [...pending2].some((f5) => RESTART_REQUIRING_FIELDS.has(f5));
   const needsRebuild = pending2.has("image_tag") && draft.image_tag != null && !!images && !images.images.some((i5) => i5.value === draft.image_tag);
+  const [confirmOpen, setConfirmOpen] = h2(false);
   const [restartChecked, setRestartChecked] = h2(false);
   const [rebuildChecked, setRebuildChecked] = h2(false);
-  const [restartTouched, setRestartTouched] = h2(false);
-  const [rebuildTouched, setRebuildTouched] = h2(false);
-  y2(() => {
-    if (!restartTouched) setRestartChecked(needsRestart || needsRebuild);
-  }, [needsRestart, needsRebuild, restartTouched]);
-  y2(() => {
-    if (!rebuildTouched) setRebuildChecked(needsRebuild);
-  }, [needsRebuild, rebuildTouched]);
-  y2(() => {
-    if (!changed) {
-      setRestartTouched(false);
-      setRebuildTouched(false);
-    }
-  }, [changed]);
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
-  const canSave = changed || effectiveRestart || effectiveRebuild;
+  const canSave = changed;
   y2(() => {
     onActions({ refresh, apply: apply2, busy, canSave });
     return () => onActions(null);
-  }, [busy, canSave]);
-  async function apply2() {
+  }, [busy, canSave, needsRestart, needsRebuild]);
+  function apply2() {
+    if (!changed) return;
+    setRestartChecked(needsRestart || needsRebuild);
+    setRebuildChecked(needsRebuild);
+    setConfirmOpen(true);
+  }
+  async function doApply() {
     if (!draft) return;
     setBusy(true);
     try {
@@ -21595,6 +21632,7 @@ function SettingsTab({ gid, onClose, onActions }) {
       } else {
         showToast("Saved.");
       }
+      setConfirmOpen(false);
       onClose();
     } finally {
       setBusy(false);
@@ -21768,7 +21806,7 @@ function SettingsTab({ gid, onClose, onActions }) {
       Field,
       {
         label: "Transcription model",
-        info: "OpenRouter model for voice transcription. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.",
+        info: "OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.",
         children: /* @__PURE__ */ u4(
           ModelSelector,
           {
@@ -21783,40 +21821,65 @@ function SettingsTab({ gid, onClose, onActions }) {
         )
       }
     ),
-    /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: [
-      /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "checkbox",
-            checked: restartChecked,
-            disabled: busy || rebuildChecked,
-            onChange: (e4) => {
-              setRestartChecked(e4.target.checked);
-              setRestartTouched(true);
-            }
-          }
-        ),
-        /* @__PURE__ */ u4("span", { children: "Restart sessions" }),
-        /* @__PURE__ */ u4(Tooltip, { text: "Stop and respawn all running container sessions for this group so they pick up the saved config.\nAuto-selected when you change provider, model, effort, image tag, assistant name, or max messages per prompt. CLI scope alone does not need a restart \u2014 it is re-read on every CLI call.\nActive conversations resume on the next user message.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
-      ] }),
-      /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "checkbox",
-            checked: rebuildChecked,
-            disabled: busy,
-            onChange: (e4) => {
-              setRebuildChecked(e4.target.checked);
-              setRebuildTouched(true);
-            }
-          }
-        ),
-        /* @__PURE__ */ u4("span", { children: "Rebuild image" }),
-        /* @__PURE__ */ u4(Tooltip, { text: "Rebuild the container image before restarting.\nAuto-selected when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change \u2014 that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
-      ] })
-    ] })
+    /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: changed ? `${pending2.size} unsaved change${pending2.size === 1 ? "" : "s"}. Click Save (\u2713) above to review and apply.` : "No unsaved changes." }) }),
+    confirmOpen ? /* @__PURE__ */ u4(
+      "div",
+      {
+        class: "settings-backdrop",
+        onClick: (e4) => {
+          if (e4.target.classList.contains("settings-backdrop") && !busy) setConfirmOpen(false);
+        },
+        children: /* @__PURE__ */ u4("div", { class: "settings-modal ga-confirm-modal", role: "dialog", "aria-label": "Apply changes", style: "max-width:440px", children: [
+          /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+            /* @__PURE__ */ u4("span", { class: "title", children: "Apply changes" }),
+            /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", disabled: busy, onClick: () => setConfirmOpen(false), children: "\u2715" })
+          ] }),
+          /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+            /* @__PURE__ */ u4("p", { class: "group-admin-help", style: "margin-bottom:12px", children: [
+              pending2.size,
+              " setting",
+              pending2.size === 1 ? "" : "s",
+              " will be saved:",
+              " ",
+              /* @__PURE__ */ u4("code", { children: [...pending2].join(", ") })
+            ] }),
+            /* @__PURE__ */ u4("div", { class: "ga-confirm-options", children: [
+              /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+                /* @__PURE__ */ u4(
+                  "input",
+                  {
+                    type: "checkbox",
+                    checked: effectiveRestart,
+                    disabled: busy || rebuildChecked,
+                    onChange: (e4) => setRestartChecked(e4.target.checked)
+                  }
+                ),
+                /* @__PURE__ */ u4("span", { children: "Restart sessions" }),
+                /* @__PURE__ */ u4(Tooltip, { text: "Stop and respawn all running container sessions for this group so they pick up the saved config.\nDefaults on when you change provider, model, effort, image tag, assistant name, or max messages per prompt. CLI scope alone does not need a restart \u2014 it is re-read on every CLI call.\nActive conversations resume on the next user message.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
+              ] }),
+              /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+                /* @__PURE__ */ u4(
+                  "input",
+                  {
+                    type: "checkbox",
+                    checked: rebuildChecked,
+                    disabled: busy,
+                    onChange: (e4) => setRebuildChecked(e4.target.checked)
+                  }
+                ),
+                /* @__PURE__ */ u4("span", { children: "Rebuild image" }),
+                /* @__PURE__ */ u4(Tooltip, { text: "Rebuild the container image before restarting.\nDefaults on when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change \u2014 that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
+              ] })
+            ] }),
+            needsRestart && !effectiveRestart ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: "These changes won\u2019t take effect until the sessions restart." }) : null
+          ] }),
+          /* @__PURE__ */ u4("footer", { class: "settings-foot ga-confirm-foot", children: [
+            /* @__PURE__ */ u4("button", { type: "button", disabled: busy, onClick: () => setConfirmOpen(false), children: "Cancel" }),
+            /* @__PURE__ */ u4("button", { type: "button", class: "primary", disabled: busy, onClick: doApply, children: busy ? "Applying\u2026" : effectiveRebuild ? "Save & rebuild" : effectiveRestart ? "Save & restart" : "Save" })
+          ] })
+        ] })
+      }
+    ) : null
   ] });
 }
 function Field({
