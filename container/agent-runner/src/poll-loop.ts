@@ -17,7 +17,8 @@ import {
   type RoutingContext,
 } from './formatter.js';
 import { isUploadTraceCommand, uploadTrace } from './upload-trace.js';
-import type { AgentProvider, AgentQuery, ProviderEvent } from './providers/types.js';
+import { isAudioMime, transcribeAudio } from './transcribe.js';
+import type { AgentProvider, AgentQuery, FileAttachment, ProviderEvent } from './providers/types.js';
 
 const POLL_INTERVAL_MS = 1000;
 const ACTIVE_POLL_INTERVAL_MS = 500;
@@ -292,7 +293,9 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // local transcript is gone), clear the continuation and retry once
     // with a fresh session — silently, so the user never sees the error.
     let attempt = 0;
-    const files = extractFileAttachments(keep);
+    const rawFiles = extractFileAttachments(keep);
+    const { prompt: resolvedPrompt, files } = await transcribeAudioFiles(rawFiles, prompt);
+    prompt = resolvedPrompt;
     try {
       while (true) {
         const query = config.provider.query({
@@ -380,6 +383,37 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     markCompleted(processingIds);
     log(`Completed ${ids.length} message(s)`);
   }
+}
+
+/**
+ * Transcribe any audio files in the attachment list. Replaces audio entries
+ * with transcript text prepended to the prompt. Non-audio files pass through.
+ */
+async function transcribeAudioFiles(
+  files: FileAttachment[],
+  prompt: string,
+): Promise<{ prompt: string; files: FileAttachment[] }> {
+  const nonAudio: FileAttachment[] = [];
+  const transcripts: string[] = [];
+  for (const file of files) {
+    if (!isAudioMime(file.mime)) {
+      nonAudio.push(file);
+      continue;
+    }
+    const text = await transcribeAudio(file.path, file.mime);
+    if (text) {
+      log(`Transcribed ${file.filename}: "${text.slice(0, 80)}${text.length > 80 ? '…' : ''}"`);
+      transcripts.push(text);
+    } else {
+      log(`Transcription failed for ${file.filename}, passing as file`);
+      nonAudio.push(file);
+    }
+  }
+  if (transcripts.length > 0) {
+    const prefix = transcripts.map((t) => `[voice message transcript]: ${t}`).join('\n');
+    prompt = prefix + '\n\n' + prompt;
+  }
+  return { prompt, files: nonAudio };
 }
 
 /**
@@ -667,8 +701,10 @@ async function processQuery(
         if (done) return;
 
         const keptIds = keep.map((m) => m.id);
-        const prompt = formatMessages(keep);
-        const followUpFiles = extractFileAttachments(keep);
+        let prompt = formatMessages(keep);
+        const rawFollowUpFiles = extractFileAttachments(keep);
+        const { prompt: resolvedFollowUp, files: followUpFiles } = await transcribeAudioFiles(rawFollowUpFiles, prompt);
+        prompt = resolvedFollowUp;
         log(`Pushing ${keep.length} follow-up message(s) into active query`);
         unwrappedNudged = false;
         if (promptTracker) promptTracker.latest = prompt;
