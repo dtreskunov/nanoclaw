@@ -42,6 +42,15 @@ function shortModel(model: string): string {
   return model.split('/').pop() || model;
 }
 
+function mediaKind(filename: string, contentType?: string | null): 'audio' | 'video' | null {
+  if (contentType?.startsWith('audio/')) return 'audio';
+  if (contentType?.startsWith('video/')) return 'video';
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  if (['webm', 'm4a', 'mp3', 'ogg', 'wav', 'aac', 'flac'].includes(ext)) return 'audio';
+  if (['mp4', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video';
+  return null;
+}
+
 function UsageMeta({ u }: { u: TurnUsage }) {
   const [expanded, setExpanded] = useState(false);
   const cost = fmtCost(u.cost_usd);
@@ -92,13 +101,25 @@ function Message({ m }: { m: ChatMessage }) {
     if (q && ref.current) highlightTextNodes(ref.current, q);
   }, [m.text, md != null, q]);
   const cls = 'msg ' + m.direction + (md != null ? ' markdown' : '');
+  const singleFile = m.files?.length === 1 ? m.files[0] : null;
+  const singleMediaKind = singleFile?.url && !m.text.trim() ? mediaKind(singleFile.filename, singleFile.contentType) : null;
   return (
     <div class={cls} data-msg-id={m.id} ref={ref}>
       {m.direction === 'internal' ? <div class="internal-label">internal</div> : null}
       {md != null
         ? <div ref={mdRef} dangerouslySetInnerHTML={{ __html: md }} />
         : (m.text || '')}
-      {m.files && m.files.length
+      {singleFile && singleMediaKind
+        ? (
+          <div class="inline-media">
+            {singleMediaKind === 'audio'
+              ? <audio controls preload="metadata" src={singleFile.url!} title={singleFile.filename} />
+              : <video controls preload="metadata" src={singleFile.url!} title={singleFile.filename} />}
+            <div class="inline-media-name">{singleFile.filename}</div>
+          </div>
+        )
+        : null}
+      {m.files && m.files.length && !singleMediaKind
         ? (
           <div class="files">
             {m.files.map((f) => f.path

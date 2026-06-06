@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import http from 'http';
 import type internal from 'stream';
+import path from 'path';
 
 import Busboy from 'busboy';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -97,6 +98,25 @@ function ensureWebMessagingGroup(userId: string, agentGroupId: string): string {
   return mg.id;
 }
 
+function userOwnsWebThread(userId: string, agentGroupId: string, threadId: string): boolean {
+  const platformId = platformIdFor(userId, agentGroupId);
+  const senderMg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
+  const existingCount = (
+    getDb()
+      .prepare('SELECT count(*) AS n FROM sessions WHERE agent_group_id = ? AND thread_id = ?')
+      .get(agentGroupId, threadId) as { n: number }
+  ).n;
+  if (existingCount === 0) return true;
+  const senderOwns = senderMg
+    ? (getDb()
+        .prepare(
+          'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND thread_id = ? AND messaging_group_id = ? LIMIT 1',
+        )
+        .get(agentGroupId, threadId, senderMg.id) as { x: number } | undefined)
+    : undefined;
+  return !!senderOwns;
+}
+
 interface ChatContext {
   userId: string;
   groupId: string;
@@ -118,6 +138,7 @@ export function matchChatPath(
   | { kind: 'search'; groupId: string }
   | { kind: 'delete'; groupId: string; threadId: string }
   | { kind: 'voice-transcribe'; groupId: string; threadId: string }
+  | { kind: 'attachment'; groupId: string; threadId: string; attachmentPath: string }
   | null {
   const start = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/start$/);
   if (start) return { kind: 'start', groupId: start[1] };
@@ -131,6 +152,14 @@ export function matchChatPath(
       kind: 'voice-transcribe',
       groupId: decodeURIComponent(voiceTranscribe[1]),
       threadId: decodeURIComponent(voiceTranscribe[2]),
+    };
+  const attachment = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/attachments\/(.+)$/);
+  if (attachment)
+    return {
+      kind: 'attachment',
+      groupId: decodeURIComponent(attachment[1]),
+      threadId: decodeURIComponent(attachment[2]),
+      attachmentPath: decodeURIComponent(attachment[3]),
     };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
   if (send) return { kind: 'send', groupId: decodeURIComponent(send[1]), threadId: decodeURIComponent(send[2]) };
@@ -359,24 +388,9 @@ export async function handleChatRequest(
     // minting a polluting session in the sender's mg with a borrowed
     // thread UUID. (Cross-channel sends are already guarded by
     // userOwnsMessagingGroup inside sendViaChannelAdapter.)
-    const senderMg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformId);
-    const existingCount = (
-      getDb()
-        .prepare('SELECT count(*) AS n FROM sessions WHERE agent_group_id = ? AND thread_id = ?')
-        .get(m.groupId, m.threadId) as { n: number }
-    ).n;
-    if (existingCount > 0) {
-      const senderOwns = senderMg
-        ? (getDb()
-            .prepare(
-              'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND thread_id = ? AND messaging_group_id = ? LIMIT 1',
-            )
-            .get(m.groupId, m.threadId, senderMg.id) as { x: number } | undefined)
-        : undefined;
-      if (!senderOwns) {
-        writeJson(res, 403, { error: 'not_owner_of_thread' });
-        return true;
-      }
+    if (!userOwnsWebThread(userId, m.groupId, m.threadId)) {
+      writeJson(res, 403, { error: 'not_owner_of_thread' });
+      return true;
     }
     try {
       const id = await submitWebInbound({
@@ -447,6 +461,19 @@ export async function handleChatRequest(
         code === 'file_too_large' || code === 'total_too_large' ? 413 : code === 'too_many_files' ? 400 : 400;
       writeJson(res, status, { error: code });
     }
+    return true;
+  }
+
+  if (m.kind === 'attachment') {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      writeJson(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+    if (!userOwnsWebThread(userId, m.groupId, m.threadId)) {
+      writeJson(res, 403, { error: 'not_owner_of_thread' });
+      return true;
+    }
+    serveInboundAttachment(req, res, userId, m.groupId, m.threadId, m.attachmentPath);
     return true;
   }
 
@@ -560,7 +587,7 @@ export interface HistoryMessage {
   id: string;
   timestamp: string;
   text: string;
-  files?: { filename: string; size: number; path?: string }[];
+  files?: { filename: string; size: number; path?: string; url?: string; contentType?: string }[];
   usage?: TurnUsageDto;
 }
 
@@ -689,7 +716,7 @@ export function readChatHistory(
       // resume. Strip the suffix here so history matches the echo.
       const suffix = `:${groupId}`;
       for (const r of rows) {
-        const parsed = parseInboundContent(r.content);
+        const parsed = parseInboundContent(r.content, groupId, threadId, target.channelType === WEB_CHANNEL_TYPE);
         if (parsed != null) {
           const id = r.id.endsWith(suffix) ? r.id.slice(0, -suffix.length) : r.id;
           messages.push({ direction: 'in', id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
@@ -1001,9 +1028,24 @@ function normTs(s: string): string {
   return s.includes('T') ? s : s.replace(' ', 'T') + 'Z';
 }
 
+function encodedAttachmentUrl(groupId: string, threadId: string, localPath: string): string {
+  const encodedPath = localPath
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+  return `api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/attachments/${encodedPath}`;
+}
+
 function parseInboundContent(
   content: string,
-): { text: string; files?: { filename: string; size: number }[]; viaWeb?: boolean } | null {
+  groupId?: string,
+  threadId?: string,
+  includeAttachmentUrls = false,
+): {
+  text: string;
+  files?: { filename: string; size: number; url?: string; contentType?: string }[];
+  viaWeb?: boolean;
+} | null {
   try {
     const o = JSON.parse(content);
     if (typeof o === 'string') return { text: o };
@@ -1014,15 +1056,39 @@ function parseInboundContent(
       const filesArr = Array.isArray(o?.attachments) ? o.attachments : Array.isArray(o?.files) ? o.files : undefined;
       const files = filesArr
         ? filesArr
-            .map((a: { filename?: string; name?: string; data?: string; size?: number }) => {
-              const size =
-                typeof a?.size === 'number'
-                  ? a.size
-                  : typeof a?.data === 'string'
-                    ? Math.floor((a.data.length * 3) / 4)
-                    : 0;
-              return { filename: String(a?.name ?? a?.filename ?? ''), size };
-            })
+            .map(
+              (a: {
+                filename?: string;
+                name?: string;
+                data?: string;
+                size?: number;
+                localPath?: string;
+                mimeType?: string;
+                contentType?: string;
+              }) => {
+                const size =
+                  typeof a?.size === 'number'
+                    ? a.size
+                    : typeof a?.data === 'string'
+                      ? Math.floor((a.data.length * 3) / 4)
+                      : 0;
+                const localPath = typeof a?.localPath === 'string' ? a.localPath : undefined;
+                const contentType =
+                  typeof a?.mimeType === 'string'
+                    ? a.mimeType
+                    : typeof a?.contentType === 'string'
+                      ? a.contentType
+                      : undefined;
+                return {
+                  filename: String(a?.name ?? a?.filename ?? ''),
+                  size,
+                  ...(includeAttachmentUrls && localPath && groupId && threadId
+                    ? { url: encodedAttachmentUrl(groupId, threadId, localPath) }
+                    : {}),
+                  ...(contentType ? { contentType } : {}),
+                };
+              },
+            )
             .filter((f: { filename: string }) => f.filename)
         : undefined;
       return {
@@ -1035,6 +1101,139 @@ function parseInboundContent(
     /* not JSON */
   }
   return null;
+}
+
+function mimeFromFilename(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  switch (ext) {
+    case 'webm':
+      return 'audio/webm';
+    case 'm4a':
+      return 'audio/mp4';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'ogg':
+      return 'audio/ogg';
+    case 'wav':
+      return 'audio/wav';
+    case 'mp4':
+      return 'video/mp4';
+    case 'mov':
+      return 'video/quicktime';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+function serveInboundAttachment(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  userId: string,
+  groupId: string,
+  threadId: string,
+  requestedPath: string,
+): void {
+  const normalizedPath = path.posix.normalize(requestedPath);
+  if (normalizedPath.startsWith('../') || normalizedPath === '..' || path.posix.isAbsolute(normalizedPath)) {
+    writeJson(res, 400, { error: 'bad_attachment_path' });
+    return;
+  }
+  const mg = getMessagingGroupByPlatform(WEB_CHANNEL_TYPE, platformIdFor(userId, groupId));
+  if (!mg) {
+    writeJson(res, 404, { error: 'not_found' });
+    return;
+  }
+  const session = resolveSessionForMode(groupId, mg.id, 'per-thread', threadId);
+  if (!session) {
+    writeJson(res, 404, { error: 'not_found' });
+    return;
+  }
+
+  let found: { filename: string; contentType: string } | null = null;
+  try {
+    const inDb = openInboundDb(groupId, session.id);
+    try {
+      const rows = inDb
+        .prepare('SELECT content FROM messages_in WHERE channel_type = ? AND thread_id = ? ORDER BY seq')
+        .all(WEB_CHANNEL_TYPE, threadId) as { content: string }[];
+      for (const row of rows) {
+        let parsed: { attachments?: unknown };
+        try {
+          parsed = JSON.parse(row.content) as { attachments?: unknown };
+        } catch {
+          continue;
+        }
+        if (!Array.isArray(parsed.attachments)) continue;
+        for (const att of parsed.attachments as Array<Record<string, unknown>>) {
+          if (att.localPath !== normalizedPath) continue;
+          const filename = String(att.name ?? att.filename ?? path.posix.basename(normalizedPath));
+          const contentType = typeof att.mimeType === 'string' ? att.mimeType : mimeFromFilename(filename);
+          found = { filename, contentType };
+          break;
+        }
+        if (found) break;
+      }
+    } finally {
+      inDb.close();
+    }
+  } catch {
+    // inbound DB may not exist
+  }
+  if (!found) {
+    writeJson(res, 404, { error: 'not_found' });
+    return;
+  }
+
+  const sessionRoot = sessionDir(groupId, session.id);
+  const abs = path.join(sessionRoot, normalizedPath);
+  let realAbs: string;
+  let stat: fs.Stats;
+  try {
+    const realRoot = fs.realpathSync(sessionRoot);
+    realAbs = fs.realpathSync(abs);
+    const rel = path.relative(realRoot, realAbs);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('escaped');
+    stat = fs.statSync(realAbs);
+    if (!stat.isFile()) throw new Error('not_file');
+  } catch {
+    writeJson(res, 404, { error: 'not_found' });
+    return;
+  }
+
+  const range = req.headers.range;
+  const headers = {
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'private, max-age=3600',
+    'Content-Type': found.contentType,
+    'Content-Disposition': `inline; filename="${found.filename.replace(/["\\]/g, '_')}"`,
+  };
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (!match) {
+      res.writeHead(416, { ...headers, 'Content-Range': `bytes */${stat.size}` });
+      res.end();
+      return;
+    }
+    const start = match[1] ? Number(match[1]) : 0;
+    const end = match[2] ? Math.min(Number(match[2]), stat.size - 1) : stat.size - 1;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= stat.size) {
+      res.writeHead(416, { ...headers, 'Content-Range': `bytes */${stat.size}` });
+      res.end();
+      return;
+    }
+    res.writeHead(206, {
+      ...headers,
+      'Content-Length': String(end - start + 1),
+      'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+    });
+    if (req.method === 'HEAD') return void res.end();
+    fs.createReadStream(realAbs, { start, end }).pipe(res);
+    return;
+  }
+
+  res.writeHead(200, { ...headers, 'Content-Length': String(stat.size) });
+  if (req.method === 'HEAD') return void res.end();
+  fs.createReadStream(realAbs).pipe(res);
 }
 
 function parseOutboundContent(content: string): {

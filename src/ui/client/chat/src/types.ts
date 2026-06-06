@@ -62,6 +62,8 @@ export interface ChatMessageFile {
   filename: string;
   size?: number;
   path?: string | null;
+  url?: string | null;
+  contentType?: string | null;
 }
 
 export interface TurnUsage {
