@@ -6,7 +6,7 @@ import { useRef, useEffect, useState } from 'preact/hooks';
 import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
-  highlightMessageId, searchQuery,
+  highlightMessageId, searchQuery, voiceMode,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
 import { renderMarkdown, rewriteFileLinks, highlightTextNodes, fmtBytesShort } from '../utils';
@@ -15,6 +15,7 @@ import {
   navFile, removePinnedPath, clearPinnedContext, respondApproval,
   openChat,
 } from '../actions';
+import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia } from '../recorder';
 import { RelativeTime } from './RelativeTime';
 import type { ChatMessage, TurnUsage } from '../types';
 
@@ -286,6 +287,7 @@ function PendingTray() {
 function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const [inputHasText, setInputHasText] = useState(false);
   const isWeb = !channelType.value || channelType.value === 'web';
   const showComposer = isWeb || canSend.value;
   // Web threads send over the WebSocket; if it isn't connected, block input
@@ -295,6 +297,7 @@ function Composer() {
   const autosize = (): void => {
     const el = inputRef.current;
     if (!el) return;
+    setInputHasText(!!el.value.trim());
     // When empty, size to min-height. Chrome's scrollHeight reflects the
     // placeholder when value is empty, which makes a long/wrapping
     // placeholder (e.g. the wsDown 'Reconnecting…') puff the box to two
@@ -360,12 +363,87 @@ function Composer() {
     ev.preventDefault();
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
+
+  // ── PTT logic ──────────────────────────────────────────────────────
+  const vm = voiceMode.value;
+  const hasPending = pending.value.length > 0;
+  const showMic = vm !== 'off' && !inputHasText && !hasPending && !wsDown && hasGetUserMedia();
+  const recording = isRecording.value;
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdModeRef = useRef(false);
+
+  const finishRecording = async (): Promise<void> => {
+    const result = await stopRecording();
+    if (!result) {
+      chatStatus.value = 'too short — discarded';
+      setTimeout(() => { if (chatStatus.value === 'too short — discarded') chatStatus.value = 'connected'; }, 2000);
+      return;
+    }
+    if (vm === 'transcribe' && result.transcript) {
+      sendChat(result.transcript, null).catch(console.error);
+    } else {
+      // Strip codec params from mime type (e.g. "audio/mp4;codecs=opus" → "audio/mp4")
+      // since providers may not recognize the parameterized form.
+      const rawType = result.blob.type.split(';')[0] || 'audio/mp4';
+      const ext = rawType.includes('ogg') ? 'ogg' : rawType.includes('mp4') ? 'm4a' : 'webm';
+      const file = new File([result.blob], `recording-${Date.now()}.${ext}`, { type: rawType });
+      sendChat('', [{ name: file.name, size: file.size, file }]).catch(console.error);
+    }
+  };
+
+  const onMicPointerDown = (ev: PointerEvent): void => {
+    ev.preventDefault();
+    (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+    holdModeRef.current = false;
+    holdTimerRef.current = setTimeout(() => {
+      // Held > 300ms → hold mode
+      holdModeRef.current = true;
+      startRecording(vm === 'transcribe').catch(console.error);
+    }, 300);
+  };
+
+  const onMicPointerUp = (): void => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdModeRef.current) {
+      // Release after hold → stop & send
+      holdModeRef.current = false;
+      finishRecording().catch(console.error);
+    } else if (recording) {
+      // Tap while recording (toggle mode) → stop & send
+      finishRecording().catch(console.error);
+    } else {
+      // Short tap → toggle mode start
+      startRecording(vm === 'transcribe').catch(console.error);
+    }
+  };
+
+  const onMicPointerCancel = (): void => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdModeRef.current || recording) {
+      cancelRecording();
+      holdModeRef.current = false;
+    }
+  };
+
+  const fmtDuration = (ms: number): string => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
   return (
     <form
       id="chat-form"
       onSubmit={onSubmit}
       style={showComposer ? '' : 'display:none'}
-      class={wsDown ? 'ws-down' : ''}
+      class={`${wsDown ? 'ws-down' : ''} ${recording ? 'recording' : ''}`}
     >
       <input type="file" id="chat-file" multiple hidden ref={fileRef} onChange={onFileChange} />
       <button
@@ -374,20 +452,40 @@ function Composer() {
         title={wsDown ? 'Disconnected' : 'Attach files'}
         aria-label="Attach files"
         onClick={onAttachClick}
-        disabled={wsDown}
+        disabled={wsDown || recording}
       >{'\uD83D\uDCCE'}</button>
-      <textarea
-        id="chat-input"
-        rows={1}
-        placeholder={wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
-        ref={inputRef}
-        onInput={autosize}
-        onKeyDown={onKey}
-        onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
-        disabled={wsDown}
-        autocomplete="off"
-      ></textarea>
-      <button type="submit" id="chat-send" disabled={wsDown}>Send</button>
+      {recording ? (
+        <div id="chat-recording-indicator">
+          <span class="recording-dot"></span>
+          <span class="recording-time">{fmtDuration(recordingDuration.value)}</span>
+        </div>
+      ) : (
+        <textarea
+          id="chat-input"
+          rows={1}
+          placeholder={wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
+          ref={inputRef}
+          onInput={autosize}
+          onKeyDown={onKey}
+          onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
+          disabled={wsDown}
+          autocomplete="off"
+        ></textarea>
+      )}
+      {showMic ? (
+        <button
+          type="button"
+          id="chat-mic"
+          class={recording ? 'active' : ''}
+          title={recording ? 'Release to send' : 'Hold to record, tap to toggle'}
+          aria-label={recording ? 'Stop recording' : 'Record voice message'}
+          onPointerDown={onMicPointerDown as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
+          onPointerUp={onMicPointerUp as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
+          onPointerCancel={onMicPointerCancel as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
+        >{'\uD83C\uDF99\uFE0F'}</button>
+      ) : (
+        <button type="submit" id="chat-send" disabled={wsDown || recording}>Send</button>
+      )}
     </form>
   );
 }

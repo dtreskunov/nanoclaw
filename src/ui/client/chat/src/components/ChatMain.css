@@ -120,6 +120,50 @@
   font: inherit;
   font-weight: 600;
 }
+.chat-main #chat-mic {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  transition: background 0.15s, border-color 0.15s;
+  touch-action: none;
+  user-select: none;
+}
+.chat-main #chat-mic.active {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgb(220, 38, 38);
+}
+.chat-main #chat-recording-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: var(--font-sm);
+  color: rgb(220, 38, 38);
+}
+.chat-main .recording-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(220, 38, 38);
+  animation: pulse-dot 1s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.chat-main .recording-time {
+  font-variant-numeric: tabular-nums;
+}
+.chat-main form.recording {
+  border-color: rgba(220, 38, 38, 0.4);
+}
 .chat-main form.ws-down textarea,
 .chat-main form.ws-down > button { opacity: 0.55; cursor: not-allowed; }
 .chat-main.drag-active { outline: 2px dashed var(--accent-strong); outline-offset: -4px; }
@@ -133,6 +177,7 @@
   }
   .chat-main #chat-attach { min-width: 44px; min-height: 44px; font-size: 20px; padding: 0; flex-shrink: 0; }
   .chat-main #chat-send { min-width: 56px; min-height: 44px; font-weight: 600; flex-shrink: 0; }
+  .chat-main #chat-mic { min-width: 56px; min-height: 44px; font-size: 22px; flex-shrink: 0; }
   .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 10px; } /* 16px prevents iOS zoom on focus */
 }
 

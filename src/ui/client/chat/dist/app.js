@@ -15514,6 +15514,7 @@ var threadId = y3(null);
 var channelType = y3("web");
 var messagingGroupId = y3(null);
 var canSend = y3(true);
+var voiceMode = y3("off");
 var chatMessages = y3([]);
 var chatStatus = y3("");
 var chatLoading = y3(false);
@@ -17665,7 +17666,8 @@ async function openChat(gid, resumeTid, opts) {
     try {
       const r4 = await fetch(historyUrl(gid, resumeTid), { credentials: "same-origin", cache: "no-store" });
       if (r4.ok) {
-        const { messages } = await r4.json();
+        const data = await r4.json();
+        const messages = data.messages;
         n2(() => {
           chatMessages.value = (messages || []).map((m6) => ({
             id: m6.id,
@@ -17676,6 +17678,7 @@ async function openChat(gid, resumeTid, opts) {
             ...m6.usage ? { usage: m6.usage } : {}
           }));
           chatLoading.value = false;
+          voiceMode.value = data.voiceMode || "off";
         });
         if (Array.isArray(messages)) {
           refs.seenIds = new Set(messages.filter((m6) => m6.id).map((m6) => `${normDirection(m6.direction)}:${m6.id}`));
@@ -18752,6 +18755,129 @@ function ThreadsRail() {
   ] });
 }
 
+// src/recorder.ts
+var isRecording = y3(false);
+var recordingDuration = y3(0);
+function hasGetUserMedia() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+function hasSpeechRecognition() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+var mediaRecorder = null;
+var audioChunks = [];
+var stream = null;
+var recognition = null;
+var transcript = "";
+var durationTimer = null;
+var startTime = 0;
+var MIN_DURATION_MS = 2e3;
+async function startRecording(transcribe) {
+  if (isRecording.value) return true;
+  if (!hasGetUserMedia()) return false;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    return false;
+  }
+  audioChunks = [];
+  transcript = "";
+  const mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus") ? "audio/ogg;codecs=opus" : MediaRecorder.isTypeSupported("audio/mp4;codecs=opus") ? "audio/mp4;codecs=opus" : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
+  mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : void 0);
+  mediaRecorder.ondataavailable = (ev) => {
+    if (ev.data.size > 0) audioChunks.push(ev.data);
+  };
+  mediaRecorder.start(250);
+  startTime = Date.now();
+  recordingDuration.value = 0;
+  durationTimer = setInterval(() => {
+    recordingDuration.value = Date.now() - startTime;
+  }, 200);
+  if (transcribe && hasSpeechRecognition()) {
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onresult = (ev) => {
+      for (let i5 = ev.resultIndex; i5 < ev.results.length; i5++) {
+        if (ev.results[i5].isFinal) {
+          transcript += ev.results[i5][0].transcript;
+        }
+      }
+    };
+    recognition.onerror = () => {
+    };
+    try {
+      recognition.start();
+    } catch {
+    }
+  }
+  isRecording.value = true;
+  return true;
+}
+function stopRecording() {
+  return new Promise((resolve) => {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+      cleanup();
+      resolve(null);
+      return;
+    }
+    mediaRecorder.onstop = () => {
+      const durationMs = Date.now() - startTime;
+      const mimeType = mediaRecorder?.mimeType || "audio/webm";
+      const chunks = audioChunks.slice();
+      const finalTranscript = transcript.trim() || null;
+      cleanup();
+      if (durationMs < MIN_DURATION_MS) {
+        resolve(null);
+        return;
+      }
+      const ext = mimeType.includes("webm") ? "webm" : "ogg";
+      const blob = new Blob(chunks, { type: mimeType });
+      resolve({
+        blob,
+        transcript: finalTranscript,
+        durationMs
+      });
+    };
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+      }
+    }
+    mediaRecorder.stop();
+  });
+}
+function cancelRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.onstop = null;
+    mediaRecorder.stop();
+  }
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch {
+    }
+  }
+  cleanup();
+}
+function cleanup() {
+  if (durationTimer) {
+    clearInterval(durationTimer);
+    durationTimer = null;
+  }
+  if (stream) {
+    for (const track of stream.getTracks()) track.stop();
+    stream = null;
+  }
+  mediaRecorder = null;
+  recognition = null;
+  audioChunks = [];
+  isRecording.value = false;
+  recordingDuration.value = 0;
+}
+
 // src/components/ChatMain.tsx
 function fmtTok(n3) {
   if (n3 >= 1e6) return (n3 / 1e6).toFixed(1) + "M";
@@ -18977,12 +19103,14 @@ function PendingTray() {
 function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
+  const [inputHasText, setInputHasText] = h2(false);
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
   const wsDown = isWeb && chatStatus.value !== "connected";
   const autosize = () => {
     const el = inputRef.current;
     if (!el) return;
+    setInputHasText(!!el.value.trim());
     if (!el.value) {
       el.style.height = "";
       el.style.overflowY = "hidden";
@@ -19032,13 +19160,76 @@ function Composer() {
     ev.preventDefault();
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
+  const vm = voiceMode.value;
+  const hasPending = pending.value.length > 0;
+  const showMic = vm !== "off" && !inputHasText && !hasPending && !wsDown && hasGetUserMedia();
+  const recording = isRecording.value;
+  const holdTimerRef = A2(null);
+  const holdModeRef = A2(false);
+  const finishRecording = async () => {
+    const result = await stopRecording();
+    if (!result) {
+      chatStatus.value = "too short \u2014 discarded";
+      setTimeout(() => {
+        if (chatStatus.value === "too short \u2014 discarded") chatStatus.value = "connected";
+      }, 2e3);
+      return;
+    }
+    if (vm === "transcribe" && result.transcript) {
+      sendChat(result.transcript, null).catch(console.error);
+    } else {
+      const rawType = result.blob.type.split(";")[0] || "audio/mp4";
+      const ext = rawType.includes("ogg") ? "ogg" : rawType.includes("mp4") ? "m4a" : "webm";
+      const file = new File([result.blob], `recording-${Date.now()}.${ext}`, { type: rawType });
+      sendChat("", [{ name: file.name, size: file.size, file }]).catch(console.error);
+    }
+  };
+  const onMicPointerDown = (ev) => {
+    ev.preventDefault();
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    holdModeRef.current = false;
+    holdTimerRef.current = setTimeout(() => {
+      holdModeRef.current = true;
+      startRecording(vm === "transcribe").catch(console.error);
+    }, 300);
+  };
+  const onMicPointerUp = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdModeRef.current) {
+      holdModeRef.current = false;
+      finishRecording().catch(console.error);
+    } else if (recording) {
+      finishRecording().catch(console.error);
+    } else {
+      startRecording(vm === "transcribe").catch(console.error);
+    }
+  };
+  const onMicPointerCancel = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdModeRef.current || recording) {
+      cancelRecording();
+      holdModeRef.current = false;
+    }
+  };
+  const fmtDuration = (ms) => {
+    const s5 = Math.floor(ms / 1e3);
+    const m6 = Math.floor(s5 / 60);
+    const sec = s5 % 60;
+    return `${m6}:${sec.toString().padStart(2, "0")}`;
+  };
   return /* @__PURE__ */ u4(
     "form",
     {
       id: "chat-form",
       onSubmit,
       style: showComposer ? "" : "display:none",
-      class: wsDown ? "ws-down" : "",
+      class: `${wsDown ? "ws-down" : ""} ${recording ? "recording" : ""}`,
       children: [
         /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
         /* @__PURE__ */ u4(
@@ -19049,11 +19240,14 @@ function Composer() {
             title: wsDown ? "Disconnected" : "Attach files",
             "aria-label": "Attach files",
             onClick: onAttachClick,
-            disabled: wsDown,
+            disabled: wsDown || recording,
             children: "\u{1F4CE}"
           }
         ),
-        /* @__PURE__ */ u4(
+        recording ? /* @__PURE__ */ u4("div", { id: "chat-recording-indicator", children: [
+          /* @__PURE__ */ u4("span", { class: "recording-dot" }),
+          /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) })
+        ] }) : /* @__PURE__ */ u4(
           "textarea",
           {
             id: "chat-input",
@@ -19067,7 +19261,20 @@ function Composer() {
             autocomplete: "off"
           }
         ),
-        /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", disabled: wsDown, children: "Send" })
+        showMic ? /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            id: "chat-mic",
+            class: recording ? "active" : "",
+            title: recording ? "Release to send" : "Hold to record, tap to toggle",
+            "aria-label": recording ? "Stop recording" : "Record voice message",
+            onPointerDown: onMicPointerDown,
+            onPointerUp: onMicPointerUp,
+            onPointerCancel: onMicPointerCancel,
+            children: "\u{1F399}\uFE0F"
+          }
+        ) : /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", disabled: wsDown || recording, children: "Send" })
       ]
     }
   );
@@ -21058,6 +21265,8 @@ function GroupAdmin() {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
   const [tab, setTab] = h2("settings");
+  const actionsRef = A2(null);
+  const [, forceRender] = h2(0);
   y2(() => {
     setTab("settings");
   }, [open, gid]);
@@ -21081,10 +21290,21 @@ function GroupAdmin() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+  const ha = actionsRef.current;
+  const setActions = (a4) => {
+    actionsRef.current = a4;
+    forceRender((n3) => n3 + 1);
+  };
   return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4("div", { class: "settings-modal", role: "dialog", "aria-label": title, children: [
     /* @__PURE__ */ u4("header", { class: "settings-head", children: [
       /* @__PURE__ */ u4("span", { class: "title", children: title }),
-      /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+      /* @__PURE__ */ u4("div", { class: "settings-head-actions", children: [
+        tab === "settings" && ha ? /* @__PURE__ */ u4(k, { children: [
+          /* @__PURE__ */ u4(Tooltip, { text: "Re-fetch settings from server", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Refresh", onClick: ha.refresh, disabled: ha.busy, children: "\u21BB" }) }),
+          /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) })
+        ] }) : null,
+        /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+      ] })
     ] }),
     /* @__PURE__ */ u4("nav", { class: "group-admin-tabs", children: [
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "settings" ? "active" : "", onClick: () => setTab("settings"), children: "Settings" }),
@@ -21092,13 +21312,13 @@ function GroupAdmin() {
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" })
     ] }),
     /* @__PURE__ */ u4("div", { class: "settings-body", children: [
-      tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, onClose: close }) : null,
+      tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, onClose: close, onActions: setActions }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
       tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null
     ] })
   ] }) });
 }
-function SettingsTab({ gid, onClose }) {
+function SettingsTab({ gid, onClose, onActions }) {
   const [data, setData] = h2(null);
   const [draft, setDraft] = h2(null);
   const [draftName, setDraftName] = h2("");
@@ -21200,6 +21420,11 @@ function SettingsTab({ gid, onClose }) {
   }, [changed]);
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
+  const canSave = changed || effectiveRestart || effectiveRebuild;
+  y2(() => {
+    onActions({ refresh, apply: apply2, busy, canSave });
+    return () => onActions(null);
+  }, [busy, canSave]);
   async function apply2() {
     if (!draft) return;
     setBusy(true);
@@ -21256,18 +21481,12 @@ function SettingsTab({ gid, onClose }) {
   const selectedImgAge = formatAge(selectedImg?.createdAt ?? null);
   const selectedImgSize = formatSize(selectedImg?.size ?? null);
   return /* @__PURE__ */ u4("section", { children: [
-    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: [
-      /* @__PURE__ */ u4("p", { class: "muted", children: [
-        "Folder ",
-        /* @__PURE__ */ u4("code", { children: data.folder }),
-        data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
-        data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
-      ] }),
-      /* @__PURE__ */ u4("div", { class: "group-admin-toolbar-buttons", children: [
-        /* @__PURE__ */ u4(Tooltip, { text: "Re-fetch settings from server", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Refresh", onClick: refresh, disabled: busy, children: "\u21BB" }) }),
-        /* @__PURE__ */ u4(Tooltip, { text: changed ? "Save changes" : effectiveRestart || effectiveRebuild ? "Run restart/rebuild" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: apply2, disabled: busy || !changed && !effectiveRestart && !effectiveRebuild, children: "\u2713" }) })
-      ] })
-    ] }),
+    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "muted", children: [
+      "Folder ",
+      /* @__PURE__ */ u4("code", { children: data.folder }),
+      data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
+      data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
+    ] }) }),
     /* @__PURE__ */ u4(Field, { label: "Name", children: /* @__PURE__ */ u4(
       "input",
       {
@@ -21424,6 +21643,27 @@ function SettingsTab({ gid, onClose }) {
             disabled: busy,
             freeform: false,
             onChange: (v5) => update("cli_scope", v5)
+          }
+        )
+      }
+    ),
+    /* @__PURE__ */ u4(
+      Field,
+      {
+        label: "Voice mode",
+        info: "Controls the push-to-talk microphone button in the chat composer.\noff = no mic button.\ntranscribe = record speech and send as text (Chrome/Edge only, uses Web Speech API).\naudio = record and send as an audio file attachment.",
+        children: /* @__PURE__ */ u4(
+          Combobox,
+          {
+            value: draft.voice_mode,
+            options: (data.validVoiceModes || ["off", "transcribe", "audio"]).map((s5) => ({
+              value: s5,
+              label: s5
+            })),
+            placeholder: "off",
+            disabled: busy,
+            freeform: false,
+            onChange: (v5) => update("voice_mode", v5)
           }
         )
       }

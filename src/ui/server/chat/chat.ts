@@ -15,6 +15,7 @@ import Busboy from 'busboy';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { getAgentGroup } from '../../../db/agent-groups.js';
+import { getContainerConfig } from '../../../db/container-configs.js';
 import { getDb } from '../../../db/connection.js';
 import {
   createMessagingGroup,
@@ -395,10 +396,11 @@ export async function handleChatRequest(
     const override = qChannel && qMg ? { channelType: qChannel, messagingGroupId: qMg } : undefined;
     try {
       const messages = readChatHistory(userId, m.groupId, m.threadId, override);
-      writeJson(res, 200, { messages });
+      const cfg = getContainerConfig(m.groupId);
+      writeJson(res, 200, { messages, voiceMode: cfg?.voice_mode ?? 'off' });
     } catch (err) {
       log.warn('web chat history read failed', { userId, groupId: m.groupId, threadId: m.threadId, err });
-      writeJson(res, 200, { messages: [] });
+      writeJson(res, 200, { messages: [], voiceMode: 'off' });
     }
     return true;
   }

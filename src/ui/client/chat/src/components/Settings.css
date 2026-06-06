@@ -19,6 +19,7 @@
   background: var(--head-tint);
 }
 .settings-head .title { flex: 1; font-weight: 600; font-size: var(--font-xl); }
+.settings-head-actions { display: flex; align-items: center; gap: 4px; }
 .settings-body { padding: 16px; overflow-y: auto; overflow-x: hidden; }
 .settings-body section { margin-bottom: 24px; }
 .settings-body section:last-child { margin-bottom: 0; }

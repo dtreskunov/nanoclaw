@@ -1,0 +1,206 @@
+/**
+ * Audio recording module for the push-to-talk feature.
+ *
+ * Wraps MediaRecorder (for audio capture) and optionally the Web Speech API
+ * (for live transcription in "transcribe" mode). Exports reactive signals for
+ * the Composer to observe.
+ */
+import { signal } from '@preact/signals';
+
+// ── Public signals ──────────────────────────────────────────────────
+
+export const isRecording = signal(false);
+export const recordingDuration = signal(0);
+
+// ── Feature detection ───────────────────────────────────────────────
+
+export function hasGetUserMedia(): boolean {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+export function hasSpeechRecognition(): boolean {
+  return !!(
+    (window as unknown as Record<string, unknown>).SpeechRecognition ||
+    (window as unknown as Record<string, unknown>).webkitSpeechRecognition
+  );
+}
+
+// ── Internals ───────────────────────────────────────────────────────
+
+let mediaRecorder: MediaRecorder | null = null;
+let audioChunks: Blob[] = [];
+let stream: MediaStream | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let recognition: any = null;
+let transcript = '';
+let durationTimer: ReturnType<typeof setInterval> | null = null;
+let startTime = 0;
+
+const MIN_DURATION_MS = 2000;
+
+// ── Public API ──────────────────────────────────────────────────────
+
+export interface RecordingResult {
+  blob: Blob;
+  transcript: string | null;
+  durationMs: number;
+}
+
+/**
+ * Start recording audio from the user's microphone.
+ * @param transcribe  If true, also start Web Speech API recognition.
+ * @returns true on success, false if permission denied or unsupported.
+ */
+export async function startRecording(transcribe: boolean): Promise<boolean> {
+  if (isRecording.value) return true;
+
+  if (!hasGetUserMedia()) return false;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    return false;
+  }
+
+  audioChunks = [];
+  transcript = '';
+
+  // Pick the best available audio format. Prefer formats that model providers
+  // accept (ogg, mp4/m4a). Chrome doesn't support ogg in MediaRecorder but
+  // does support mp4. Firefox supports ogg. Avoid webm — most providers reject it.
+  const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+    ? 'audio/ogg;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/mp4;codecs=opus')
+      ? 'audio/mp4;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : '';
+
+  mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  mediaRecorder.ondataavailable = (ev) => {
+    if (ev.data.size > 0) audioChunks.push(ev.data);
+  };
+  mediaRecorder.start(250); // collect chunks every 250ms for snappy stop
+
+  // Duration tracking
+  startTime = Date.now();
+  recordingDuration.value = 0;
+  durationTimer = setInterval(() => {
+    recordingDuration.value = Date.now() - startTime;
+  }, 200);
+
+  // Optional speech recognition
+  if (transcribe && hasSpeechRecognition()) {
+    const SpeechRecognitionCtor =
+      (window as unknown as Record<string, unknown>).SpeechRecognition ||
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition = new (SpeechRecognitionCtor as any)();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (ev: any) => {
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        if (ev.results[i].isFinal) {
+          transcript += ev.results[i][0].transcript;
+        }
+      }
+    };
+    recognition.onerror = () => {
+      /* best effort */
+    };
+    try {
+      recognition.start();
+    } catch {
+      /* ignore if already started */
+    }
+  }
+
+  isRecording.value = true;
+  return true;
+}
+
+/**
+ * Stop recording and return the result.
+ * Returns null if the recording was too short (< 2s) — caller should
+ * treat this as a discard.
+ */
+export function stopRecording(): Promise<RecordingResult | null> {
+  return new Promise((resolve) => {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      cleanup();
+      resolve(null);
+      return;
+    }
+
+    mediaRecorder.onstop = () => {
+      const durationMs = Date.now() - startTime;
+      const mimeType = mediaRecorder?.mimeType || 'audio/webm';
+      const chunks = audioChunks.slice();
+      const finalTranscript = transcript.trim() || null;
+      cleanup();
+
+      if (durationMs < MIN_DURATION_MS) {
+        resolve(null);
+        return;
+      }
+
+      const ext = mimeType.includes('webm') ? 'webm' : 'ogg';
+      const blob = new Blob(chunks, { type: mimeType });
+      resolve({
+        blob,
+        transcript: finalTranscript,
+        durationMs,
+      });
+    };
+
+    // Stop recognition first
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    mediaRecorder.stop();
+  });
+}
+
+/**
+ * Cancel recording without producing output.
+ */
+export function cancelRecording(): void {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.onstop = null;
+    mediaRecorder.stop();
+  }
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch {
+      /* ignore */
+    }
+  }
+  cleanup();
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+function cleanup(): void {
+  if (durationTimer) {
+    clearInterval(durationTimer);
+    durationTimer = null;
+  }
+  if (stream) {
+    for (const track of stream.getTracks()) track.stop();
+    stream = null;
+  }
+  mediaRecorder = null;
+  recognition = null;
+  audioChunks = [];
+  isRecording.value = false;
+  recordingDuration.value = 0;
+}

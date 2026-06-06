@@ -2,7 +2,7 @@
 // Visible only when the active group's `isAdmin` is true. Reuses the
 // existing .settings-backdrop / .settings-modal chrome for visual parity.
 import './GroupAdmin.css';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
 
 import {
@@ -16,6 +16,13 @@ import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
 
 type Tab = 'settings' | 'members' | 'roles';
+
+interface HeaderActions {
+  refresh: () => void;
+  apply: () => void;
+  busy: boolean;
+  canSave: boolean;
+}
 
 
 interface SettingsResponse {
@@ -32,6 +39,7 @@ interface SettingsResponse {
     assistant_name: string | null;
     max_messages_per_prompt: number | null;
     cli_scope: string | null;
+    voice_mode: string | null;
   };
   defaults: {
     provider: string | null;
@@ -40,6 +48,7 @@ interface SettingsResponse {
   };
   validProviders: string[];
   validCliScopes: string[];
+  validVoiceModes: string[];
   runningSessionCount: number;
   selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
   selectedImageDetail: { label: string; createdAt: string | null; size: number | null } | null;
@@ -161,6 +170,8 @@ export function GroupAdmin(): JSX.Element | null {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
   const [tab, setTab] = useState<Tab>('settings');
+  const actionsRef = useRef<HeaderActions | null>(null);
+  const [, forceRender] = useState(0);
   useEffect(() => { setTab('settings'); }, [open, gid]);
   useBackButtonCloses(open, () => { groupAdminOpen.value = false; });
 
@@ -180,12 +191,27 @@ export function GroupAdmin(): JSX.Element | null {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  const ha = actionsRef.current;
+  const setActions = (a: HeaderActions | null) => { actionsRef.current = a; forceRender((n) => n + 1); };
+
   return (
     <div class="settings-backdrop" onClick={onBackdrop}>
       <div class="settings-modal" role="dialog" aria-label={title}>
         <header class="settings-head">
           <span class="title">{title}</span>
-          <button type="button" class="icon-btn" aria-label="Close" onClick={close}>{'\u2715'}</button>
+          <div class="settings-head-actions">
+            {tab === 'settings' && ha ? (
+              <>
+                <Tooltip text="Re-fetch settings from server">
+                  <button type="button" class="icon-btn" aria-label="Refresh" onClick={ha.refresh} disabled={ha.busy}>&#x21bb;</button>
+                </Tooltip>
+                <Tooltip text={ha.canSave ? 'Save changes' : 'Nothing to save'}>
+                  <button type="button" class="icon-btn" aria-label="Save" onClick={ha.apply} disabled={ha.busy || !ha.canSave}>&#x2713;</button>
+                </Tooltip>
+              </>
+            ) : null}
+            <button type="button" class="icon-btn" aria-label="Close" onClick={close}>{'\u2715'}</button>
+          </div>
         </header>
         <nav class="group-admin-tabs">
           <button type="button" class={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
@@ -193,7 +219,7 @@ export function GroupAdmin(): JSX.Element | null {
           <button type="button" class={tab === 'roles' ? 'active' : ''} onClick={() => setTab('roles')}>Admins</button>
         </nav>
         <div class="settings-body">
-          {tab === 'settings' ? <SettingsTab gid={gid} onClose={close} /> : null}
+          {tab === 'settings' ? <SettingsTab gid={gid} onClose={close} onActions={setActions} /> : null}
           {tab === 'members' ? <MembersTab gid={gid} /> : null}
           {tab === 'roles' ? <RolesTab gid={gid} /> : null}
         </div>
@@ -204,7 +230,7 @@ export function GroupAdmin(): JSX.Element | null {
 
 // ── Settings ──────────────────────────────────────────────────────────────
 
-function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JSX.Element {
+function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => void; onActions: (a: HeaderActions | null) => void }): JSX.Element {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [draftName, setDraftName] = useState('');
@@ -308,6 +334,13 @@ function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JS
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
 
+  // Report actions to parent header.
+  const canSave = changed || effectiveRestart || effectiveRebuild;
+  useEffect(() => {
+    onActions({ refresh, apply, busy, canSave });
+    return () => onActions(null);
+  }, [busy, canSave]);
+
   async function apply(): Promise<void> {
     if (!draft) return;
     setBusy(true);
@@ -375,14 +408,6 @@ function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JS
           Folder <code>{data.folder}</code>{data.updatedAt ? ` · last updated ${new Date(data.updatedAt).toLocaleString()}` : ''}
           {data.runningSessionCount > 0 ? ` · ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? '' : 's'}` : ' · no running sessions'}
         </p>
-        <div class="group-admin-toolbar-buttons">
-          <Tooltip text="Re-fetch settings from server">
-            <button type="button" class="icon-btn" aria-label="Refresh" onClick={refresh} disabled={busy}>&#x21bb;</button>
-          </Tooltip>
-          <Tooltip text={changed ? 'Save changes' : (effectiveRestart || effectiveRebuild) ? 'Run restart/rebuild' : 'Nothing to save'}>
-            <button type="button" class="icon-btn" aria-label="Save" onClick={apply} disabled={busy || (!changed && !effectiveRestart && !effectiveRebuild)}>&#x2713;</button>
-          </Tooltip>
-        </div>
       </div>
 
       <Field label="Name">
@@ -546,6 +571,26 @@ function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JS
           disabled={busy}
           freeform={false}
           onChange={(v) => update('cli_scope', v)}
+        />
+      </Field>
+
+      <Field
+        label="Voice mode"
+        info={'Controls the push-to-talk microphone button in the chat composer.\n' +
+          'off = no mic button.\n' +
+          'transcribe = record speech and send as text (Chrome/Edge only, uses Web Speech API).\n' +
+          'audio = record and send as an audio file attachment.'}
+      >
+        <Combobox
+          value={draft.voice_mode}
+          options={(data.validVoiceModes || ['off', 'transcribe', 'audio']).map((s) => ({
+            value: s,
+            label: s,
+          }))}
+          placeholder="off"
+          disabled={busy}
+          freeform={false}
+          onChange={(v) => update('voice_mode', v)}
         />
       </Field>
 

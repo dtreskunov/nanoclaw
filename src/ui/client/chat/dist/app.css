@@ -414,42 +414,21 @@ header .mobile-only {
   }
 }
 .toast-sticky {
-  top: auto;
-  bottom: max(24px, env(safe-area-inset-bottom));
-  animation: toast-in-bottom 160ms ease-out;
+  animation: toast-in 160ms ease-out;
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 6px 6px 14px;
-  border-radius: var(--radius-pill);
-  font-size: var(--font-base);
-  font-weight: 500;
-  letter-spacing: 0;
-  background: var(--surface, #1f2329);
-  color: var(--surface-fg, #e6e6e6);
-  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  padding: 8px 8px 8px 18px;
 }
 .toast-sticky .toast-text {
   white-space: nowrap;
-  opacity: 0.9;
-}
-@keyframes toast-in-bottom {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 8px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
 }
 .toast-action {
   appearance: none;
-  border: 1px solid var(--border-strong, rgba(127, 127, 127, 0.45));
-  background: var(--wash, rgba(127, 127, 127, 0.12));
-  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
   font-weight: 600;
   font-size: var(--font-sm);
   letter-spacing: 0;
@@ -458,10 +437,10 @@ header .mobile-only {
   cursor: pointer;
 }
 .toast-action:hover {
-  background: var(--wash-strong, rgba(127, 127, 127, 0.2));
+  background: rgba(255, 255, 255, 0.25);
 }
 .toast-action:focus-visible {
-  outline: 2px solid var(--accent-strong, #1a73e8);
+  outline: 2px solid rgba(255, 255, 255, 0.6);
   outline-offset: 2px;
 }
 
@@ -884,6 +863,11 @@ header .mobile-only {
   flex: 1;
   font-weight: 600;
   font-size: var(--font-xl);
+}
+.settings-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .settings-body {
   padding: 16px;
@@ -1531,6 +1515,54 @@ header .mobile-only {
   font: inherit;
   font-weight: 600;
 }
+.chat-main #chat-mic {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  transition: background 0.15s, border-color 0.15s;
+  touch-action: none;
+  user-select: none;
+}
+.chat-main #chat-mic.active {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgb(220, 38, 38);
+}
+.chat-main #chat-recording-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: var(--font-sm);
+  color: rgb(220, 38, 38);
+}
+.chat-main .recording-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(220, 38, 38);
+  animation: pulse-dot 1s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+.chat-main .recording-time {
+  font-variant-numeric: tabular-nums;
+}
+.chat-main form.recording {
+  border-color: rgba(220, 38, 38, 0.4);
+}
 .chat-main form.ws-down textarea,
 .chat-main form.ws-down > button {
   opacity: 0.55;
@@ -1561,6 +1593,12 @@ header .mobile-only {
     min-width: 56px;
     min-height: 44px;
     font-weight: 600;
+    flex-shrink: 0;
+  }
+  .chat-main #chat-mic {
+    min-width: 56px;
+    min-height: 44px;
+    font-size: 22px;
     flex-shrink: 0;
   }
   .chat-main textarea {

@@ -7,6 +7,7 @@ import {
   channelType,
   messagingGroupId,
   canSend,
+  voiceMode,
   chatMessages,
   chatStatus,
   chatLoading,
@@ -451,7 +452,8 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
     try {
       const r = await fetch(historyUrl(gid, resumeTid), { credentials: 'same-origin', cache: 'no-store' });
       if (r.ok) {
-        const { messages } = (await r.json()) as { messages: ServerMessage[] };
+        const data = (await r.json()) as { messages: ServerMessage[]; voiceMode?: string };
+        const messages = data.messages;
         batch(() => {
           chatMessages.value = (messages || []).map((m) => ({
             id: m.id,
@@ -462,6 +464,7 @@ export async function openChat(gid: string, resumeTid: string | null, opts: Thre
             ...(m.usage ? { usage: m.usage } : {}),
           }));
           chatLoading.value = false;
+          voiceMode.value = (data.voiceMode as typeof voiceMode.value) || 'off';
         });
         if (Array.isArray(messages)) {
           refs.seenIds = new Set(messages.filter((m) => m.id).map((m) => `${normDirection(m.direction)}:${m.id}`));
