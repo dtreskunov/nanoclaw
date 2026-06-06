@@ -13,12 +13,10 @@ import {
 import { Combobox, type ComboboxOption } from './Combobox';
 import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
-import { requestConfirm } from './PromptModal';
 import { useBackButtonCloses } from '../modalBackButton';
 
 type Tab = 'settings' | 'members' | 'roles';
 
-interface Status { ok?: string; err?: string }
 
 interface SettingsResponse {
   id: string;
@@ -190,7 +188,7 @@ export function GroupAdmin(): JSX.Element | null {
           <button type="button" class={tab === 'roles' ? 'active' : ''} onClick={() => setTab('roles')}>Admins</button>
         </nav>
         <div class="settings-body">
-          {tab === 'settings' ? <SettingsTab gid={gid} /> : null}
+          {tab === 'settings' ? <SettingsTab gid={gid} onClose={close} /> : null}
           {tab === 'members' ? <MembersTab gid={gid} /> : null}
           {tab === 'roles' ? <RolesTab gid={gid} /> : null}
         </div>
@@ -201,22 +199,23 @@ export function GroupAdmin(): JSX.Element | null {
 
 // ── Settings ──────────────────────────────────────────────────────────────
 
-function SettingsTab({ gid }: { gid: string }): JSX.Element {
+function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JSX.Element {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [draftName, setDraftName] = useState('');
-  const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [images, setImages] = useState<ImagesResponse | null>(null);
 
   async function refresh(): Promise<void> {
-    const r = await call<SettingsResponse>(apiPath(gid, '/settings'));
-    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
-    setData(r.data);
-    setDraft({ ...r.data.config });
-    setDraftName(r.data.name);
-    setStatus(null);
+    setBusy(true);
+    try {
+      const r = await call<SettingsResponse>(apiPath(gid, '/settings'));
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      setData(r.data);
+      setDraft({ ...r.data.config });
+      setDraftName(r.data.name);
+    } finally { setBusy(false); }
   }
 
   useEffect(() => { refresh(); }, [gid]);
@@ -250,36 +249,13 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
     setDraft((d) => (d ? { ...d, [k]: v } : d));
   }
 
-  async function save(): Promise<{ ok: boolean; data?: SettingsResponse }> {
-    if (!draft) return { ok: false };
-    const body: Record<string, unknown> = { ...draft };
-    if (data && draftName.trim() !== data.name) body.name = draftName.trim();
-    const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', body);
-    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return { ok: false }; }
-    setData(r.data);
-    setDraft({ ...r.data.config });
-    setDraftName(r.data.name);
-    // Propagate name change to the sidebar/header group list.
-    groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: r.data.name } : g);
-    return { ok: true, data: r.data };
-  }
-
   async function runRestart(rebuild: boolean): Promise<{ ok: boolean; restarted?: number }> {
     const r = await call<{ restarted: number; rebuilt: boolean }>(apiPath(gid, '/restart'), 'POST', { rebuild });
-    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return { ok: false }; }
+    if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return { ok: false }; }
     return { ok: true, restarted: r.data.restarted };
   }
 
-  function reset(): void {
-    if (!data) return;
-    setDraft({ ...data.config });
-    setDraftName(data.name);
-    setStatus(null);
-  }
-
   // Which fields actually require a container restart to take effect?
-  // cli_scope is re-read per CLI dispatch (src/cli/dispatch.ts) so saving
-  // it alone is enough. Everything else is baked in at container spawn.
   const RESTART_REQUIRING_FIELDS = new Set([
     'provider', 'model', 'effort', 'image_tag', 'assistant_name', 'max_messages_per_prompt',
   ]);
@@ -327,50 +303,33 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
 
-  function applyLabel(): string {
-    if (!changed && !effectiveRestart && !effectiveRebuild) return 'Save';
-    const parts: string[] = changed ? ['Save'] : [];
-    if (effectiveRebuild) parts.push('rebuild');
-    if (effectiveRestart) parts.push('restart');
-    // Capitalize first word.
-    if (parts.length === 0) return 'Apply';
-    return parts.map((p, i) => i === 0 ? p[0]!.toUpperCase() + p.slice(1) : p).join(parts.length > 2 ? ', ' : ' and ');
-  }
-
   async function apply(): Promise<void> {
+    if (!draft) return;
     setBusy(true);
-    setStatus(null);
-    const steps: string[] = [];
     try {
+      // Save config changes.
       if (changed) {
-        const r = await save();
-        if (!r.ok) return;
-        steps.push('Saved');
+        const body: Record<string, unknown> = { ...draft };
+        if (data && draftName.trim() !== data.name) body.name = draftName.trim();
+        const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', body);
+        if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+        setData(r.data);
+        setDraft({ ...r.data.config });
+        setDraftName(r.data.name);
+        groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: r.data.name } : g);
       }
+      // Restart / rebuild without confirmation.
       if (effectiveRebuild || effectiveRestart) {
-        const label = effectiveRebuild ? 'Rebuild image + restart' : 'Restart';
-        const ok = await requestConfirm({
-          title: label,
-          message: effectiveRebuild
-            ? `Rebuild the container image, then restart ${data?.runningSessionCount ?? 0} running session(s)?`
-            : `Restart ${data?.runningSessionCount ?? 0} running session(s)?`,
-          okLabel: label,
-          danger: false,
-        });
-        if (!ok) {
-          if (steps.length) setStatus({ ok: `${steps.join(', ')} (restart skipped).` });
-          return;
-        }
         const r = await runRestart(effectiveRebuild);
         if (!r.ok) return;
-        steps.push(effectiveRebuild
-          ? `rebuilt image and restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}`
-          : `restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}`);
+        const msg = effectiveRebuild
+          ? `Rebuilt image and restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}.`
+          : `Restarted ${r.restarted} session${r.restarted === 1 ? '' : 's'}.`;
+        showToast(msg);
+      } else {
+        showToast('Saved.');
       }
-      if (steps.length) {
-        setStatus({ ok: steps.join(', ') + '.' });
-        refresh();
-      }
+      onClose();
     } finally { setBusy(false); }
   }
 
@@ -406,10 +365,20 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
 
   return (
     <section>
-      <p class="muted">
-        Folder <code>{data.folder}</code>{data.updatedAt ? ` · last updated ${new Date(data.updatedAt).toLocaleString()}` : ''}
-        {data.runningSessionCount > 0 ? ` · ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? '' : 's'}` : ' · no running sessions'}
-      </p>
+      <div class="group-admin-toolbar">
+        <p class="muted">
+          Folder <code>{data.folder}</code>{data.updatedAt ? ` · last updated ${new Date(data.updatedAt).toLocaleString()}` : ''}
+          {data.runningSessionCount > 0 ? ` · ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? '' : 's'}` : ' · no running sessions'}
+        </p>
+        <div class="group-admin-toolbar-buttons">
+          <Tooltip text="Re-fetch settings from server">
+            <button type="button" class="icon-btn" aria-label="Refresh" onClick={refresh} disabled={busy}>&#x21bb;</button>
+          </Tooltip>
+          <Tooltip text={changed ? 'Save changes' : (effectiveRestart || effectiveRebuild) ? 'Run restart/rebuild' : 'Nothing to save'}>
+            <button type="button" class="icon-btn" aria-label="Save" onClick={apply} disabled={busy || (!changed && !effectiveRestart && !effectiveRebuild)}>&#x2713;</button>
+          </Tooltip>
+        </div>
+      </div>
 
       <Field label="Name">
         <input
@@ -515,7 +484,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
                 <pre class="selected-tooltip">Created: {new Date(selectedImg.createdAt).toLocaleString()}</pre>
               ) : null}
             </div>
-          ) : draft.image_tag ? (
+          ) : (draft.image_tag && images) ? (
             <p class="group-admin-help">Tag not in local image list — will fail at container start if not pulled.</p>
           ) : null}
         </div>
@@ -576,9 +545,6 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
       </Field>
 
       <div class="settings-row group-admin-actions" style="margin-top:16px">
-        <Tooltip text={'Discard pending edits. Reverts every field back to the saved value.'}>
-          <button type="button" class="ghost" onClick={reset} disabled={busy || !changed}>Reset</button>
-        </Tooltip>
         <label class="group-admin-check">
           <input
             type="checkbox"
@@ -609,21 +575,7 @@ function SettingsTab({ gid }: { gid: string }): JSX.Element {
             <span class="info-icon" aria-label="More info">i</span>
           </Tooltip>
         </label>
-        <div style="flex:1"></div>
-        <Tooltip text={changed
-          ? 'Persist pending edits to the database, then run any actions ticked above.'
-          : (effectiveRestart || effectiveRebuild)
-            ? 'Run the actions ticked above. No DB edits to save.'
-            : 'Nothing to do — no pending edits and no actions ticked.'}>
-          <button
-            type="button"
-            onClick={apply}
-            disabled={busy || (!changed && !effectiveRestart && !effectiveRebuild)}
-          >{applyLabel()}</button>
-        </Tooltip>
       </div>
-
-      {status ? <div class={'settings-status ' + (status.err ? 'err' : 'ok')}>{status.err || status.ok}</div> : null}
     </section>
   );
 }
@@ -652,41 +604,30 @@ function Field({
 
 function MembersTab({ gid }: { gid: string }): JSX.Element {
   const [members, setMembers] = useState<MemberDto[] | null>(null);
-  const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function refresh(): Promise<void> {
     const r = await call<{ members: MemberDto[] }>(apiPath(gid, '/members'));
-    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
+    if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
     setMembers(r.data.members);
-    setStatus(null);
   }
   useEffect(() => { refresh(); }, [gid]);
 
   async function add(userId: string): Promise<void> {
     setBusy(true);
-    setStatus(null);
     try {
       const r = await call(apiPath(gid, '/members'), 'POST', { userId });
-      if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
       showToast('Member added');
       refresh();
     } finally { setBusy(false); }
   }
 
   async function remove(m: MemberDto): Promise<void> {
-    const ok = await requestConfirm({
-      title: 'Remove member',
-      message: `Remove ${userLabel(m)} from this group?`,
-      okLabel: 'Remove',
-      danger: true,
-    });
-    if (!ok) return;
     setBusy(true);
-    setStatus(null);
     try {
       const r = await call(apiPath(gid, `/members/${encodeURIComponent(m.userId)}`), 'DELETE');
-      if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
       showToast('Member removed');
       refresh();
     } finally { setBusy(false); }
@@ -730,8 +671,6 @@ function MembersTab({ gid }: { gid: string }): JSX.Element {
         disabled={busy}
         onPick={add}
       />
-
-      {status ? <div class={'settings-status ' + (status.err ? 'err' : 'ok')}>{status.err || status.ok}</div> : null}
     </section>
   );
 }
@@ -740,43 +679,32 @@ function MembersTab({ gid }: { gid: string }): JSX.Element {
 
 function RolesTab({ gid }: { gid: string }): JSX.Element {
   const [admins, setAdmins] = useState<RoleDto[] | null>(null);
-  const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function refresh(): Promise<void> {
     const r = await call<{ admins: RoleDto[] }>(apiPath(gid, '/roles'));
-    if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
+    if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
     setAdmins(r.data.admins);
-    setStatus(null);
   }
   useEffect(() => { refresh(); }, [gid]);
 
   async function grant(userId: string): Promise<void> {
     setBusy(true);
-    setStatus(null);
     try {
       const r = await call<{ ok?: boolean; alreadyGranted?: boolean }>(
         apiPath(gid, '/roles'), 'POST', { userId },
       );
-      if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
       showToast(r.data.alreadyGranted ? 'Already an admin' : 'Admin granted');
       refresh();
     } finally { setBusy(false); }
   }
 
   async function revoke(a: RoleDto): Promise<void> {
-    const ok = await requestConfirm({
-      title: 'Revoke admin',
-      message: `Revoke admin role from ${userLabel(a)} on this group?`,
-      okLabel: 'Revoke',
-      danger: true,
-    });
-    if (!ok) return;
     setBusy(true);
-    setStatus(null);
     try {
       const r = await call(apiPath(gid, `/roles/${encodeURIComponent(a.userId)}`), 'DELETE');
-      if (!r.ok) { setStatus({ err: errMsg(r.data, `HTTP ${r.status}`) }); return; }
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
       showToast('Admin revoked');
       refresh();
     } finally { setBusy(false); }
@@ -813,8 +741,6 @@ function RolesTab({ gid }: { gid: string }): JSX.Element {
         disabled={busy}
         onPick={grant}
       />
-
-      {status ? <div class={'settings-status ' + (status.err ? 'err' : 'ok')}>{status.err || status.ok}</div> : null}
     </section>
   );
 }

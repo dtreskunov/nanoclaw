@@ -143,6 +143,52 @@
   opacity: 0.6;
 }
 
+/* Inline restart/rebuild confirmation banner */
+.group-admin-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-top: 6px;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--head-tint);
+  border: 1px solid var(--border);
+  font-size: var(--font-sm);
+}
+.group-admin-confirm-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Toolbar with refresh/save icons at the top of the settings tab */
+.group-admin-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.group-admin-toolbar .muted {
+  flex: 1;
+  margin: 0;
+}
+.group-admin-toolbar-buttons {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.group-admin-toolbar-buttons .icon-btn {
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.group-admin-toolbar-buttons .icon-btn:disabled {
+  opacity: 0.35;
+}
+
 .group-admin-badge {
   display: inline-block;
   margin-left: 6px;

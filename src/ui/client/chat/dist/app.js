@@ -21052,11 +21052,6 @@ function errMsg(d5, fallback) {
   const e4 = d5?.error;
   return typeof e4 === "string" && e4 ? e4 : fallback;
 }
-function userLabel(u5) {
-  if (u5.displayName) return u5.displayName;
-  if (u5.primaryHandle) return `${u5.primaryChannel ?? "?"}:${u5.primaryHandle}`;
-  return u5.userId;
-}
 function GroupAdmin() {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
@@ -21095,30 +21090,33 @@ function GroupAdmin() {
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" })
     ] }),
     /* @__PURE__ */ u4("div", { class: "settings-body", children: [
-      tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid }) : null,
+      tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, onClose: close }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
       tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null
     ] })
   ] }) });
 }
-function SettingsTab({ gid }) {
+function SettingsTab({ gid, onClose }) {
   const [data, setData] = h2(null);
   const [draft, setDraft] = h2(null);
   const [draftName, setDraftName] = h2("");
-  const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
   const [models, setModels] = h2(null);
   const [images, setImages] = h2(null);
   async function refresh() {
-    const r4 = await call(apiPath(gid, "/settings"));
-    if (!r4.ok) {
-      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
-      return;
+    setBusy(true);
+    try {
+      const r4 = await call(apiPath(gid, "/settings"));
+      if (!r4.ok) {
+        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      setData(r4.data);
+      setDraft({ ...r4.data.config });
+      setDraftName(r4.data.name);
+    } finally {
+      setBusy(false);
     }
-    setData(r4.data);
-    setDraft({ ...r4.data.config });
-    setDraftName(r4.data.name);
-    setStatus(null);
   }
   y2(() => {
     refresh();
@@ -21153,34 +21151,13 @@ function SettingsTab({ gid }) {
   function update(k4, v5) {
     setDraft((d5) => d5 ? { ...d5, [k4]: v5 } : d5);
   }
-  async function save() {
-    if (!draft) return { ok: false };
-    const body = { ...draft };
-    if (data && draftName.trim() !== data.name) body.name = draftName.trim();
-    const r4 = await call(apiPath(gid, "/settings"), "PATCH", body);
-    if (!r4.ok) {
-      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
-      return { ok: false };
-    }
-    setData(r4.data);
-    setDraft({ ...r4.data.config });
-    setDraftName(r4.data.name);
-    groups.value = groups.value.map((g8) => g8.id === gid ? { ...g8, name: r4.data.name } : g8);
-    return { ok: true, data: r4.data };
-  }
   async function runRestart(rebuild) {
     const r4 = await call(apiPath(gid, "/restart"), "POST", { rebuild });
     if (!r4.ok) {
-      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
       return { ok: false };
     }
     return { ok: true, restarted: r4.data.restarted };
-  }
-  function reset() {
-    if (!data) return;
-    setDraft({ ...data.config });
-    setDraftName(data.name);
-    setStatus(null);
   }
   const RESTART_REQUIRING_FIELDS = /* @__PURE__ */ new Set([
     "provider",
@@ -21221,44 +21198,32 @@ function SettingsTab({ gid }) {
   }, [changed]);
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
-  function applyLabel() {
-    if (!changed && !effectiveRestart && !effectiveRebuild) return "Save";
-    const parts = changed ? ["Save"] : [];
-    if (effectiveRebuild) parts.push("rebuild");
-    if (effectiveRestart) parts.push("restart");
-    if (parts.length === 0) return "Apply";
-    return parts.map((p5, i5) => i5 === 0 ? p5[0].toUpperCase() + p5.slice(1) : p5).join(parts.length > 2 ? ", " : " and ");
-  }
   async function apply2() {
+    if (!draft) return;
     setBusy(true);
-    setStatus(null);
-    const steps = [];
     try {
       if (changed) {
-        const r4 = await save();
-        if (!r4.ok) return;
-        steps.push("Saved");
-      }
-      if (effectiveRebuild || effectiveRestart) {
-        const label = effectiveRebuild ? "Rebuild image + restart" : "Restart";
-        const ok = await requestConfirm({
-          title: label,
-          message: effectiveRebuild ? `Rebuild the container image, then restart ${data?.runningSessionCount ?? 0} running session(s)?` : `Restart ${data?.runningSessionCount ?? 0} running session(s)?`,
-          okLabel: label,
-          danger: false
-        });
-        if (!ok) {
-          if (steps.length) setStatus({ ok: `${steps.join(", ")} (restart skipped).` });
+        const body = { ...draft };
+        if (data && draftName.trim() !== data.name) body.name = draftName.trim();
+        const r4 = await call(apiPath(gid, "/settings"), "PATCH", body);
+        if (!r4.ok) {
+          showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
           return;
         }
+        setData(r4.data);
+        setDraft({ ...r4.data.config });
+        setDraftName(r4.data.name);
+        groups.value = groups.value.map((g8) => g8.id === gid ? { ...g8, name: r4.data.name } : g8);
+      }
+      if (effectiveRebuild || effectiveRestart) {
         const r4 = await runRestart(effectiveRebuild);
         if (!r4.ok) return;
-        steps.push(effectiveRebuild ? `rebuilt image and restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}` : `restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}`);
+        const msg = effectiveRebuild ? `Rebuilt image and restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}.` : `Restarted ${r4.restarted} session${r4.restarted === 1 ? "" : "s"}.`;
+        showToast(msg);
+      } else {
+        showToast("Saved.");
       }
-      if (steps.length) {
-        setStatus({ ok: steps.join(", ") + "." });
-        refresh();
-      }
+      onClose();
     } finally {
       setBusy(false);
     }
@@ -21289,11 +21254,17 @@ function SettingsTab({ gid }) {
   const selectedImgAge = formatAge(selectedImg?.createdAt ?? null);
   const selectedImgSize = formatSize(selectedImg?.size ?? null);
   return /* @__PURE__ */ u4("section", { children: [
-    /* @__PURE__ */ u4("p", { class: "muted", children: [
-      "Folder ",
-      /* @__PURE__ */ u4("code", { children: data.folder }),
-      data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
-      data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
+    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: [
+      /* @__PURE__ */ u4("p", { class: "muted", children: [
+        "Folder ",
+        /* @__PURE__ */ u4("code", { children: data.folder }),
+        data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
+        data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
+      ] }),
+      /* @__PURE__ */ u4("div", { class: "group-admin-toolbar-buttons", children: [
+        /* @__PURE__ */ u4(Tooltip, { text: "Re-fetch settings from server", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Refresh", onClick: refresh, disabled: busy, children: "\u21BB" }) }),
+        /* @__PURE__ */ u4(Tooltip, { text: changed ? "Save changes" : effectiveRestart || effectiveRebuild ? "Run restart/rebuild" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: apply2, disabled: busy || !changed && !effectiveRestart && !effectiveRebuild, children: "\u2713" }) })
+      ] })
     ] }),
     /* @__PURE__ */ u4(Field, { label: "Name", children: /* @__PURE__ */ u4(
       "input",
@@ -21401,7 +21372,7 @@ function SettingsTab({ gid }) {
           "Created: ",
           new Date(selectedImg.createdAt).toLocaleString()
         ] }) : null
-      ] }) : draft.image_tag ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
+      ] }) : draft.image_tag && images ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
     ] }) }),
     /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
       "input",
@@ -21456,7 +21427,6 @@ function SettingsTab({ gid }) {
       }
     ),
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: [
-      /* @__PURE__ */ u4(Tooltip, { text: "Discard pending edits. Reverts every field back to the saved value.", children: /* @__PURE__ */ u4("button", { type: "button", class: "ghost", onClick: reset, disabled: busy || !changed, children: "Reset" }) }),
       /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
         /* @__PURE__ */ u4(
           "input",
@@ -21488,19 +21458,8 @@ function SettingsTab({ gid }) {
         ),
         /* @__PURE__ */ u4("span", { children: "Rebuild image" }),
         /* @__PURE__ */ u4(Tooltip, { text: "Rebuild the container image before restarting.\nAuto-selected when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change \u2014 that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
-      ] }),
-      /* @__PURE__ */ u4("div", { style: "flex:1" }),
-      /* @__PURE__ */ u4(Tooltip, { text: changed ? "Persist pending edits to the database, then run any actions ticked above." : effectiveRestart || effectiveRebuild ? "Run the actions ticked above. No DB edits to save." : "Nothing to do \u2014 no pending edits and no actions ticked.", children: /* @__PURE__ */ u4(
-        "button",
-        {
-          type: "button",
-          onClick: apply2,
-          disabled: busy || !changed && !effectiveRestart && !effectiveRebuild,
-          children: applyLabel()
-        }
-      ) })
-    ] }),
-    status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+      ] })
+    ] })
   ] });
 }
 function Field({
@@ -21518,27 +21477,24 @@ function Field({
 }
 function MembersTab({ gid }) {
   const [members, setMembers] = h2(null);
-  const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
   async function refresh() {
     const r4 = await call(apiPath(gid, "/members"));
     if (!r4.ok) {
-      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
       return;
     }
     setMembers(r4.data.members);
-    setStatus(null);
   }
   y2(() => {
     refresh();
   }, [gid]);
   async function add(userId) {
     setBusy(true);
-    setStatus(null);
     try {
       const r4 = await call(apiPath(gid, "/members"), "POST", { userId });
       if (!r4.ok) {
-        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast("Member added");
@@ -21548,19 +21504,11 @@ function MembersTab({ gid }) {
     }
   }
   async function remove(m6) {
-    const ok = await requestConfirm({
-      title: "Remove member",
-      message: `Remove ${userLabel(m6)} from this group?`,
-      okLabel: "Remove",
-      danger: true
-    });
-    if (!ok) return;
     setBusy(true);
-    setStatus(null);
     try {
       const r4 = await call(apiPath(gid, `/members/${encodeURIComponent(m6.userId)}`), "DELETE");
       if (!r4.ok) {
-        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast("Member removed");
@@ -21600,29 +21548,25 @@ function MembersTab({ gid }) {
         disabled: busy,
         onPick: add
       }
-    ),
-    status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+    )
   ] });
 }
 function RolesTab({ gid }) {
   const [admins, setAdmins] = h2(null);
-  const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
   async function refresh() {
     const r4 = await call(apiPath(gid, "/roles"));
     if (!r4.ok) {
-      setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
       return;
     }
     setAdmins(r4.data.admins);
-    setStatus(null);
   }
   y2(() => {
     refresh();
   }, [gid]);
   async function grant(userId) {
     setBusy(true);
-    setStatus(null);
     try {
       const r4 = await call(
         apiPath(gid, "/roles"),
@@ -21630,7 +21574,7 @@ function RolesTab({ gid }) {
         { userId }
       );
       if (!r4.ok) {
-        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast(r4.data.alreadyGranted ? "Already an admin" : "Admin granted");
@@ -21640,19 +21584,11 @@ function RolesTab({ gid }) {
     }
   }
   async function revoke(a4) {
-    const ok = await requestConfirm({
-      title: "Revoke admin",
-      message: `Revoke admin role from ${userLabel(a4)} on this group?`,
-      okLabel: "Revoke",
-      danger: true
-    });
-    if (!ok) return;
     setBusy(true);
-    setStatus(null);
     try {
       const r4 = await call(apiPath(gid, `/roles/${encodeURIComponent(a4.userId)}`), "DELETE");
       if (!r4.ok) {
-        setStatus({ err: errMsg(r4.data, `HTTP ${r4.status}`) });
+        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast("Admin revoked");
@@ -21689,8 +21625,7 @@ function RolesTab({ gid }) {
         disabled: busy,
         onPick: grant
       }
-    ),
-    status ? /* @__PURE__ */ u4("div", { class: "settings-status " + (status.err ? "err" : "ok"), children: status.err || status.ok }) : null
+    )
   ] });
 }
 function UserPicker({
