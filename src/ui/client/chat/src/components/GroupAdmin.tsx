@@ -11,6 +11,7 @@ import {
   groups,
 } from '../state';
 import { Combobox, type ComboboxOption } from './Combobox';
+import { ModelSelector } from './ModelSelector';
 import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
@@ -40,6 +41,7 @@ interface SettingsResponse {
     max_messages_per_prompt: number | null;
     cli_scope: string | null;
     voice_mode: string | null;
+    transcription_model: string | null;
   };
   defaults: {
     provider: string | null;
@@ -79,19 +81,6 @@ interface UserSearchDto {
   kind: string;
   primaryHandle: string | null;
   primaryChannel: string | null;
-}
-
-interface ModelSuggestion {
-  id: string;
-  label: string;
-  detail?: string;
-  tooltip?: string;
-}
-
-interface ModelsResponse {
-  models: ModelSuggestion[];
-  source: 'models.dev' | 'unavailable';
-  upstream: string | null;
 }
 
 interface ImageSuggestion {
@@ -235,7 +224,6 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [draftName, setDraftName] = useState('');
   const [busy, setBusy] = useState(false);
-  const [models, setModels] = useState<ModelsResponse | null>(null);
   const [images, setImages] = useState<ImagesResponse | null>(null);
 
   async function refresh(): Promise<void> {
@@ -261,18 +249,7 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
     return () => { cancelled = true; };
   }, [gid]);
 
-  // Refetch model suggestions whenever the provider changes.
   const provider = draft?.provider ?? null;
-  useEffect(() => {
-    if (!provider) { setModels(null); return; }
-    let cancelled = false;
-    (async () => {
-      const r = await call<ModelsResponse>(apiPath(gid, `/models?provider=${encodeURIComponent(provider)}`));
-      if (cancelled) return;
-      setModels(r.ok ? r.data : { models: [], source: 'unavailable', upstream: null });
-    })();
-    return () => { cancelled = true; };
-  }, [provider, gid]);
 
   if (!data || !draft) return <p class="muted">Loading…</p>;
 
@@ -371,14 +348,6 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
     } finally { setBusy(false); }
   }
 
-  // Model options for the combobox; reflects current selection's detail/tooltip.
-  const modelOptions: ComboboxOption[] = (models?.models ?? []).map((m) => ({
-    value: m.id,
-    label: m.label,
-    detail: m.detail,
-    tooltip: m.tooltip,
-  }));
-
   const imageOptions: ComboboxOption[] = (images?.images ?? []).map((i) => {
     const age = formatAge(i.createdAt);
     const size = formatSize(i.size);
@@ -448,38 +417,15 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
       </Field>
 
       <Field label="Model">
-        <div class="group-admin-stack">
-          <Combobox
-            value={draft.model}
-            options={modelOptions}
-            placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
-            disabled={busy || !provider}
-            onChange={(v) => update('model', v)}
-          />
-          {(() => {
-            const matched = modelOptions.find((o) => o.value === draft.model);
-            if (matched) {
-              return (
-                <div class="group-admin-selected-info">
-                  <div class="selected-title">
-                    {matched.label}
-                    {matched.detail ? <span class="selected-detail"> · {matched.detail}</span> : null}
-                  </div>
-                  {matched.tooltip ? (
-                    <pre class="selected-tooltip">{matched.tooltip.split('\n').slice(1).join('\n')}</pre>
-                  ) : null}
-                </div>
-              );
-            }
-            if (models?.source === 'unavailable') {
-              return <p class="group-admin-help">Catalog unavailable — saved as-is.</p>;
-            }
-            if (draft.model) {
-              return <p class="group-admin-help">Not in catalog — saved as a custom value.</p>;
-            }
-            return null;
-          })()}
-        </div>
+        <ModelSelector
+          value={draft.model}
+          provider={provider}
+          placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
+          disabled={busy}
+          apiBasePath={apiPath(gid, '')}
+          outputModality="text"
+          onChange={(v) => update('model', v)}
+        />
       </Field>
 
       <Field label="Effort">
@@ -575,22 +521,17 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
       </Field>
 
       <Field
-        label="Voice mode"
-        info={'Controls the push-to-talk microphone button in the chat composer.\n' +
-          'off = no mic button.\n' +
-          'transcribe = record speech and send as text (Chrome/Edge only, uses Web Speech API).\n' +
-          'audio = record and send as an audio file attachment.'}
+        label="Transcription model"
+        info={'OpenRouter model for voice transcription. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.'}
       >
-        <Combobox
-          value={draft.voice_mode}
-          options={(data.validVoiceModes || ['off', 'transcribe', 'audio']).map((s) => ({
-            value: s,
-            label: s,
-          }))}
-          placeholder="off"
+        <ModelSelector
+          value={draft.transcription_model}
+          provider="openrouter"
+          placeholder="google/gemini-2.0-flash-lite-001"
           disabled={busy}
-          freeform={false}
-          onChange={(v) => update('voice_mode', v)}
+          apiBasePath={apiPath(gid, '')}
+          inputModality="audio"
+          onChange={(v) => update('transcription_model', v)}
         />
       </Field>
 

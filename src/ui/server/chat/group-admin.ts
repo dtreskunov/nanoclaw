@@ -55,6 +55,7 @@ const SCALAR_FIELDS = [
   'max_messages_per_prompt',
   'cli_scope',
   'voice_mode',
+  'transcription_model',
 ] as const;
 
 // Provider list is parsed once at startup from the agent-runner's
@@ -182,6 +183,7 @@ interface SettingsResponse {
     | 'max_messages_per_prompt'
     | 'cli_scope'
     | 'voice_mode'
+    | 'transcription_model'
   >;
   /** Resolved defaults for nullable config fields (shown as placeholders). */
   defaults: {
@@ -251,6 +253,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
       max_messages_per_prompt: cfg.max_messages_per_prompt,
       cli_scope: cfg.cli_scope,
       voice_mode: cfg.voice_mode,
+      transcription_model: cfg.transcription_model,
     },
     defaults: {
       provider: defaultProvider,
@@ -289,6 +292,7 @@ async function handlePatchSettings(
       | 'max_messages_per_prompt'
       | 'cli_scope'
       | 'voice_mode'
+      | 'transcription_model'
     >
   > = {};
   const isElevated = isOwner(actorUserId) || isGlobalAdmin(actorUserId);
@@ -367,6 +371,11 @@ async function handlePatchSettings(
     const existing = getContainerConfig(gid);
     const effectiveProvider = updates.provider ?? existing?.provider ?? null;
     updates.model = dbValueFromBareId(effectiveProvider, updates.model ?? null);
+  }
+
+  // Auto-derive voice_mode from transcription_model: set → transcribe, cleared → off.
+  if ('transcription_model' in updates) {
+    updates.voice_mode = updates.transcription_model ? 'transcribe' : 'off';
   }
 
   if (Object.keys(updates).length === 0 && nameUpdate === undefined) {
@@ -630,10 +639,13 @@ async function handleListModels(req: http.IncomingMessage, res: http.ServerRespo
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const provider = (url.searchParams.get('provider') || '').trim();
   if (!provider) throw new BadRequest('provider query parameter is required');
-  if (!VALID_PROVIDERS.includes(provider)) {
-    throw new BadRequest(`provider must be one of: ${VALID_PROVIDERS.join(', ')}`);
+  // Allow both agent providers and 'openrouter' (used by the transcription model selector).
+  if (!VALID_PROVIDERS.includes(provider) && provider !== 'openrouter') {
+    throw new BadRequest(`provider must be one of: ${VALID_PROVIDERS.join(', ')}, openrouter`);
   }
-  const result = await listModelsForProvider(provider);
+  const inputModality = (url.searchParams.get('inputModality') || '').trim() || undefined;
+  const outputModality = (url.searchParams.get('outputModality') || '').trim() || undefined;
+  const result = await listModelsForProvider(provider, { inputModality, outputModality });
   writeJson(res, 200, result);
 }
 
