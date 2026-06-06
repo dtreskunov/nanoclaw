@@ -18877,6 +18877,65 @@ function cleanup() {
   isRecording.value = false;
   recordingDuration.value = 0;
 }
+function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
+  const controller = new AbortController();
+  const fd = new FormData();
+  const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("mp4") ? "mp4" : "ogg";
+  fd.append("audio", blob, `voice.${ext}`);
+  const url = `/ui/chat/api/groups/${encodeURIComponent(groupId2)}/chat/${encodeURIComponent(threadId2)}/voice/transcribe`;
+  fetch(url, {
+    method: "POST",
+    body: fd,
+    signal: controller.signal,
+    credentials: "same-origin"
+  }).then(async (res) => {
+    if (!res.ok || !res.body) {
+      const errJson = await res.text().catch(() => "");
+      callbacks.onError(errJson || `http_${res.status}`);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      let eventType = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          try {
+            const parsed = JSON.parse(data);
+            if (eventType === "partial" && parsed.text) {
+              fullText += parsed.text;
+              callbacks.onPartial(parsed.text);
+            } else if (eventType === "done" && parsed.text) {
+              callbacks.onDone(parsed.text);
+            } else if (eventType === "error") {
+              callbacks.onError(parsed.error || "transcription_failed");
+            }
+          } catch {
+          }
+          eventType = "";
+        }
+      }
+    }
+    if (fullText && !controller.signal.aborted) {
+      callbacks.onDone(fullText);
+    }
+  }).catch((err) => {
+    if (!controller.signal.aborted) {
+      callbacks.onError(err instanceof Error ? err.message : "network_error");
+    }
+  });
+  return controller;
+}
 
 // src/components/ChatMain.tsx
 function fmtTok(n3) {
@@ -19166,6 +19225,8 @@ function Composer() {
   const recording = isRecording.value;
   const holdTimerRef = A2(null);
   const holdModeRef = A2(false);
+  const transcribingRef = A2(false);
+  const [transcribeStatus, setTranscribeStatus] = h2("");
   const finishRecording = async () => {
     const result = await stopRecording();
     if (!result) {
@@ -19175,8 +19236,34 @@ function Composer() {
       }, 2e3);
       return;
     }
-    if (vm === "transcribe" && result.transcript) {
-      sendChat(result.transcript, null).catch(console.error);
+    if (vm === "transcribe") {
+      if (result.transcript) {
+        sendChat(result.transcript, null).catch(console.error);
+      } else {
+        if (!groupId.value || !threadId.value) return;
+        transcribingRef.current = true;
+        setTranscribeStatus("transcribing\u2026");
+        transcribeViaServer(result.blob, groupId.value, threadId.value, {
+          onPartial: (delta) => {
+            setTranscribeStatus((prev) => {
+              const cur = prev === "transcribing\u2026" ? "" : prev;
+              return cur + delta;
+            });
+          },
+          onDone: (_fullText) => {
+            transcribingRef.current = false;
+            setTranscribeStatus("");
+          },
+          onError: (err) => {
+            transcribingRef.current = false;
+            setTranscribeStatus("");
+            chatStatus.value = `transcription failed: ${err}`;
+            setTimeout(() => {
+              if (chatStatus.value.startsWith("transcription failed")) chatStatus.value = "connected";
+            }, 3e3);
+          }
+        });
+      }
     } else {
       const rawType = result.blob.type.split(";")[0] || "audio/mp4";
       const ext = rawType.includes("ogg") ? "ogg" : rawType.includes("mp4") ? "m4a" : "webm";
@@ -19247,7 +19334,7 @@ function Composer() {
         recording ? /* @__PURE__ */ u4("div", { id: "chat-recording-indicator", children: [
           /* @__PURE__ */ u4("span", { class: "recording-dot" }),
           /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) })
-        ] }) : /* @__PURE__ */ u4(
+        ] }) : transcribeStatus ? /* @__PURE__ */ u4("div", { id: "chat-transcribing-indicator", children: /* @__PURE__ */ u4("span", { class: "transcribing-text", children: transcribeStatus }) }) : /* @__PURE__ */ u4(
           "textarea",
           {
             id: "chat-input",
@@ -21213,6 +21300,80 @@ function Combobox({
   ] });
 }
 
+// src/components/ModelSelector.tsx
+async function fetchJson(url) {
+  try {
+    const res = await fetch(url, { credentials: "same-origin" });
+    const data = await res.json();
+    return { ok: res.ok, data, status: res.status };
+  } catch {
+    return { ok: false, data: {}, status: 0 };
+  }
+}
+function ModelSelector({ value, provider, placeholder, disabled, apiBasePath, inputModality, outputModality, onChange }) {
+  const [models, setModels] = h2(null);
+  y2(() => {
+    if (!provider) {
+      setModels(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const params = new URLSearchParams({ provider });
+      if (inputModality) params.set("inputModality", inputModality);
+      if (outputModality) params.set("outputModality", outputModality);
+      const r4 = await fetchJson(
+        `${apiBasePath}/models?${params.toString()}`
+      );
+      if (cancelled) return;
+      setModels(r4.ok ? r4.data : { models: [], source: "unavailable", upstream: null });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [provider, apiBasePath, inputModality, outputModality]);
+  const options = (models?.models ?? []).map((m6) => ({
+    value: m6.id,
+    label: m6.label,
+    detail: m6.detail,
+    tooltip: m6.tooltip
+  }));
+  const matched = options.find((o4) => o4.value === value);
+  return /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+    /* @__PURE__ */ u4(
+      Combobox,
+      {
+        value,
+        options,
+        placeholder: placeholder || "pick or type a model id",
+        disabled: disabled || !provider,
+        onChange
+      }
+    ),
+    (() => {
+      if (matched) {
+        return /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
+          /* @__PURE__ */ u4("div", { class: "selected-title", children: [
+            matched.label,
+            matched.detail ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
+              " \xB7 ",
+              matched.detail
+            ] }) : null
+          ] }),
+          matched.tooltip ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: matched.tooltip.split("\n").slice(1).join("\n") }) : null
+        ] });
+      }
+      if (models?.source === "unavailable") {
+        return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Catalog unavailable \u2014 saved as-is." });
+      }
+      if (value) {
+        return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Not in catalog \u2014 saved as a custom value." });
+      }
+      return null;
+    })()
+  ] });
+}
+
 // src/components/GroupAdmin.tsx
 var PROVIDER_INFO = {
   claude: "Claude \u2014 Anthropic models via the official SDK. Uses your OneCLI-injected Anthropic API key.",
@@ -21323,7 +21484,6 @@ function SettingsTab({ gid, onClose, onActions }) {
   const [draft, setDraft] = h2(null);
   const [draftName, setDraftName] = h2("");
   const [busy, setBusy] = h2(false);
-  const [models, setModels] = h2(null);
   const [images, setImages] = h2(null);
   async function refresh() {
     setBusy(true);
@@ -21354,21 +21514,6 @@ function SettingsTab({ gid, onClose, onActions }) {
     };
   }, [gid]);
   const provider = draft?.provider ?? null;
-  y2(() => {
-    if (!provider) {
-      setModels(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const r4 = await call(apiPath(gid, `/models?provider=${encodeURIComponent(provider)}`));
-      if (cancelled) return;
-      setModels(r4.ok ? r4.data : { models: [], source: "unavailable", upstream: null });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [provider, gid]);
   if (!data || !draft) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
   function update(k4, v5) {
     setDraft((d5) => d5 ? { ...d5, [k4]: v5 } : d5);
@@ -21455,12 +21600,6 @@ function SettingsTab({ gid, onClose, onActions }) {
       setBusy(false);
     }
   }
-  const modelOptions = (models?.models ?? []).map((m6) => ({
-    value: m6.id,
-    label: m6.label,
-    detail: m6.detail,
-    tooltip: m6.tooltip
-  }));
   const imageOptions = (images?.images ?? []).map((i5) => {
     const age = formatAge(i5.createdAt);
     const size = formatSize(i5.size);
@@ -21525,40 +21664,18 @@ function SettingsTab({ gid, onClose, onActions }) {
         )
       }
     ),
-    /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
-      /* @__PURE__ */ u4(
-        Combobox,
-        {
-          value: draft.model,
-          options: modelOptions,
-          placeholder: data.defaults.model ? `default: ${data.defaults.model}` : "pick or type a model id",
-          disabled: busy || !provider,
-          onChange: (v5) => update("model", v5)
-        }
-      ),
-      (() => {
-        const matched = modelOptions.find((o4) => o4.value === draft.model);
-        if (matched) {
-          return /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
-            /* @__PURE__ */ u4("div", { class: "selected-title", children: [
-              matched.label,
-              matched.detail ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
-                " \xB7 ",
-                matched.detail
-              ] }) : null
-            ] }),
-            matched.tooltip ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: matched.tooltip.split("\n").slice(1).join("\n") }) : null
-          ] });
-        }
-        if (models?.source === "unavailable") {
-          return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Catalog unavailable \u2014 saved as-is." });
-        }
-        if (draft.model) {
-          return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Not in catalog \u2014 saved as a custom value." });
-        }
-        return null;
-      })()
-    ] }) }),
+    /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
+      ModelSelector,
+      {
+        value: draft.model,
+        provider,
+        placeholder: data.defaults.model ? `default: ${data.defaults.model}` : "pick or type a model id",
+        disabled: busy,
+        apiBasePath: apiPath(gid, ""),
+        outputModality: "text",
+        onChange: (v5) => update("model", v5)
+      }
+    ) }),
     /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
       "input",
       {
@@ -21650,20 +21767,18 @@ function SettingsTab({ gid, onClose, onActions }) {
     /* @__PURE__ */ u4(
       Field,
       {
-        label: "Voice mode",
-        info: "Controls the push-to-talk microphone button in the chat composer.\noff = no mic button.\ntranscribe = record speech and send as text (Chrome/Edge only, uses Web Speech API).\naudio = record and send as an audio file attachment.",
+        label: "Transcription model",
+        info: "OpenRouter model for voice transcription. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.",
         children: /* @__PURE__ */ u4(
-          Combobox,
+          ModelSelector,
           {
-            value: draft.voice_mode,
-            options: (data.validVoiceModes || ["off", "transcribe", "audio"]).map((s5) => ({
-              value: s5,
-              label: s5
-            })),
-            placeholder: "off",
+            value: draft.transcription_model,
+            provider: "openrouter",
+            placeholder: "google/gemini-2.0-flash-lite-001",
             disabled: busy,
-            freeform: false,
-            onChange: (v5) => update("voice_mode", v5)
+            apiBasePath: apiPath(gid, ""),
+            inputModality: "audio",
+            onChange: (v5) => update("transcription_model", v5)
           }
         )
       }
