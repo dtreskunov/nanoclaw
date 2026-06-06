@@ -24,4 +24,4 @@ The `conversations/` folder in your workspace holds searchable transcripts of pa
 
 You **can** view images and other file attachments. When a user sends a file, it is saved to your workspace and included inline with the message — you can see images directly and read other file types. The message annotation shows the file path (e.g. `[image: photo.jpg — saved to /workspace/agent/inbox/…/photo.jpg]`); you can also Read that path later if you need to re-examine it.
 
-Note: not all models support all attachment types. If your model doesn't natively handle a particular format (e.g. audio, video), you can still Read the file from disk and process it with command-line tools.
+Audio files sent by the user are included inline — you can hear them directly and should respond to the spoken content (transcribe, answer questions, follow instructions, etc.). If your model can't natively process a particular attachment format, you can still Read the file from disk and process it with command-line tools (e.g. `ffmpeg` for audio/video conversion).
