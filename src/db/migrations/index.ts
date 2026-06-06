@@ -25,6 +25,7 @@ import { moduleApprovalsPendingApprovals } from './module-approvals-pending-appr
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
 import { moduleContainerConfigsVoiceMode } from './module-container-configs-voice-mode.js';
+import { moduleContainerConfigsTranscriptionModel } from './module-container-configs-transcription-model.js';
 import { moduleResendThreadRoots } from './module-resend-thread-roots.js';
 
 export interface Migration {
@@ -59,6 +60,7 @@ const migrations: Migration[] = [
   moduleResendThreadRoots,
   moduleContainerConfigsPip,
   moduleContainerConfigsVoiceMode,
+  moduleContainerConfigsTranscriptionModel,
 ];
 
 export function runMigrations(db: Database.Database): void {

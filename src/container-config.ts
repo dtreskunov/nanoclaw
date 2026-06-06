@@ -54,6 +54,7 @@ export interface ContainerConfig {
   maxMessagesPerPrompt?: number;
   model?: string;
   effort?: string;
+  transcriptionModel?: string;
 }
 
 /**
@@ -93,6 +94,7 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     maxMessagesPerPrompt: row.max_messages_per_prompt ?? undefined,
     model: row.model ?? envFallback('DEFAULT_MODEL'),
     effort: row.effort ?? envFallback('DEFAULT_EFFORT'),
+    transcriptionModel: row.transcription_model ?? envFallback('DEFAULT_TRANSCRIPTION_MODEL'),
   };
 }
 

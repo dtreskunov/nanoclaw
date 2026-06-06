@@ -27,6 +27,7 @@ export interface ContainerConfigRow {
   additional_mounts: string; // JSON: AdditionalMountConfig[]
   cli_scope: string; // 'disabled' | 'group' | 'global'
   voice_mode: string; // 'off' | 'transcribe' | 'audio'
+  transcription_model: string | null;
   updated_at: string;
 }
 

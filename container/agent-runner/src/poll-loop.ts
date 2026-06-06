@@ -18,6 +18,7 @@ import {
 } from './formatter.js';
 import { isUploadTraceCommand, uploadTrace } from './upload-trace.js';
 import { isAudioMime, transcribeAudio } from './transcribe.js';
+import { getConfig } from './config.js';
 import type { AgentProvider, AgentQuery, FileAttachment, ProviderEvent } from './providers/types.js';
 
 const POLL_INTERVAL_MS = 1000;
@@ -395,12 +396,13 @@ async function transcribeAudioFiles(
 ): Promise<{ prompt: string; files: FileAttachment[] }> {
   const nonAudio: FileAttachment[] = [];
   const transcripts: string[] = [];
+  const model = getConfig().transcriptionModel;
   for (const file of files) {
     if (!isAudioMime(file.mime)) {
       nonAudio.push(file);
       continue;
     }
-    const text = await transcribeAudio(file.path, file.mime);
+    const text = await transcribeAudio(file.path, file.mime, model);
     if (text) {
       log(`Transcribed ${file.filename}: "${text.slice(0, 80)}${text.length > 80 ? '…' : ''}"`);
       transcripts.push(text);

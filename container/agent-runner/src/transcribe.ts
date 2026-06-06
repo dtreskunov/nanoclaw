@@ -10,7 +10,7 @@
  */
 import fs from 'fs';
 
-const TRANSCRIPTION_MODEL = 'google/gemini-2.0-flash-lite-001';
+const DEFAULT_TRANSCRIPTION_MODEL = 'google/gemini-2.0-flash-lite-001';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const TIMEOUT_MS = 15_000;
 
@@ -33,7 +33,7 @@ export function isAudioMime(mime: string): boolean {
  * Transcribe an audio file by calling OpenRouter directly.
  * Returns the transcript text, or null on failure.
  */
-export async function transcribeAudio(filePath: string, mime: string): Promise<string | null> {
+export async function transcribeAudio(filePath: string, mime: string, model?: string): Promise<string | null> {
   const format = MIME_TO_FORMAT[mime];
   if (!format) return null;
 
@@ -49,7 +49,7 @@ export async function transcribeAudio(filePath: string, mime: string): Promise<s
   const b64 = data.toString('base64');
 
   const body = {
-    model: TRANSCRIPTION_MODEL,
+    model: model || DEFAULT_TRANSCRIPTION_MODEL,
     messages: [
       {
         role: 'user',
