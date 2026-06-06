@@ -1,25 +1,28 @@
 /**
- * Model catalog backed by models.dev.
+ * Model catalog backed by OpenRouter /api/v1/models.
  *
  * Wire format is opaque to the client. The host translates between the bare
  * model id (what users see and pick) and the on-disk `container_configs.model`
  * value at the API boundary:
  *
- *   - claude   → DB value === bare id. No translation.
+ *   - claude   → DB value === bare id (no provider prefix, e.g. "claude-sonnet-4.6").
+ *                The OpenRouter catalog uses "anthropic/claude-sonnet-4.6"; we
+ *                strip the prefix before exposing to the client.
  *   - opencode → DB value === `<OPENCODE_PROVIDER>/<bare-id>` (e.g.
  *                `openrouter/anthropic/claude-sonnet-4.6`). The opencode
  *                container provider sets OPENCODE_MODEL from the DB value
  *                verbatim, so the prefix is required at storage time.
  *                See src/providers/opencode.ts. The client always works
- *                with the bare id.
+ *                with the bare id (the full OpenRouter model id).
  *   - mock     → no UI catalog; not exposed by the admin endpoint.
  *
  * Catalog cached in memory (~1h TTL + brief negative cache on failure).
  */
 import { log } from '../../../log.js';
 import { readEnvFile } from '../../../env.js';
+import { proxyFetch } from './onecli-proxy.js';
 
-const MODELS_DEV_URL = 'https://models.dev/api.json';
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export interface ModelSuggestion {
@@ -41,51 +44,56 @@ export interface ModelSuggestion {
   modalitiesOut?: string[];
 }
 
-interface ModelsDevModel {
+interface OpenRouterModel {
   id: string;
   name?: string;
-  family?: string;
-  reasoning?: boolean;
-  tool_call?: boolean;
-  knowledge?: string;
-  release_date?: string;
-  modalities?: { input?: string[]; output?: string[] };
-  limit?: { context?: number; output?: number };
-  cost?: { input?: number; output?: number };
+  description?: string;
+  context_length?: number;
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+    modality?: string;
+  };
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+  };
+  top_provider?: {
+    context_length?: number;
+    max_completion_tokens?: number;
+  };
+  supported_parameters?: string[];
+  knowledge_cutoff?: string;
+  created?: number;
 }
-interface ModelsDevProvider {
-  id: string;
-  name?: string;
-  models: Record<string, ModelsDevModel>;
+
+interface OpenRouterResponse {
+  data: OpenRouterModel[];
 }
-type ModelsDevCatalog = Record<string, ModelsDevProvider>;
 
 interface CacheEntry {
   fetchedAt: number;
-  catalog: ModelsDevCatalog | null; // null = last fetch failed
+  models: OpenRouterModel[] | null; // null = last fetch failed
 }
 
 let cache: CacheEntry | null = null;
-let inflight: Promise<ModelsDevCatalog | null> | null = null;
+let inflight: Promise<OpenRouterModel[] | null> | null = null;
 
-async function fetchCatalog(): Promise<ModelsDevCatalog | null> {
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS && cache.catalog) {
-    return cache.catalog;
+async function fetchCatalog(): Promise<OpenRouterModel[] | null> {
+  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS && cache.models) {
+    return cache.models;
   }
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const r = await fetch(MODELS_DEV_URL, { signal: controller.signal });
-      clearTimeout(timer);
+      const r = await proxyFetch(OPENROUTER_MODELS_URL, { timeout: 15_000 });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const json = (await r.json()) as ModelsDevCatalog;
-      cache = { fetchedAt: Date.now(), catalog: json };
-      return json;
+      const json = (await r.json()) as OpenRouterResponse;
+      cache = { fetchedAt: Date.now(), models: json.data };
+      return json.data;
     } catch (err) {
-      log.warn('models.dev fetch failed', { err: String(err) });
-      cache = { fetchedAt: Date.now(), catalog: null };
+      log.warn('OpenRouter models fetch failed', { err: String(err) });
+      cache = { fetchedAt: Date.now(), models: null };
       return null;
     } finally {
       inflight = null;
@@ -94,89 +102,119 @@ async function fetchCatalog(): Promise<ModelsDevCatalog | null> {
   return inflight;
 }
 
-function formatDetail(m: ModelsDevModel): string | undefined {
+function perTokenToPMtok(perToken: string | undefined): number | undefined {
+  if (perToken == null) return undefined;
+  const n = parseFloat(perToken);
+  if (isNaN(n)) return undefined;
+  return Math.round(n * 1_000_000 * 100) / 100; // 2 decimal places
+}
+
+function formatDetail(m: OpenRouterModel): string | undefined {
   const parts: string[] = [];
-  const ctx = m.limit?.context;
+  const ctx = m.context_length;
   if (ctx) parts.push(`${Math.round(ctx / 1024)}k ctx`);
-  if (m.cost?.input != null && m.cost?.output != null) {
-    parts.push(`$${m.cost.input}/$${m.cost.output} per Mtok`);
+  const inCost = perTokenToPMtok(m.pricing?.prompt);
+  const outCost = perTokenToPMtok(m.pricing?.completion);
+  if (inCost != null && outCost != null) {
+    parts.push(`$${inCost}/$${outCost} per Mtok`);
   }
   return parts.length ? parts.join(' · ') : undefined;
 }
 
-function formatTooltip(m: ModelsDevModel, providerLabel: string): string {
+function formatTooltip(m: OpenRouterModel): string {
   const lines: string[] = [];
-  lines.push(`${providerLabel} · ${m.name?.trim() || m.id}`);
-  if (m.family && m.family !== m.id) lines.push(`Family: ${m.family}`);
-  if (m.limit?.context) {
-    const out = m.limit.output ? ` · output up to ${m.limit.output.toLocaleString()}` : '';
-    lines.push(`Context: ${m.limit.context.toLocaleString()} tokens${out}`);
+  lines.push(m.name?.trim() || m.id);
+  if (m.context_length) {
+    const maxOut = m.top_provider?.max_completion_tokens;
+    const out = maxOut ? ` · output up to ${maxOut.toLocaleString()}` : '';
+    lines.push(`Context: ${m.context_length.toLocaleString()} tokens${out}`);
   }
-  if (m.cost?.input != null && m.cost?.output != null) {
-    lines.push(`Cost: $${m.cost.input} in · $${m.cost.output} out (per Mtok)`);
+  const inCost = perTokenToPMtok(m.pricing?.prompt);
+  const outCost = perTokenToPMtok(m.pricing?.completion);
+  if (inCost != null && outCost != null) {
+    lines.push(`Cost: $${inCost} in · $${outCost} out (per Mtok)`);
   }
-  if (m.knowledge) lines.push(`Knowledge cutoff: ${m.knowledge}`);
-  if (m.release_date) lines.push(`Released: ${m.release_date}`);
-  if (m.modalities?.input?.length) lines.push(`Input: ${m.modalities.input.join(', ')}`);
-  if (m.modalities?.output?.length) lines.push(`Output: ${m.modalities.output.join(', ')}`);
-  const caps: string[] = [];
-  if (m.tool_call) caps.push('tools');
-  if (m.reasoning) caps.push('reasoning');
-  if (caps.length) lines.push(`Capabilities: ${caps.join(', ')}`);
+  if (m.knowledge_cutoff) lines.push(`Knowledge cutoff: ${m.knowledge_cutoff}`);
+  if (m.created) lines.push(`Created: ${new Date(m.created * 1000).toISOString().slice(0, 10)}`);
+  if (m.architecture?.input_modalities?.length) lines.push(`Input: ${m.architecture.input_modalities.join(', ')}`);
+  if (m.architecture?.output_modalities?.length) lines.push(`Output: ${m.architecture.output_modalities.join(', ')}`);
+  if (m.description) lines.push(m.description.slice(0, 200));
   return lines.join('\n');
 }
 
-function mapModel(m: ModelsDevModel, providerLabel: string): ModelSuggestion {
+function mapModel(m: OpenRouterModel, bareId: string): ModelSuggestion {
   return {
-    id: m.id,
-    label: m.name?.trim() || m.id,
+    id: bareId,
+    label: m.name?.trim() || bareId,
     detail: formatDetail(m),
-    tooltip: formatTooltip(m, providerLabel),
-    contextWindow: m.limit?.context,
-    inputCostPerMTok: m.cost?.input,
-    outputCostPerMTok: m.cost?.output,
-    knowledgeCutoff: m.knowledge,
-    releaseDate: m.release_date,
-    modalitiesIn: m.modalities?.input,
-    modalitiesOut: m.modalities?.output,
+    tooltip: formatTooltip(m),
+    contextWindow: m.context_length,
+    inputCostPerMTok: perTokenToPMtok(m.pricing?.prompt),
+    outputCostPerMTok: perTokenToPMtok(m.pricing?.completion),
+    knowledgeCutoff: m.knowledge_cutoff,
+    modalitiesIn: m.architecture?.input_modalities,
+    modalitiesOut: m.architecture?.output_modalities,
   };
 }
 
 export interface ModelCatalogResult {
   models: ModelSuggestion[];
-  source: 'models.dev' | 'unavailable';
+  source: 'openrouter' | 'unavailable';
   /** Label for the upstream catalog (e.g. "openrouter", "anthropic"). */
   upstream: string | null;
 }
 
+export interface ModelFilterOptions {
+  /** Only include models whose input modalities contain this value. */
+  inputModality?: string;
+  /** Only include models whose output modalities contain this value. */
+  outputModality?: string;
+}
+
 /** Returns suggestions whose `id` is the bare model id (no prefix). */
-export async function listModelsForProvider(agentProvider: string): Promise<ModelCatalogResult> {
+export async function listModelsForProvider(
+  agentProvider: string,
+  filter?: ModelFilterOptions,
+): Promise<ModelCatalogResult> {
   // mock is intentionally not surfaced through the admin UI — it's a
   // test-only provider and the dropdown shouldn't tempt users into picking
   // it. If you need it, set via `ncl groups config update --provider mock`.
   if (agentProvider === 'mock') {
-    return { models: [], source: 'models.dev', upstream: null };
+    return { models: [], source: 'openrouter', upstream: null };
   }
 
-  const catalog = await fetchCatalog();
-  if (!catalog) return { models: [], source: 'unavailable', upstream: null };
+  const allModels = await fetchCatalog();
+  if (!allModels) return { models: [], source: 'unavailable', upstream: null };
 
-  let upstreamKey: string | null = null;
-  if (agentProvider === 'claude') upstreamKey = 'anthropic';
-  else if (agentProvider === 'opencode') upstreamKey = opencodeUpstream();
+  // Determine which models to show and how to derive the bare ID.
+  let filterPrefix: string | null = null;
+  let upstream: string | null = null;
 
-  if (!upstreamKey) return { models: [], source: 'models.dev', upstream: null };
-  const p = catalog[upstreamKey];
-  if (!p) return { models: [], source: 'models.dev', upstream: upstreamKey };
+  if (agentProvider === 'claude') {
+    filterPrefix = 'anthropic/';
+    upstream = 'anthropic';
+  } else if (agentProvider === 'opencode') {
+    upstream = opencodeUpstream();
+    // opencode uses the full OpenRouter model id as the bare id
+    filterPrefix = null;
+  } else if (agentProvider === 'openrouter') {
+    upstream = 'openrouter';
+    filterPrefix = null;
+  }
 
-  const providerLabel = p.name?.trim() || upstreamKey;
-  return {
-    models: Object.values(p.models)
-      .map((m) => mapModel(m, providerLabel))
-      .sort((a, b) => a.label.localeCompare(b.label)),
-    source: 'models.dev',
-    upstream: upstreamKey,
-  };
+  if (!upstream) return { models: [], source: 'openrouter', upstream: null };
+
+  const models: ModelSuggestion[] = [];
+  for (const m of allModels) {
+    if (filterPrefix && !m.id.startsWith(filterPrefix)) continue;
+    if (filter?.inputModality && !m.architecture?.input_modalities?.includes(filter.inputModality)) continue;
+    if (filter?.outputModality && !m.architecture?.output_modalities?.includes(filter.outputModality)) continue;
+    const bareId = filterPrefix ? m.id.slice(filterPrefix.length) : m.id;
+    models.push(mapModel(m, bareId));
+  }
+
+  models.sort((a, b) => a.label.localeCompare(b.label));
+  return { models, source: 'openrouter', upstream };
 }
 
 /** Look up details for a specific bare id (used for the "current selection" panel). */
