@@ -361,6 +361,20 @@ async function handlePatchSettings(
     const existing = getContainerConfig(gid);
     const effectiveProvider = updates.provider ?? existing?.provider ?? null;
     updates.model = dbValueFromBareId(effectiveProvider, updates.model ?? null);
+    const bareModel = bareIdForResponse(effectiveProvider, updates.model ?? null);
+    if (effectiveProvider && bareModel) {
+      const exact = await getModelDetails(effectiveProvider, bareModel);
+      if (!exact) {
+        const catalog = await listModelsForProvider(effectiveProvider);
+        const q = bareModel.trim().toLowerCase();
+        const partialMatch = catalog.models.some(
+          (m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q),
+        );
+        if (partialMatch) {
+          throw new BadRequest('model must be selected from the catalog, not a partial search term');
+        }
+      }
+    }
   }
 
   if ('transcription_model' in updates || 'provider' in updates || 'model' in updates) {

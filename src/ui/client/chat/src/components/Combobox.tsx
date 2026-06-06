@@ -51,9 +51,8 @@ export function Combobox({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Track external value changes (e.g. provider switch resets model).
-  // In freeform mode the parent value echoes our text on every keystroke;
-  // only resync (and exit filtering mode) when the external value actually
-  // differs from what we're showing.
+  // While typing, text is only a local filter; the parent value changes when
+  // the user picks an option or commits free-form text.
   const valueRef = useRef(value);
   valueRef.current = value;
   useEffect(() => {
@@ -69,6 +68,7 @@ export function Combobox({
     if (!open) return undefined;
     const onDoc = (e: MouseEvent): void => {
       if (!rootRef.current?.contains(e.target as Node)) {
+        if (freeform) commitText(text);
         setOpen(false);
         setFiltering(false);
         // If we don't allow free-form input, reset any typed-but-uncommitted
@@ -78,7 +78,7 @@ export function Combobox({
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [open, freeform]);
+  }, [open, freeform, text]);
 
   // Filter: only narrow when the user is actively typing. Otherwise show
   // everything so opening the popup from a saved selection lets the user
@@ -90,12 +90,23 @@ export function Combobox({
       )
     : options;
 
-  function commit(next: string): void {
+  function finishCommit(next: string): void {
     setText(next);
-    onChange(freeform ? next || null : next || null);
     setOpen(false);
     setFiltering(false);
     setHighlight(-1);
+  }
+
+  function commitOption(next: string): void {
+    onChange(next || null);
+    finishCommit(next);
+  }
+
+  function commitText(next: string): void {
+    if (!freeform) return;
+    const trimmed = next.trim();
+    onChange(trimmed || null);
+    finishCommit(trimmed);
   }
 
   function onKeyDown(e: JSX.TargetedKeyboardEvent<HTMLInputElement>): void {
@@ -110,9 +121,9 @@ export function Combobox({
     } else if (e.key === 'Enter') {
       if (open && highlight >= 0 && matches[highlight]) {
         e.preventDefault();
-        commit(matches[highlight]!.value);
+        commitOption(matches[highlight]!.value);
       } else if (freeform) {
-        commit(text);
+        commitText(text);
       }
     } else if (e.key === 'Escape') {
       setOpen(false);
@@ -136,7 +147,6 @@ export function Combobox({
         onInput={(e) => {
           const v = (e.currentTarget as HTMLInputElement).value;
           setText(v);
-          if (freeform) onChange(v || null);
           setOpen(true);
           setFiltering(true);
           setHighlight(-1);
@@ -169,7 +179,7 @@ export function Combobox({
               onMouseEnter={() => setHighlight(i)}
               onMouseDown={(e) => {
                 e.preventDefault(); // keep focus on input
-                commit(o.value);
+                commitOption(o.value);
               }}
             >
               <span class="combobox-option-main">
