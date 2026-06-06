@@ -204,3 +204,87 @@ function cleanup(): void {
   isRecording.value = false;
   recordingDuration.value = 0;
 }
+
+// ── Server-side streaming transcription ─────────────────────────────
+
+export interface TranscribeCallbacks {
+  onPartial: (delta: string) => void;
+  onDone: (fullText: string) => void;
+  onError: (error: string) => void;
+}
+
+/**
+ * POST audio to the server and stream SSE transcript chunks back.
+ * Returns an AbortController for cancellation.
+ */
+export function transcribeViaServer(
+  blob: Blob,
+  groupId: string,
+  threadId: string,
+  callbacks: TranscribeCallbacks,
+): AbortController {
+  const controller = new AbortController();
+  const fd = new FormData();
+  const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp4') ? 'mp4' : 'ogg';
+  fd.append('audio', blob, `voice.${ext}`);
+
+  const url = `/ui/chat/api/groups/${encodeURIComponent(groupId)}/chat/${encodeURIComponent(threadId)}/voice/transcribe`;
+
+  fetch(url, {
+    method: 'POST',
+    body: fd,
+    signal: controller.signal,
+    credentials: 'same-origin',
+  })
+    .then(async (res) => {
+      if (!res.ok || !res.body) {
+        const errJson = await res.text().catch(() => '');
+        callbacks.onError(errJson || `http_${res.status}`);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let fullText = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+        let eventType = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data) as { text?: string; error?: string };
+              if (eventType === 'partial' && parsed.text) {
+                fullText += parsed.text;
+                callbacks.onPartial(parsed.text);
+              } else if (eventType === 'done' && parsed.text) {
+                callbacks.onDone(parsed.text);
+              } else if (eventType === 'error') {
+                callbacks.onError(parsed.error || 'transcription_failed');
+              }
+            } catch {
+              /* skip malformed */
+            }
+            eventType = '';
+          }
+        }
+      }
+      // If we never got a done event but accumulated text, treat as done
+      if (fullText && !controller.signal.aborted) {
+        callbacks.onDone(fullText);
+      }
+    })
+    .catch((err) => {
+      if (!controller.signal.aborted) {
+        callbacks.onError(err instanceof Error ? err.message : 'network_error');
+      }
+    });
+
+  return controller;
+}

@@ -15,7 +15,7 @@ import {
   navFile, removePinnedPath, clearPinnedContext, respondApproval,
   openChat,
 } from '../actions';
-import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia } from '../recorder';
+import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia, transcribeViaServer } from '../recorder';
 import { RelativeTime } from './RelativeTime';
 import type { ChatMessage, TurnUsage } from '../types';
 
@@ -372,6 +372,9 @@ function Composer() {
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdModeRef = useRef(false);
 
+  const transcribingRef = useRef(false);
+  const [transcribeStatus, setTranscribeStatus] = useState('');
+
   const finishRecording = async (): Promise<void> => {
     const result = await stopRecording();
     if (!result) {
@@ -379,8 +382,34 @@ function Composer() {
       setTimeout(() => { if (chatStatus.value === 'too short — discarded') chatStatus.value = 'connected'; }, 2000);
       return;
     }
-    if (vm === 'transcribe' && result.transcript) {
-      sendChat(result.transcript, null).catch(console.error);
+    if (vm === 'transcribe') {
+      // Prefer client-side transcript if available; otherwise use server
+      if (result.transcript) {
+        sendChat(result.transcript, null).catch(console.error);
+      } else {
+        // Server-side streaming transcription
+        if (!groupId.value || !threadId.value) return;
+        transcribingRef.current = true;
+        setTranscribeStatus('transcribing…');
+        transcribeViaServer(result.blob, groupId.value, threadId.value, {
+          onPartial: (delta) => {
+            setTranscribeStatus((prev) => {
+              const cur = prev === 'transcribing…' ? '' : prev;
+              return cur + delta;
+            });
+          },
+          onDone: (_fullText) => {
+            transcribingRef.current = false;
+            setTranscribeStatus('');
+          },
+          onError: (err) => {
+            transcribingRef.current = false;
+            setTranscribeStatus('');
+            chatStatus.value = `transcription failed: ${err}`;
+            setTimeout(() => { if (chatStatus.value.startsWith('transcription failed')) chatStatus.value = 'connected'; }, 3000);
+          },
+        });
+      }
     } else {
       // Strip codec params from mime type (e.g. "audio/mp4;codecs=opus" → "audio/mp4")
       // since providers may not recognize the parameterized form.
@@ -458,6 +487,10 @@ function Composer() {
         <div id="chat-recording-indicator">
           <span class="recording-dot"></span>
           <span class="recording-time">{fmtDuration(recordingDuration.value)}</span>
+        </div>
+      ) : transcribeStatus ? (
+        <div id="chat-transcribing-indicator">
+          <span class="transcribing-text">{transcribeStatus}</span>
         </div>
       ) : (
         <textarea
