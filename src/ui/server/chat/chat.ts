@@ -2144,7 +2144,21 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
     },
     onInboundEcho(id, text, files) {
       try {
-        ws.send(JSON.stringify({ kind: 'inbound', id, text, files: files ?? [], timestamp: new Date().toISOString() }));
+        // Live echo files arrive with just {filename, size}. Enrich them
+        // with the same attachment `url` + `contentType` that /history
+        // supplies so inline audio/video players render immediately on send
+        // instead of only after a page reload. The host namespaces the
+        // stored message id as `<id>:<agentGroupId>` and writes attachments
+        // to inbox/<namespaced-id>/<filename>; reconstruct that localPath to
+        // build the matching url.
+        const enriched = (files ?? []).map((f) => ({
+          ...f,
+          url: encodedAttachmentUrl(ctx.groupId, ctx.threadId, `inbox/${id}:${ctx.groupId}/${f.filename}`),
+          contentType: mimeFromFilename(f.filename),
+        }));
+        ws.send(
+          JSON.stringify({ kind: 'inbound', id, text, files: enriched, timestamp: new Date().toISOString() }),
+        );
       } catch (err) {
         log.warn('web chat ws echo failed', { err });
       }
