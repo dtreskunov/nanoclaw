@@ -143,23 +143,27 @@
   opacity: 0.6;
 }
 
-/* Inline restart/rebuild confirmation banner */
-.group-admin-confirm {
+/* Apply-confirmation dialog (restart / rebuild) */
+.ga-confirm-options {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  padding: 8px 12px;
-  margin-top: 6px;
+}
+.ga-confirm-warn {
+  margin: 12px 0 0;
+  padding: 6px 10px;
   border-radius: var(--radius-sm, 4px);
   background: var(--head-tint);
   border: 1px solid var(--border);
+  color: var(--muted);
   font-size: var(--font-sm);
 }
-.group-admin-confirm-actions {
+.ga-confirm-foot {
   display: flex;
-  gap: 6px;
-  margin-left: auto;
-  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
 }
 
 /* Toolbar with refresh/save icons at the top of the settings tab */

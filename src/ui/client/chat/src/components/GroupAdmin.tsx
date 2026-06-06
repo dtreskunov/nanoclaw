@@ -289,36 +289,35 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
     && !!images
     && !images.images.some((i) => i.value === draft.image_tag);
 
-  // Action checkboxes — auto-set from `needsRestart` / `needsRebuild`, but
-  // the user can override (e.g. tick Restart even when only cli_scope
-  // changed, to force agents to pick up the new scope sooner).
+  // Restart / rebuild are confirmed in a dialog opened on Apply, rather than
+  // toggled inline in the form. The checkboxes default to checked when the
+  // pending changes only take effect after a restart / rebuild.
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [restartChecked, setRestartChecked] = useState(false);
   const [rebuildChecked, setRebuildChecked] = useState(false);
-  // Keep the suggested defaults in sync with what's pending; once the user
-  // toggles a checkbox manually we treat it as sticky for this draft.
-  const [restartTouched, setRestartTouched] = useState(false);
-  const [rebuildTouched, setRebuildTouched] = useState(false);
-  useEffect(() => { if (!restartTouched) setRestartChecked(needsRestart || needsRebuild); }, [needsRestart, needsRebuild, restartTouched]);
-  useEffect(() => { if (!rebuildTouched) setRebuildChecked(needsRebuild); }, [needsRebuild, rebuildTouched]);
-  useEffect(() => {
-    // After a save round-trip, draft === data again, so pending is empty;
-    // reset the manual-override flag so the next edit picks suggestions
-    // fresh.
-    if (!changed) { setRestartTouched(false); setRebuildTouched(false); }
-  }, [changed]);
 
   // Rebuild implies restart. Force it on if the user ticks rebuild.
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
 
-  // Report actions to parent header.
-  const canSave = changed || effectiveRestart || effectiveRebuild;
+  // Report actions to parent header. Apply only opens the confirmation
+  // dialog — the actual save/restart happens in `doApply`.
+  const canSave = changed;
   useEffect(() => {
     onActions({ refresh, apply, busy, canSave });
     return () => onActions(null);
-  }, [busy, canSave]);
+  }, [busy, canSave, needsRestart, needsRebuild]);
 
-  async function apply(): Promise<void> {
+  // Open the confirmation dialog, seeding the checkboxes from the suggested
+  // defaults for the current pending changes.
+  function apply(): void {
+    if (!changed) return;
+    setRestartChecked(needsRestart || needsRebuild);
+    setRebuildChecked(needsRebuild);
+    setConfirmOpen(true);
+  }
+
+  async function doApply(): Promise<void> {
     if (!draft) return;
     setBusy(true);
     try {
@@ -333,7 +332,7 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
         setDraftName(r.data.name);
         groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: r.data.name } : g);
       }
-      // Restart / rebuild without confirmation.
+      // Restart / rebuild as chosen in the confirmation dialog.
       if (effectiveRebuild || effectiveRestart) {
         const r = await runRestart(effectiveRebuild);
         if (!r.ok) return;
@@ -344,6 +343,7 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
       } else {
         showToast('Saved.');
       }
+      setConfirmOpen(false);
       onClose();
     } finally { setBusy(false); }
   }
@@ -522,7 +522,7 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
 
       <Field
         label="Transcription model"
-        info={'OpenRouter model for voice transcription. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.'}
+        info={'OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.'}
       >
         <ModelSelector
           value={draft.transcription_model}
@@ -536,37 +536,77 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
       </Field>
 
       <div class="settings-row group-admin-actions" style="margin-top:16px">
-        <label class="group-admin-check">
-          <input
-            type="checkbox"
-            checked={restartChecked}
-            disabled={busy || rebuildChecked /* rebuild always restarts */}
-            onChange={(e) => {
-              setRestartChecked((e.target as HTMLInputElement).checked);
-              setRestartTouched(true);
-            }}
-          />
-          <span>Restart sessions</span>
-          <Tooltip text={'Stop and respawn all running container sessions for this group so they pick up the saved config.\nAuto-selected when you change provider, model, effort, image tag, assistant name, or max messages per prompt. CLI scope alone does not need a restart — it is re-read on every CLI call.\nActive conversations resume on the next user message.'}>
-            <span class="info-icon" aria-label="More info">i</span>
-          </Tooltip>
-        </label>
-        <label class="group-admin-check">
-          <input
-            type="checkbox"
-            checked={rebuildChecked}
-            disabled={busy}
-            onChange={(e) => {
-              setRebuildChecked((e.target as HTMLInputElement).checked);
-              setRebuildTouched(true);
-            }}
-          />
-          <span>Rebuild image</span>
-          <Tooltip text={'Rebuild the container image before restarting.\nAuto-selected when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change — that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.'}>
-            <span class="info-icon" aria-label="More info">i</span>
-          </Tooltip>
-        </label>
+        <p class="group-admin-help">
+          {changed
+            ? `${pending.size} unsaved change${pending.size === 1 ? '' : 's'}. Click Save (✓) above to review and apply.`
+            : 'No unsaved changes.'}
+        </p>
       </div>
+
+      {confirmOpen ? (
+        <div
+          class="settings-backdrop"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).classList.contains('settings-backdrop') && !busy) setConfirmOpen(false);
+          }}
+        >
+          <div class="settings-modal ga-confirm-modal" role="dialog" aria-label="Apply changes" style="max-width:440px">
+            <header class="settings-head">
+              <span class="title">Apply changes</span>
+              <button type="button" class="icon-btn" aria-label="Close" disabled={busy} onClick={() => setConfirmOpen(false)}>{'\u2715'}</button>
+            </header>
+            <div class="settings-body">
+              <p class="group-admin-help" style="margin-bottom:12px">
+                {pending.size} setting{pending.size === 1 ? '' : 's'} will be saved:{' '}
+                <code>{[...pending].join(', ')}</code>
+              </p>
+              <div class="ga-confirm-options">
+                <label class="group-admin-check">
+                  <input
+                    type="checkbox"
+                    checked={effectiveRestart}
+                    disabled={busy || rebuildChecked /* rebuild always restarts */}
+                    onChange={(e) => setRestartChecked((e.target as HTMLInputElement).checked)}
+                  />
+                  <span>Restart sessions</span>
+                  <Tooltip text={'Stop and respawn all running container sessions for this group so they pick up the saved config.\nDefaults on when you change provider, model, effort, image tag, assistant name, or max messages per prompt. CLI scope alone does not need a restart — it is re-read on every CLI call.\nActive conversations resume on the next user message.'}>
+                    <span class="info-icon" aria-label="More info">i</span>
+                  </Tooltip>
+                </label>
+                <label class="group-admin-check">
+                  <input
+                    type="checkbox"
+                    checked={rebuildChecked}
+                    disabled={busy}
+                    onChange={(e) => setRebuildChecked((e.target as HTMLInputElement).checked)}
+                  />
+                  <span>Rebuild image</span>
+                  <Tooltip text={'Rebuild the container image before restarting.\nDefaults on when the chosen image tag does not exist locally. Otherwise normally only needed after `ncl groups config add-package` / `add-mcp-server` or a base-image change — that workflow lives in the CLI today, not this UI.\nA rebuild always implies a restart and takes minutes, not seconds.'}>
+                    <span class="info-icon" aria-label="More info">i</span>
+                  </Tooltip>
+                </label>
+              </div>
+              {needsRestart && !effectiveRestart ? (
+                <p class="ga-confirm-warn">
+                  These changes won&rsquo;t take effect until the sessions restart.
+                </p>
+              ) : null}
+            </div>
+            <footer class="settings-foot ga-confirm-foot">
+              <button type="button" disabled={busy} onClick={() => setConfirmOpen(false)}>Cancel</button>
+              <button type="button" class="primary" disabled={busy} onClick={doApply}>
+                {busy
+                  ? 'Applying…'
+                  : effectiveRebuild
+                    ? 'Save & rebuild'
+                    : effectiveRestart
+                      ? 'Save & restart'
+                      : 'Save'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
