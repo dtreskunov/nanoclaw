@@ -50,6 +50,7 @@ import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } 
 import { setResendPendingWebOverride } from '../../../channels/resend.js';
 import type { OutboundMessage } from '../../../channels/adapter.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
+import { streamTranscribe } from './voice-transcribe.js';
 import fs from 'fs';
 
 /** Map (userId, agentGroupId) → deterministic web platform_id. */
@@ -116,6 +117,7 @@ export function matchChatPath(
   | { kind: 'threads'; groupId: string }
   | { kind: 'search'; groupId: string }
   | { kind: 'delete'; groupId: string; threadId: string }
+  | { kind: 'voice-transcribe'; groupId: string; threadId: string }
   | null {
   const start = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/start$/);
   if (start) return { kind: 'start', groupId: start[1] };
@@ -123,6 +125,13 @@ export function matchChatPath(
   if (threads) return { kind: 'threads', groupId: threads[1] };
   const search = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/search$/);
   if (search) return { kind: 'search', groupId: decodeURIComponent(search[1]) };
+  const voiceTranscribe = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/voice\/transcribe$/);
+  if (voiceTranscribe)
+    return {
+      kind: 'voice-transcribe',
+      groupId: decodeURIComponent(voiceTranscribe[1]),
+      threadId: decodeURIComponent(voiceTranscribe[2]),
+    };
   const send = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/send$/);
   if (send) return { kind: 'send', groupId: decodeURIComponent(send[1]), threadId: decodeURIComponent(send[2]) };
   const hist = pathname.match(/^\/api\/groups\/([^/]+)\/chat\/([^/]+)\/history$/);
@@ -381,6 +390,62 @@ export async function handleChatRequest(
     } catch (err) {
       log.error('web chat send failed', { userId, groupId: m.groupId, err });
       writeJson(res, 500, { error: 'send_failed' });
+    }
+    return true;
+  }
+
+  if (m.kind === 'voice-transcribe') {
+    if (req.method !== 'POST') {
+      writeJson(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+    const cfg = getContainerConfig(m.groupId);
+    if (!cfg || cfg.voice_mode === 'off') {
+      writeJson(res, 400, { error: 'voice_disabled' });
+      return true;
+    }
+    try {
+      const parsed = await readMultipartBody(req);
+      const file = parsed.files[0];
+      if (!file || !file.contentType.startsWith('audio/')) {
+        writeJson(res, 400, { error: 'audio_file_required' });
+        return true;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      let fullText = '';
+      try {
+        for await (const delta of streamTranscribe(file.buffer, file.contentType, cfg.transcription_model)) {
+          fullText += delta;
+          res.write(`event: partial\ndata: ${JSON.stringify({ text: delta })}\n\n`);
+        }
+        res.write(`event: done\ndata: ${JSON.stringify({ text: fullText })}\n\n`);
+        res.end();
+        // Auto-submit the transcript as a user message
+        if (fullText.trim() && fullText.trim() !== '[inaudible]') {
+          const platformId = platformIdFor(userId, m.groupId);
+          ensureWebMessagingGroup(userId, m.groupId);
+          await submitWebInbound({
+            userId,
+            platformId,
+            threadId: m.threadId,
+            text: fullText.trim(),
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'transcription_failed';
+        res.write(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`);
+        res.end();
+      }
+    } catch (err) {
+      const code = (err as Error).message;
+      const status =
+        code === 'file_too_large' || code === 'total_too_large' ? 413 : code === 'too_many_files' ? 400 : 400;
+      writeJson(res, status, { error: code });
     }
     return true;
   }
