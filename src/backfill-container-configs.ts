@@ -66,6 +66,7 @@ export function backfillContainerConfigs(): void {
       packages_pip: JSON.stringify(legacy.packages?.pip ?? []),
       additional_mounts: JSON.stringify(legacy.additionalMounts ?? []),
       cli_scope: 'group',
+      voice_mode: 'off',
       updated_at: new Date().toISOString(),
     };
 

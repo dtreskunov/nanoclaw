@@ -14,6 +14,7 @@ import http from 'http';
 import { URL } from 'url';
 
 import { CONTAINER_IMAGE } from '../../../config.js';
+import { readEnvFile } from '../../../env.js';
 import { buildAgentGroupImage } from '../../../container-runner.js';
 import { restartAgentGroupContainers } from '../../../container-restart.js';
 import { getDb } from '../../../db/connection.js';
@@ -53,6 +54,7 @@ const SCALAR_FIELDS = [
   'assistant_name',
   'max_messages_per_prompt',
   'cli_scope',
+  'voice_mode',
 ] as const;
 
 // Provider list is parsed once at startup from the agent-runner's
@@ -64,6 +66,7 @@ const SCALAR_FIELDS = [
 const VALID_PROVIDERS = VALID_AGENT_PROVIDERS;
 const SELECTABLE_PROVIDERS = SELECTABLE_AGENT_PROVIDERS;
 const VALID_CLI_SCOPES = ['disabled', 'group', 'global'] as const;
+const VALID_VOICE_MODES = ['off', 'transcribe', 'audio'] as const;
 
 // ── dispatcher ────────────────────────────────────────────────────────────
 
@@ -171,7 +174,14 @@ interface SettingsResponse {
   updatedAt: string | null;
   config: Pick<
     ContainerConfigRow,
-    'provider' | 'model' | 'effort' | 'image_tag' | 'assistant_name' | 'max_messages_per_prompt' | 'cli_scope'
+    | 'provider'
+    | 'model'
+    | 'effort'
+    | 'image_tag'
+    | 'assistant_name'
+    | 'max_messages_per_prompt'
+    | 'cli_scope'
+    | 'voice_mode'
   >;
   /** Resolved defaults for nullable config fields (shown as placeholders). */
   defaults: {
@@ -181,6 +191,7 @@ interface SettingsResponse {
   };
   validProviders: readonly string[];
   validCliScopes: readonly string[];
+  validVoiceModes: readonly string[];
   runningSessionCount: number;
   /** Tooltip / detail / age for the currently-selected model and image. */
   selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
@@ -220,8 +231,9 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
   }
 
   // Resolve effective defaults for fields the UI shows as placeholders.
-  const defaultProvider = process.env.DEFAULT_PROVIDER || 'claude';
-  const defaultModel = process.env.DEFAULT_MODEL || null;
+  const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL']);
+  const defaultProvider = envDefaults.DEFAULT_PROVIDER || 'claude';
+  const defaultModel = envDefaults.DEFAULT_MODEL || null;
   const defaultImage = CONTAINER_IMAGE || null;
 
   const body: SettingsResponse = {
@@ -238,6 +250,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
       assistant_name: cfg.assistant_name,
       max_messages_per_prompt: cfg.max_messages_per_prompt,
       cli_scope: cfg.cli_scope,
+      voice_mode: cfg.voice_mode,
     },
     defaults: {
       provider: defaultProvider,
@@ -246,6 +259,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
     },
     validProviders: SELECTABLE_PROVIDERS,
     validCliScopes: VALID_CLI_SCOPES,
+    validVoiceModes: VALID_VOICE_MODES,
     runningSessionCount: running.n,
     selectedModelDetail,
     selectedImageDetail,
@@ -267,7 +281,14 @@ async function handlePatchSettings(
   const updates: Partial<
     Pick<
       ContainerConfigRow,
-      'provider' | 'model' | 'effort' | 'image_tag' | 'assistant_name' | 'max_messages_per_prompt' | 'cli_scope'
+      | 'provider'
+      | 'model'
+      | 'effort'
+      | 'image_tag'
+      | 'assistant_name'
+      | 'max_messages_per_prompt'
+      | 'cli_scope'
+      | 'voice_mode'
     >
   > = {};
   const isElevated = isOwner(actorUserId) || isGlobalAdmin(actorUserId);
@@ -323,6 +344,16 @@ async function handlePatchSettings(
         throw new BadRequest('max_messages_per_prompt must be a number between 1 and 1000');
       }
       updates.max_messages_per_prompt = Math.floor(n);
+    } else if (key === 'voice_mode') {
+      if (isCleared) {
+        updates.voice_mode = 'off';
+        continue;
+      }
+      const v = String(raw);
+      if (!VALID_VOICE_MODES.includes(v as (typeof VALID_VOICE_MODES)[number])) {
+        throw new BadRequest(`voice_mode must be one of: ${VALID_VOICE_MODES.join(', ')}`);
+      }
+      updates.voice_mode = v;
     } else {
       // model, effort, image_tag, assistant_name — nullable strings
       updates[key] = isCleared ? null : String(raw);

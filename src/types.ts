@@ -26,6 +26,7 @@ export interface ContainerConfigRow {
   packages_pip: string; // JSON: string[]
   additional_mounts: string; // JSON: AdditionalMountConfig[]
   cli_scope: string; // 'disabled' | 'group' | 'global'
+  voice_mode: string; // 'off' | 'transcribe' | 'audio'
   updated_at: string;
 }
 

@@ -24,6 +24,7 @@ import { migration024 } from './024-pending-user-approvals-partial-unique.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
+import { moduleContainerConfigsVoiceMode } from './module-container-configs-voice-mode.js';
 import { moduleResendThreadRoots } from './module-resend-thread-roots.js';
 
 export interface Migration {
@@ -57,6 +58,7 @@ const migrations: Migration[] = [
   migration024,
   moduleResendThreadRoots,
   moduleContainerConfigsPip,
+  moduleContainerConfigsVoiceMode,
 ];
 
 export function runMigrations(db: Database.Database): void {
