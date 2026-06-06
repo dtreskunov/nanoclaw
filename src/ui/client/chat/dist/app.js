@@ -20881,6 +20881,8 @@ function Combobox({
   const [highlight, setHighlight] = h2(-1);
   const rootRef = A2(null);
   const inputRef = A2(null);
+  const valueRef = A2(value);
+  valueRef.current = value;
   y2(() => {
     const v5 = value ?? "";
     if (v5 !== text) {
@@ -20894,12 +20896,12 @@ function Combobox({
       if (!rootRef.current?.contains(e4.target)) {
         setOpen(false);
         setFiltering(false);
-        if (!freeform) setText(value ?? "");
+        if (!freeform) setText(valueRef.current ?? "");
       }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open, freeform, value]);
+  }, [open, freeform]);
   const filterText = text.trim().toLowerCase();
   const matches = filtering && filterText ? options.filter(
     (o4) => o4.value.toLowerCase().includes(filterText) || o4.label.toLowerCase().includes(filterText)
@@ -21296,7 +21298,7 @@ function SettingsTab({ gid, onClose }) {
                 tooltip: PROVIDER_INFO[p5]
               }));
             })(),
-            placeholder: "pick a provider",
+            placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
             disabled: busy,
             freeform: false,
             onChange: (v5) => update("provider", v5)
@@ -21310,7 +21312,7 @@ function SettingsTab({ gid, onClose }) {
         {
           value: draft.model,
           options: modelOptions,
-          placeholder: "pick or type a model id",
+          placeholder: data.defaults.model ? `default: ${data.defaults.model}` : "pick or type a model id",
           disabled: busy || !provider,
           onChange: (v5) => update("model", v5)
         }
@@ -21354,7 +21356,7 @@ function SettingsTab({ gid, onClose }) {
         {
           value: draft.image_tag,
           options: imageOptions,
-          placeholder: "pick an image",
+          placeholder: data.defaults.image_tag ? `default: ${data.defaults.image_tag}` : "pick an image",
           disabled: busy,
           onChange: (v5) => update("image_tag", v5)
         }

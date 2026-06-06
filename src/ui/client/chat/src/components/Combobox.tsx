@@ -54,6 +54,8 @@ export function Combobox({
   // In freeform mode the parent value echoes our text on every keystroke;
   // only resync (and exit filtering mode) when the external value actually
   // differs from what we're showing.
+  const valueRef = useRef(value);
+  valueRef.current = value;
   useEffect(() => {
     const v = value ?? '';
     if (v !== text) {
@@ -71,12 +73,12 @@ export function Combobox({
         setFiltering(false);
         // If we don't allow free-form input, reset any typed-but-uncommitted
         // text back to the actual saved value when the popup closes.
-        if (!freeform) setText(value ?? '');
+        if (!freeform) setText(valueRef.current ?? '');
       }
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [open, freeform, value]);
+  }, [open, freeform]);
 
   // Filter: only narrow when the user is actively typing. Otherwise show
   // everything so opening the popup from a saved selection lets the user

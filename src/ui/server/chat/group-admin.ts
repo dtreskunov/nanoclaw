@@ -13,6 +13,7 @@
 import http from 'http';
 import { URL } from 'url';
 
+import { CONTAINER_IMAGE } from '../../../config.js';
 import { buildAgentGroupImage } from '../../../container-runner.js';
 import { restartAgentGroupContainers } from '../../../container-restart.js';
 import { getDb } from '../../../db/connection.js';
@@ -172,6 +173,12 @@ interface SettingsResponse {
     ContainerConfigRow,
     'provider' | 'model' | 'effort' | 'image_tag' | 'assistant_name' | 'max_messages_per_prompt' | 'cli_scope'
   >;
+  /** Resolved defaults for nullable config fields (shown as placeholders). */
+  defaults: {
+    provider: string | null;
+    model: string | null;
+    image_tag: string | null;
+  };
   validProviders: readonly string[];
   validCliScopes: readonly string[];
   runningSessionCount: number;
@@ -212,6 +219,11 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
     }
   }
 
+  // Resolve effective defaults for fields the UI shows as placeholders.
+  const defaultProvider = process.env.DEFAULT_PROVIDER || 'claude';
+  const defaultModel = process.env.DEFAULT_MODEL || null;
+  const defaultImage = CONTAINER_IMAGE || null;
+
   const body: SettingsResponse = {
     id: group.id,
     name: group.name,
@@ -226,6 +238,11 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
       assistant_name: cfg.assistant_name,
       max_messages_per_prompt: cfg.max_messages_per_prompt,
       cli_scope: cfg.cli_scope,
+    },
+    defaults: {
+      provider: defaultProvider,
+      model: defaultModel ? bareIdForResponse(defaultProvider, defaultModel) : null,
+      image_tag: defaultImage,
     },
     validProviders: SELECTABLE_PROVIDERS,
     validCliScopes: VALID_CLI_SCOPES,

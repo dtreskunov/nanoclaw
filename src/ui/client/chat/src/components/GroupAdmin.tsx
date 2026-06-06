@@ -33,6 +33,11 @@ interface SettingsResponse {
     max_messages_per_prompt: number | null;
     cli_scope: string | null;
   };
+  defaults: {
+    provider: string | null;
+    model: string | null;
+    image_tag: string | null;
+  };
   validProviders: string[];
   validCliScopes: string[];
   runningSessionCount: number;
@@ -410,7 +415,7 @@ function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JS
               tooltip: PROVIDER_INFO[p],
             }));
           })()}
-          placeholder="pick a provider"
+          placeholder={data.defaults.provider ? `default: ${data.defaults.provider}` : 'pick a provider'}
           disabled={busy}
           freeform={false}
           onChange={(v) => update('provider', v)}
@@ -422,7 +427,7 @@ function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JS
           <Combobox
             value={draft.model}
             options={modelOptions}
-            placeholder="pick or type a model id"
+            placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
             disabled={busy || !provider}
             onChange={(v) => update('model', v)}
           />
@@ -467,7 +472,7 @@ function SettingsTab({ gid, onClose }: { gid: string; onClose: () => void }): JS
           <Combobox
             value={draft.image_tag}
             options={imageOptions}
-            placeholder="pick an image"
+            placeholder={data.defaults.image_tag ? `default: ${data.defaults.image_tag}` : 'pick an image'}
             disabled={busy}
             onChange={(v) => update('image_tag', v)}
           />
