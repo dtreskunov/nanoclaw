@@ -21679,6 +21679,34 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
     ] }) }),
     section === "models" ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4(
+        Field,
+        {
+          label: "Provider",
+          info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
+          children: /* @__PURE__ */ u4(
+            Combobox,
+            {
+              value: draft.provider,
+              options: (() => {
+                const selectable = data.validProviders.slice();
+                if (draft.provider && !selectable.includes(draft.provider)) {
+                  selectable.push(draft.provider);
+                }
+                return selectable.map((p5) => ({
+                  value: p5,
+                  label: p5,
+                  tooltip: PROVIDER_INFO[p5]
+                }));
+              })(),
+              placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
+              disabled: busy,
+              freeform: false,
+              onChange: (v5) => update("provider", v5)
+            }
+          )
+        }
+      ),
       /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
         ModelSelector,
         {
@@ -21722,34 +21750,6 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           onInput: (e4) => setDraftName(e4.target.value)
         }
       ) }),
-      /* @__PURE__ */ u4(
-        Field,
-        {
-          label: "Provider",
-          info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
-          children: /* @__PURE__ */ u4(
-            Combobox,
-            {
-              value: draft.provider,
-              options: (() => {
-                const selectable = data.validProviders.slice();
-                if (draft.provider && !selectable.includes(draft.provider)) {
-                  selectable.push(draft.provider);
-                }
-                return selectable.map((p5) => ({
-                  value: p5,
-                  label: p5,
-                  tooltip: PROVIDER_INFO[p5]
-                }));
-              })(),
-              placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
-              disabled: busy,
-              freeform: false,
-              onChange: (v5) => update("provider", v5)
-            }
-          )
-        }
-      ),
       /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
         "input",
         {
