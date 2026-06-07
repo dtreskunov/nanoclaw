@@ -356,9 +356,7 @@ describe('deliverSessionMessages — delivery-failure bounce-back', () => {
     await deliverSessionMessages(session);
 
     const inDb = openInboundDb('ag-1', session.id);
-    const row = inDb
-      .prepare("SELECT 1 FROM messages_in WHERE id = 'delivery-fail-out-origin-fail'")
-      .get();
+    const row = inDb.prepare("SELECT 1 FROM messages_in WHERE id = 'delivery-fail-out-origin-fail'").get();
     // The message itself is still marked failed…
     const delivered = getDeliveredIds(inDb);
     inDb.close();
