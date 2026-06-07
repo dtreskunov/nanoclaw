@@ -2845,6 +2845,50 @@ body.is-admin .files-pane.collapsed .admin-only {
   color: var(--muted);
   font-size: var(--font-sm);
 }
+.ga-id-sub {
+  display: block;
+  font-size: var(--font-sm);
+  word-break: break-all;
+}
+.ga-reverse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ga-reverse-x {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 1;
+  font-size: 12px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ga-reverse-x:hover:not(:disabled) {
+  background: var(--wash-soft);
+  color: var(--surface-fg);
+}
+.ga-reverse-x:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ga-hint {
+  margin-top: 4px;
+  font-size: var(--font-sm);
+}
+.ga-section-h4 {
+  margin-top: 24px;
+}
+.ga-add-link-form .ga-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
 @media (max-width: 720px) {
   .group-admin-field {
     flex-direction: column;

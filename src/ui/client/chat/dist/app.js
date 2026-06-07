@@ -22432,6 +22432,12 @@ function RolesTab({ gid }) {
     )
   ] });
 }
+function formatChannelHandle(channelType2, platformId, targetId) {
+  if (!channelType2 && !platformId) return targetId;
+  if (!channelType2) return platformId ?? targetId;
+  if (!platformId) return channelType2;
+  return platformId.startsWith(`${channelType2}:`) ? platformId : `${channelType2}:${platformId}`;
+}
 function DestinationsTab({ gid }) {
   const [destinations, setDestinations] = h2(null);
   const [adding, setAdding] = h2(false);
@@ -22462,28 +22468,86 @@ function DestinationsTab({ gid }) {
       setBusy(false);
     }
   }
+  async function removeReverse(d5) {
+    if (!d5.reverseLink) return;
+    if (!confirm(`Remove the reverse link "${d5.reverseLink.localName}" in "${d5.targetName ?? d5.targetId}"?`)) return;
+    setBusy(true);
+    try {
+      const r4 = await call(
+        apiPath(gid, `/destinations/${encodeURIComponent(d5.localName)}/reverse`),
+        "DELETE"
+      );
+      if (!r4.ok) {
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      showToast("Reverse link removed");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
   if (!destinations) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
+  const agents = destinations.filter((d5) => d5.targetType === "agent");
+  const channels = destinations.filter((d5) => d5.targetType === "channel");
   return /* @__PURE__ */ u4("section", { children: [
-    /* @__PURE__ */ u4("p", { class: "muted", children: "Destinations are the names this agent uses to route messages \u2014 either to channels (auto-managed) or to other agent groups (added here). Adding an agent link as an admin of both groups applies immediately; otherwise an admin of the target group is asked to approve." }),
-    destinations.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No destinations yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+    /* @__PURE__ */ u4("p", { class: "muted", children: "Destinations are the names this agent uses to route messages \u2014 either to channels (auto-managed, listed below) or to other agent groups (added here)." }),
+    /* @__PURE__ */ u4("h4", { children: "Agent destinations" }),
+    agents.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No agent destinations yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
       /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
-        /* @__PURE__ */ u4("th", { children: "Name" }),
-        /* @__PURE__ */ u4("th", { children: "Type" }),
-        /* @__PURE__ */ u4("th", { children: "Target" }),
+        /* @__PURE__ */ u4("th", { children: "Target agent" }),
+        /* @__PURE__ */ u4("th", { children: "Local name" }),
+        /* @__PURE__ */ u4("th", { children: "Reverse link" }),
         /* @__PURE__ */ u4("th", {})
       ] }) }),
-      /* @__PURE__ */ u4("tbody", { children: destinations.map((d5) => /* @__PURE__ */ u4("tr", { children: [
+      /* @__PURE__ */ u4("tbody", { children: agents.map((d5) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("td", { children: [
+          /* @__PURE__ */ u4("div", { children: d5.targetName ?? /* @__PURE__ */ u4("span", { class: "muted", children: "(unnamed)" }) }),
+          /* @__PURE__ */ u4("code", { class: "muted ga-id-sub", children: d5.targetId })
+        ] }),
         /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { children: d5.localName }) }),
-        /* @__PURE__ */ u4("td", { children: d5.targetType }),
-        /* @__PURE__ */ u4("td", { children: d5.targetType === "agent" ? d5.targetName ?? /* @__PURE__ */ u4("code", { class: "muted", children: d5.targetId }) : /* @__PURE__ */ u4("code", { class: "muted", children: d5.targetId }) }),
-        /* @__PURE__ */ u4("td", { children: d5.targetType === "agent" ? /* @__PURE__ */ u4("button", { type: "button", class: "danger", disabled: busy, onClick: () => remove(d5), children: "Remove" }) : /* @__PURE__ */ u4("span", { class: "muted", children: "channel" }) })
+        /* @__PURE__ */ u4("td", { children: d5.reverseLink ? /* @__PURE__ */ u4("span", { class: "ga-reverse", children: [
+          /* @__PURE__ */ u4("code", { children: d5.reverseLink.localName }),
+          d5.reverseLink.viewerCanRemove ? /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              class: "ga-reverse-x",
+              title: `Remove reverse link "${d5.reverseLink.localName}" in target group`,
+              disabled: busy,
+              onClick: () => removeReverse(d5),
+              children: "\xD7"
+            }
+          ) : /* @__PURE__ */ u4(Tooltip, { text: "You must be an admin of the target group to remove its destinations.", children: /* @__PURE__ */ u4("span", { class: "muted ga-id-sub", children: "(target-admin only)" }) })
+        ] }) : /* @__PURE__ */ u4("span", { class: "muted", children: "\u2014" }) }),
+        /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("button", { type: "button", class: "danger", disabled: busy, onClick: () => remove(d5), children: "Remove" }) })
       ] }, d5.localName)) })
+    ] }),
+    /* @__PURE__ */ u4("p", { class: "muted ga-hint", children: [
+      'A "reverse link" is a destination row in the ',
+      /* @__PURE__ */ u4("em", { children: "target" }),
+      " group's table pointing back at this one \u2014 created either by ticking the box when you add the link, or by an admin of that group adding it independently. Either way it shows up here."
     ] }),
     /* @__PURE__ */ u4("h4", { children: "Add an agent link" }),
     adding ? /* @__PURE__ */ u4(AddDestinationForm, { gid, onCancel: () => setAdding(false), onDone: () => {
       setAdding(false);
       refresh();
-    } }) : /* @__PURE__ */ u4("button", { type: "button", onClick: () => setAdding(true), children: "Link another agent\u2026" })
+    } }) : /* @__PURE__ */ u4("button", { type: "button", onClick: () => setAdding(true), children: "Link another agent\u2026" }),
+    /* @__PURE__ */ u4("h4", { class: "ga-section-h4", children: "Channel destinations" }),
+    /* @__PURE__ */ u4("p", { class: "muted", children: "Channels (chat platforms, email, web) are wired automatically when a messaging group is connected to this agent \u2014 read-only here." }),
+    channels.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No channel destinations." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+      /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("th", { children: "Channel" }),
+        /* @__PURE__ */ u4("th", { children: "Local name" })
+      ] }) }),
+      /* @__PURE__ */ u4("tbody", { children: channels.map((d5) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("td", { children: [
+          /* @__PURE__ */ u4("div", { children: d5.targetName ?? /* @__PURE__ */ u4("span", { class: "muted", children: "(unnamed)" }) }),
+          /* @__PURE__ */ u4("code", { class: "muted ga-id-sub", children: formatChannelHandle(d5.channelType, d5.platformId, d5.targetId) })
+        ] }),
+        /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { children: d5.localName }) })
+      ] }, d5.localName)) })
+    ] })
   ] });
 }
 function AddDestinationForm({ gid, onCancel, onDone }) {
@@ -22528,35 +22592,45 @@ function AddDestinationForm({ gid, onCancel, onDone }) {
     /* @__PURE__ */ u4("p", { class: "muted", children: "No eligible target groups. You must be an admin (or member, when admin-on-target) of another agent group to link it." }),
     /* @__PURE__ */ u4("button", { type: "button", onClick: onCancel, children: "Cancel" })
   ] });
-  return /* @__PURE__ */ u4("form", { onSubmit: submit, children: [
-    /* @__PURE__ */ u4("label", { children: [
-      "Target agent group",
-      /* @__PURE__ */ u4("select", { value: targetId, onChange: (e4) => setTargetId(e4.target.value), disabled: busy, children: [
-        /* @__PURE__ */ u4("option", { value: "", children: "\u2014 select \u2014" }),
-        candidates.map((c4) => /* @__PURE__ */ u4("option", { value: c4.id, children: [
-          c4.name,
-          c4.adminOnTarget ? "" : " (needs approval)"
-        ] }, c4.id))
-      ] })
-    ] }),
-    /* @__PURE__ */ u4("label", { children: [
-      "Local name",
+  return /* @__PURE__ */ u4("form", { onSubmit: submit, class: "ga-add-link-form", children: [
+    /* @__PURE__ */ u4(Field, { label: "Target agent group", children: /* @__PURE__ */ u4(
+      "select",
+      {
+        value: targetId,
+        onChange: (e4) => setTargetId(e4.target.value),
+        disabled: busy,
+        children: [
+          /* @__PURE__ */ u4("option", { value: "", children: "\u2014 select \u2014" }),
+          candidates.map((c4) => /* @__PURE__ */ u4("option", { value: c4.id, children: [
+            c4.name,
+            c4.adminOnTarget ? "" : " (needs approval)"
+          ] }, c4.id))
+        ]
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Local name", children: /* @__PURE__ */ u4(
+      "input",
+      {
+        type: "text",
+        value: localName,
+        onInput: (e4) => setLocalName(e4.target.value),
+        placeholder: selected?.folder ?? "e.g. research-bot",
+        disabled: busy
+      }
+    ) }),
+    /* @__PURE__ */ u4(Field, { label: "Reverse link", children: /* @__PURE__ */ u4("label", { class: "ga-checkbox", children: [
       /* @__PURE__ */ u4(
         "input",
         {
-          type: "text",
-          value: localName,
-          onInput: (e4) => setLocalName(e4.target.value),
-          placeholder: selected?.folder ?? "e.g. research-bot",
+          type: "checkbox",
+          checked: alsoReverse,
+          onChange: (e4) => setAlsoReverse(e4.target.checked),
           disabled: busy
         }
-      )
-    ] }),
-    /* @__PURE__ */ u4("label", { class: "ga-checkbox", children: [
-      /* @__PURE__ */ u4("input", { type: "checkbox", checked: alsoReverse, onChange: (e4) => setAlsoReverse(e4.target.checked), disabled: busy }),
-      "Also create reverse link (target agent can send back to this one)"
-    ] }),
-    selected && !selected.adminOnTarget ? /* @__PURE__ */ u4("p", { class: "muted", children: [
+      ),
+      "Also let the target agent send back to this one"
+    ] }) }),
+    selected && !selected.adminOnTarget ? /* @__PURE__ */ u4("p", { class: "muted ga-hint", children: [
       'You are not an admin of "',
       selected.name,
       '" \u2014 an admin of that group will be asked to approve this link.'

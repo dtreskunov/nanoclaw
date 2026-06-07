@@ -19,6 +19,7 @@ import { buildAgentGroupImage } from '../../../container-runner.js';
 import { restartAgentGroupContainers } from '../../../container-restart.js';
 import { getDb } from '../../../db/connection.js';
 import { getAgentGroup, getAgentGroupBySiteSlug, updateAgentGroup } from '../../../db/agent-groups.js';
+import { getMessagingGroup } from '../../../db/messaging-groups.js';
 import { getContainerConfig, updateContainerConfigScalars } from '../../../db/container-configs.js';
 import { log } from '../../../log.js';
 import { archiveAgentGroup } from '../../../modules/archive/archive-group.js';
@@ -39,7 +40,11 @@ import {
   isOwner,
 } from '../../../modules/permissions/db/user-roles.js';
 import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
-import { getDestinations, deleteDestination } from '../../../modules/agent-to-agent/db/agent-destinations.js';
+import {
+  getDestinations,
+  deleteDestination,
+  getDestinationByTarget,
+} from '../../../modules/agent-to-agent/db/agent-destinations.js';
 import { authorizeAgentLink, authorizeAgentLinkRemoval } from '../../../modules/agent-to-agent/authorize.js';
 import { applyAgentLink, AgentLinkError, validateLocalName } from '../../../modules/agent-to-agent/apply-link.js';
 import { writeDestinations } from '../../../modules/agent-to-agent/write-destinations.js';
@@ -170,10 +175,15 @@ async function dispatch(
 
   if (rest === '/users-search' && method === 'GET') return handleUsersSearch(req, res);
 
-  if (rest === '/destinations' && method === 'GET') return handleListDestinations(res, gid);
+  if (rest === '/destinations' && method === 'GET') return handleListDestinations(res, actorUserId, gid);
   if (rest === '/destinations' && method === 'POST') return handleAddDestination(req, res, actorUserId, gid);
   if (rest === '/destinations/candidates' && method === 'GET')
     return handleListDestinationCandidates(res, actorUserId, gid);
+  {
+    const m = /^\/destinations\/([^/]+)\/reverse$/.exec(rest);
+    if (m && method === 'DELETE')
+      return handleRemoveReverseDestination(res, actorUserId, gid, decodeURIComponent(m[1]!));
+  }
   {
     const m = /^\/destinations\/([^/]+)$/.exec(rest);
     if (m && method === 'DELETE') return handleRemoveDestination(res, actorUserId, gid, decodeURIComponent(m[1]!));
@@ -795,22 +805,52 @@ interface DestinationDto {
   targetType: 'agent' | 'channel';
   targetId: string;
   targetName: string | null;
+  /** For channels only: human descriptors so the UI can render `discord:123…`. */
+  channelType: string | null;
+  platformId: string | null;
+  /**
+   * For agent destinations only: information about a destination in the
+   * target group that points back at this one. `null` when no reverse row
+   * exists. Independent: the target may have created it on its own.
+   */
+  reverseLink: {
+    localName: string;
+    viewerCanRemove: boolean;
+  } | null;
   createdAt: string;
   createdBy: string | null;
 }
 
-function handleListDestinations(res: http.ServerResponse, gid: string): void {
+function handleListDestinations(res: http.ServerResponse, actorUserId: string, gid: string): void {
   const rows = getDestinations(gid);
   const out: DestinationDto[] = rows.map((r) => {
     let targetName: string | null = null;
+    let channelType: string | null = null;
+    let platformId: string | null = null;
+    let reverseLink: DestinationDto['reverseLink'] = null;
     if (r.target_type === 'agent') {
       targetName = getAgentGroup(r.target_id)?.name ?? null;
+      const reverse = getDestinationByTarget(r.target_id, 'agent', gid);
+      if (reverse) {
+        reverseLink = {
+          localName: reverse.local_name,
+          viewerCanRemove: hasAdminPrivilege(actorUserId, r.target_id),
+        };
+      }
+    } else {
+      const mg = getMessagingGroup(r.target_id);
+      targetName = mg?.name ?? null;
+      channelType = mg?.channel_type ?? null;
+      platformId = mg?.platform_id ?? null;
     }
     return {
       localName: r.local_name,
       targetType: r.target_type,
       targetId: r.target_id,
       targetName,
+      channelType,
+      platformId,
+      reverseLink,
       createdAt: r.created_at,
       createdBy: r.created_by,
     };
@@ -971,6 +1011,51 @@ function handleRemoveDestination(res: http.ServerResponse, actorUserId: string, 
     targetKind: 'agent_group',
     targetId: gid,
     payload: { localName, targetType: existing.target_type, targetId: existing.target_id },
+  });
+  writeJson(res, 200, { ok: true });
+}
+
+/**
+ * Remove the reverse-direction destination — the row in the *target* group's
+ * table that points back at this one. Requires admin privilege on the
+ * target group, not on this one. We re-project to the target's sessions so
+ * its agent stops seeing the destination on the next poll.
+ */
+function handleRemoveReverseDestination(
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+  localName: string,
+): void {
+  const forward = getDestinations(gid).find((d) => d.local_name === localName && d.target_type === 'agent');
+  if (!forward) {
+    writeJson(res, 404, { error: 'destination not found' });
+    return;
+  }
+  const targetGid = forward.target_id;
+  const reverse = getDestinationByTarget(targetGid, 'agent', gid);
+  if (!reverse) {
+    writeJson(res, 404, { error: 'no reverse link' });
+    return;
+  }
+  if (!hasAdminPrivilege(actorUserId, targetGid)) {
+    writeJson(res, 403, { error: 'not admin of target group' });
+    return;
+  }
+  deleteDestination(targetGid, reverse.local_name);
+  for (const s of getSessionsByAgentGroup(targetGid)) {
+    try {
+      writeDestinations(targetGid, s.id);
+    } catch {
+      // best-effort projection; container may be down
+    }
+  }
+  recordAdminAction({
+    actorUserId,
+    action: 'destination_remove_reverse',
+    targetKind: 'agent_group',
+    targetId: targetGid,
+    payload: { sourceAgentGroupId: gid, reverseLocalName: reverse.local_name },
   });
   writeJson(res, 200, { ok: true });
 }
