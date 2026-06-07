@@ -199,9 +199,6 @@ export function GroupAdmin(): JSX.Element | null {
           <div class="settings-head-actions">
             {(tab === 'models' || tab === 'settings') && ha ? (
               <>
-                <Tooltip text="Re-fetch settings from server">
-                  <button type="button" class="icon-btn" aria-label="Refresh" onClick={ha.refresh} disabled={ha.busy}>&#x21bb;</button>
-                </Tooltip>
                 <Tooltip text={ha.canSave ? 'Save changes' : 'Nothing to save'}>
                   <button type="button" class="icon-btn" aria-label="Save" onClick={ha.apply} disabled={ha.busy || !ha.canSave}>&#x2713;</button>
                 </Tooltip>
