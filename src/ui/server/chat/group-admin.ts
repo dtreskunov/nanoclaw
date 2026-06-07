@@ -21,6 +21,7 @@ import { getDb } from '../../../db/connection.js';
 import { getAgentGroup, getAgentGroupBySiteSlug, updateAgentGroup } from '../../../db/agent-groups.js';
 import { getContainerConfig, updateContainerConfigScalars } from '../../../db/container-configs.js';
 import { log } from '../../../log.js';
+import { archiveAgentGroup } from '../../../modules/archive/archive-group.js';
 import {
   addMember,
   getMembers,
@@ -143,6 +144,7 @@ async function dispatch(
   if (rest === '/settings' && method === 'GET') return handleGetSettings(res, gid, actorUserId);
   if (rest === '/settings' && method === 'PATCH') return handlePatchSettings(req, res, actorUserId, gid);
   if (rest === '/restart' && method === 'POST') return handleRestart(req, res, actorUserId, gid);
+  if (rest === '/archive' && method === 'POST') return handleArchive(req, res, actorUserId, gid);
 
   if (rest === '/members' && method === 'GET') return handleGetMembers(res, gid);
   if (rest === '/members' && method === 'POST') return handleAddMember(req, res, actorUserId, gid);
@@ -494,6 +496,46 @@ async function handleRestart(
     payload: { rebuild, restarted: count },
   });
   writeJson(res, 200, { restarted: count, rebuilt: rebuild });
+}
+
+async function handleArchive(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+): Promise<void> {
+  const group = getAgentGroup(gid)!;
+  const body = (await readJsonBody(req)) as { confirm_folder?: unknown };
+  // Defense in depth: client UI requires the operator to type the folder
+  // name to confirm. Server re-checks so a CSRF / scripted call can't
+  // archive without that ack.
+  if (typeof body.confirm_folder !== 'string' || body.confirm_folder !== group.folder) {
+    throw new BadRequest('confirm_folder must equal the group folder name');
+  }
+
+  const actorUser = getUser(actorUserId);
+  const result = archiveAgentGroup(gid, {
+    user_id: actorUserId,
+    display_name: actorUser?.display_name ?? null,
+  });
+  recordAdminAction({
+    actorUserId,
+    action: 'group_archive',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: {
+      folder: result.folder,
+      archivedFolder: result.archivedFolder,
+      archivedSessionsDir: result.archivedSessionsDir,
+      cascade: result.cascade as unknown as Record<string, unknown>,
+    },
+  });
+  writeJson(res, 200, {
+    ok: true,
+    id: result.id,
+    folder: result.folder,
+    archivedFolder: result.archivedFolder,
+  });
 }
 
 // ── members ───────────────────────────────────────────────────────────────
