@@ -205,22 +205,32 @@ async function focusOrOpen(data) {
   const groupId = data && data.groupId;
   const threadId = data && data.threadId;
   const target = groupId && threadId ? `${SCOPE_PATH}#g/${groupId}/t/${threadId}` : SCOPE_PATH;
+  const threadHash = groupId && threadId ? `#g/${groupId}/t/${threadId}` : null;
   const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const c of clientsList) {
-    if (c.url.includes(SCOPE_PATH)) {
-      try {
-        await c.focus();
-        if ('navigate' in c) {
-          try {
-            await c.navigate(target);
-          } catch (_e) {
-            // Cross-origin or unsupported — leave the existing URL.
-          }
+  // Prefer a window already on the target thread — focusing it avoids
+  // hijacking another window (e.g. one parked on a different thread) and
+  // redirecting it to the notification's thread.
+  const candidates = clientsList
+    .filter((c) => c.url.includes(SCOPE_PATH))
+    .sort((a, b) => {
+      if (!threadHash) return 0;
+      const aMatch = a.url.includes(threadHash) ? 0 : 1;
+      const bMatch = b.url.includes(threadHash) ? 0 : 1;
+      return aMatch - bMatch;
+    });
+  for (const c of candidates) {
+    try {
+      await c.focus();
+      if ('navigate' in c && !c.url.includes(threadHash || '\0')) {
+        try {
+          await c.navigate(target);
+        } catch (_e) {
+          // Cross-origin or unsupported — leave the existing URL.
         }
-        return;
-      } catch (_e) {
-        /* try next */
       }
+      return;
+    } catch (_e) {
+      /* try next */
     }
   }
   if (self.clients.openWindow) {
