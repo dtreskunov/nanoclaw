@@ -14,6 +14,7 @@ import {
 import { selectGroup } from '../actions';
 import { fmtRelative, fmtAbsolute } from '../utils';
 import type { Group } from '../types';
+import { createGroupOpen } from './CreateGroupModal';
 
 function isNonMember(g: Group): boolean {
   return g.hasContent === false;
@@ -96,6 +97,17 @@ export function GroupStrip() {
           onClick={() => openModal('non-members')}
         >
           <span class="chip-name">More agents{'\u2026'}</span>
+        </button>
+      ) : null}
+      {elevated ? (
+        <button
+          type="button"
+          class="group-chip group-chip-new"
+          title="Create a new agent group"
+          aria-haspopup="dialog"
+          onClick={() => { createGroupOpen.value = true; }}
+        >
+          <span class="chip-name">{'\u002B New agent'}</span>
         </button>
       ) : null}
     </nav>
@@ -196,6 +208,23 @@ export function GroupPickerModal() {
             );
           })}
         </div>
+        {elevated ? (
+          <footer
+            class="settings-foot"
+            style="display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)"
+          >
+            <button
+              type="button"
+              class="primary"
+              onClick={() => {
+                close();
+                createGroupOpen.value = true;
+              }}
+            >
+              {'\u002B New agent group'}
+            </button>
+          </footer>
+        ) : null}
       </div>
     </div>
   );

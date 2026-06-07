@@ -18104,6 +18104,147 @@ async function respondApproval(approvalId, value) {
   }
 }
 
+// src/components/CreateGroupModal.tsx
+var createGroupOpen = y3(false);
+function errMsg(data, fallback) {
+  if (data && typeof data === "object") {
+    const obj = data;
+    if (typeof obj.message === "string" && obj.message) return obj.message;
+    if (typeof obj.error === "string" && obj.error) return obj.error;
+  }
+  return fallback;
+}
+function CreateGroupModal() {
+  const open = createGroupOpen.value;
+  const [name, setName] = h2("");
+  const [folder, setFolder] = h2("");
+  const [instructions, setInstructions] = h2("");
+  const [submitting, setSubmitting] = h2(false);
+  const nameRef = A2(null);
+  y2(() => {
+    if (!open) return;
+    setName("");
+    setFolder("");
+    setInstructions("");
+    setSubmitting(false);
+    requestAnimationFrame(() => nameRef.current?.focus());
+  }, [open]);
+  if (!open) return null;
+  function close() {
+    createGroupOpen.value = false;
+  }
+  async function onSubmit(e4) {
+    e4.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || submitting) return;
+    setSubmitting(true);
+    const r4 = await postJson("api/groups", {
+      name: trimmed,
+      folder: folder.trim() || void 0,
+      instructions: instructions || void 0
+    });
+    if (!r4.ok) {
+      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+      setSubmitting(false);
+      return;
+    }
+    const created = {
+      id: r4.data.id,
+      name: r4.data.name,
+      isAdmin: true,
+      hasContent: true,
+      lastActivityAt: r4.data.createdAt
+    };
+    groups.value = [created, ...groups.value.filter((g8) => g8.id !== created.id)];
+    close();
+    showToast(`Created "${created.name}"`);
+    selectGroup(created.id).catch((err) => console.error("selectGroup after create", err));
+  }
+  function onBackdrop(e4) {
+    if (e4.target.classList.contains("settings-backdrop")) close();
+  }
+  function onKey(e4) {
+    if (e4.key === "Escape") close();
+  }
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4(
+    "form",
+    {
+      class: "settings-modal",
+      role: "dialog",
+      "aria-label": "Create agent group",
+      style: "max-width:480px",
+      onSubmit,
+      onKeyDown: onKey,
+      children: [
+        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+          /* @__PURE__ */ u4("span", { class: "title", children: "New agent group" }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-body", style: "display:flex;flex-direction:column;gap:12px", children: [
+          /* @__PURE__ */ u4("label", { style: "display:block", children: [
+            /* @__PURE__ */ u4("span", { style: "display:block;margin-bottom:4px;font-size:12px;color:var(--muted)", children: "Name" }),
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                ref: nameRef,
+                type: "text",
+                value: name,
+                required: true,
+                placeholder: "e.g. Research Helper",
+                onInput: (e4) => setName(e4.currentTarget.value),
+                style: "width:100%"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ u4("label", { style: "display:block", children: [
+            /* @__PURE__ */ u4("span", { style: "display:block;margin-bottom:4px;font-size:12px;color:var(--muted)", children: [
+              "Folder ",
+              /* @__PURE__ */ u4("span", { style: "opacity:0.6", children: "(optional \u2014 derived from name)" })
+            ] }),
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "text",
+                value: folder,
+                placeholder: "research-helper",
+                onInput: (e4) => setFolder(e4.currentTarget.value),
+                style: "width:100%"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ u4("label", { style: "display:block", children: [
+            /* @__PURE__ */ u4("span", { style: "display:block;margin-bottom:4px;font-size:12px;color:var(--muted)", children: [
+              "Initial instructions ",
+              /* @__PURE__ */ u4("span", { style: "opacity:0.6", children: "(optional)" })
+            ] }),
+            /* @__PURE__ */ u4(
+              "textarea",
+              {
+                value: instructions,
+                rows: 5,
+                placeholder: "What should this agent know or do?",
+                onInput: (e4) => setInstructions(e4.currentTarget.value),
+                style: "width:100%;resize:vertical;min-height:96px"
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ u4(
+          "footer",
+          {
+            class: "settings-foot",
+            style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)",
+            children: [
+              /* @__PURE__ */ u4("button", { type: "button", onClick: close, disabled: submitting, children: "Cancel" }),
+              /* @__PURE__ */ u4("button", { type: "submit", class: "primary", disabled: submitting || !name.trim(), children: submitting ? "Creating\u2026" : "Create" })
+            ]
+          }
+        )
+      ]
+    }
+  ) });
+}
+
 // src/components/GroupPicker.tsx
 function isNonMember(g8) {
   return g8.hasContent === false;
@@ -18173,6 +18314,19 @@ function GroupStrip() {
           "More agents",
           "\u2026"
         ] })
+      }
+    ) : null,
+    elevated ? /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "group-chip group-chip-new",
+        title: "Create a new agent group",
+        "aria-haspopup": "dialog",
+        onClick: () => {
+          createGroupOpen.value = true;
+        },
+        children: /* @__PURE__ */ u4("span", { class: "chip-name", children: "+ New agent" })
       }
     ) : null
   ] });
@@ -18265,7 +18419,26 @@ function GroupPickerModal() {
             },
             g8.id
           );
-        }) })
+        }) }),
+        elevated ? /* @__PURE__ */ u4(
+          "footer",
+          {
+            class: "settings-foot",
+            style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)",
+            children: /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: "primary",
+                onClick: () => {
+                  close();
+                  createGroupOpen.value = true;
+                },
+                children: "+ New agent group"
+              }
+            )
+          }
+        ) : null
       ]
     }
   ) });
@@ -21476,7 +21649,7 @@ async function call(url, method = "GET", body) {
   }
   return { ok: r4.ok, status: r4.status, data };
 }
-function errMsg(d5, fallback) {
+function errMsg2(d5, fallback) {
   const e4 = d5?.error;
   return typeof e4 === "string" && e4 ? e4 : fallback;
 }
@@ -21548,7 +21721,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
     try {
       const r4 = await call(apiPath(gid, "/settings"));
       if (!r4.ok) {
-        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       setData(r4.data);
@@ -21581,7 +21754,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
   async function runRestart(rebuild) {
     const r4 = await call(apiPath(gid, "/restart"), "POST", { rebuild });
     if (!r4.ok) {
-      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+      showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
       return { ok: false };
     }
     return { ok: true, restarted: r4.data.restarted };
@@ -21638,7 +21811,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         if (pending2.has("site_slug")) body.site_slug = siteSlug.trim() || null;
         const r4 = await call(apiPath(gid, "/settings"), "PATCH", body);
         if (!r4.ok) {
-          showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+          showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
           return;
         }
         setData(r4.data);
@@ -21969,7 +22142,7 @@ function MembersTab({ gid }) {
   async function refresh() {
     const r4 = await call(apiPath(gid, "/members"));
     if (!r4.ok) {
-      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+      showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
       return;
     }
     setMembers(r4.data.members);
@@ -21982,7 +22155,7 @@ function MembersTab({ gid }) {
     try {
       const r4 = await call(apiPath(gid, "/members"), "POST", { userId });
       if (!r4.ok) {
-        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast("Member added");
@@ -21996,7 +22169,7 @@ function MembersTab({ gid }) {
     try {
       const r4 = await call(apiPath(gid, `/members/${encodeURIComponent(m6.userId)}`), "DELETE");
       if (!r4.ok) {
-        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast("Member removed");
@@ -22045,7 +22218,7 @@ function RolesTab({ gid }) {
   async function refresh() {
     const r4 = await call(apiPath(gid, "/roles"));
     if (!r4.ok) {
-      showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+      showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
       return;
     }
     setAdmins(r4.data.admins);
@@ -22062,7 +22235,7 @@ function RolesTab({ gid }) {
         { userId }
       );
       if (!r4.ok) {
-        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast(r4.data.alreadyGranted ? "Already an admin" : "Admin granted");
@@ -22076,7 +22249,7 @@ function RolesTab({ gid }) {
     try {
       const r4 = await call(apiPath(gid, `/roles/${encodeURIComponent(a4.userId)}`), "DELETE");
       if (!r4.ok) {
-        showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
         return;
       }
       showToast("Admin revoked");
@@ -22246,6 +22419,7 @@ function App() {
     /* @__PURE__ */ u4(ConfirmModal, {}),
     /* @__PURE__ */ u4(GroupPickerModal, {}),
     /* @__PURE__ */ u4(GroupAdmin, {}),
+    /* @__PURE__ */ u4(CreateGroupModal, {}),
     /* @__PURE__ */ u4(Toast, {})
   ] });
 }
