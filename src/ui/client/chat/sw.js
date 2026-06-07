@@ -167,6 +167,7 @@ async function handlePush(event) {
   let title = '{{BRAND_NAME}}';
   let body = 'New message';
   let icon = '/ui/chat/icon.svg';
+  let timestamp = null;
   try {
     const url = `${NOTIF_DETAILS_URL}?groupId=${encodeURIComponent(groupId)}&threadId=${encodeURIComponent(
       threadId,
@@ -177,6 +178,14 @@ async function handlePush(event) {
       if (detail.title) title = detail.title;
       if (detail.body) body = detail.body;
       if (detail.icon) icon = detail.icon;
+      if (detail.timestamp) {
+        // Server returns SQLite UTC format "YYYY-MM-DD HH:MM:SS" (no tz).
+        // Normalize to ISO so Date.parse interprets as UTC, matching the
+        // client's fmtRelative/fmtAbsolute helpers in utils.ts.
+        const iso = detail.timestamp.includes('T') ? detail.timestamp : detail.timestamp.replace(' ', 'T') + 'Z';
+        const t = Date.parse(iso);
+        if (!isNaN(t)) timestamp = t;
+      }
     }
   } catch (_e) {
     // Network/auth failed — fall through with generic body.
@@ -187,6 +196,7 @@ async function handlePush(event) {
     icon,
     tag,
     renotify: true,
+    timestamp: timestamp || undefined,
     data: { groupId, threadId, msgId },
     actions: [
       { action: 'open', title: 'Open' },

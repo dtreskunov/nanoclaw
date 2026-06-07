@@ -934,10 +934,26 @@ function handlePushNotification(ctx: Ctx, userId: string): void {
   const fileCount = msg.files?.length ?? 0;
   const filePart = fileCount > 0 ? ` · ${fileCount} file${fileCount > 1 ? 's' : ''}` : '';
   const body = (text.slice(0, 200) + filePart).trim() || (filePart ? filePart.trim() : 'New message');
+  const groupName = group.name || getBranding().name;
+  // Per-thread title makes notifications distinguishable when the same
+  // group has multiple active threads. Lookup is bounded by the user's
+  // accessible thread list and only runs on push delivery (rare).
+  let threadTitle = '';
+  try {
+    const elevated = isOwner(userId) || isGlobalAdmin(userId);
+    const threads = elevated ? listAllThreadsForAgentGroup(groupId) : listAllThreadsForUser(userId, groupId);
+    threadTitle = threads.find((t) => t.threadId === threadId)?.title || '';
+  } catch {
+    /* fall back to group name only */
+  }
+  // System tray clips long titles; keep room for both parts.
+  const truncatedThread = threadTitle.length > 40 ? threadTitle.slice(0, 39) + '…' : threadTitle;
+  const title = truncatedThread ? `${truncatedThread} · ${groupName}` : groupName;
   json(ctx, 200, {
-    title: group.name || getBranding().name,
+    title,
     body,
     icon: '/ui/chat/icon.svg',
+    timestamp: msg.timestamp,
     groupId,
     threadId,
     msgId,
