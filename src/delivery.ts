@@ -12,7 +12,7 @@ import type Database from 'better-sqlite3';
 import { getRunningSessions, getActiveSessions, createPendingQuestion } from './db/sessions.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getDb, hasTable } from './db/connection.js';
-import { getMessagingGroupByPlatform } from './db/messaging-groups.js';
+import { getMessagingGroupByPlatform, getMessagingGroup } from './db/messaging-groups.js';
 import {
   getDueOutboundMessages,
   getDeliveredIds,
@@ -22,7 +22,7 @@ import {
 } from './db/session-db.js';
 import { log } from './log.js';
 import { normalizeOptions } from './channels/ask-question.js';
-import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './session-manager.js';
+import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles, writeSessionMessage } from './session-manager.js';
 import { extractOutboundText, indexMessage } from './search-index.js';
 import { checkTurnEndedAndStop, setTypingAdapter } from './modules/typing/index.js';
 import type { OutboundFile } from './channels/adapter.js';
@@ -34,6 +34,17 @@ const MAX_DELIVERY_ATTEMPTS = 3;
 
 /** Track delivery attempt counts. Resets on process restart (gives failed messages a fresh chance). */
 const deliveryAttempts = new Map<string, number>();
+
+/**
+ * Cap on how many delivery-failure bounce-backs we'll write into a single
+ * session per process lifetime. Each terminal failure normally bounces once
+ * (the failed message is marked failed and never reprocessed), but the agent's
+ * corrective re-send is a *new* message that could also fail — without a cap a
+ * stubborn agent re-sending to a permanently-broken destination would loop.
+ * Resets on process restart, like deliveryAttempts.
+ */
+const MAX_BOUNCE_BACKS_PER_SESSION = 3;
+const bounceBackCounts = new Map<string, number>();
 
 /**
  * Sessions whose outbound queue is currently being drained.
@@ -241,6 +252,15 @@ async function drainSession(session: Session): Promise<void> {
           });
           markDeliveryFailed(inDb, msg.id);
           deliveryAttempts.delete(msg.id);
+          // Self-correcting safety net: tell the agent its reply never reached
+          // the recipient so it can re-send to the right destination. Never let
+          // this throw out of the loop — a failed bounce-back must not block
+          // delivery of other messages.
+          try {
+            bounceBackDeliveryFailure(msg, session, err);
+          } catch (bbErr) {
+            log.warn('Delivery-failure bounce-back failed', { messageId: msg.id, sessionId: session.id, err: bbErr });
+          }
         } else {
           log.warn('Message delivery failed, will retry', {
             messageId: msg.id,
@@ -256,6 +276,94 @@ async function drainSession(session: Session): Promise<void> {
     outDb.close();
     inDb.close();
   }
+}
+
+/**
+ * Write a `delivery_failed` system message back into the session's inbound DB
+ * so the agent learns its reply never reached the recipient and can re-send to
+ * the correct destination. Renders to the LLM as a `<system_response
+ * action="delivery_failed" ...>` block (see formatter.formatSystemMessage).
+ *
+ * Only fires for human-channel deliveries. Skips:
+ *   - agent-to-agent and system kinds (their own paths handle failures),
+ *   - the case where the failed destination *is* the session origin (re-sending
+ *     to a channel that's itself down won't help),
+ *   - sessions that have already exhausted MAX_BOUNCE_BACKS_PER_SESSION.
+ */
+function bounceBackDeliveryFailure(
+  msg: { id: string; kind: string; platform_id: string | null; channel_type: string | null; content: string },
+  session: Session,
+  err: unknown,
+): void {
+  if (msg.kind === 'system' || msg.channel_type === 'agent') return;
+  if (!msg.channel_type || !msg.platform_id) return;
+
+  const mg = getMessagingGroupByPlatform(msg.channel_type, msg.platform_id);
+  // If the failed target is the conversation's own origin, a re-send goes to the
+  // same broken channel — bouncing back would just loop. Let it stay failed.
+  if (mg && session.messaging_group_id && mg.id === session.messaging_group_id) return;
+
+  const used = bounceBackCounts.get(session.id) ?? 0;
+  if (used >= MAX_BOUNCE_BACKS_PER_SESSION) {
+    log.warn('Delivery-failure bounce-back cap reached; not notifying agent', {
+      sessionId: session.id,
+      messageId: msg.id,
+    });
+    return;
+  }
+
+  // Resolve a friendly name for the destination the agent tried (what it wrote
+  // in `to="..."`). Inlined SQL — mirrors the permission check in deliverMessage
+  // — so core doesn't hard-depend on the agent-to-agent module.
+  let failedName = mg?.name ?? `${msg.channel_type}/${msg.platform_id}`;
+  if (mg && hasTable(getDb(), 'agent_destinations')) {
+    const row = getDb()
+      .prepare(
+        "SELECT local_name FROM agent_destinations WHERE agent_group_id = ? AND target_type = 'channel' AND target_id = ? LIMIT 1",
+      )
+      .get(session.agent_group_id, mg.id) as { local_name?: string } | undefined;
+    if (row?.local_name) failedName = row.local_name;
+  }
+
+  // Resolve the conversation origin so the guidance can name where to re-send.
+  let originName: string | undefined;
+  if (session.messaging_group_id) {
+    const originMg = getMessagingGroup(session.messaging_group_id);
+    originName = originMg?.name ?? undefined;
+    if (hasTable(getDb(), 'agent_destinations')) {
+      const row = getDb()
+        .prepare(
+          "SELECT local_name FROM agent_destinations WHERE agent_group_id = ? AND target_type = 'channel' AND target_id = ? LIMIT 1",
+        )
+        .get(session.agent_group_id, session.messaging_group_id) as { local_name?: string } | undefined;
+      if (row?.local_name) originName = row.local_name;
+    }
+  }
+
+  const originalText = extractOutboundText(msg.content) || undefined;
+  const reason = err instanceof Error ? err.message : String(err);
+  const guidance = originName
+    ? `Your message was NOT delivered to "${failedName}". This conversation lives on "${originName}" — re-send your reply there so the person waiting actually receives it.`
+    : `Your message was NOT delivered to "${failedName}". Re-send your reply to the destination this conversation lives on (see your destinations list) so the person waiting actually receives it.`;
+
+  bounceBackCounts.set(session.id, used + 1);
+  writeSessionMessage(session.agent_group_id, session.id, {
+    id: `delivery-fail-${msg.id}`,
+    kind: 'system',
+    timestamp: new Date().toISOString(),
+    content: JSON.stringify({
+      action: 'delivery_failed',
+      status: 'error',
+      result: { failedDestination: failedName, originDestination: originName ?? null, reason, originalText, guidance },
+    }),
+    trigger: 1,
+  });
+  log.info('Wrote delivery-failure bounce-back to agent', {
+    sessionId: session.id,
+    messageId: msg.id,
+    failedDestination: failedName,
+    originDestination: originName,
+  });
 }
 
 async function deliverMessage(

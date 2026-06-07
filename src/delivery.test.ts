@@ -271,3 +271,99 @@ describe('deliverSessionMessages — permission check', () => {
     expect(delivered.has('out-unauth')).toBe(true);
   });
 });
+
+describe('deliverSessionMessages — delivery-failure bounce-back', () => {
+  it('writes a delivery_failed system message after permanent failure to a non-origin destination', async () => {
+    seedAgentAndChannel(); // ag-1, mg-1 (telegram:123) = origin
+
+    // A second, authorized destination — an email persona named after a person,
+    // the exact shape that attracts a mis-routed reply.
+    createMessagingGroup({
+      id: 'mg-2',
+      channel_type: 'resend',
+      platform_id: 'resend:bob@example.com',
+      name: 'Bob (Bot)',
+      is_group: 0,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga-2',
+      messaging_group_id: 'mg-2',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+
+    const { session } = resolveSession('ag-1', 'mg-1', null, 'shared'); // origin = mg-1
+
+    // Outbound addressed to the email persona (non-origin) — delivery will fail.
+    const outDb = new Database(outboundDbPath('ag-1', session.id));
+    outDb
+      .prepare(
+        `INSERT INTO messages_out (id, timestamp, kind, platform_id, channel_type, content)
+         VALUES (?, datetime('now'), 'chat', 'resend:bob@example.com', 'resend', ?)`,
+      )
+      .run('out-misroute', JSON.stringify({ text: 'the wedding site is live' }));
+    outDb.close();
+
+    setDeliveryAdapter({
+      async deliver() {
+        throw new Error('Resend cold DM: no user_dms row');
+      },
+    });
+
+    // Exhaust the 3 attempts → permanent failure → bounce-back.
+    await deliverSessionMessages(session);
+    await deliverSessionMessages(session);
+    await deliverSessionMessages(session);
+
+    const inDb = openInboundDb('ag-1', session.id);
+    const row = inDb
+      .prepare("SELECT kind, content, trigger FROM messages_in WHERE id = 'delivery-fail-out-misroute'")
+      .get() as { kind: string; content: string; trigger: number } | undefined;
+    inDb.close();
+
+    expect(row).toBeTruthy();
+    expect(row!.kind).toBe('system');
+    expect(row!.trigger).toBe(1); // wakes the agent
+    const content = JSON.parse(row!.content);
+    expect(content.action).toBe('delivery_failed');
+    expect(content.status).toBe('error');
+    expect(content.result.failedDestination).toBeTruthy();
+    expect(content.result.originalText).toContain('wedding');
+    expect(content.result.reason).toContain('no user_dms row');
+  });
+
+  it('does NOT bounce back when the failed destination is the session origin', async () => {
+    seedAgentAndChannel();
+    const { session } = resolveSession('ag-1', 'mg-1', null, 'shared');
+    insertOutbound('ag-1', session.id, 'out-origin-fail'); // targets telegram:123 = origin
+
+    setDeliveryAdapter({
+      async deliver() {
+        throw new Error('telegram down');
+      },
+    });
+
+    await deliverSessionMessages(session);
+    await deliverSessionMessages(session);
+    await deliverSessionMessages(session);
+
+    const inDb = openInboundDb('ag-1', session.id);
+    const row = inDb
+      .prepare("SELECT 1 FROM messages_in WHERE id = 'delivery-fail-out-origin-fail'")
+      .get();
+    // The message itself is still marked failed…
+    const delivered = getDeliveredIds(inDb);
+    inDb.close();
+    expect(delivered.has('out-origin-fail')).toBe(true);
+    // …but no bounce-back is written (re-sending to the broken origin is futile).
+    expect(row).toBeUndefined();
+  });
+});
