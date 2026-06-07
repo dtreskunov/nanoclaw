@@ -154,12 +154,15 @@ async function handlePush(event) {
   const { groupId, threadId, msgId } = payload;
   const tag = `nanoclaw-${groupId}-${threadId}`;
 
-  // Skip if a window for this thread is already focused.
+  // Skip if any visible window is already showing this thread — the user
+  // can see the message and a notification would be spam. `visibilityState`
+  // (not `focused`) is the right signal: a side-by-side / split-screen tab
+  // is "visible" but not "focused" and the user can still see it.
   const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  const focusedOnThread = clientsList.some(
-    (c) => c.focused && c.url.includes(`#g/${groupId}/t/${threadId}`),
+  const visibleOnThread = clientsList.some(
+    (c) => c.visibilityState === 'visible' && c.url.includes(`#g/${groupId}/t/${threadId}`),
   );
-  if (focusedOnThread) return;
+  if (visibleOnThread) return;
 
   let title = '{{BRAND_NAME}}';
   let body = 'New message';
