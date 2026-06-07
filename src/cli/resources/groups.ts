@@ -4,6 +4,7 @@ import { restartAgentGroupContainers } from '../../container-restart.js';
 import { cascadeDeleteAgentGroup } from '../../db/cascade-delete-agent-group.js';
 import { getDb } from '../../db/connection.js';
 import { getSession } from '../../db/sessions.js';
+import { createGroup, GroupCreateError } from '../../modules/groups/create.js';
 import { writeSessionMessage } from '../../session-manager.js';
 import {
   getContainerConfig,
@@ -55,16 +56,38 @@ registerResource({
       name: 'folder',
       type: 'string',
       description:
-        'Directory name under groups/ on the host. Must be unique. Contains CLAUDE.md, skills/, and container.json. Cannot be changed after creation.',
-      required: true,
+        'Directory name under groups/ on the host. Must be unique. Contains CLAUDE.md, skills/, and container.json. ' +
+        'Optional on create — if omitted, derived from --name and deduped with -2, -3, ... suffixes. Cannot be changed after creation.',
     },
     { name: 'created_at', type: 'string', description: 'Auto-set.', generated: true },
   ],
   // `delete` is intentionally not in `operations` — the generic single-table
-  // DELETE violates FK constraints (see #2525). The cascading handler is
-  // provided as `customOperations.delete` below.
-  operations: { list: 'open', get: 'open', create: 'approval', update: 'approval' },
+  // DELETE violates FK constraints (see #2525). `create` is also custom so
+  // we can scaffold the on-disk group folder (`initGroupFilesystem`) in the
+  // same step; the generic INSERT would leave the FS in an inconsistent
+  // state until the first container spawn.
+  operations: { list: 'open', get: 'open', update: 'approval' },
   customOperations: {
+    create: {
+      access: 'approval',
+      description:
+        'Create a new agent group. Inserts the DB row, scaffolds groups/<folder>/ (CLAUDE.local.md, .claude-shared/, container_configs), ' +
+        'and returns the new record. Use --name <display-name> [--folder <slug>] [--instructions <body>]. ' +
+        'If --folder is omitted it is derived from --name and deduped with -2, -3, ... suffixes.',
+      handler: async (args) => {
+        const name = args.name as string | undefined;
+        const folder = args.folder as string | undefined;
+        const instructions = args.instructions as string | undefined;
+        if (!name) throw new Error('--name is required');
+        try {
+          const group = createGroup({ name, folder, instructions });
+          return group;
+        } catch (err) {
+          if (err instanceof GroupCreateError) throw new Error(err.message);
+          throw err;
+        }
+      },
+    },
     delete: {
       access: 'approval',
       description:
