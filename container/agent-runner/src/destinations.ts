@@ -11,6 +11,7 @@
  * so even if this table is stale the host's enforcement is authoritative.
  */
 import { getInboundDb } from './db/connection.js';
+import { getSessionRouting } from './db/session-routing.js';
 
 export interface DestinationEntry {
   name: string;
@@ -102,6 +103,22 @@ function buildDestinationsSection(): string {
     ].join('\n');
   }
 
+  // The session origin — the channel this conversation actually lives on — is
+  // recorded in session_routing. Match it back to a destination so we can flag
+  // it explicitly. This stops the agent from picking a same-named-but-wrong
+  // destination (e.g. an outbound email persona named after the user) instead
+  // of the channel the human is actually waiting on.
+  const routing = getSessionRouting();
+  const origin =
+    routing.channel_type && routing.platform_id
+      ? all.find(
+          (d) =>
+            d.type === 'channel' &&
+            d.channelType === routing.channel_type &&
+            d.platformId === routing.platform_id,
+        )
+      : undefined;
+
   const lines = ['## Sending messages', ''];
   if (all.length === 1) {
     const d = all[0];
@@ -109,7 +126,8 @@ function buildDestinationsSection(): string {
   } else {
     lines.push('You can send messages to the following destinations:', '');
     for (const d of all) {
-      lines.push(`- ${describeDestination(d)}`);
+      const marker = origin && d.name === origin.name ? ' — **← this conversation; reply here by default**' : '';
+      lines.push(`- ${describeDestination(d)}${marker}`);
     }
   }
   lines.push('');
@@ -120,6 +138,12 @@ function buildDestinationsSection(): string {
   lines.push(
     '**Routing rule:** every inbound `<message>` tag carries a `from="name"` attribute. Default to addressing the destination it came `from` — a human channel message gets a human-channel reply; a peer-agent message gets a peer-agent reply. Cross-routing (forwarding a human request to a peer agent, or relaying a peer\'s answer back to the human) is fine when the request explicitly asks for it, but never silently swap destinations.',
   );
+  if (origin && all.length > 1) {
+    lines.push('');
+    lines.push(
+      `**This conversation lives on \`${origin.name}\`.** Unless a request explicitly tells you to send elsewhere, reply there — addressing a different destination means the human waiting here sees nothing.`,
+    );
+  }
   if (all.some((d) => d.type === 'agent') && all.some((d) => d.type === 'channel')) {
     lines.push('');
     lines.push(
