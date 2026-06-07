@@ -103,9 +103,9 @@ export function CreateGroupModal() {
           <span class="title">New agent group</span>
           <button type="button" class="icon-btn" aria-label="Close" onClick={close}>{'\u2715'}</button>
         </header>
-        <div class="settings-body" style="display:flex;flex-direction:column;gap:12px">
-          <label style="display:block">
-            <span style="display:block;margin-bottom:4px;font-size:12px;color:var(--muted)">Name</span>
+        <div class="settings-body create-group-body">
+          <label class="cg-field">
+            <span class="cg-label">Name</span>
             <input
               ref={nameRef}
               type="text"
@@ -113,31 +113,28 @@ export function CreateGroupModal() {
               required
               placeholder="e.g. Research Helper"
               onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setName(e.currentTarget.value)}
-              style="width:100%"
             />
           </label>
-          <label style="display:block">
-            <span style="display:block;margin-bottom:4px;font-size:12px;color:var(--muted)">
-              Folder <span style="opacity:0.6">(optional — derived from name)</span>
+          <label class="cg-field">
+            <span class="cg-label">
+              Folder <span class="cg-optional">(optional — derived from name)</span>
             </span>
             <input
               type="text"
               value={folder}
               placeholder="research-helper"
               onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setFolder(e.currentTarget.value)}
-              style="width:100%"
             />
           </label>
-          <label style="display:block">
-            <span style="display:block;margin-bottom:4px;font-size:12px;color:var(--muted)">
-              Initial instructions <span style="opacity:0.6">(optional)</span>
+          <label class="cg-field">
+            <span class="cg-label">
+              Initial instructions <span class="cg-optional">(optional)</span>
             </span>
             <textarea
               value={instructions}
               rows={5}
               placeholder="What should this agent know or do?"
               onInput={(e: JSX.TargetedEvent<HTMLTextAreaElement>) => setInstructions(e.currentTarget.value)}
-              style="width:100%;resize:vertical;min-height:96px"
             />
           </label>
         </div>

@@ -554,6 +554,39 @@ header .mobile-only {
 .settings-body button.ghost {
   background: transparent;
 }
+.create-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cg-field {
+  display: block;
+}
+.cg-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--font-base);
+  color: var(--muted);
+}
+.cg-optional {
+  opacity: 0.6;
+  font-weight: normal;
+}
+.cg-field input[type=text],
+.cg-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+}
+.cg-field textarea {
+  resize: vertical;
+  min-height: 96px;
+}
 .settings-table {
   width: 100%;
   border-collapse: collapse;
@@ -2714,23 +2747,10 @@ body.is-admin .files-pane.collapsed .admin-only {
 }
 .group-admin-danger-zone {
   margin-top: 24px;
-  border: 1px solid var(--danger-border, #d93b3b);
-  border-radius: var(--radius-md, 6px);
-  background: var(--danger-tint, rgba(217, 59, 59, 0.06));
-}
-.group-admin-danger-zone > header {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--danger-border, #d93b3b);
-}
-.group-admin-danger-zone > header .title {
-  font-weight: 600;
-  color: var(--danger-fg, #d93b3b);
-}
-.group-admin-danger-zone > .body {
-  padding: 10px 12px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  justify-content: flex-end;
 }
 .group-admin-danger-zone button.danger,
 .ga-confirm-foot button.danger {

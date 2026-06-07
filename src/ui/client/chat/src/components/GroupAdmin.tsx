@@ -170,18 +170,26 @@ export function GroupAdmin(): JSX.Element | null {
   const [tab, setTab] = useState<Tab>('models');
   const actionsRef = useRef<HeaderActions | null>(null);
   const [, forceRender] = useState(0);
-  useEffect(() => { setTab('models'); }, [open, gid]);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  useEffect(() => { setTab('models'); setCloseConfirmOpen(false); }, [open, gid]);
   useBackButtonCloses(open, () => { groupAdminOpen.value = false; });
 
   if (!open || !gid) return null;
   const group = groups.value.find((g) => g.id === gid);
   const title = group ? `Admin · ${group.name}` : 'Admin';
 
-  function close(): void { groupAdminOpen.value = false; }
-  function onBackdrop(e: JSX.TargetedMouseEvent<HTMLDivElement>): void {
-    if ((e.target as HTMLElement).classList.contains('settings-backdrop')) close();
+  function hardClose(): void { groupAdminOpen.value = false; }
+  function attemptClose(): void {
+    if (actionsRef.current?.canSave) {
+      setCloseConfirmOpen(true);
+    } else {
+      hardClose();
+    }
   }
-  function onKey(e: KeyboardEvent): void { if (e.key === 'Escape') close(); }
+  function onBackdrop(e: JSX.TargetedMouseEvent<HTMLDivElement>): void {
+    if ((e.target as HTMLElement).classList.contains('settings-backdrop')) attemptClose();
+  }
+  function onKey(e: KeyboardEvent): void { if (e.key === 'Escape') attemptClose(); }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -205,7 +213,7 @@ export function GroupAdmin(): JSX.Element | null {
                 </Tooltip>
               </>
             ) : null}
-            <button type="button" class="icon-btn" aria-label="Close" onClick={close}>{'\u2715'}</button>
+            <button type="button" class="icon-btn" aria-label="Close" onClick={attemptClose}>{'\u2715'}</button>
           </div>
         </header>
         <nav class="group-admin-tabs">
@@ -216,11 +224,42 @@ export function GroupAdmin(): JSX.Element | null {
         </nav>
         <div class="settings-body">
           {(tab === 'models' || tab === 'settings')
-            ? <SettingsTab gid={gid} section={tab} onClose={close} onActions={setActions} />
+            ? <SettingsTab gid={gid} section={tab} onClose={hardClose} onActions={setActions} />
             : null}
           {tab === 'members' ? <MembersTab gid={gid} /> : null}
           {tab === 'roles' ? <RolesTab gid={gid} /> : null}
         </div>
+        {closeConfirmOpen ? (
+          <div
+            class="settings-backdrop"
+            onClick={(e) => {
+              if ((e.target as HTMLElement).classList.contains('settings-backdrop')) setCloseConfirmOpen(false);
+            }}
+          >
+            <div class="settings-modal ga-confirm-modal" role="dialog" aria-label="Discard changes?" style="max-width:420px">
+              <header class="settings-head">
+                <span class="title">Discard unsaved changes?</span>
+                <button type="button" class="icon-btn" aria-label="Close" onClick={() => setCloseConfirmOpen(false)}>{'\u2715'}</button>
+              </header>
+              <div class="settings-body">
+                <p class="group-admin-help">
+                  You have unsaved changes. Closing now discards them.
+                </p>
+              </div>
+              <footer class="settings-foot ga-confirm-foot">
+                <button type="button" onClick={() => setCloseConfirmOpen(false)}>Keep editing</button>
+                <button
+                  type="button"
+                  class="danger"
+                  data-testid="discard-and-close-btn"
+                  onClick={() => { setCloseConfirmOpen(false); hardClose(); }}
+                >
+                  Discard &amp; close
+                </button>
+              </footer>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -633,27 +672,15 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
       ) : null}
 
       <div class="group-admin-danger-zone" data-testid="danger-zone">
-        <header>
-          <span class="title">Danger zone</span>
-        </header>
-        <div class="body">
-          <p class="group-admin-help">
-            Archive this group. Running container sessions stop, the group disappears from the sidebar,
-            and its folder is renamed with a <code>~</code> suffix. Nothing is deleted.
-          </p>
-          <p class="group-admin-help">
-            Restore is host-only — operator runs <code>ncl groups restore --folder {data.folder}</code> in a shell.
-          </p>
-          <button
-            type="button"
-            class="danger"
-            data-testid="archive-btn"
-            disabled={busy || archiveBusy}
-            onClick={() => { setArchiveConfirm(''); setArchiveOpen(true); }}
-          >
-            Archive group…
-          </button>
-        </div>
+        <button
+          type="button"
+          class="danger"
+          data-testid="archive-btn"
+          disabled={busy || archiveBusy}
+          onClick={() => { setArchiveConfirm(''); setArchiveOpen(true); }}
+        >
+          Archive group…
+        </button>
       </div>
         </>
       ) : null}
@@ -745,9 +772,11 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
             </header>
             <div class="settings-body">
               <p class="group-admin-help" style="margin-bottom:12px">
-                Running container sessions will stop. The group will be removed from this UI and
-                its folder renamed with a <code>~</code> suffix. Restore is host-only:{' '}
-                <code>ncl groups restore --folder {data.folder}</code>.
+                Running container sessions will stop and the group will be removed from this UI.
+                Its folder is renamed with a <code>~</code> suffix — nothing is deleted.
+              </p>
+              <p class="group-admin-help" style="margin-bottom:12px">
+                Restore is host-only: <code>ncl groups restore --folder {data.folder}</code>.
               </p>
               <p class="group-admin-help" style="margin-bottom:8px">
                 Type <code>{data.folder}</code> to confirm:

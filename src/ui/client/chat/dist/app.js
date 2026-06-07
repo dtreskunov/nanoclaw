@@ -18180,9 +18180,9 @@ function CreateGroupModal() {
           /* @__PURE__ */ u4("span", { class: "title", children: "New agent group" }),
           /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
         ] }),
-        /* @__PURE__ */ u4("div", { class: "settings-body", style: "display:flex;flex-direction:column;gap:12px", children: [
-          /* @__PURE__ */ u4("label", { style: "display:block", children: [
-            /* @__PURE__ */ u4("span", { style: "display:block;margin-bottom:4px;font-size:12px;color:var(--muted)", children: "Name" }),
+        /* @__PURE__ */ u4("div", { class: "settings-body create-group-body", children: [
+          /* @__PURE__ */ u4("label", { class: "cg-field", children: [
+            /* @__PURE__ */ u4("span", { class: "cg-label", children: "Name" }),
             /* @__PURE__ */ u4(
               "input",
               {
@@ -18191,15 +18191,14 @@ function CreateGroupModal() {
                 value: name,
                 required: true,
                 placeholder: "e.g. Research Helper",
-                onInput: (e4) => setName(e4.currentTarget.value),
-                style: "width:100%"
+                onInput: (e4) => setName(e4.currentTarget.value)
               }
             )
           ] }),
-          /* @__PURE__ */ u4("label", { style: "display:block", children: [
-            /* @__PURE__ */ u4("span", { style: "display:block;margin-bottom:4px;font-size:12px;color:var(--muted)", children: [
+          /* @__PURE__ */ u4("label", { class: "cg-field", children: [
+            /* @__PURE__ */ u4("span", { class: "cg-label", children: [
               "Folder ",
-              /* @__PURE__ */ u4("span", { style: "opacity:0.6", children: "(optional \u2014 derived from name)" })
+              /* @__PURE__ */ u4("span", { class: "cg-optional", children: "(optional \u2014 derived from name)" })
             ] }),
             /* @__PURE__ */ u4(
               "input",
@@ -18207,15 +18206,14 @@ function CreateGroupModal() {
                 type: "text",
                 value: folder,
                 placeholder: "research-helper",
-                onInput: (e4) => setFolder(e4.currentTarget.value),
-                style: "width:100%"
+                onInput: (e4) => setFolder(e4.currentTarget.value)
               }
             )
           ] }),
-          /* @__PURE__ */ u4("label", { style: "display:block", children: [
-            /* @__PURE__ */ u4("span", { style: "display:block;margin-bottom:4px;font-size:12px;color:var(--muted)", children: [
+          /* @__PURE__ */ u4("label", { class: "cg-field", children: [
+            /* @__PURE__ */ u4("span", { class: "cg-label", children: [
               "Initial instructions ",
-              /* @__PURE__ */ u4("span", { style: "opacity:0.6", children: "(optional)" })
+              /* @__PURE__ */ u4("span", { class: "cg-optional", children: "(optional)" })
             ] }),
             /* @__PURE__ */ u4(
               "textarea",
@@ -18223,8 +18221,7 @@ function CreateGroupModal() {
                 value: instructions,
                 rows: 5,
                 placeholder: "What should this agent know or do?",
-                onInput: (e4) => setInstructions(e4.currentTarget.value),
-                style: "width:100%;resize:vertical;min-height:96px"
+                onInput: (e4) => setInstructions(e4.currentTarget.value)
               }
             )
           ] })
@@ -21659,8 +21656,10 @@ function GroupAdmin() {
   const [tab, setTab] = h2("models");
   const actionsRef = A2(null);
   const [, forceRender] = h2(0);
+  const [closeConfirmOpen, setCloseConfirmOpen] = h2(false);
   y2(() => {
     setTab("models");
+    setCloseConfirmOpen(false);
   }, [open, gid]);
   useBackButtonCloses(open, () => {
     groupAdminOpen.value = false;
@@ -21668,14 +21667,21 @@ function GroupAdmin() {
   if (!open || !gid) return null;
   const group = groups.value.find((g8) => g8.id === gid);
   const title = group ? `Admin \xB7 ${group.name}` : "Admin";
-  function close() {
+  function hardClose() {
     groupAdminOpen.value = false;
   }
+  function attemptClose() {
+    if (actionsRef.current?.canSave) {
+      setCloseConfirmOpen(true);
+    } else {
+      hardClose();
+    }
+  }
   function onBackdrop(e4) {
-    if (e4.target.classList.contains("settings-backdrop")) close();
+    if (e4.target.classList.contains("settings-backdrop")) attemptClose();
   }
   function onKey(e4) {
-    if (e4.key === "Escape") close();
+    if (e4.key === "Escape") attemptClose();
   }
   y2(() => {
     if (!open) return void 0;
@@ -21692,7 +21698,7 @@ function GroupAdmin() {
       /* @__PURE__ */ u4("span", { class: "title", children: title }),
       /* @__PURE__ */ u4("div", { class: "settings-head-actions", children: [
         (tab === "models" || tab === "settings") && ha ? /* @__PURE__ */ u4(k, { children: /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) }) }) : null,
-        /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
+        /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: attemptClose, children: "\u2715" })
       ] })
     ] }),
     /* @__PURE__ */ u4("nav", { class: "group-admin-tabs", children: [
@@ -21702,10 +21708,42 @@ function GroupAdmin() {
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" })
     ] }),
     /* @__PURE__ */ u4("div", { class: "settings-body", children: [
-      tab === "models" || tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: close, onActions: setActions }) : null,
+      tab === "models" || tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: hardClose, onActions: setActions }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
       tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null
-    ] })
+    ] }),
+    closeConfirmOpen ? /* @__PURE__ */ u4(
+      "div",
+      {
+        class: "settings-backdrop",
+        onClick: (e4) => {
+          if (e4.target.classList.contains("settings-backdrop")) setCloseConfirmOpen(false);
+        },
+        children: /* @__PURE__ */ u4("div", { class: "settings-modal ga-confirm-modal", role: "dialog", "aria-label": "Discard changes?", style: "max-width:420px", children: [
+          /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+            /* @__PURE__ */ u4("span", { class: "title", children: "Discard unsaved changes?" }),
+            /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: () => setCloseConfirmOpen(false), children: "\u2715" })
+          ] }),
+          /* @__PURE__ */ u4("div", { class: "settings-body", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "You have unsaved changes. Closing now discards them." }) }),
+          /* @__PURE__ */ u4("footer", { class: "settings-foot ga-confirm-foot", children: [
+            /* @__PURE__ */ u4("button", { type: "button", onClick: () => setCloseConfirmOpen(false), children: "Keep editing" }),
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: "danger",
+                "data-testid": "discard-and-close-btn",
+                onClick: () => {
+                  setCloseConfirmOpen(false);
+                  hardClose();
+                },
+                children: "Discard & close"
+              }
+            )
+          ] })
+        ] })
+      }
+    ) : null
   ] }) });
 }
 function SettingsTab({ gid, section, onClose, onActions }) {
@@ -22090,38 +22128,20 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           ] })
         }
       ) : null,
-      /* @__PURE__ */ u4("div", { class: "group-admin-danger-zone", "data-testid": "danger-zone", children: [
-        /* @__PURE__ */ u4("header", { children: /* @__PURE__ */ u4("span", { class: "title", children: "Danger zone" }) }),
-        /* @__PURE__ */ u4("div", { class: "body", children: [
-          /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
-            "Archive this group. Running container sessions stop, the group disappears from the sidebar, and its folder is renamed with a ",
-            /* @__PURE__ */ u4("code", { children: "~" }),
-            " suffix. Nothing is deleted."
-          ] }),
-          /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
-            "Restore is host-only \u2014 operator runs ",
-            /* @__PURE__ */ u4("code", { children: [
-              "ncl groups restore --folder ",
-              data.folder
-            ] }),
-            " in a shell."
-          ] }),
-          /* @__PURE__ */ u4(
-            "button",
-            {
-              type: "button",
-              class: "danger",
-              "data-testid": "archive-btn",
-              disabled: busy || archiveBusy,
-              onClick: () => {
-                setArchiveConfirm("");
-                setArchiveOpen(true);
-              },
-              children: "Archive group\u2026"
-            }
-          )
-        ] })
-      ] })
+      /* @__PURE__ */ u4("div", { class: "group-admin-danger-zone", "data-testid": "danger-zone", children: /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "danger",
+          "data-testid": "archive-btn",
+          disabled: busy || archiveBusy,
+          onClick: () => {
+            setArchiveConfirm("");
+            setArchiveOpen(true);
+          },
+          children: "Archive group\u2026"
+        }
+      ) })
     ] }) : null,
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: changed ? `${pending2.size} unsaved change${pending2.size === 1 ? "" : "s"}. Click Save (\u2713) above to review and apply.` : "No unsaved changes." }) }),
     confirmOpen ? /* @__PURE__ */ u4(
@@ -22196,10 +22216,12 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           ] }),
           /* @__PURE__ */ u4("div", { class: "settings-body", children: [
             /* @__PURE__ */ u4("p", { class: "group-admin-help", style: "margin-bottom:12px", children: [
-              "Running container sessions will stop. The group will be removed from this UI and its folder renamed with a ",
+              "Running container sessions will stop and the group will be removed from this UI. Its folder is renamed with a ",
               /* @__PURE__ */ u4("code", { children: "~" }),
-              " suffix. Restore is host-only:",
-              " ",
+              " suffix \u2014 nothing is deleted."
+            ] }),
+            /* @__PURE__ */ u4("p", { class: "group-admin-help", style: "margin-bottom:12px", children: [
+              "Restore is host-only: ",
               /* @__PURE__ */ u4("code", { children: [
                 "ncl groups restore --folder ",
                 data.folder

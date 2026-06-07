@@ -41,6 +41,29 @@
 .settings-body button.danger { color: var(--danger); border-color: var(--danger); }
 .settings-body button.danger:hover { background: var(--danger); color: #fff; }
 .settings-body button.ghost { background: transparent; }
+
+/* "Create agent group" modal — stacked label-above-input fields. */
+.create-group-body { display: flex; flex-direction: column; gap: 12px; }
+.cg-field { display: block; }
+.cg-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--font-base);
+  color: var(--muted);
+}
+.cg-optional { opacity: 0.6; font-weight: normal; }
+.cg-field input[type="text"],
+.cg-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+}
+.cg-field textarea { resize: vertical; min-height: 96px; }
 .settings-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: var(--font-base); table-layout: auto; }
 .settings-table th, .settings-table td {
   text-align: left; padding: 6px 8px;
