@@ -157,6 +157,7 @@ export function migrateGroupsToClaudeLocal(): void {
   for (const entry of fs.readdirSync(GROUPS_DIR, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     if (entry.name === 'global') continue;
+    if (/~\d*$/.test(entry.name)) continue; // archived folder (e.g. `my-group~`, `my-group~2`)
 
     const groupDir = path.join(GROUPS_DIR, entry.name);
 

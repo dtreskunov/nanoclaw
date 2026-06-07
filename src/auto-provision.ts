@@ -163,6 +163,7 @@ export function listEmailBotFolders(): BotFolder[] {
   const out: BotFolder[] = [];
   for (const entry of fs.readdirSync(GROUPS_DIR, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
+    if (/~\d*$/.test(entry.name)) continue; // archived folder (e.g. `bot@x.com~`, `bot@x.com~2`)
     if (!entry.name.includes('@')) continue; // email-bot folders are full addresses
     const bot = readBotFolder(entry.name);
     if (bot) out.push(bot);
