@@ -404,6 +404,33 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
 
       {section === 'models' ? (
         <>
+          <Field
+            label="Provider"
+            info={draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : undefined}
+          >
+            <Combobox
+              value={draft.provider}
+              options={(() => {
+                const selectable = data.validProviders.slice();
+                // If the saved provider isn't in the selectable list (e.g. legacy
+                // 'mock'), keep it visible so the user can see their state and
+                // still switch away to a supported value.
+                if (draft.provider && !selectable.includes(draft.provider)) {
+                  selectable.push(draft.provider);
+                }
+                return selectable.map((p) => ({
+                  value: p,
+                  label: p,
+                  tooltip: PROVIDER_INFO[p],
+                }));
+              })()}
+              placeholder={data.defaults.provider ? `default: ${data.defaults.provider}` : 'pick a provider'}
+              disabled={busy}
+              freeform={false}
+              onChange={(v) => update('provider', v)}
+            />
+          </Field>
+
           <Field label="Model">
             <ModelSelector
               value={draft.model}
@@ -442,33 +469,6 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           disabled={busy}
           maxLength={100}
           onInput={(e) => setDraftName((e.target as HTMLInputElement).value)}
-        />
-      </Field>
-
-      <Field
-        label="Provider"
-        info={draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : undefined}
-      >
-        <Combobox
-          value={draft.provider}
-          options={(() => {
-            const selectable = data.validProviders.slice();
-            // If the saved provider isn't in the selectable list (e.g. legacy
-            // 'mock'), keep it visible so the user can see their state and
-            // still switch away to a supported value.
-            if (draft.provider && !selectable.includes(draft.provider)) {
-              selectable.push(draft.provider);
-            }
-            return selectable.map((p) => ({
-              value: p,
-              label: p,
-              tooltip: PROVIDER_INFO[p],
-            }));
-          })()}
-          placeholder={data.defaults.provider ? `default: ${data.defaults.provider}` : 'pick a provider'}
-          disabled={busy}
-          freeform={false}
-          onChange={(v) => update('provider', v)}
         />
       </Field>
 
