@@ -314,4 +314,14 @@
     gap: 4px;
   }
   .group-admin-label { width: auto; }
+  /*
+   * Override the global Settings.css rule that hides the 3rd column on
+   * narrow widths (intended for the Members/Admins identity column).
+   * On the Destinations tab the 3rd column is meaningful (Reverse link
+   * or Local name) and must stay visible.
+   */
+  .settings-table.ga-destinations-table th:nth-child(3),
+  .settings-table.ga-destinations-table td:nth-child(3) {
+    display: table-cell;
+  }
 }

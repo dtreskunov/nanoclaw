@@ -22493,7 +22493,7 @@ function DestinationsTab({ gid }) {
   return /* @__PURE__ */ u4("section", { children: [
     /* @__PURE__ */ u4("p", { class: "muted", children: "Destinations are the names this agent uses to route messages \u2014 either to channels (auto-managed, listed below) or to other agent groups (added here)." }),
     /* @__PURE__ */ u4("h4", { children: "Agent destinations" }),
-    agents.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No agent destinations yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+    agents.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No agent destinations yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table ga-destinations-table", children: [
       /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
         /* @__PURE__ */ u4("th", { children: "Target agent" }),
         /* @__PURE__ */ u4("th", { children: "Local name" }),
@@ -22535,7 +22535,7 @@ function DestinationsTab({ gid }) {
     } }) : /* @__PURE__ */ u4("button", { type: "button", onClick: () => setAdding(true), children: "Link another agent\u2026" }),
     /* @__PURE__ */ u4("h4", { class: "ga-section-h4", children: "Channel destinations" }),
     /* @__PURE__ */ u4("p", { class: "muted", children: "Channels (chat platforms, email, web) are wired automatically when a messaging group is connected to this agent \u2014 read-only here." }),
-    channels.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No channel destinations." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+    channels.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No channel destinations." }) : /* @__PURE__ */ u4("table", { class: "settings-table ga-destinations-table", children: [
       /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
         /* @__PURE__ */ u4("th", { children: "Channel" }),
         /* @__PURE__ */ u4("th", { children: "Local name" })

@@ -1306,7 +1306,10 @@ function serveStatic(ctx: Ctx, relName: string): void {
                 ? 'application/manifest+json; charset=utf-8'
                 : 'application/octet-stream';
   if (ext === '.html') {
-    let body = fs.readFileSync(full, 'utf8').replace(/(<script[^>]+src="dist\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`);
+    let body = fs
+      .readFileSync(full, 'utf8')
+      .replace(/(<script[^>]+src="dist\/app\.js)"/g, `$1?v=${ASSET_VERSION}"`)
+      .replace(/(<link[^>]+href="dist\/app\.css)"/g, `$1?v=${ASSET_VERSION}"`);
     body = applyBrandTokens(body).replace(/\{\{BRAND_BOOTSTRAP\}\}/g, brandBootstrapScript());
     const buf = Buffer.from(body, 'utf8');
     ctx.res.writeHead(200, {

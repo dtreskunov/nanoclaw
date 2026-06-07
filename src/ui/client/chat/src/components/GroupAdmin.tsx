@@ -1067,7 +1067,7 @@ function DestinationsTab({ gid }: { gid: string }): JSX.Element {
       {agents.length === 0
         ? <p class="muted">No agent destinations yet.</p>
         : (
-          <table class="settings-table">
+          <table class="settings-table ga-destinations-table">
             <thead><tr><th>Target agent</th><th>Local name</th><th>Reverse link</th><th></th></tr></thead>
             <tbody>
               {agents.map((d) => (
@@ -1123,7 +1123,7 @@ function DestinationsTab({ gid }: { gid: string }): JSX.Element {
       {channels.length === 0
         ? <p class="muted">No channel destinations.</p>
         : (
-          <table class="settings-table">
+          <table class="settings-table ga-destinations-table">
             <thead><tr><th>Channel</th><th>Local name</th></tr></thead>
             <tbody>
               {channels.map((d) => (

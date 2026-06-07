@@ -2901,6 +2901,10 @@ body.is-admin .files-pane.collapsed .admin-only {
   .group-admin-label {
     width: auto;
   }
+  .settings-table.ga-destinations-table th:nth-child(3),
+  .settings-table.ga-destinations-table td:nth-child(3) {
+    display: table-cell;
+  }
 }
 
 /* src/components/Combobox.css */
