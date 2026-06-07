@@ -4,6 +4,8 @@ import { restartAgentGroupContainers } from '../../container-restart.js';
 import { cascadeDeleteAgentGroup } from '../../db/cascade-delete-agent-group.js';
 import { getDb } from '../../db/connection.js';
 import { getSession } from '../../db/sessions.js';
+import { archiveAgentGroup } from '../../modules/archive/archive-group.js';
+import { restoreAgentGroup } from '../../modules/archive/restore-group.js';
 import { createGroup, GroupCreateError } from '../../modules/groups/create.js';
 import { writeSessionMessage } from '../../session-manager.js';
 import {
@@ -99,6 +101,39 @@ registerResource({
         if (!id) throw new Error('--id is required');
         const removed = cascadeDeleteAgentGroup(id);
         return { deleted: id, removed };
+      },
+    },
+    archive: {
+      access: 'approval',
+      description:
+        'Archive an agent group: snapshot every dependent row into groups/<folder>/archive.json, ' +
+        'write ARCHIVE_RESTORE.md, kill any running containers, run the FK cascade, then rename ' +
+        'groups/<folder> -> groups/<folder>~ and data/v2-sessions/<id> -> data/v2-sessions/<id>~. ' +
+        'Restorable via `ncl groups restore --folder <name>`. Use --id <group-id>. ' +
+        'From inside a container, --id is auto-filled to the calling group.',
+      handler: async (args, ctx) => {
+        const id = (args.id as string) || (ctx.caller === 'agent' ? ctx.agentGroupId : undefined);
+        if (!id) throw new Error('--id is required');
+        const actor = ctx.caller === 'agent' ? { user_id: `agent:${ctx.agentGroupId}` } : { user_id: 'host:ncl' };
+        const result = archiveAgentGroup(id, actor);
+        return result;
+      },
+    },
+    restore: {
+      access: 'approval',
+      description:
+        'Restore a previously-archived group from groups/<folder>~/archive.json. CLI/host-only. ' +
+        'Use --folder <name> (accepts either the original "my-group" or the suffixed "my-group~"). ' +
+        'Optional --with-sessions also replays sessions and pending_* rows; default omits them so ' +
+        'restored agents come back with a clean session history.',
+      handler: async (args, ctx) => {
+        if (ctx.caller === 'agent') {
+          throw new Error('restore is host-only — run from the host shell, not from inside a container');
+        }
+        const folder = args.folder as string;
+        if (!folder) throw new Error('--folder is required');
+        const withSessions = Boolean(args['with-sessions'] ?? args.with_sessions ?? args.withSessions);
+        return restoreAgentGroup(folder, { withSessions });
       },
     },
     restart: {
