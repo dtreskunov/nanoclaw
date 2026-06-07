@@ -264,8 +264,11 @@
 /* Destinations tab — two-line "name + id" cells, reverse-link chip, hints. */
 .ga-id-sub {
   display: block;
+  margin-top: 2px;
   font-size: var(--font-sm);
+  color: var(--muted);
   word-break: break-all;
+  font-weight: 400;
 }
 .ga-reverse {
   display: inline-flex;

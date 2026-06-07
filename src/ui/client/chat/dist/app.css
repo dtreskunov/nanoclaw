@@ -2847,8 +2847,11 @@ body.is-admin .files-pane.collapsed .admin-only {
 }
 .ga-id-sub {
   display: block;
+  margin-top: 2px;
   font-size: var(--font-sm);
+  color: var(--muted);
   word-break: break-all;
+  font-weight: 400;
 }
 .ga-reverse {
   display: inline-flex;
