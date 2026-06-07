@@ -25,6 +25,14 @@ interface WebhookEntry {
 type MountHandler = (req: http.IncomingMessage, res: http.ServerResponse) => void | Promise<void>;
 type UpgradeHandler = (req: http.IncomingMessage, socket: internal.Duplex, head: Buffer) => void | Promise<void>;
 
+/**
+ * Host-based handler. Inspects the request (typically its `Host` header) and
+ * either fully handles it (returns true) or declines (returns false) so the
+ * request falls through to the normal path-prefix mounts. Checked before
+ * mounts, so a declined request behaves exactly as if no host handler existed.
+ */
+type HostHandler = (req: http.IncomingMessage, res: http.ServerResponse) => boolean | Promise<boolean>;
+
 interface Mount {
   prefix: string; // e.g. '/files' (no trailing slash)
   handler: MountHandler;
@@ -38,6 +46,7 @@ interface UpgradeMount {
 const routes = new Map<string, WebhookEntry>();
 const mounts: Mount[] = [];
 const upgradeMounts: UpgradeMount[] = [];
+const hostHandlers: HostHandler[] = [];
 let server: http.Server | null = null;
 
 /** Convert Node.js IncomingMessage to a Web API Request. */
@@ -118,11 +127,22 @@ export function mountUpgradeHandler(prefix: string, handler: UpgradeHandler): vo
   log.info('HTTP upgrade mount registered', { prefix: normalized });
 }
 
+/**
+ * Register a host-based handler on the shared server. Handlers are consulted
+ * in registration order before any path-prefix mount. A handler returns true
+ * if it fully handled the request, or false to decline (the request then
+ * falls through to the normal mount routing). Starts the server lazily.
+ */
+export function registerHostHandler(handler: HostHandler): void {
+  hostHandlers.push(handler);
+  ensureSharedHttpServer();
+  log.info('HTTP host handler registered');
+}
+
 /** Public for modules that want the shared server up without registering a route. */
 export function ensureSharedHttpServer(): void {
   ensureServer();
 }
-
 function ensureServer(): void {
   if (server) return;
 
@@ -131,6 +151,22 @@ function ensureServer(): void {
   server = http.createServer(async (req, res) => {
     const url = req.url || '/';
     const pathname = url.split('?')[0];
+
+    // 0. Host-based handlers (e.g. per-group static websites). Checked before
+    //    mounts; a handler that declines (returns false) lets the request fall
+    //    through to the normal path-prefix routing below.
+    for (const h of hostHandlers) {
+      try {
+        if (await h(req, res)) return;
+      } catch (err) {
+        log.error('Host handler threw', { url: req.url, host: req.headers.host, err });
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Internal Server Error');
+        }
+        return;
+      }
+    }
 
     // 1. Mounts (longest prefix first so '/files/x' beats '/files' when both exist).
     for (const m of [...mounts].sort((a, b) => b.prefix.length - a.prefix.length)) {

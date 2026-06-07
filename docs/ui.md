@@ -2,6 +2,9 @@
 
 Optional read-only web UI mounted on the existing webhook HTTP server under `/ui`. A shared auth shell (`/ui/auth/*`) hands out a single bearer-cookie that's reused by every UI app. Today the only app is the **chat** app at `/ui/chat`; more apps will live alongside it.
 
+> Per-agent-group **public static websites** (served by `Host` on the same
+> listener) are documented separately in [pages.md](pages.md).
+
 ## Enable
 
 Set in `.env`:

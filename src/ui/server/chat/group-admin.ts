@@ -18,7 +18,7 @@ import { readEnvFile } from '../../../env.js';
 import { buildAgentGroupImage } from '../../../container-runner.js';
 import { restartAgentGroupContainers } from '../../../container-restart.js';
 import { getDb } from '../../../db/connection.js';
-import { getAgentGroup, updateAgentGroup } from '../../../db/agent-groups.js';
+import { getAgentGroup, getAgentGroupBySiteSlug, updateAgentGroup } from '../../../db/agent-groups.js';
 import { getContainerConfig, updateContainerConfigScalars } from '../../../db/container-configs.js';
 import { log } from '../../../log.js';
 import {
@@ -37,13 +37,14 @@ import {
   isGlobalAdmin,
   isOwner,
 } from '../../../modules/permissions/db/user-roles.js';
-import type { ContainerConfigRow } from '../../../types.js';
+import type { AgentGroup, ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
 import { SELECTABLE_AGENT_PROVIDERS, VALID_AGENT_PROVIDERS } from './agent-providers.js';
 import { recordAdminAction } from './audit.js';
 import { listImages } from './image-catalog.js';
 import { bareIdForResponse, dbValueFromBareId, getModelDetails, listModelsForProvider } from './models-catalog.js';
 import { deriveVoiceMode } from './voice-mode.js';
+import { allocateSiteSlug, isValidSlug, pagesBaseDomain, pagesEnabled, siteFqdn, siteUrl } from '../pages/site.js';
 
 // ── allowed scalar config fields (mirrors ncl groups config update) ───────
 
@@ -194,6 +195,15 @@ interface SettingsResponse {
   validProviders: readonly string[];
   validCliScopes: readonly string[];
   validVoiceModes: readonly string[];
+  /** Per-group static website. `available` reflects PAGES_BASE_DOMAIN being set. */
+  site: {
+    available: boolean;
+    baseDomain: string | null;
+    slug: string | null;
+    fqdn: string | null;
+    url: string | null;
+    enabled: boolean;
+  };
   runningSessionCount: number;
   /** Tooltip / detail / age for the currently-selected model and image. */
   selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
@@ -263,6 +273,14 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
     validProviders: SELECTABLE_PROVIDERS,
     validCliScopes: VALID_CLI_SCOPES,
     validVoiceModes: VALID_VOICE_MODES,
+    site: {
+      available: pagesEnabled(),
+      baseDomain: pagesEnabled() ? pagesBaseDomain() : null,
+      slug: group.site_slug ?? null,
+      fqdn: siteFqdn(group),
+      url: siteUrl(group),
+      enabled: !!group.site_enabled,
+    },
     runningSessionCount: running.n,
     selectedModelDetail,
     selectedImageDetail,
@@ -305,6 +323,45 @@ async function handlePatchSettings(
     if (!trimmed) throw new BadRequest('name cannot be empty');
     if (trimmed.length > 100) throw new BadRequest('name must be 100 characters or fewer');
     nameUpdate = trimmed;
+  }
+
+  // Static website settings live in agent_groups (host-side routing), not
+  // container_configs. The single user-facing control is `site_enabled`;
+  // `site_slug` is an elevated override of the auto-derived subdomain.
+  const siteUpdates: Partial<Pick<AgentGroup, 'site_slug' | 'site_enabled'>> = {};
+  if ('site_slug' in body || 'site_enabled' in body) {
+    if (!pagesEnabled()) {
+      throw new BadRequest('website feature is not configured (PAGES_BASE_DOMAIN unset)');
+    }
+    const group = getAgentGroup(gid)!; // validated by caller
+    if ('site_slug' in body) {
+      if (!isElevated) throw new BadRequest('only owner or global admin may change the website subdomain');
+      const raw = body['site_slug'];
+      if (raw == null || raw === '') {
+        siteUpdates.site_slug = null;
+      } else {
+        const v = String(raw).trim().toLowerCase();
+        if (!isValidSlug(v)) throw new BadRequest('subdomain must be a valid DNS label (a-z, 0-9, hyphen)');
+        const taken = getAgentGroupBySiteSlug(v);
+        if (taken && taken.id !== gid) throw new BadRequest('that subdomain is already in use');
+        siteUpdates.site_slug = v;
+      }
+    }
+    if ('site_enabled' in body) {
+      const raw = body['site_enabled'];
+      const enabled = raw === true || raw === 'true' || raw === 1;
+      siteUpdates.site_enabled = enabled ? 1 : 0;
+      if (enabled) {
+        const effectiveSlug = 'site_slug' in siteUpdates ? siteUpdates.site_slug : group.site_slug;
+        if (!effectiveSlug) {
+          const derived = allocateSiteSlug(group);
+          if (!derived) {
+            throw new BadRequest('could not derive a subdomain from the group name; set one explicitly');
+          }
+          siteUpdates.site_slug = derived;
+        }
+      }
+    }
   }
 
   for (const key of SCALAR_FIELDS) {
@@ -393,12 +450,14 @@ async function handlePatchSettings(
     updates.voice_mode = await deriveVoiceMode(effectiveProvider, effectiveModel ?? null, effectiveTranscriptionModel);
   }
 
-  if (Object.keys(updates).length === 0 && nameUpdate === undefined) {
+  if (Object.keys(updates).length === 0 && nameUpdate === undefined && Object.keys(siteUpdates).length === 0) {
     throw new BadRequest('no editable fields supplied');
   }
 
-  if (nameUpdate !== undefined) {
-    updateAgentGroup(gid, { name: nameUpdate });
+  const agentGroupUpdates: Partial<Pick<AgentGroup, 'name' | 'site_slug' | 'site_enabled'>> = { ...siteUpdates };
+  if (nameUpdate !== undefined) agentGroupUpdates.name = nameUpdate;
+  if (Object.keys(agentGroupUpdates).length > 0) {
+    updateAgentGroup(gid, agentGroupUpdates);
   }
   if (Object.keys(updates).length > 0) {
     updateContainerConfigScalars(gid, updates);
@@ -408,7 +467,7 @@ async function handlePatchSettings(
     action: 'group_config_update',
     targetKind: 'agent_group',
     targetId: gid,
-    payload: { ...(nameUpdate !== undefined ? { name: nameUpdate } : {}), ...updates } as Record<string, unknown>,
+    payload: { ...agentGroupUpdates, ...updates } as Record<string, unknown>,
   });
   await handleGetSettings(res, gid, actorUserId);
 }

@@ -6,6 +6,15 @@ export interface AgentGroup {
   folder: string;
   /** @deprecated Use container_configs.provider instead. */
   agent_provider: string | null;
+  /**
+   * DNS label for the public static-website subdomain
+   * (`<site_slug>.<PAGES_BASE_DOMAIN>`). Null/absent = unset. Always present
+   * on rows read from the DB; optional here so in-memory constructions
+   * (tests, ephemeral groups) need not specify it.
+   */
+  site_slug?: string | null;
+  /** 1 = static website serving enabled, 0/absent = disabled. */
+  site_enabled?: number;
   created_at: string;
 }
 

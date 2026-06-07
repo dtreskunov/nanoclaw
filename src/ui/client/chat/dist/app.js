@@ -21527,6 +21527,8 @@ function SettingsTab({ gid, onClose, onActions }) {
   const [data, setData] = h2(null);
   const [draft, setDraft] = h2(null);
   const [draftName, setDraftName] = h2("");
+  const [siteEnabled, setSiteEnabled] = h2(false);
+  const [siteSlug, setSiteSlug] = h2("");
   const [busy, setBusy] = h2(false);
   const [images, setImages] = h2(null);
   async function refresh() {
@@ -21540,6 +21542,8 @@ function SettingsTab({ gid, onClose, onActions }) {
       setData(r4.data);
       setDraft({ ...r4.data.config });
       setDraftName(r4.data.name);
+      setSiteEnabled(r4.data.site.enabled);
+      setSiteSlug(r4.data.site.slug ?? "");
     } finally {
       setBusy(false);
     }
@@ -21585,6 +21589,10 @@ function SettingsTab({ gid, onClose, onActions }) {
     for (const k4 of Object.keys(draft)) {
       if (draft[k4] !== data.config[k4]) out.add(k4);
     }
+    if (data.site.available) {
+      if (siteEnabled !== data.site.enabled) out.add("site_enabled");
+      if (data.actorIsElevated && siteSlug.trim() !== (data.site.slug ?? "")) out.add("site_slug");
+    }
     return out;
   }
   const pending2 = changedFields();
@@ -21614,6 +21622,8 @@ function SettingsTab({ gid, onClose, onActions }) {
       if (changed) {
         const body = { ...draft };
         if (data && draftName.trim() !== data.name) body.name = draftName.trim();
+        if (pending2.has("site_enabled")) body.site_enabled = siteEnabled;
+        if (pending2.has("site_slug")) body.site_slug = siteSlug.trim() || null;
         const r4 = await call(apiPath(gid, "/settings"), "PATCH", body);
         if (!r4.ok) {
           showToast(errMsg(r4.data, `HTTP ${r4.status}`), "err");
@@ -21622,6 +21632,8 @@ function SettingsTab({ gid, onClose, onActions }) {
         setData(r4.data);
         setDraft({ ...r4.data.config });
         setDraftName(r4.data.name);
+        setSiteEnabled(r4.data.site.enabled);
+        setSiteSlug(r4.data.site.slug ?? "");
         groups.value = groups.value.map((g8) => g8.id === gid ? { ...g8, name: r4.data.name } : g8);
       }
       if (effectiveRebuild || effectiveRestart) {
@@ -21821,6 +21833,46 @@ function SettingsTab({ gid, onClose, onActions }) {
         )
       }
     ),
+    data.site.available ? /* @__PURE__ */ u4(
+      Field,
+      {
+        label: "Website",
+        info: "Serve a public static website for this group from a folder in its workspace. Files in the FQDN-named folder become readable by anyone with the link \u2014 no login required. Separate from private file-share links.",
+        children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+          /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "checkbox",
+                checked: siteEnabled,
+                disabled: busy,
+                onChange: (e4) => setSiteEnabled(e4.target.checked)
+              }
+            ),
+            /* @__PURE__ */ u4("span", { children: "Enable website" })
+          ] }),
+          data.actorIsElevated ? /* @__PURE__ */ u4(
+            "input",
+            {
+              type: "text",
+              value: siteSlug,
+              disabled: busy,
+              maxLength: 63,
+              placeholder: data.site.baseDomain ? `subdomain (.${data.site.baseDomain})` : "subdomain",
+              onInput: (e4) => setSiteSlug(e4.currentTarget.value)
+            }
+          ) : null,
+          siteEnabled && data.site.url ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+            "Live at ",
+            /* @__PURE__ */ u4("a", { href: data.site.url, target: "_blank", rel: "noopener noreferrer", children: data.site.url }),
+            " ",
+            "\u2014 publish by writing files into the ",
+            /* @__PURE__ */ u4("code", { children: data.site.fqdn }),
+            " folder in the workspace."
+          ] }) : siteEnabled ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Save to allocate a subdomain and go live." }) : /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Disabled \u2014 enable to publish a public static site on its own subdomain." })
+        ] })
+      }
+    ) : null,
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: changed ? `${pending2.size} unsaved change${pending2.size === 1 ? "" : "s"}. Click Save (\u2713) above to review and apply.` : "No unsaved changes." }) }),
     confirmOpen ? /* @__PURE__ */ u4(
       "div",

@@ -55,6 +55,14 @@ interface SettingsResponse {
   selectedModelDetail: { label: string; detail?: string; tooltip?: string } | null;
   selectedImageDetail: { label: string; createdAt: string | null; size: number | null } | null;
   actorIsElevated: boolean;
+  site: {
+    available: boolean;
+    baseDomain: string | null;
+    slug: string | null;
+    fqdn: string | null;
+    url: string | null;
+    enabled: boolean;
+  };
 }
 
 interface MemberDto {
@@ -223,6 +231,8 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [siteEnabled, setSiteEnabled] = useState(false);
+  const [siteSlug, setSiteSlug] = useState('');
   const [busy, setBusy] = useState(false);
   const [images, setImages] = useState<ImagesResponse | null>(null);
 
@@ -234,6 +244,8 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
       setData(r.data);
       setDraft({ ...r.data.config });
       setDraftName(r.data.name);
+      setSiteEnabled(r.data.site.enabled);
+      setSiteSlug(r.data.site.slug ?? '');
     } finally { setBusy(false); }
   }
 
@@ -274,6 +286,10 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
     if (draftName.trim() !== data.name) out.add('name');
     for (const k of Object.keys(draft) as (keyof SettingsResponse['config'])[]) {
       if (draft[k] !== data.config[k]) out.add(k);
+    }
+    if (data.site.available) {
+      if (siteEnabled !== data.site.enabled) out.add('site_enabled');
+      if (data.actorIsElevated && siteSlug.trim() !== (data.site.slug ?? '')) out.add('site_slug');
     }
     return out;
   }
@@ -325,11 +341,15 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
       if (changed) {
         const body: Record<string, unknown> = { ...draft };
         if (data && draftName.trim() !== data.name) body.name = draftName.trim();
+        if (pending.has('site_enabled')) body.site_enabled = siteEnabled;
+        if (pending.has('site_slug')) body.site_slug = siteSlug.trim() || null;
         const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', body);
         if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
         setData(r.data);
         setDraft({ ...r.data.config });
         setDraftName(r.data.name);
+        setSiteEnabled(r.data.site.enabled);
+        setSiteSlug(r.data.site.slug ?? '');
         groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: r.data.name } : g);
       }
       // Restart / rebuild as chosen in the confirmation dialog.
@@ -534,6 +554,45 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
           onChange={(v) => update('transcription_model', v)}
         />
       </Field>
+
+      {data.site.available ? (
+        <Field
+          label="Website"
+          info={'Serve a public static website for this group from a folder in its workspace. Files in the FQDN-named folder become readable by anyone with the link \u2014 no login required. Separate from private file-share links.'}
+        >
+          <div class="group-admin-stack">
+            <label class="group-admin-check">
+              <input
+                type="checkbox"
+                checked={siteEnabled}
+                disabled={busy}
+                onChange={(e) => setSiteEnabled((e.target as HTMLInputElement).checked)}
+              />
+              <span>Enable website</span>
+            </label>
+            {data.actorIsElevated ? (
+              <input
+                type="text"
+                value={siteSlug}
+                disabled={busy}
+                maxLength={63}
+                placeholder={data.site.baseDomain ? `subdomain (.${data.site.baseDomain})` : 'subdomain'}
+                onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setSiteSlug(e.currentTarget.value)}
+              />
+            ) : null}
+            {siteEnabled && data.site.url ? (
+              <p class="group-admin-help">
+                Live at <a href={data.site.url} target="_blank" rel="noopener noreferrer">{data.site.url}</a>{' '}
+                — publish by writing files into the <code>{data.site.fqdn}</code> folder in the workspace.
+              </p>
+            ) : siteEnabled ? (
+              <p class="group-admin-help">Save to allocate a subdomain and go live.</p>
+            ) : (
+              <p class="group-admin-help">Disabled — enable to publish a public static site on its own subdomain.</p>
+            )}
+          </div>
+        </Field>
+      ) : null}
 
       <div class="settings-row group-admin-actions" style="margin-top:16px">
         <p class="group-admin-help">
