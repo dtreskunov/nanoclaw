@@ -2156,9 +2156,7 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
           url: encodedAttachmentUrl(ctx.groupId, ctx.threadId, `inbox/${id}:${ctx.groupId}/${f.filename}`),
           contentType: mimeFromFilename(f.filename),
         }));
-        ws.send(
-          JSON.stringify({ kind: 'inbound', id, text, files: enriched, timestamp: new Date().toISOString() }),
-        );
+        ws.send(JSON.stringify({ kind: 'inbound', id, text, files: enriched, timestamp: new Date().toISOString() }));
       } catch (err) {
         log.warn('web chat ws echo failed', { err });
       }
