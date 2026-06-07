@@ -10,6 +10,7 @@ import {
   groupId,
   groups,
 } from '../state';
+import { selectGroup } from '../actions';
 import { Combobox, type ComboboxOption } from './Combobox';
 import { ModelSelector } from './ModelSelector';
 import { InfoIcon, Tooltip } from './Tooltip';
@@ -312,6 +313,12 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
   const [restartChecked, setRestartChecked] = useState(false);
   const [rebuildChecked, setRebuildChecked] = useState(false);
 
+  // Danger zone (archive): typed-confirmation flow. The string the user
+  // types must equal the group's folder slug exactly; the server re-checks.
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState('');
+  const [archiveBusy, setArchiveBusy] = useState(false);
+
   // Rebuild implies restart. Force it on if the user ticks rebuild.
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
@@ -366,6 +373,31 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
       setConfirmOpen(false);
       onClose();
     } finally { setBusy(false); }
+  }
+
+  async function doArchive(): Promise<void> {
+    if (!data || archiveBusy) return;
+    setArchiveBusy(true);
+    try {
+      const r = await call<{ ok: boolean; folder: string; archivedFolder: string }>(
+        apiPath(gid, '/archive'),
+        'POST',
+        { confirm_folder: archiveConfirm.trim() },
+      );
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      // Drop the archived group locally; the next sync tick would do this too
+      // but doing it now keeps the UI responsive.
+      const archivedId = gid;
+      const remaining = groups.value.filter((g) => g.id !== archivedId);
+      groups.value = remaining;
+      setArchiveOpen(false);
+      onClose();
+      showToast(`Archived. Restore on the host with: ncl groups restore --folder ${r.data.folder}`);
+      // If the archived group was current, switch to the first remaining one.
+      if (groupId.value === archivedId && remaining[0]) {
+        void selectGroup(remaining[0].id);
+      }
+    } finally { setArchiveBusy(false); }
   }
 
   const imageOptions: ComboboxOption[] = (images?.images ?? []).map((i) => {
@@ -599,6 +631,30 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           </div>
         </Field>
       ) : null}
+
+      <div class="group-admin-danger-zone" data-testid="danger-zone">
+        <header>
+          <span class="title">Danger zone</span>
+        </header>
+        <div class="body">
+          <p class="group-admin-help">
+            Archive this group. Running container sessions stop, the group disappears from the sidebar,
+            and its folder is renamed with a <code>~</code> suffix. Nothing is deleted.
+          </p>
+          <p class="group-admin-help">
+            Restore is host-only — operator runs <code>ncl groups restore --folder {data.folder}</code> in a shell.
+          </p>
+          <button
+            type="button"
+            class="danger"
+            data-testid="archive-btn"
+            disabled={busy || archiveBusy}
+            onClick={() => { setArchiveConfirm(''); setArchiveOpen(true); }}
+          >
+            Archive group…
+          </button>
+        </div>
+      </div>
         </>
       ) : null}
 
@@ -669,6 +725,52 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
                     : effectiveRestart
                       ? 'Save & restart'
                       : 'Save'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+
+      {archiveOpen ? (
+        <div
+          class="settings-backdrop"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).classList.contains('settings-backdrop') && !archiveBusy) setArchiveOpen(false);
+          }}
+        >
+          <div class="settings-modal ga-confirm-modal" role="dialog" aria-label="Archive group" style="max-width:440px">
+            <header class="settings-head">
+              <span class="title">Archive group</span>
+              <button type="button" class="icon-btn" aria-label="Close" disabled={archiveBusy} onClick={() => setArchiveOpen(false)}>{'\u2715'}</button>
+            </header>
+            <div class="settings-body">
+              <p class="group-admin-help" style="margin-bottom:12px">
+                Running container sessions will stop. The group will be removed from this UI and
+                its folder renamed with a <code>~</code> suffix. Restore is host-only:{' '}
+                <code>ncl groups restore --folder {data.folder}</code>.
+              </p>
+              <p class="group-admin-help" style="margin-bottom:8px">
+                Type <code>{data.folder}</code> to confirm:
+              </p>
+              <input
+                type="text"
+                data-testid="archive-confirm-input"
+                value={archiveConfirm}
+                disabled={archiveBusy}
+                placeholder={data.folder}
+                onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setArchiveConfirm(e.currentTarget.value)}
+              />
+            </div>
+            <footer class="settings-foot ga-confirm-foot">
+              <button type="button" disabled={archiveBusy} onClick={() => setArchiveOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                class="danger"
+                data-testid="archive-confirm-btn"
+                disabled={archiveBusy || archiveConfirm.trim() !== data.folder}
+                onClick={doArchive}
+              >
+                {archiveBusy ? 'Archiving…' : 'Archive group'}
               </button>
             </footer>
           </div>

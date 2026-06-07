@@ -166,6 +166,39 @@
   border-top: 1px solid var(--border);
 }
 
+/* Danger zone (archive) — placed at the bottom of the Settings tab. */
+.group-admin-danger-zone {
+  margin-top: 24px;
+  border: 1px solid var(--danger-border, #d93b3b);
+  border-radius: var(--radius-md, 6px);
+  background: var(--danger-tint, rgba(217, 59, 59, 0.06));
+}
+.group-admin-danger-zone > header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--danger-border, #d93b3b);
+}
+.group-admin-danger-zone > header .title {
+  font-weight: 600;
+  color: var(--danger-fg, #d93b3b);
+}
+.group-admin-danger-zone > .body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.group-admin-danger-zone button.danger,
+.ga-confirm-foot button.danger {
+  background: var(--danger-fg, #d93b3b);
+  color: #fff;
+  border: 1px solid var(--danger-fg, #d93b3b);
+}
+.group-admin-danger-zone button.danger:disabled,
+.ga-confirm-foot button.danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Toolbar with refresh/save icons at the top of the settings tab */
 .group-admin-toolbar {
   display: flex;

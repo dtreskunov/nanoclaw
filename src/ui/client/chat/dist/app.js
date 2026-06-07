@@ -21787,6 +21787,9 @@ function SettingsTab({ gid, section, onClose, onActions }) {
   const [confirmOpen, setConfirmOpen] = h2(false);
   const [restartChecked, setRestartChecked] = h2(false);
   const [rebuildChecked, setRebuildChecked] = h2(false);
+  const [archiveOpen, setArchiveOpen] = h2(false);
+  const [archiveConfirm, setArchiveConfirm] = h2("");
+  const [archiveBusy, setArchiveBusy] = h2(false);
   const effectiveRestart = restartChecked || rebuildChecked;
   const effectiveRebuild = rebuildChecked;
   const canSave = changed;
@@ -21833,6 +21836,32 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       onClose();
     } finally {
       setBusy(false);
+    }
+  }
+  async function doArchive() {
+    if (!data || archiveBusy) return;
+    setArchiveBusy(true);
+    try {
+      const r4 = await call(
+        apiPath(gid, "/archive"),
+        "POST",
+        { confirm_folder: archiveConfirm.trim() }
+      );
+      if (!r4.ok) {
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      const archivedId = gid;
+      const remaining = groups.value.filter((g8) => g8.id !== archivedId);
+      groups.value = remaining;
+      setArchiveOpen(false);
+      onClose();
+      showToast(`Archived. Restore on the host with: ncl groups restore --folder ${r4.data.folder}`);
+      if (groupId.value === archivedId && remaining[0]) {
+        void selectGroup(remaining[0].id);
+      }
+    } finally {
+      setArchiveBusy(false);
     }
   }
   const imageOptions = (images?.images ?? []).map((i5) => {
@@ -22060,7 +22089,39 @@ function SettingsTab({ gid, section, onClose, onActions }) {
             ] }) : siteEnabled ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Save to allocate a subdomain and go live." }) : /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Disabled \u2014 enable to publish a public static site on its own subdomain." })
           ] })
         }
-      ) : null
+      ) : null,
+      /* @__PURE__ */ u4("div", { class: "group-admin-danger-zone", "data-testid": "danger-zone", children: [
+        /* @__PURE__ */ u4("header", { children: /* @__PURE__ */ u4("span", { class: "title", children: "Danger zone" }) }),
+        /* @__PURE__ */ u4("div", { class: "body", children: [
+          /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+            "Archive this group. Running container sessions stop, the group disappears from the sidebar, and its folder is renamed with a ",
+            /* @__PURE__ */ u4("code", { children: "~" }),
+            " suffix. Nothing is deleted."
+          ] }),
+          /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+            "Restore is host-only \u2014 operator runs ",
+            /* @__PURE__ */ u4("code", { children: [
+              "ncl groups restore --folder ",
+              data.folder
+            ] }),
+            " in a shell."
+          ] }),
+          /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              class: "danger",
+              "data-testid": "archive-btn",
+              disabled: busy || archiveBusy,
+              onClick: () => {
+                setArchiveConfirm("");
+                setArchiveOpen(true);
+              },
+              children: "Archive group\u2026"
+            }
+          )
+        ] })
+      ] })
     ] }) : null,
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: changed ? `${pending2.size} unsaved change${pending2.size === 1 ? "" : "s"}. Click Save (\u2713) above to review and apply.` : "No unsaved changes." }) }),
     confirmOpen ? /* @__PURE__ */ u4(
@@ -22117,6 +22178,64 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           /* @__PURE__ */ u4("footer", { class: "settings-foot ga-confirm-foot", children: [
             /* @__PURE__ */ u4("button", { type: "button", disabled: busy, onClick: () => setConfirmOpen(false), children: "Cancel" }),
             /* @__PURE__ */ u4("button", { type: "button", class: "primary", disabled: busy, onClick: doApply, children: busy ? "Applying\u2026" : effectiveRebuild ? "Save & rebuild" : effectiveRestart ? "Save & restart" : "Save" })
+          ] })
+        ] })
+      }
+    ) : null,
+    archiveOpen ? /* @__PURE__ */ u4(
+      "div",
+      {
+        class: "settings-backdrop",
+        onClick: (e4) => {
+          if (e4.target.classList.contains("settings-backdrop") && !archiveBusy) setArchiveOpen(false);
+        },
+        children: /* @__PURE__ */ u4("div", { class: "settings-modal ga-confirm-modal", role: "dialog", "aria-label": "Archive group", style: "max-width:440px", children: [
+          /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+            /* @__PURE__ */ u4("span", { class: "title", children: "Archive group" }),
+            /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", disabled: archiveBusy, onClick: () => setArchiveOpen(false), children: "\u2715" })
+          ] }),
+          /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+            /* @__PURE__ */ u4("p", { class: "group-admin-help", style: "margin-bottom:12px", children: [
+              "Running container sessions will stop. The group will be removed from this UI and its folder renamed with a ",
+              /* @__PURE__ */ u4("code", { children: "~" }),
+              " suffix. Restore is host-only:",
+              " ",
+              /* @__PURE__ */ u4("code", { children: [
+                "ncl groups restore --folder ",
+                data.folder
+              ] }),
+              "."
+            ] }),
+            /* @__PURE__ */ u4("p", { class: "group-admin-help", style: "margin-bottom:8px", children: [
+              "Type ",
+              /* @__PURE__ */ u4("code", { children: data.folder }),
+              " to confirm:"
+            ] }),
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "text",
+                "data-testid": "archive-confirm-input",
+                value: archiveConfirm,
+                disabled: archiveBusy,
+                placeholder: data.folder,
+                onInput: (e4) => setArchiveConfirm(e4.currentTarget.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ u4("footer", { class: "settings-foot ga-confirm-foot", children: [
+            /* @__PURE__ */ u4("button", { type: "button", disabled: archiveBusy, onClick: () => setArchiveOpen(false), children: "Cancel" }),
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: "danger",
+                "data-testid": "archive-confirm-btn",
+                disabled: archiveBusy || archiveConfirm.trim() !== data.folder,
+                onClick: doArchive,
+                children: archiveBusy ? "Archiving\u2026" : "Archive group"
+              }
+            )
           ] })
         ] })
       }
