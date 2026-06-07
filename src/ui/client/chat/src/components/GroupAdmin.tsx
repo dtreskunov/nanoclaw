@@ -16,7 +16,7 @@ import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
 
-type Tab = 'settings' | 'members' | 'roles';
+type Tab = 'models' | 'settings' | 'members' | 'roles';
 
 interface HeaderActions {
   refresh: () => void;
@@ -166,10 +166,10 @@ function userLabel(u: { displayName?: string | null; primaryHandle?: string | nu
 export function GroupAdmin(): JSX.Element | null {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
-  const [tab, setTab] = useState<Tab>('settings');
+  const [tab, setTab] = useState<Tab>('models');
   const actionsRef = useRef<HeaderActions | null>(null);
   const [, forceRender] = useState(0);
-  useEffect(() => { setTab('settings'); }, [open, gid]);
+  useEffect(() => { setTab('models'); }, [open, gid]);
   useBackButtonCloses(open, () => { groupAdminOpen.value = false; });
 
   if (!open || !gid) return null;
@@ -197,7 +197,7 @@ export function GroupAdmin(): JSX.Element | null {
         <header class="settings-head">
           <span class="title">{title}</span>
           <div class="settings-head-actions">
-            {tab === 'settings' && ha ? (
+            {(tab === 'models' || tab === 'settings') && ha ? (
               <>
                 <Tooltip text="Re-fetch settings from server">
                   <button type="button" class="icon-btn" aria-label="Refresh" onClick={ha.refresh} disabled={ha.busy}>&#x21bb;</button>
@@ -211,12 +211,15 @@ export function GroupAdmin(): JSX.Element | null {
           </div>
         </header>
         <nav class="group-admin-tabs">
+          <button type="button" class={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Models</button>
           <button type="button" class={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
           <button type="button" class={tab === 'members' ? 'active' : ''} onClick={() => setTab('members')}>Members</button>
           <button type="button" class={tab === 'roles' ? 'active' : ''} onClick={() => setTab('roles')}>Admins</button>
         </nav>
         <div class="settings-body">
-          {tab === 'settings' ? <SettingsTab gid={gid} onClose={close} onActions={setActions} /> : null}
+          {(tab === 'models' || tab === 'settings')
+            ? <SettingsTab gid={gid} section={tab} onClose={close} onActions={setActions} />
+            : null}
           {tab === 'members' ? <MembersTab gid={gid} /> : null}
           {tab === 'roles' ? <RolesTab gid={gid} /> : null}
         </div>
@@ -227,7 +230,7 @@ export function GroupAdmin(): JSX.Element | null {
 
 // ── Settings ──────────────────────────────────────────────────────────────
 
-function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => void; onActions: (a: HeaderActions | null) => void }): JSX.Element {
+function SettingsTab({ gid, section, onClose, onActions }: { gid: string; section: 'models' | 'settings'; onClose: () => void; onActions: (a: HeaderActions | null) => void }): JSX.Element {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [draftName, setDraftName] = useState('');
@@ -399,6 +402,39 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
         </p>
       </div>
 
+      {section === 'models' ? (
+        <>
+          <Field label="Model">
+            <ModelSelector
+              value={draft.model}
+              provider={provider}
+              placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
+              disabled={busy}
+              apiBasePath={apiPath(gid, '')}
+              outputModality="text"
+              onChange={(v) => update('model', v)}
+            />
+          </Field>
+
+          <Field
+            label="Transcription model"
+            info={'OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.'}
+          >
+            <ModelSelector
+              value={draft.transcription_model}
+              provider="openrouter"
+              placeholder="google/gemini-2.0-flash-lite-001"
+              disabled={busy}
+              apiBasePath={apiPath(gid, '')}
+              inputModality="audio"
+              onChange={(v) => update('transcription_model', v)}
+            />
+          </Field>
+        </>
+      ) : null}
+
+      {section === 'settings' ? (
+        <>
       <Field label="Name">
         <input
           type="text"
@@ -433,18 +469,6 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
           disabled={busy}
           freeform={false}
           onChange={(v) => update('provider', v)}
-        />
-      </Field>
-
-      <Field label="Model">
-        <ModelSelector
-          value={draft.model}
-          provider={provider}
-          placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
-          disabled={busy}
-          apiBasePath={apiPath(gid, '')}
-          outputModality="text"
-          onChange={(v) => update('model', v)}
         />
       </Field>
 
@@ -540,21 +564,6 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
         />
       </Field>
 
-      <Field
-        label="Transcription model"
-        info={'OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.'}
-      >
-        <ModelSelector
-          value={draft.transcription_model}
-          provider="openrouter"
-          placeholder="google/gemini-2.0-flash-lite-001"
-          disabled={busy}
-          apiBasePath={apiPath(gid, '')}
-          inputModality="audio"
-          onChange={(v) => update('transcription_model', v)}
-        />
-      </Field>
-
       {data.site.available ? (
         <Field
           label="Website"
@@ -592,6 +601,8 @@ function SettingsTab({ gid, onClose, onActions }: { gid: string; onClose: () => 
             )}
           </div>
         </Field>
+      ) : null}
+        </>
       ) : null}
 
       <div class="settings-row group-admin-actions" style="margin-top:16px">
