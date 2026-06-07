@@ -309,6 +309,7 @@ function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [inputHasText, setInputHasText] = useState(false);
+  const [focused, setFocused] = useState(false);
   const isWeb = !channelType.value || channelType.value === 'web';
   const showComposer = isWeb || canSend.value;
   // Web threads send over the WebSocket; if it isn't connected, block input
@@ -388,7 +389,10 @@ function Composer() {
   // ── PTT logic ──────────────────────────────────────────────────────
   const vm = voiceMode.value;
   const hasPending = pending.value.length > 0;
-  const showMic = vm !== 'off' && hasGetUserMedia();
+  const micCapable = vm !== 'off' && hasGetUserMedia();
+  // Focused (or with content to send) → Send button; idle → Microphone.
+  const showSend = !micCapable || focused || inputHasText || hasPending;
+  const showMic = micCapable && !showSend;
   const micDisabled = inputHasText || hasPending || wsDown;
   const recording = isRecording.value;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -521,8 +525,9 @@ function Composer() {
           ref={inputRef}
           onInput={autosize}
           onKeyDown={onKey}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
-          disabled={wsDown}
           autocomplete="off"
         ></textarea>
       )}
@@ -547,7 +552,12 @@ function Composer() {
           onPointerCancel={onMicPointerCancel as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
         >{'\uD83C\uDF99\uFE0F'}</button>
       ) : (
-        <button type="submit" id="chat-send" disabled={wsDown || recording}>Send</button>
+        <button
+          type="submit"
+          id="chat-send"
+          disabled={wsDown || recording}
+          onMouseDown={(e) => e.preventDefault()}
+        >Send</button>
       )}
     </form>
   );
