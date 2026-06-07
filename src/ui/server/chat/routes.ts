@@ -16,7 +16,8 @@ import { getDb } from '../../../db/connection.js';
 import { getSession } from '../../../db/sessions.js';
 import { log } from '../../../log.js';
 import { listAccessibleAgentGroups, canAccessAgentGroup } from '../../../modules/permissions/access.js';
-import { hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
+import { grantRole, hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
+import { createGroup, GroupCreateError } from '../../../modules/groups/create.js';
 import { deleteSubscriptionByEndpoint, upsertSubscription } from '../../../modules/push/db.js';
 import { pushAvailable, vapidPublicKey } from '../../../modules/push/sender.js';
 import { dispatchResponse } from '../../../response-registry.js';
@@ -180,6 +181,11 @@ on(
   '/api/groups',
   authed((ctx, userId) => handleGroups(ctx, userId)),
 );
+on(
+  'POST',
+  '/api/groups',
+  authed((ctx, userId) => handleCreateGroup(ctx, userId)),
+);
 
 // File/dir resources: path-in-URL, single endpoint per kind.
 //   GET|HEAD /api/groups/:gid/files/<rel/path>           → file bytes
@@ -290,6 +296,71 @@ function handleGroups(ctx: Ctx, userId: string): void {
     lastActivityAt: lastByGroup.get(g.id) ?? null,
   }));
   json(ctx, 200, { groups });
+}
+
+/**
+ * Create a new agent group from the chat UI.
+ *
+ * Reserved for owners and global admins — scoped admins manage their own
+ * group but cannot mint new ones. The creator is auto-granted a scoped
+ * `admin` role on the new group so they can immediately manage it from
+ * the UI without a second roundtrip.
+ */
+async function handleCreateGroup(ctx: Ctx, userId: string): Promise<void> {
+  if (!isOwner(userId) && !isGlobalAdmin(userId)) {
+    return json(ctx, 403, { error: 'forbidden' });
+  }
+
+  let body: { name?: unknown; folder?: unknown; instructions?: unknown };
+  try {
+    body = (await readJsonBody(ctx.req)) as typeof body;
+  } catch {
+    return json(ctx, 400, { error: 'invalid_json' });
+  }
+
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name) return json(ctx, 400, { error: 'name_required' });
+  const folder = typeof body.folder === 'string' && body.folder.trim() ? body.folder.trim() : undefined;
+  const instructions = typeof body.instructions === 'string' ? body.instructions : undefined;
+
+  let group;
+  try {
+    group = createGroup({ name, folder, instructions });
+  } catch (err) {
+    if (err instanceof GroupCreateError) {
+      const status = err.code === 'folder_conflict' ? 409 : 400;
+      return json(ctx, status, { error: err.code, message: err.message });
+    }
+    throw err;
+  }
+
+  // Auto-grant the creator scoped admin on the new group so the UI's
+  // admin surfaces (Settings, Danger Zone) light up immediately.
+  try {
+    grantRole({
+      user_id: userId,
+      role: 'admin',
+      agent_group_id: group.id,
+      granted_by: userId,
+      granted_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    log.warn('Failed to auto-grant scoped admin on new group', { userId, groupId: group.id, err });
+  }
+
+  log.info('admin_action', {
+    actor: userId,
+    action: 'group_create',
+    target: `agent_group:${group.id}`,
+    payload: { name: group.name, folder: group.folder },
+  });
+
+  return json(ctx, 200, {
+    id: group.id,
+    name: group.name,
+    folder: group.folder,
+    createdAt: group.created_at,
+  });
 }
 
 interface ApprovalDto {
