@@ -21505,10 +21505,7 @@ function GroupAdmin() {
     /* @__PURE__ */ u4("header", { class: "settings-head", children: [
       /* @__PURE__ */ u4("span", { class: "title", children: title }),
       /* @__PURE__ */ u4("div", { class: "settings-head-actions", children: [
-        (tab === "models" || tab === "settings") && ha ? /* @__PURE__ */ u4(k, { children: [
-          /* @__PURE__ */ u4(Tooltip, { text: "Re-fetch settings from server", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Refresh", onClick: ha.refresh, disabled: ha.busy, children: "\u21BB" }) }),
-          /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) })
-        ] }) : null,
+        (tab === "models" || tab === "settings") && ha ? /* @__PURE__ */ u4(k, { children: /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) }) }) : null,
         /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
       ] })
     ] }),
