@@ -179,6 +179,13 @@ export function Combobox({
               onMouseEnter={() => setHighlight(i)}
               onMouseDown={(e) => {
                 e.preventDefault(); // keep focus on input
+                // Stop the event from reaching the document-level mousedown
+                // listener (`onDoc`). Committing the option synchronously
+                // unmounts this <li>; once detached, `rootRef.contains(target)`
+                // returns false and `onDoc` would mistake the click for an
+                // outside click and overwrite the value with the stale filter
+                // text. Halting propagation keeps the option commit authoritative.
+                e.stopPropagation();
                 commitOption(o.value);
               }}
             >
