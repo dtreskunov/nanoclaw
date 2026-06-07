@@ -147,6 +147,37 @@ register({
   handler: async (args) => ({ id: (args as Record<string, unknown>).id, agent_group_id: 'g1' }),
 });
 
+// Real custom-op names so the dispatcher's gates (`groups-create`,
+// `groups-restore`) have a matching command to even reach the gate. If
+// these aren't registered, dispatch returns "unknown-command" before the
+// gate fires, which would make the regression tests false-pass.
+register({
+  name: 'groups-create',
+  description: 'creates a new agent group',
+  resource: 'groups',
+  access: 'open',
+  parseArgs: (raw) => raw,
+  handler: async () => ({ created: true }),
+});
+
+register({
+  name: 'groups-restore',
+  description: 'restores an archived agent group',
+  resource: 'groups',
+  access: 'open',
+  parseArgs: (raw) => raw,
+  handler: async () => ({ restored: true }),
+});
+
+register({
+  name: 'groups-archive',
+  description: 'archives an agent group',
+  resource: 'groups',
+  access: 'open',
+  parseArgs: (raw) => raw,
+  handler: async () => ({ archived: true }),
+});
+
 import { dispatch } from './dispatch.js';
 import type { CallerContext } from './frame.js';
 
@@ -510,5 +541,54 @@ describe('CLI scope enforcement', () => {
       expect(resp.error.code).toBe('forbidden');
       expect(resp.error.message).toContain('not available in group scope');
     }
+  });
+
+  // --- Archive / create / restore gates ---
+
+  it('group: blocks groups-create (would escape the scope)', async () => {
+    mockGetContainerConfig.mockReturnValue({ cli_scope: 'group' });
+    const resp = await dispatch({ id: '1', command: 'groups-create', args: { name: 'X' } }, agentCtx());
+    expect(resp.ok).toBe(false);
+    if (!resp.ok) {
+      expect(resp.error.code).toBe('forbidden');
+      expect(resp.error.message).toContain('groups create');
+      expect(resp.error.message).toContain('global');
+    }
+  });
+
+  it('group: allows groups-archive (custom op pinned to caller via --id auto-fill)', async () => {
+    mockGetContainerConfig.mockReturnValue({ cli_scope: 'group' });
+    const resp = await dispatch({ id: '1', command: 'groups-archive', args: {} }, agentCtx());
+    // The op itself is `access: 'open'` in this test, so the gate is the
+    // only thing standing between the agent and the handler. If we get a
+    // success response, the gate let it through (the post-handler doesn't
+    // touch custom ops — they pin to the caller's id via auto-fill).
+    expect(resp.ok).toBe(true);
+  });
+
+  it('group: blocks groups-restore (restore is host-only)', async () => {
+    mockGetContainerConfig.mockReturnValue({ cli_scope: 'group' });
+    const resp = await dispatch({ id: '1', command: 'groups-restore', args: { folder: 'x' } }, agentCtx());
+    expect(resp.ok).toBe(false);
+    if (!resp.ok) {
+      expect(resp.error.code).toBe('forbidden');
+      expect(resp.error.message).toContain('host-only');
+    }
+  });
+
+  it('global: blocks groups-restore (restore is host-only regardless of scope)', async () => {
+    mockGetContainerConfig.mockReturnValue({ cli_scope: 'global' });
+    const resp = await dispatch({ id: '1', command: 'groups-restore', args: { folder: 'x' } }, agentCtx());
+    expect(resp.ok).toBe(false);
+    if (!resp.ok) {
+      expect(resp.error.code).toBe('forbidden');
+      expect(resp.error.message).toContain('host-only');
+    }
+  });
+
+  it('global: allows groups-create', async () => {
+    mockGetContainerConfig.mockReturnValue({ cli_scope: 'global' });
+    const resp = await dispatch({ id: '1', command: 'groups-create', args: { name: 'X' } }, agentCtx());
+    expect(resp.ok).toBe(true);
   });
 });

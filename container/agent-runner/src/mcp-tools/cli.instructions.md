@@ -20,12 +20,19 @@ Run `ncl help` for the full list. Common resources:
 
 | Resource | Verbs | What it is |
 |----------|-------|------------|
-| groups | list, get, create, update, delete, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package | Agent groups (workspace, personality, container config) |
+| groups | list, get, archive, update, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package | Agent groups (workspace, personality, container config) |
 | sessions | list, get, search | Active sessions + message history search |
 | destinations | list, add, remove | Where an agent group can send messages |
 | members | list, add, remove | Unprivileged access gate for an agent group |
 
 Additional resources (available under `global` scope only): messaging-groups, wirings, users, roles, user-dms, dropped-messages, approvals.
+The verbs `groups create` and `groups delete` also require `global` scope.
+
+### Archive vs. delete vs. restore
+
+- `groups archive` (allowed in your scope) — snapshots the group's DB rows to `groups/<folder>/archive.json`, kills running containers, deletes the rows, and renames the folder with a `~` suffix. Reversible. Use this when the operator says they want to "delete" or "stop using" a group — archive is almost always what they actually want.
+- `groups delete` (global scope only) — drops the DB rows without writing a snapshot. Not reversible; reserved for clearly throwaway groups (created in error, never used).
+- `groups restore` — **host-only.** The agent cannot run this. If you archived something the operator now wants back, tell them: *"run `ncl groups restore --folder <name>` on the host shell."*
 
 ### Searching past conversations
 
@@ -75,10 +82,14 @@ ncl members list
 # Write commands (approval required)
 ncl groups restart
 ncl groups restart --rebuild --message "Config updated."
+ncl groups archive                              # archive yourself (--id auto-fills)
 ncl groups config update --model claude-sonnet-4-5-20250514
 ncl groups config add-mcp-server --name rss --command npx --args '["some-rss-mcp"]'
 ncl groups config add-package --npm some-package
 ncl members add --user telegram:jane
+
+# Host-only — DO NOT attempt; ask the operator instead
+# ncl groups restore --folder some-archived-group
 ```
 
 ### Important

@@ -47,11 +47,33 @@ export async function dispatch(req: RequestFrame, ctx: CallerContext): Promise<R
       return err(req.id, 'forbidden', 'CLI access is disabled for this agent group.');
     }
 
+    // Restore is host-only regardless of scope — even a `global`-scope
+    // agent must not be able to rehydrate an archived group. The archive
+    // contains historical user data; restore is an operator action.
+    if (req.command === 'groups-restore') {
+      return err(
+        req.id,
+        'forbidden',
+        'groups restore is host-only — ask the operator to run `ncl groups restore --folder <name>` on the host shell.',
+      );
+    }
+
     if (cliScope === 'group') {
       const allowed = new Set(['groups', 'sessions', 'destinations', 'members']);
       // Only allow whitelisted resources and general commands (no resource, like help)
       if (cmd.resource && !allowed.has(cmd.resource)) {
         return err(req.id, 'forbidden', `CLI access is scoped to this agent group. Cannot access "${cmd.resource}".`);
+      }
+
+      // Group-scope cannot create new groups — would escape the scope.
+      // `archive` IS allowed (with --id auto-filled to the caller's own
+      // group) because it only touches a group the agent already owns.
+      if (req.command === 'groups-create') {
+        return err(
+          req.id,
+          'forbidden',
+          'groups create requires `global` cli_scope. A group-scoped agent cannot create new agent groups.',
+        );
       }
 
       // Enforce group scope on all agent-group-related args.
