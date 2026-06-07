@@ -19195,6 +19195,7 @@ function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
   const [inputHasText, setInputHasText] = h2(false);
+  const [focused, setFocused] = h2(false);
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
   const wsDown = isWeb && chatStatus.value !== "connected";
@@ -19253,7 +19254,9 @@ function Composer() {
   };
   const vm = voiceMode.value;
   const hasPending = pending.value.length > 0;
-  const showMic = vm !== "off" && hasGetUserMedia();
+  const micCapable = vm !== "off" && hasGetUserMedia();
+  const showSend = !micCapable || focused || inputHasText || hasPending;
+  const showMic = micCapable && !showSend;
   const micDisabled = inputHasText || hasPending || wsDown;
   const recording = isRecording.value;
   const holdTimerRef = A2(null);
@@ -19377,8 +19380,9 @@ function Composer() {
             ref: inputRef,
             onInput: autosize,
             onKeyDown: onKey,
+            onFocus: () => setFocused(true),
+            onBlur: () => setFocused(false),
             onPaste,
-            disabled: wsDown,
             autocomplete: "off"
           }
         ),
@@ -19396,7 +19400,16 @@ function Composer() {
             onPointerCancel: onMicPointerCancel,
             children: "\u{1F399}\uFE0F"
           }
-        ) : /* @__PURE__ */ u4("button", { type: "submit", id: "chat-send", disabled: wsDown || recording, children: "Send" })
+        ) : /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "submit",
+            id: "chat-send",
+            disabled: wsDown || recording,
+            onMouseDown: (e4) => e4.preventDefault(),
+            children: "Send"
+          }
+        )
       ]
     }
   );
