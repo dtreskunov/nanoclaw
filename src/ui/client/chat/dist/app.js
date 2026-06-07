@@ -21322,6 +21322,7 @@ function Combobox({
         onMouseEnter: () => setHighlight(i5),
         onMouseDown: (e4) => {
           e4.preventDefault();
+          e4.stopPropagation();
           commitOption(o4.value);
         },
         children: [
@@ -21469,11 +21470,11 @@ function errMsg(d5, fallback) {
 function GroupAdmin() {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
-  const [tab, setTab] = h2("settings");
+  const [tab, setTab] = h2("models");
   const actionsRef = A2(null);
   const [, forceRender] = h2(0);
   y2(() => {
-    setTab("settings");
+    setTab("models");
   }, [open, gid]);
   useBackButtonCloses(open, () => {
     groupAdminOpen.value = false;
@@ -21504,7 +21505,7 @@ function GroupAdmin() {
     /* @__PURE__ */ u4("header", { class: "settings-head", children: [
       /* @__PURE__ */ u4("span", { class: "title", children: title }),
       /* @__PURE__ */ u4("div", { class: "settings-head-actions", children: [
-        tab === "settings" && ha ? /* @__PURE__ */ u4(k, { children: [
+        (tab === "models" || tab === "settings") && ha ? /* @__PURE__ */ u4(k, { children: [
           /* @__PURE__ */ u4(Tooltip, { text: "Re-fetch settings from server", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Refresh", onClick: ha.refresh, disabled: ha.busy, children: "\u21BB" }) }),
           /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) })
         ] }) : null,
@@ -21512,18 +21513,19 @@ function GroupAdmin() {
       ] })
     ] }),
     /* @__PURE__ */ u4("nav", { class: "group-admin-tabs", children: [
+      /* @__PURE__ */ u4("button", { type: "button", class: tab === "models" ? "active" : "", onClick: () => setTab("models"), children: "Models" }),
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "settings" ? "active" : "", onClick: () => setTab("settings"), children: "Settings" }),
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "members" ? "active" : "", onClick: () => setTab("members"), children: "Members" }),
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" })
     ] }),
     /* @__PURE__ */ u4("div", { class: "settings-body", children: [
-      tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, onClose: close, onActions: setActions }) : null,
+      tab === "models" || tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: close, onActions: setActions }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
       tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null
     ] })
   ] }) });
 }
-function SettingsTab({ gid, onClose, onActions }) {
+function SettingsTab({ gid, section, onClose, onActions }) {
   const [data, setData] = h2(null);
   const [draft, setDraft] = h2(null);
   const [draftName, setDraftName] = h2("");
@@ -21676,203 +21678,207 @@ function SettingsTab({ gid, onClose, onActions }) {
       data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
       data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
     ] }) }),
-    /* @__PURE__ */ u4(Field, { label: "Name", children: /* @__PURE__ */ u4(
-      "input",
-      {
-        type: "text",
-        value: draftName,
-        disabled: busy,
-        maxLength: 100,
-        onInput: (e4) => setDraftName(e4.target.value)
-      }
-    ) }),
-    /* @__PURE__ */ u4(
-      Field,
-      {
-        label: "Provider",
-        info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
-        children: /* @__PURE__ */ u4(
-          Combobox,
-          {
-            value: draft.provider,
-            options: (() => {
-              const selectable = data.validProviders.slice();
-              if (draft.provider && !selectable.includes(draft.provider)) {
-                selectable.push(draft.provider);
-              }
-              return selectable.map((p5) => ({
-                value: p5,
-                label: p5,
-                tooltip: PROVIDER_INFO[p5]
-              }));
-            })(),
-            placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
-            disabled: busy,
-            freeform: false,
-            onChange: (v5) => update("provider", v5)
-          }
-        )
-      }
-    ),
-    /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
-      ModelSelector,
-      {
-        value: draft.model,
-        provider,
-        placeholder: data.defaults.model ? `default: ${data.defaults.model}` : "pick or type a model id",
-        disabled: busy,
-        apiBasePath: apiPath(gid, ""),
-        outputModality: "text",
-        onChange: (v5) => update("model", v5)
-      }
-    ) }),
-    /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
-      "input",
-      {
-        type: "text",
-        value: draft.effort ?? "",
-        disabled: busy,
-        onInput: (e4) => update("effort", e4.currentTarget.value || null),
-        placeholder: "provider-specific (e.g. high)"
-      }
-    ) }),
-    /* @__PURE__ */ u4(Field, { label: "Image tag", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
-      /* @__PURE__ */ u4(
-        Combobox,
+    section === "models" ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
+        ModelSelector,
         {
-          value: draft.image_tag,
-          options: imageOptions,
-          placeholder: data.defaults.image_tag ? `default: ${data.defaults.image_tag}` : "pick an image",
+          value: draft.model,
+          provider,
+          placeholder: data.defaults.model ? `default: ${data.defaults.model}` : "pick or type a model id",
           disabled: busy,
-          onChange: (v5) => update("image_tag", v5)
+          apiBasePath: apiPath(gid, ""),
+          outputModality: "text",
+          onChange: (v5) => update("model", v5)
+        }
+      ) }),
+      /* @__PURE__ */ u4(
+        Field,
+        {
+          label: "Transcription model",
+          info: "OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.",
+          children: /* @__PURE__ */ u4(
+            ModelSelector,
+            {
+              value: draft.transcription_model,
+              provider: "openrouter",
+              placeholder: "google/gemini-2.0-flash-lite-001",
+              disabled: busy,
+              apiBasePath: apiPath(gid, ""),
+              inputModality: "audio",
+              onChange: (v5) => update("transcription_model", v5)
+            }
+          )
+        }
+      )
+    ] }) : null,
+    section === "settings" ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4(Field, { label: "Name", children: /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          value: draftName,
+          disabled: busy,
+          maxLength: 100,
+          onInput: (e4) => setDraftName(e4.target.value)
+        }
+      ) }),
+      /* @__PURE__ */ u4(
+        Field,
+        {
+          label: "Provider",
+          info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
+          children: /* @__PURE__ */ u4(
+            Combobox,
+            {
+              value: draft.provider,
+              options: (() => {
+                const selectable = data.validProviders.slice();
+                if (draft.provider && !selectable.includes(draft.provider)) {
+                  selectable.push(draft.provider);
+                }
+                return selectable.map((p5) => ({
+                  value: p5,
+                  label: p5,
+                  tooltip: PROVIDER_INFO[p5]
+                }));
+              })(),
+              placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
+              disabled: busy,
+              freeform: false,
+              onChange: (v5) => update("provider", v5)
+            }
+          )
         }
       ),
-      selectedImg ? /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
-        /* @__PURE__ */ u4("div", { class: "selected-title", children: [
-          selectedImg.label,
-          selectedImgAge || selectedImgSize ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
-            " \xB7 ",
-            [selectedImgAge, selectedImgSize].filter(Boolean).join(" \xB7 ")
-          ] }) : null,
-          selectedImg.isDefault ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: " \xB7 default" }) : null
-        ] }),
-        selectedImg.createdAt ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: [
-          "Created: ",
-          new Date(selectedImg.createdAt).toLocaleString()
-        ] }) : null
-      ] }) : draft.image_tag && images ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
-    ] }) }),
-    /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
-      "input",
-      {
-        type: "text",
-        value: draft.assistant_name ?? "",
-        disabled: busy,
-        onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
-      }
-    ) }),
-    /* @__PURE__ */ u4(
-      Field,
-      {
-        label: "Max messages / prompt",
-        info: "Hard cap on how many history messages get included in each model call. Higher = more context but more cost; lower = faster + cheaper but the agent forgets sooner. Leave blank for the provider default.",
-        children: /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "number",
-            min: 1,
-            max: 1e3,
-            value: draft.max_messages_per_prompt ?? "",
-            disabled: busy,
-            onInput: (e4) => {
-              const v5 = e4.currentTarget.value;
-              update("max_messages_per_prompt", v5 ? Number(v5) : null);
-            }
-          }
-        )
-      }
-    ),
-    /* @__PURE__ */ u4(
-      Field,
-      {
-        label: "CLI scope",
-        info: "Controls which `ncl` commands an agent in this group can run.\ndisabled = no CLI access.\ngroup = limited to the group's own resources.\nglobal = unrestricted (owner / global admin only \u2014 use sparingly).",
-        children: /* @__PURE__ */ u4(
+      /* @__PURE__ */ u4(Field, { label: "Effort", children: /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          value: draft.effort ?? "",
+          disabled: busy,
+          onInput: (e4) => update("effort", e4.currentTarget.value || null),
+          placeholder: "provider-specific (e.g. high)"
+        }
+      ) }),
+      /* @__PURE__ */ u4(Field, { label: "Image tag", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+        /* @__PURE__ */ u4(
           Combobox,
           {
-            value: draft.cli_scope,
-            options: data.validCliScopes.filter((s5) => s5 !== "global" || data.actorIsElevated || draft.cli_scope === "global").map((s5) => ({
-              value: s5,
-              label: s5,
-              tooltip: s5 === "global" && !data.actorIsElevated ? "Owner / global admin only." : void 0
-            })),
-            placeholder: "pick a scope",
+            value: draft.image_tag,
+            options: imageOptions,
+            placeholder: data.defaults.image_tag ? `default: ${data.defaults.image_tag}` : "pick an image",
             disabled: busy,
-            freeform: false,
-            onChange: (v5) => update("cli_scope", v5)
+            onChange: (v5) => update("image_tag", v5)
           }
-        )
-      }
-    ),
-    /* @__PURE__ */ u4(
-      Field,
-      {
-        label: "Transcription model",
-        info: "OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.",
-        children: /* @__PURE__ */ u4(
-          ModelSelector,
-          {
-            value: draft.transcription_model,
-            provider: "openrouter",
-            placeholder: "google/gemini-2.0-flash-lite-001",
-            disabled: busy,
-            apiBasePath: apiPath(gid, ""),
-            inputModality: "audio",
-            onChange: (v5) => update("transcription_model", v5)
-          }
-        )
-      }
-    ),
-    data.site.available ? /* @__PURE__ */ u4(
-      Field,
-      {
-        label: "Website",
-        info: "Serve a public static website for this group from a folder in its workspace. Files in the FQDN-named folder become readable by anyone with the link \u2014 no login required. Separate from private file-share links.",
-        children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
-          /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
-            /* @__PURE__ */ u4(
-              "input",
-              {
-                type: "checkbox",
-                checked: siteEnabled,
-                disabled: busy,
-                onChange: (e4) => setSiteEnabled(e4.target.checked)
-              }
-            ),
-            /* @__PURE__ */ u4("span", { children: "Enable website" })
+        ),
+        selectedImg ? /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
+          /* @__PURE__ */ u4("div", { class: "selected-title", children: [
+            selectedImg.label,
+            selectedImgAge || selectedImgSize ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
+              " \xB7 ",
+              [selectedImgAge, selectedImgSize].filter(Boolean).join(" \xB7 ")
+            ] }) : null,
+            selectedImg.isDefault ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: " \xB7 default" }) : null
           ] }),
-          data.actorIsElevated ? /* @__PURE__ */ u4(
+          selectedImg.createdAt ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: [
+            "Created: ",
+            new Date(selectedImg.createdAt).toLocaleString()
+          ] }) : null
+        ] }) : draft.image_tag && images ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
+      ] }) }),
+      /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          value: draft.assistant_name ?? "",
+          disabled: busy,
+          onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
+        }
+      ) }),
+      /* @__PURE__ */ u4(
+        Field,
+        {
+          label: "Max messages / prompt",
+          info: "Hard cap on how many history messages get included in each model call. Higher = more context but more cost; lower = faster + cheaper but the agent forgets sooner. Leave blank for the provider default.",
+          children: /* @__PURE__ */ u4(
             "input",
             {
-              type: "text",
-              value: siteSlug,
+              type: "number",
+              min: 1,
+              max: 1e3,
+              value: draft.max_messages_per_prompt ?? "",
               disabled: busy,
-              maxLength: 63,
-              placeholder: data.site.baseDomain ? `subdomain (.${data.site.baseDomain})` : "subdomain",
-              onInput: (e4) => setSiteSlug(e4.currentTarget.value)
+              onInput: (e4) => {
+                const v5 = e4.currentTarget.value;
+                update("max_messages_per_prompt", v5 ? Number(v5) : null);
+              }
             }
-          ) : null,
-          siteEnabled && data.site.url ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
-            "Live at ",
-            /* @__PURE__ */ u4("a", { href: data.site.url, target: "_blank", rel: "noopener noreferrer", children: data.site.url }),
-            " ",
-            "\u2014 publish by writing files into the ",
-            /* @__PURE__ */ u4("code", { children: data.site.fqdn }),
-            " folder in the workspace."
-          ] }) : siteEnabled ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Save to allocate a subdomain and go live." }) : /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Disabled \u2014 enable to publish a public static site on its own subdomain." })
-        ] })
-      }
-    ) : null,
+          )
+        }
+      ),
+      /* @__PURE__ */ u4(
+        Field,
+        {
+          label: "CLI scope",
+          info: "Controls which `ncl` commands an agent in this group can run.\ndisabled = no CLI access.\ngroup = limited to the group's own resources.\nglobal = unrestricted (owner / global admin only \u2014 use sparingly).",
+          children: /* @__PURE__ */ u4(
+            Combobox,
+            {
+              value: draft.cli_scope,
+              options: data.validCliScopes.filter((s5) => s5 !== "global" || data.actorIsElevated || draft.cli_scope === "global").map((s5) => ({
+                value: s5,
+                label: s5,
+                tooltip: s5 === "global" && !data.actorIsElevated ? "Owner / global admin only." : void 0
+              })),
+              placeholder: "pick a scope",
+              disabled: busy,
+              freeform: false,
+              onChange: (v5) => update("cli_scope", v5)
+            }
+          )
+        }
+      ),
+      data.site.available ? /* @__PURE__ */ u4(
+        Field,
+        {
+          label: "Website",
+          info: "Serve a public static website for this group from a folder in its workspace. Files in the FQDN-named folder become readable by anyone with the link \u2014 no login required. Separate from private file-share links.",
+          children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+            /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+              /* @__PURE__ */ u4(
+                "input",
+                {
+                  type: "checkbox",
+                  checked: siteEnabled,
+                  disabled: busy,
+                  onChange: (e4) => setSiteEnabled(e4.target.checked)
+                }
+              ),
+              /* @__PURE__ */ u4("span", { children: "Enable website" })
+            ] }),
+            data.actorIsElevated ? /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "text",
+                value: siteSlug,
+                disabled: busy,
+                maxLength: 63,
+                placeholder: data.site.baseDomain ? `subdomain (.${data.site.baseDomain})` : "subdomain",
+                onInput: (e4) => setSiteSlug(e4.currentTarget.value)
+              }
+            ) : null,
+            siteEnabled && data.site.url ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+              "Live at ",
+              /* @__PURE__ */ u4("a", { href: data.site.url, target: "_blank", rel: "noopener noreferrer", children: data.site.url }),
+              " ",
+              "\u2014 publish by writing files into the ",
+              /* @__PURE__ */ u4("code", { children: data.site.fqdn }),
+              " folder in the workspace."
+            ] }) : siteEnabled ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Save to allocate a subdomain and go live." }) : /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Disabled \u2014 enable to publish a public static site on its own subdomain." })
+          ] })
+        }
+      ) : null
+    ] }) : null,
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: changed ? `${pending2.size} unsaved change${pending2.size === 1 ? "" : "s"}. Click Save (\u2713) above to review and apply.` : "No unsaved changes." }) }),
     confirmOpen ? /* @__PURE__ */ u4(
       "div",
