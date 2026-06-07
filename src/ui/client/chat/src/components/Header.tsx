@@ -29,7 +29,7 @@ export function Header() {
           aria-label="Group admin"
           title="Group admin"
           onClick={() => { groupAdminOpen.value = !groupAdminOpen.value; }}
-        >{'\uD83D\uDEE0\uFE0F'}</button>
+        >{'\u2699\uFE0F'}</button>
       ) : null}
       <button
         type="button"
@@ -37,7 +37,7 @@ export function Header() {
         aria-label="Settings"
         title="Settings"
         onClick={() => { settingsOpen.value = !settingsOpen.value; }}
-      >{'\u2699\uFE0F'}</button>
+      >{'\uD83D\uDC64'}</button>
       <button
         type="button"
         class="icon-btn mobile-only"
