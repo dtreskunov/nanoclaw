@@ -18301,7 +18301,7 @@ function Header() {
         onClick: () => {
           groupAdminOpen.value = !groupAdminOpen.value;
         },
-        children: "\u{1F6E0}\uFE0F"
+        children: "\u2699\uFE0F"
       }
     ) : null,
     /* @__PURE__ */ u4(
@@ -18314,7 +18314,7 @@ function Header() {
         onClick: () => {
           settingsOpen.value = !settingsOpen.value;
         },
-        children: "\u2699\uFE0F"
+        children: "\u{1F464}"
       }
     ),
     /* @__PURE__ */ u4(
