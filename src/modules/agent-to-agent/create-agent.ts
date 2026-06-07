@@ -92,6 +92,7 @@ export async function handleCreateAgent(content: Record<string, unknown>, sessio
     target_type: 'agent',
     target_id: agentGroupId,
     created_at: now,
+    created_by: null,
   });
   // Handle the unlikely case where the child already has a "parent" destination
   // (shouldn't happen for a brand-new agent, but be safe).
@@ -107,6 +108,7 @@ export async function handleCreateAgent(content: Record<string, unknown>, sessio
     target_type: 'agent',
     target_id: sourceGroup.id,
     created_at: now,
+    created_by: null,
   });
 
   // REQUIRED: project the new destination into the running container's

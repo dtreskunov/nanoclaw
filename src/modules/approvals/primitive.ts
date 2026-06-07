@@ -149,6 +149,13 @@ export interface RequestApprovalOptions {
   title: string;
   /** Card body shown to the admin. */
   question: string;
+  /**
+   * Agent group whose admins should be asked. Defaults to the requesting
+   * session's agent group. Override for cross-group flows where the
+   * decision authority lives elsewhere (e.g. agent-link target-side
+   * approval — the source agent requests, the target's admins decide).
+   */
+  approverAgentGroupId?: string;
 }
 
 /**
@@ -160,7 +167,7 @@ export interface RequestApprovalOptions {
 export async function requestApproval(opts: RequestApprovalOptions): Promise<void> {
   const { session, action, payload, title, question, agentName } = opts;
 
-  const approvers = pickApprover(session.agent_group_id);
+  const approvers = pickApprover(opts.approverAgentGroupId ?? session.agent_group_id);
   if (approvers.length === 0) {
     notifyAgent(session, `${action} failed: no owner or admin configured to approve.`);
     return;

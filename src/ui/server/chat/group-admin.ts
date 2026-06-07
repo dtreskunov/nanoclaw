@@ -38,6 +38,14 @@ import {
   isGlobalAdmin,
   isOwner,
 } from '../../../modules/permissions/db/user-roles.js';
+import { listAccessibleAgentGroups } from '../../../modules/permissions/access.js';
+import { getDestinations, deleteDestination } from '../../../modules/agent-to-agent/db/agent-destinations.js';
+import { authorizeAgentLink, authorizeAgentLinkRemoval } from '../../../modules/agent-to-agent/authorize.js';
+import { applyAgentLink, AgentLinkError, validateLocalName } from '../../../modules/agent-to-agent/apply-link.js';
+import { writeDestinations } from '../../../modules/agent-to-agent/write-destinations.js';
+import { getSessionsByAgentGroup } from '../../../db/sessions.js';
+import { requestApproval } from '../../../modules/approvals/primitive.js';
+import type { Session } from '../../../types.js';
 import type { AgentGroup, ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
 import { SELECTABLE_AGENT_PROVIDERS, VALID_AGENT_PROVIDERS } from './agent-providers.js';
@@ -161,6 +169,15 @@ async function dispatch(
   }
 
   if (rest === '/users-search' && method === 'GET') return handleUsersSearch(req, res);
+
+  if (rest === '/destinations' && method === 'GET') return handleListDestinations(res, gid);
+  if (rest === '/destinations' && method === 'POST') return handleAddDestination(req, res, actorUserId, gid);
+  if (rest === '/destinations/candidates' && method === 'GET')
+    return handleListDestinationCandidates(res, actorUserId, gid);
+  {
+    const m = /^\/destinations\/([^/]+)$/.exec(rest);
+    if (m && method === 'DELETE') return handleRemoveDestination(res, actorUserId, gid, decodeURIComponent(m[1]!));
+  }
 
   if (rest === '/models' && method === 'GET') return handleListModels(req, res);
   if (rest === '/images' && method === 'GET') return handleListImages(res);
@@ -769,6 +786,193 @@ async function handleListModels(req: http.IncomingMessage, res: http.ServerRespo
 
 function handleListImages(res: http.ServerResponse): void {
   writeJson(res, 200, { images: listImages() });
+}
+
+// ── destinations (agent-to-agent links) ────────────────────────────────────
+
+interface DestinationDto {
+  localName: string;
+  targetType: 'agent' | 'channel';
+  targetId: string;
+  targetName: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+function handleListDestinations(res: http.ServerResponse, gid: string): void {
+  const rows = getDestinations(gid);
+  const out: DestinationDto[] = rows.map((r) => {
+    let targetName: string | null = null;
+    if (r.target_type === 'agent') {
+      targetName = getAgentGroup(r.target_id)?.name ?? null;
+    }
+    return {
+      localName: r.local_name,
+      targetType: r.target_type,
+      targetId: r.target_id,
+      targetName,
+      createdAt: r.created_at,
+      createdBy: r.created_by,
+    };
+  });
+  writeJson(res, 200, { destinations: out });
+}
+
+/**
+ * Lists agent groups the actor could link this group to. Excludes self and
+ * groups already linked. Includes admin-on-target hint so the UI can show
+ * "auto-apply" vs. "needs approval".
+ */
+function handleListDestinationCandidates(res: http.ServerResponse, actorUserId: string, gid: string): void {
+  const accessible = listAccessibleAgentGroups(actorUserId);
+  const existing = new Set(
+    getDestinations(gid)
+      .filter((d) => d.target_type === 'agent')
+      .map((d) => d.target_id),
+  );
+  const out = accessible
+    .filter((g) => g.id !== gid && !existing.has(g.id))
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      folder: g.folder,
+      adminOnTarget: hasAdminPrivilege(actorUserId, g.id),
+    }));
+  writeJson(res, 200, { candidates: out });
+}
+
+async function handleAddDestination(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+): Promise<void> {
+  const body = (await readJsonBody(req)) as {
+    targetAgentGroupId?: unknown;
+    localName?: unknown;
+    alsoReverse?: unknown;
+    reverseLocalName?: unknown;
+  };
+  const targetGid = typeof body.targetAgentGroupId === 'string' ? body.targetAgentGroupId : '';
+  const localNameRaw = typeof body.localName === 'string' ? body.localName : '';
+  const alsoReverse = body.alsoReverse === true;
+  const reverseLocalNameRaw =
+    typeof body.reverseLocalName === 'string' && body.reverseLocalName.length > 0 ? body.reverseLocalName : undefined;
+  if (!targetGid) throw new BadRequest('targetAgentGroupId is required');
+  if (!localNameRaw) throw new BadRequest('localName is required');
+
+  let localName: string;
+  try {
+    localName = validateLocalName(localNameRaw);
+  } catch (err) {
+    throw new BadRequest((err as Error).message);
+  }
+
+  const decision = authorizeAgentLink(actorUserId, gid, targetGid);
+  if (decision.mode === 'denied') {
+    if (decision.reason === 'not_admin_on_source') {
+      writeJson(res, 403, { error: 'forbidden' });
+      return;
+    }
+    writeJson(res, 400, { error: decision.reason });
+    return;
+  }
+
+  if (decision.mode === 'auto') {
+    try {
+      const result = await applyAgentLink({
+        sourceAgentGroupId: gid,
+        targetAgentGroupId: targetGid,
+        localName,
+        createdBy: actorUserId,
+        alsoReverse,
+        reverseLocalName: reverseLocalNameRaw,
+      });
+      recordAdminAction({
+        actorUserId,
+        action: 'destination_add',
+        targetKind: 'agent_group',
+        targetId: gid,
+        payload: { targetAgentGroupId: targetGid, localName, alsoReverse },
+      });
+      writeJson(res, 200, {
+        status: 'applied',
+        forward: result.forward,
+        reverse: result.reverse,
+      });
+    } catch (err) {
+      if (err instanceof AgentLinkError) throw new BadRequest(err.message);
+      throw err;
+    }
+    return;
+  }
+
+  // needs-approval — synthesize a session shim so requestApproval can notify
+  // back to the requester's *agent-group context* (source). Wake/notify
+  // targets the most-recent active session of the source group, if any.
+  const sourceSessions = getSessionsByAgentGroup(gid);
+  const session: Session | undefined = sourceSessions[0];
+  if (!session) {
+    writeJson(res, 400, {
+      error: 'no_active_session',
+      detail: 'Source group has no active session to receive the approval result.',
+    });
+    return;
+  }
+  await requestApproval({
+    session,
+    agentName: getAgentGroup(gid)?.name ?? gid,
+    action: 'add_agent_destination',
+    approverAgentGroupId: targetGid,
+    payload: {
+      sourceAgentGroupId: gid,
+      targetAgentGroupId: targetGid,
+      localName,
+      alsoReverse,
+      reverseLocalName: reverseLocalNameRaw ?? null,
+    },
+    title: `Agent link request from "${getAgentGroup(gid)?.name ?? gid}"`,
+    question: `Allow "${getAgentGroup(gid)?.name ?? gid}" to add "${getAgentGroup(targetGid)?.name ?? targetGid}" as destination "${localName}"?`,
+  });
+  recordAdminAction({
+    actorUserId,
+    action: 'destination_request',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: { targetAgentGroupId: targetGid, localName, alsoReverse },
+  });
+  writeJson(res, 202, { status: 'pending_approval' });
+}
+
+function handleRemoveDestination(res: http.ServerResponse, actorUserId: string, gid: string, localName: string): void {
+  const decision = authorizeAgentLinkRemoval(actorUserId, gid);
+  if (!decision.allowed) {
+    writeJson(res, 403, { error: decision.reason });
+    return;
+  }
+  const destinations = getDestinations(gid);
+  const existing = destinations.find((d) => d.local_name === localName);
+  if (!existing) {
+    writeJson(res, 404, { error: 'destination not found' });
+    return;
+  }
+  deleteDestination(gid, localName);
+  // Re-project to active sessions so the agent stops seeing it.
+  for (const s of getSessionsByAgentGroup(gid)) {
+    try {
+      writeDestinations(gid, s.id);
+    } catch {
+      // best-effort projection; container may be down
+    }
+  }
+  recordAdminAction({
+    actorUserId,
+    action: 'destination_remove',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: { localName, targetType: existing.target_type, targetId: existing.target_id },
+  });
+  writeJson(res, 200, { ok: true });
 }
 
 // ── tiny local helpers (kept private to avoid widening routes.ts surface) ─

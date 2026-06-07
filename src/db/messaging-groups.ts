@@ -187,6 +187,7 @@ export function createMessagingGroupAgent(mga: MessagingGroupAgent): void {
     target_type: 'channel',
     target_id: mga.messaging_group_id,
     created_at: mga.created_at,
+    created_by: null,
   });
 }
 

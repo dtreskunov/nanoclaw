@@ -218,4 +218,6 @@ export interface AgentDestination {
   target_type: 'channel' | 'agent';
   target_id: string;
   created_at: string;
+  /** User who created this row. Null for legacy rows (channel backfill, pre-audit). */
+  created_by: string | null;
 }

@@ -17,7 +17,7 @@ import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
 
-type Tab = 'models' | 'settings' | 'members' | 'roles';
+type Tab = 'models' | 'settings' | 'members' | 'roles' | 'destinations';
 
 interface HeaderActions {
   refresh: () => void;
@@ -221,6 +221,7 @@ export function GroupAdmin(): JSX.Element | null {
           <button type="button" class={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
           <button type="button" class={tab === 'members' ? 'active' : ''} onClick={() => setTab('members')}>Members</button>
           <button type="button" class={tab === 'roles' ? 'active' : ''} onClick={() => setTab('roles')}>Admins</button>
+          <button type="button" class={tab === 'destinations' ? 'active' : ''} onClick={() => setTab('destinations')}>Destinations</button>
         </nav>
         <div class="settings-body">
           {(tab === 'models' || tab === 'settings')
@@ -228,6 +229,7 @@ export function GroupAdmin(): JSX.Element | null {
             : null}
           {tab === 'members' ? <MembersTab gid={gid} /> : null}
           {tab === 'roles' ? <RolesTab gid={gid} /> : null}
+          {tab === 'destinations' ? <DestinationsTab gid={gid} /> : null}
         </div>
         {closeConfirmOpen ? (
           <div
@@ -971,6 +973,167 @@ function RolesTab({ gid }: { gid: string }): JSX.Element {
         onPick={grant}
       />
     </section>
+  );
+}
+
+// ── Destinations (agent-to-agent links) ──────────────────────────────────
+
+interface DestinationDto {
+  localName: string;
+  targetType: 'agent' | 'channel';
+  targetId: string;
+  targetName: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+interface DestinationCandidate {
+  id: string;
+  name: string;
+  folder: string;
+  adminOnTarget: boolean;
+}
+
+function DestinationsTab({ gid }: { gid: string }): JSX.Element {
+  const [destinations, setDestinations] = useState<DestinationDto[] | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function refresh(): Promise<void> {
+    const r = await call<{ destinations: DestinationDto[] }>(apiPath(gid, '/destinations'));
+    if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+    setDestinations(r.data.destinations);
+  }
+  useEffect(() => { refresh(); }, [gid]);
+
+  async function remove(d: DestinationDto): Promise<void> {
+    if (!confirm(`Remove destination "${d.localName}"?`)) return;
+    setBusy(true);
+    try {
+      const r = await call(apiPath(gid, `/destinations/${encodeURIComponent(d.localName)}`), 'DELETE');
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      showToast('Destination removed');
+      refresh();
+    } finally { setBusy(false); }
+  }
+
+  if (!destinations) return <p class="muted">Loading…</p>;
+
+  return (
+    <section>
+      <p class="muted">
+        Destinations are the names this agent uses to route messages — either to channels (auto-managed) or to other agent groups (added here). Adding an agent link as an admin of both groups applies immediately; otherwise an admin of the target group is asked to approve.
+      </p>
+      {destinations.length === 0
+        ? <p class="muted">No destinations yet.</p>
+        : (
+          <table class="settings-table">
+            <thead><tr><th>Name</th><th>Type</th><th>Target</th><th></th></tr></thead>
+            <tbody>
+              {destinations.map((d) => (
+                <tr key={d.localName}>
+                  <td><code>{d.localName}</code></td>
+                  <td>{d.targetType}</td>
+                  <td>
+                    {d.targetType === 'agent'
+                      ? (d.targetName ?? <code class="muted">{d.targetId}</code>)
+                      : <code class="muted">{d.targetId}</code>}
+                  </td>
+                  <td>
+                    {d.targetType === 'agent'
+                      ? <button type="button" class="danger" disabled={busy} onClick={() => remove(d)}>Remove</button>
+                      : <span class="muted">channel</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+      <h4>Add an agent link</h4>
+      {adding
+        ? <AddDestinationForm gid={gid} onCancel={() => setAdding(false)} onDone={() => { setAdding(false); refresh(); }} />
+        : <button type="button" onClick={() => setAdding(true)}>Link another agent…</button>}
+    </section>
+  );
+}
+
+function AddDestinationForm({ gid, onCancel, onDone }: { gid: string; onCancel: () => void; onDone: () => void }): JSX.Element {
+  const [candidates, setCandidates] = useState<DestinationCandidate[] | null>(null);
+  const [targetId, setTargetId] = useState('');
+  const [localName, setLocalName] = useState('');
+  const [alsoReverse, setAlsoReverse] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const r = await call<{ candidates: DestinationCandidate[] }>(apiPath(gid, '/destinations/candidates'));
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      setCandidates(r.data.candidates);
+    })();
+  }, [gid]);
+
+  const selected = candidates?.find((c) => c.id === targetId) ?? null;
+
+  async function submit(e: Event): Promise<void> {
+    e.preventDefault();
+    if (!targetId || !localName.trim()) return;
+    setBusy(true);
+    try {
+      const r = await call<{ status: 'applied' | 'pending_approval' }>(
+        apiPath(gid, '/destinations'),
+        'POST',
+        { targetAgentGroupId: targetId, localName: localName.trim(), alsoReverse },
+      );
+      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      showToast(r.data.status === 'applied' ? 'Destination added' : 'Approval requested');
+      onDone();
+    } finally { setBusy(false); }
+  }
+
+  if (!candidates) return <p class="muted">Loading candidates…</p>;
+  if (candidates.length === 0) return (
+    <div>
+      <p class="muted">No eligible target groups. You must be an admin (or member, when admin-on-target) of another agent group to link it.</p>
+      <button type="button" onClick={onCancel}>Cancel</button>
+    </div>
+  );
+
+  return (
+    <form onSubmit={submit}>
+      <label>
+        Target agent group
+        <select value={targetId} onChange={(e) => setTargetId((e.target as HTMLSelectElement).value)} disabled={busy}>
+          <option value="">— select —</option>
+          {candidates.map((c) => (
+            <option value={c.id} key={c.id}>{c.name}{c.adminOnTarget ? '' : ' (needs approval)'}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Local name
+        <input
+          type="text"
+          value={localName}
+          onInput={(e) => setLocalName((e.target as HTMLInputElement).value)}
+          placeholder={selected?.folder ?? 'e.g. research-bot'}
+          disabled={busy}
+        />
+      </label>
+      <label class="ga-checkbox">
+        <input type="checkbox" checked={alsoReverse} onChange={(e) => setAlsoReverse((e.target as HTMLInputElement).checked)} disabled={busy} />
+        Also create reverse link (target agent can send back to this one)
+      </label>
+      {selected && !selected.adminOnTarget ? (
+        <p class="muted">You are not an admin of "{selected.name}" — an admin of that group will be asked to approve this link.</p>
+      ) : null}
+      <div class="settings-actions">
+        <button type="submit" disabled={busy || !targetId || !localName.trim()}>
+          {selected?.adminOnTarget ? 'Add' : 'Request'}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
+      </div>
+    </form>
   );
 }
 

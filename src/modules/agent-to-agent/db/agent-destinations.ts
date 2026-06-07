@@ -46,8 +46,8 @@ import { getDb } from '../../../db/connection.js';
 export function createDestination(row: AgentDestination): void {
   getDb()
     .prepare(
-      `INSERT INTO agent_destinations (agent_group_id, local_name, target_type, target_id, created_at)
-       VALUES (@agent_group_id, @local_name, @target_type, @target_id, @created_at)`,
+      `INSERT INTO agent_destinations (agent_group_id, local_name, target_type, target_id, created_at, created_by)
+       VALUES (@agent_group_id, @local_name, @target_type, @target_id, @created_at, @created_by)`,
     )
     .run(row);
 }

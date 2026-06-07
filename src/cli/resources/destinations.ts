@@ -59,6 +59,11 @@ registerResource({
       description: "The target's ID — messaging_groups.id for channels, agent_groups.id for agents.",
     },
     { name: 'created_at', type: 'string', description: 'Auto-set.' },
+    {
+      name: 'created_by',
+      type: 'string',
+      description: 'User who created the row (audit). Null for legacy rows or implicit channel destinations.',
+    },
   ],
   operations: { list: 'open' },
   customOperations: {
@@ -78,8 +83,8 @@ registerResource({
         if (!targetId) throw new Error('--target-id is required');
         getDb()
           .prepare(
-            `INSERT INTO agent_destinations (agent_group_id, local_name, target_type, target_id, created_at)
-             VALUES (?, ?, ?, ?, datetime('now'))`,
+            `INSERT INTO agent_destinations (agent_group_id, local_name, target_type, target_id, created_at, created_by)
+             VALUES (?, ?, ?, ?, datetime('now'), NULL)`,
           )
           .run(agentGroupId, localName, targetType, targetId);
         await projectDestinationsToSessions(agentGroupId);

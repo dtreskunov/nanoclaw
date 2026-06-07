@@ -4,6 +4,7 @@ import { log } from '../../log.js';
 import { migration001 } from './001-initial.js';
 import { migration002 } from './002-chat-sdk-state.js';
 import { moduleAgentToAgentDestinations } from './module-agent-to-agent-destinations.js';
+import { moduleAgentToAgentDestinationsCreatedBy } from './module-agent-to-agent-destinations-created-by.js';
 import { migration008 } from './008-dropped-messages.js';
 import { migration009 } from './009-drop-pending-credentials.js';
 import { migration010 } from './010-engage-modes.js';
@@ -22,6 +23,7 @@ import { migration022 } from './022-push-subscriptions.js';
 import { migration023 } from './023-unregistered-senders-uuid.js';
 import { migration024 } from './024-pending-user-approvals-partial-unique.js';
 import { migration025 } from './025-site-website.js';
+import { migration026 } from './026-user-onboarded.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
@@ -40,6 +42,7 @@ const migrations: Migration[] = [
   migration002,
   moduleApprovalsPendingApprovals,
   moduleAgentToAgentDestinations,
+  moduleAgentToAgentDestinationsCreatedBy,
   moduleApprovalsTitleOptions,
   migration008,
   migration009,
@@ -59,6 +62,7 @@ const migrations: Migration[] = [
   migration023,
   migration024,
   migration025,
+  migration026,
   moduleResendThreadRoots,
   moduleContainerConfigsPip,
   moduleContainerConfigsVoiceMode,

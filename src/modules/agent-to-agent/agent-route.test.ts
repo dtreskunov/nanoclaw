@@ -150,6 +150,7 @@ describe('routeAgentMessage return-path', () => {
       target_type: 'agent',
       target_id: B,
       created_at: now(),
+      created_by: null,
     });
     createDestination({
       agent_group_id: B,
@@ -157,6 +158,7 @@ describe('routeAgentMessage return-path', () => {
       target_type: 'agent',
       target_id: A,
       created_at: now(),
+      created_by: null,
     });
   });
 
@@ -316,7 +318,14 @@ describe('routeAgentMessage return-path', () => {
     };
     createSession(SC);
     initSessionFolder(C, SC.id);
-    createDestination({ agent_group_id: C, local_name: 'b', target_type: 'agent', target_id: B, created_at: now() });
+    createDestination({
+      agent_group_id: C,
+      local_name: 'b',
+      target_type: 'agent',
+      target_id: B,
+      created_at: now(),
+      created_by: null,
+    });
 
     await routeAgentMessage(
       { id: 'msg-from-C', platform_id: B, content: JSON.stringify({ text: 'from C' }), in_reply_to: null },

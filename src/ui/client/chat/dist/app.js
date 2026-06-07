@@ -21705,12 +21705,14 @@ function GroupAdmin() {
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "models" ? "active" : "", onClick: () => setTab("models"), children: "Models" }),
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "settings" ? "active" : "", onClick: () => setTab("settings"), children: "Settings" }),
       /* @__PURE__ */ u4("button", { type: "button", class: tab === "members" ? "active" : "", onClick: () => setTab("members"), children: "Members" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" })
+      /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: tab === "destinations" ? "active" : "", onClick: () => setTab("destinations"), children: "Destinations" })
     ] }),
     /* @__PURE__ */ u4("div", { class: "settings-body", children: [
       tab === "models" || tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: hardClose, onActions: setActions }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
-      tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null
+      tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null,
+      tab === "destinations" ? /* @__PURE__ */ u4(DestinationsTab, { gid }) : null
     ] }),
     closeConfirmOpen ? /* @__PURE__ */ u4(
       "div",
@@ -22428,6 +22430,141 @@ function RolesTab({ gid }) {
         onPick: grant
       }
     )
+  ] });
+}
+function DestinationsTab({ gid }) {
+  const [destinations, setDestinations] = h2(null);
+  const [adding, setAdding] = h2(false);
+  const [busy, setBusy] = h2(false);
+  async function refresh() {
+    const r4 = await call(apiPath(gid, "/destinations"));
+    if (!r4.ok) {
+      showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+      return;
+    }
+    setDestinations(r4.data.destinations);
+  }
+  y2(() => {
+    refresh();
+  }, [gid]);
+  async function remove(d5) {
+    if (!confirm(`Remove destination "${d5.localName}"?`)) return;
+    setBusy(true);
+    try {
+      const r4 = await call(apiPath(gid, `/destinations/${encodeURIComponent(d5.localName)}`), "DELETE");
+      if (!r4.ok) {
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      showToast("Destination removed");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!destinations) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading\u2026" });
+  return /* @__PURE__ */ u4("section", { children: [
+    /* @__PURE__ */ u4("p", { class: "muted", children: "Destinations are the names this agent uses to route messages \u2014 either to channels (auto-managed) or to other agent groups (added here). Adding an agent link as an admin of both groups applies immediately; otherwise an admin of the target group is asked to approve." }),
+    destinations.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No destinations yet." }) : /* @__PURE__ */ u4("table", { class: "settings-table", children: [
+      /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("th", { children: "Name" }),
+        /* @__PURE__ */ u4("th", { children: "Type" }),
+        /* @__PURE__ */ u4("th", { children: "Target" }),
+        /* @__PURE__ */ u4("th", {})
+      ] }) }),
+      /* @__PURE__ */ u4("tbody", { children: destinations.map((d5) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { children: d5.localName }) }),
+        /* @__PURE__ */ u4("td", { children: d5.targetType }),
+        /* @__PURE__ */ u4("td", { children: d5.targetType === "agent" ? d5.targetName ?? /* @__PURE__ */ u4("code", { class: "muted", children: d5.targetId }) : /* @__PURE__ */ u4("code", { class: "muted", children: d5.targetId }) }),
+        /* @__PURE__ */ u4("td", { children: d5.targetType === "agent" ? /* @__PURE__ */ u4("button", { type: "button", class: "danger", disabled: busy, onClick: () => remove(d5), children: "Remove" }) : /* @__PURE__ */ u4("span", { class: "muted", children: "channel" }) })
+      ] }, d5.localName)) })
+    ] }),
+    /* @__PURE__ */ u4("h4", { children: "Add an agent link" }),
+    adding ? /* @__PURE__ */ u4(AddDestinationForm, { gid, onCancel: () => setAdding(false), onDone: () => {
+      setAdding(false);
+      refresh();
+    } }) : /* @__PURE__ */ u4("button", { type: "button", onClick: () => setAdding(true), children: "Link another agent\u2026" })
+  ] });
+}
+function AddDestinationForm({ gid, onCancel, onDone }) {
+  const [candidates, setCandidates] = h2(null);
+  const [targetId, setTargetId] = h2("");
+  const [localName, setLocalName] = h2("");
+  const [alsoReverse, setAlsoReverse] = h2(false);
+  const [busy, setBusy] = h2(false);
+  y2(() => {
+    (async () => {
+      const r4 = await call(apiPath(gid, "/destinations/candidates"));
+      if (!r4.ok) {
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      setCandidates(r4.data.candidates);
+    })();
+  }, [gid]);
+  const selected = candidates?.find((c4) => c4.id === targetId) ?? null;
+  async function submit(e4) {
+    e4.preventDefault();
+    if (!targetId || !localName.trim()) return;
+    setBusy(true);
+    try {
+      const r4 = await call(
+        apiPath(gid, "/destinations"),
+        "POST",
+        { targetAgentGroupId: targetId, localName: localName.trim(), alsoReverse }
+      );
+      if (!r4.ok) {
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      showToast(r4.data.status === "applied" ? "Destination added" : "Approval requested");
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!candidates) return /* @__PURE__ */ u4("p", { class: "muted", children: "Loading candidates\u2026" });
+  if (candidates.length === 0) return /* @__PURE__ */ u4("div", { children: [
+    /* @__PURE__ */ u4("p", { class: "muted", children: "No eligible target groups. You must be an admin (or member, when admin-on-target) of another agent group to link it." }),
+    /* @__PURE__ */ u4("button", { type: "button", onClick: onCancel, children: "Cancel" })
+  ] });
+  return /* @__PURE__ */ u4("form", { onSubmit: submit, children: [
+    /* @__PURE__ */ u4("label", { children: [
+      "Target agent group",
+      /* @__PURE__ */ u4("select", { value: targetId, onChange: (e4) => setTargetId(e4.target.value), disabled: busy, children: [
+        /* @__PURE__ */ u4("option", { value: "", children: "\u2014 select \u2014" }),
+        candidates.map((c4) => /* @__PURE__ */ u4("option", { value: c4.id, children: [
+          c4.name,
+          c4.adminOnTarget ? "" : " (needs approval)"
+        ] }, c4.id))
+      ] })
+    ] }),
+    /* @__PURE__ */ u4("label", { children: [
+      "Local name",
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          value: localName,
+          onInput: (e4) => setLocalName(e4.target.value),
+          placeholder: selected?.folder ?? "e.g. research-bot",
+          disabled: busy
+        }
+      )
+    ] }),
+    /* @__PURE__ */ u4("label", { class: "ga-checkbox", children: [
+      /* @__PURE__ */ u4("input", { type: "checkbox", checked: alsoReverse, onChange: (e4) => setAlsoReverse(e4.target.checked), disabled: busy }),
+      "Also create reverse link (target agent can send back to this one)"
+    ] }),
+    selected && !selected.adminOnTarget ? /* @__PURE__ */ u4("p", { class: "muted", children: [
+      'You are not an admin of "',
+      selected.name,
+      '" \u2014 an admin of that group will be asked to approve this link.'
+    ] }) : null,
+    /* @__PURE__ */ u4("div", { class: "settings-actions", children: [
+      /* @__PURE__ */ u4("button", { type: "submit", disabled: busy || !targetId || !localName.trim(), children: selected?.adminOnTarget ? "Add" : "Request" }),
+      /* @__PURE__ */ u4("button", { type: "button", onClick: onCancel, disabled: busy, children: "Cancel" })
+    ] })
   ] });
 }
 function UserPicker({
