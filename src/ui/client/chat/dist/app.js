@@ -22592,20 +22592,22 @@ function AddDestinationForm({ gid, onCancel, onDone }) {
     /* @__PURE__ */ u4("p", { class: "muted", children: "No eligible target groups. You must be an admin (or member, when admin-on-target) of another agent group to link it." }),
     /* @__PURE__ */ u4("button", { type: "button", onClick: onCancel, children: "Cancel" })
   ] });
+  const options = candidates.map((c4) => ({
+    value: c4.id,
+    label: c4.name,
+    detail: c4.adminOnTarget ? c4.folder : `${c4.folder} \xB7 needs approval`,
+    tooltip: c4.adminOnTarget ? `You are an admin of "${c4.name}". Linking will apply immediately.` : `You are not an admin of "${c4.name}". An admin of that group will be asked to approve the link.`
+  }));
   return /* @__PURE__ */ u4("form", { onSubmit: submit, class: "ga-add-link-form", children: [
     /* @__PURE__ */ u4(Field, { label: "Target agent group", children: /* @__PURE__ */ u4(
-      "select",
+      Combobox,
       {
-        value: targetId,
-        onChange: (e4) => setTargetId(e4.target.value),
+        value: targetId || null,
+        options,
+        placeholder: "Search by name or id\u2026",
         disabled: busy,
-        children: [
-          /* @__PURE__ */ u4("option", { value: "", children: "\u2014 select \u2014" }),
-          candidates.map((c4) => /* @__PURE__ */ u4("option", { value: c4.id, children: [
-            c4.name,
-            c4.adminOnTarget ? "" : " (needs approval)"
-          ] }, c4.id))
-        ]
+        freeform: false,
+        onChange: (v5) => setTargetId(v5 ?? "")
       }
     ) }),
     /* @__PURE__ */ u4(Field, { label: "Local name", children: /* @__PURE__ */ u4(

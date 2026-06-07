@@ -1185,19 +1185,26 @@ function AddDestinationForm({ gid, onCancel, onDone }: { gid: string; onCancel: 
     </div>
   );
 
+  const options: ComboboxOption[] = candidates.map((c) => ({
+    value: c.id,
+    label: c.name,
+    detail: c.adminOnTarget ? c.folder : `${c.folder} · needs approval`,
+    tooltip: c.adminOnTarget
+      ? `You are an admin of "${c.name}". Linking will apply immediately.`
+      : `You are not an admin of "${c.name}". An admin of that group will be asked to approve the link.`,
+  }));
+
   return (
     <form onSubmit={submit} class="ga-add-link-form">
       <Field label="Target agent group">
-        <select
-          value={targetId}
-          onChange={(e) => setTargetId((e.target as HTMLSelectElement).value)}
+        <Combobox
+          value={targetId || null}
+          options={options}
+          placeholder="Search by name or id…"
           disabled={busy}
-        >
-          <option value="">— select —</option>
-          {candidates.map((c) => (
-            <option value={c.id} key={c.id}>{c.name}{c.adminOnTarget ? '' : ' (needs approval)'}</option>
-          ))}
-        </select>
+          freeform={false}
+          onChange={(v) => setTargetId(v ?? '')}
+        />
       </Field>
       <Field label="Local name">
         <input
