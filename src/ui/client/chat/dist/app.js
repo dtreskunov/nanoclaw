@@ -22003,6 +22003,15 @@ function SettingsTab({ gid, section, onClose, onActions }) {
             }
           )
         }
+      ),
+      /* @__PURE__ */ u4(
+        ModelParamsEditor,
+        {
+          gid,
+          provider: draft.provider,
+          initial: data.modelParams,
+          onSaved: (next) => setData((d5) => d5 ? { ...d5, modelParams: next } : d5)
+        }
       )
     ] }) : null,
     section === "settings" ? /* @__PURE__ */ u4(k, { children: [
@@ -22712,6 +22721,196 @@ function UserPicker({
     ) }, u5.userId)) }) : null,
     !searching && q5 && visible.length === 0 ? /* @__PURE__ */ u4("p", { class: "muted", children: "No matches." }) : null
   ] });
+}
+var MODEL_PARAM_RECOGNIZED = {
+  opencode: ["max_tokens", "temperature", "top_p", "top_k", "frequency_penalty", "presence_penalty", "seed", "stop"],
+  claude: ["max_tokens", "thinking_budget_tokens"]
+};
+var MODEL_PARAM_KEY_RE = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+var _rowUid = 0;
+function nextRowUid() {
+  _rowUid += 1;
+  return _rowUid;
+}
+function paramsToRows(params) {
+  return Object.entries(params).map(([k4, v5]) => ({
+    uid: nextRowUid(),
+    key: k4,
+    // Stringify in a JSON-roundtrippable form so the user can edit & resave.
+    valueText: typeof v5 === "string" ? v5 : JSON.stringify(v5)
+  }));
+}
+function rowsEqualParams(rows, params) {
+  const keys = Object.keys(params);
+  if (rows.length !== keys.length) return false;
+  for (const r4 of rows) {
+    if (!(r4.key in params)) return false;
+    const stored = params[r4.key];
+    const storedText = typeof stored === "string" ? stored : JSON.stringify(stored);
+    if (storedText !== r4.valueText) return false;
+  }
+  return true;
+}
+function parseRowValue(raw) {
+  const trimmed = raw.trim();
+  if (trimmed === "") return "";
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return raw;
+  }
+}
+function ModelParamsEditor({
+  gid,
+  provider,
+  initial,
+  onSaved
+}) {
+  const [rows, setRows] = h2(() => paramsToRows(initial));
+  const [busy, setBusy] = h2(false);
+  y2(() => {
+    setRows(paramsToRows(initial));
+  }, [initial]);
+  const recognized = provider ? MODEL_PARAM_RECOGNIZED[provider] ?? [] : [];
+  function update(uid, patch) {
+    setRows((rs) => rs.map((r4) => r4.uid === uid ? { ...r4, ...patch } : r4));
+  }
+  function remove(uid) {
+    setRows((rs) => rs.filter((r4) => r4.uid !== uid));
+  }
+  function addBlank(presetKey = "") {
+    setRows((rs) => [...rs, { uid: nextRowUid(), key: presetKey, valueText: "" }]);
+  }
+  const dirty = !rowsEqualParams(rows, initial);
+  const issues = [];
+  const seenKeys = /* @__PURE__ */ new Set();
+  for (const r4 of rows) {
+    const k4 = r4.key.trim();
+    if (k4 === "" && r4.valueText.trim() === "") continue;
+    if (k4 === "") {
+      issues.push("A row is missing a key.");
+      continue;
+    }
+    if (!MODEL_PARAM_KEY_RE.test(k4)) {
+      issues.push(`Invalid key "${k4}".`);
+      continue;
+    }
+    if (seenKeys.has(k4)) {
+      issues.push(`Duplicate key "${k4}".`);
+      continue;
+    }
+    seenKeys.add(k4);
+  }
+  const canSave = dirty && issues.length === 0 && !busy;
+  async function save() {
+    setBusy(true);
+    try {
+      const params = {};
+      for (const r5 of rows) {
+        const k4 = r5.key.trim();
+        if (k4 === "" && r5.valueText.trim() === "") continue;
+        params[k4] = parseRowValue(r5.valueText);
+      }
+      const r4 = await call(
+        apiPath(gid, "/model-params"),
+        "PATCH",
+        { params }
+      );
+      if (!r4.ok) {
+        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+        return;
+      }
+      onSaved(r4.data.modelParams);
+      showToast("Saved. Restart sessions for the change to take effect.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function reset() {
+    setRows(paramsToRows(initial));
+  }
+  const suggestions = recognized.filter((k4) => !rows.some((r4) => r4.key.trim() === k4));
+  return /* @__PURE__ */ u4(
+    Field,
+    {
+      label: "Model parameters",
+      info: 'Per-group knobs passed to the provider when it builds requests (max_tokens, temperature, \u2026).\nValues are parsed as JSON first (so 8192 is a number, "high" is a string, true is a boolean), then fall back to a plain string if JSON parsing fails.\nChanges take effect on next container restart. Providers warn once per startup about keys they do not recognize.',
+      children: /* @__PURE__ */ u4("div", { class: "group-admin-stack ga-model-params", children: [
+        rows.length === 0 ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "No parameters set \u2014 using provider defaults." }) : /* @__PURE__ */ u4("ul", { class: "ga-mp-list", children: rows.map((r4) => {
+          const trimmedKey = r4.key.trim();
+          const isRecognized = trimmedKey !== "" && recognized.includes(trimmedKey);
+          return /* @__PURE__ */ u4("li", { class: "ga-mp-row", children: [
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "text",
+                class: `ga-mp-key${trimmedKey !== "" && !isRecognized && recognized.length > 0 ? " ga-mp-key-unknown" : ""}`,
+                placeholder: "key (e.g. max_tokens)",
+                value: r4.key,
+                disabled: busy,
+                list: `ga-mp-keys-${gid}`,
+                onInput: (e4) => update(r4.uid, { key: e4.currentTarget.value })
+              }
+            ),
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "text",
+                class: "ga-mp-value",
+                placeholder: "value (JSON or string)",
+                value: r4.valueText,
+                disabled: busy,
+                onInput: (e4) => update(r4.uid, { valueText: e4.currentTarget.value })
+              }
+            ),
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: "icon-btn",
+                "aria-label": "Remove",
+                disabled: busy,
+                onClick: () => remove(r4.uid),
+                children: "\u2715"
+              }
+            )
+          ] }, r4.uid);
+        }) }),
+        /* @__PURE__ */ u4("datalist", { id: `ga-mp-keys-${gid}`, children: recognized.map((k4) => /* @__PURE__ */ u4("option", { value: k4 }, k4)) }),
+        /* @__PURE__ */ u4("div", { class: "ga-mp-actions", children: [
+          /* @__PURE__ */ u4("button", { type: "button", disabled: busy, onClick: () => addBlank(), children: "+ Add parameter" }),
+          suggestions.length > 0 ? /* @__PURE__ */ u4("span", { class: "ga-mp-suggest", children: [
+            /* @__PURE__ */ u4("span", { class: "group-admin-help", children: [
+              "Common for ",
+              provider,
+              ":"
+            ] }),
+            suggestions.map((k4) => /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: "ga-mp-suggest-chip",
+                disabled: busy,
+                onClick: () => addBlank(k4),
+                title: `Add ${k4}`,
+                children: [
+                  "+ ",
+                  k4
+                ]
+              },
+              k4
+            ))
+          ] }) : null
+        ] }),
+        issues.length > 0 ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: issues[0] }) : null,
+        dirty ? /* @__PURE__ */ u4("div", { class: "ga-mp-save", children: [
+          /* @__PURE__ */ u4("button", { type: "button", disabled: busy, onClick: reset, children: "Reset" }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "primary", disabled: !canSave, onClick: save, children: busy ? "Saving\u2026" : "Save parameters" }),
+          /* @__PURE__ */ u4(Tooltip, { text: "Saving updates model_params immediately, but the running container won't pick it up until you restart it (Settings \u2192 Restart, or `ncl groups restart`).", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
+        ] }) : null
+      ] })
+    }
+  );
 }
 
 // src/panels.ts
