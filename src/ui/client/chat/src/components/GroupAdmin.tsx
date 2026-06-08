@@ -9,6 +9,7 @@ import {
   groupAdminOpen,
   groupId,
   groups,
+  isMobile,
 } from '../state';
 import { selectGroup } from '../actions';
 import { Combobox, type ComboboxOption } from './Combobox';
@@ -16,8 +17,17 @@ import { ModelSelector } from './ModelSelector';
 import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
+import { TabBar, type TabItem } from './TabBar';
 
 type Tab = 'models' | 'settings' | 'members' | 'roles' | 'destinations';
+
+const TAB_ITEMS: TabItem[] = [
+  { id: 'models', label: 'Models', sublabel: 'Provider, model, voice' },
+  { id: 'settings', label: 'Settings', sublabel: 'Image, scope, public site' },
+  { id: 'members', label: 'Members', sublabel: 'Who can use this group' },
+  { id: 'roles', label: 'Admins', sublabel: 'Admins for this group' },
+  { id: 'destinations', label: 'Destinations', sublabel: 'Where this group can send messages' },
+];
 
 interface HeaderActions {
   refresh: () => void;
@@ -169,11 +179,17 @@ function userLabel(u: { displayName?: string | null; primaryHandle?: string | nu
 export function GroupAdmin(): JSX.Element | null {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
-  const [tab, setTab] = useState<Tab>('models');
+  const mobile = isMobile.value;
+  // On mobile we open into a section list (no section selected). Desktop
+  // always has an active tab so the body is never empty.
+  const [tab, setTab] = useState<Tab | null>(() => (isMobile.value ? null : 'models'));
   const actionsRef = useRef<HeaderActions | null>(null);
   const [, forceRender] = useState(0);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
-  useEffect(() => { setTab('models'); setCloseConfirmOpen(false); }, [open, gid]);
+  useEffect(() => {
+    setTab(isMobile.value ? null : 'models');
+    setCloseConfirmOpen(false);
+  }, [open, gid]);
   useBackButtonCloses(open, () => { groupAdminOpen.value = false; });
 
   if (!open || !gid) return null;
@@ -218,20 +234,39 @@ export function GroupAdmin(): JSX.Element | null {
             <button type="button" class="icon-btn" aria-label="Close" onClick={attemptClose}>{'\u2715'}</button>
           </div>
         </header>
-        <nav class="group-admin-tabs">
-          <button type="button" class={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}>Models</button>
-          <button type="button" class={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
-          <button type="button" class={tab === 'members' ? 'active' : ''} onClick={() => setTab('members')}>Members</button>
-          <button type="button" class={tab === 'roles' ? 'active' : ''} onClick={() => setTab('roles')}>Admins</button>
-          <button type="button" class={tab === 'destinations' ? 'active' : ''} onClick={() => setTab('destinations')}>Destinations</button>
-        </nav>
+        {!mobile ? (
+          <TabBar
+            ariaLabel="Group settings sections"
+            mobileSheetTitle="Settings sections"
+            activeId={tab}
+            items={TAB_ITEMS}
+            onSelect={(id) => setTab(id as Tab)}
+            className="group-admin-tab-bar"
+          />
+        ) : null}
         <div class="settings-body">
-          {(tab === 'models' || tab === 'settings')
-            ? <SettingsTab gid={gid} section={tab} onClose={hardClose} onActions={setActions} />
-            : null}
-          {tab === 'members' ? <MembersTab gid={gid} /> : null}
-          {tab === 'roles' ? <RolesTab gid={gid} /> : null}
-          {tab === 'destinations' ? <DestinationsTab gid={gid} /> : null}
+          {mobile && tab === null ? (
+            <MobileSectionList items={TAB_ITEMS} onSelect={(id) => setTab(id as Tab)} />
+          ) : (
+            <>
+              {mobile && tab !== null ? (
+                <button
+                  type="button"
+                  class="group-admin-back"
+                  onClick={() => setTab(null)}
+                  aria-label="Back to sections"
+                >
+                  <span aria-hidden="true">{'\u2039'}</span> Sections
+                </button>
+              ) : null}
+              {(tab === 'models' || tab === 'settings')
+                ? <SettingsTab gid={gid} section={tab} onClose={hardClose} onActions={setActions} />
+                : null}
+              {tab === 'members' ? <MembersTab gid={gid} /> : null}
+              {tab === 'roles' ? <RolesTab gid={gid} /> : null}
+              {tab === 'destinations' ? <DestinationsTab gid={gid} /> : null}
+            </>
+          )}
         </div>
         {closeConfirmOpen ? (
           <div
@@ -265,6 +300,28 @@ export function GroupAdmin(): JSX.Element | null {
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+// Mobile-only: vertical list of section rows shown as the modal body
+// before the user has drilled into a section.
+function MobileSectionList({ items, onSelect }: { items: TabItem[]; onSelect: (id: string) => void }): JSX.Element {
+  return (
+    <div class="group-admin-section-list" role="list">
+      {items.map((it) => (
+        <button
+          type="button"
+          key={it.id}
+          role="listitem"
+          class="group-admin-section-row"
+          onClick={() => onSelect(it.id)}
+        >
+          <span class="group-admin-section-name">{it.label}</span>
+          {it.sublabel ? <span class="group-admin-section-sub">{it.sublabel}</span> : null}
+          <span class="group-admin-section-caret" aria-hidden="true">{'\u203A'}</span>
+        </button>
+      ))}
     </div>
   );
 }

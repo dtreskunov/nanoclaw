@@ -1,49 +1,89 @@
 /* Per-group admin modal — extends Settings modal chrome. */
 
-/* Tab strip styled like the top group rail: flat inactive tabs,
-   lifted active tab that overlaps the bottom border. */
-.group-admin-tabs {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  padding: 0 8px;
+/* Section selector. On desktop it's a horizontal TabBar strip; on
+   mobile the TabBar is omitted entirely and the body itself acts as a
+   drill-in section list (see `.group-admin-section-list` below). The
+   strip variant gets the modal-head tint to blend with the header. */
+.tab-bar-strip.group-admin-tab-bar {
   background: var(--head-tint);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: -1px;
-  position: relative;
-  z-index: 1;
+  padding: 0 8px;
 }
-.group-admin-tabs button {
-  position: relative;
+/* Sublabels on TAB_ITEMS are mobile-only hints for the section list;
+   they'd be visual clutter in the desktop tab strip. */
+.tab-bar-strip.group-admin-tab-bar .tab-item-sublabel {
+  display: none;
+}
+
+/* Mobile drill-in section list — shown as the modal body when no
+   section is selected. Each row: bold label + muted hint sublabel +
+   chevron, tap to enter that section. */
+.group-admin-section-list {
+  display: flex;
+  flex-direction: column;
+}
+.group-admin-section-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 14px 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  min-height: 64px;
+  font: inherit;
+}
+.group-admin-section-row:hover,
+.group-admin-section-row:focus-visible {
+  background: var(--wash-subtle);
+  outline: none;
+}
+.group-admin-section-name {
+  grid-column: 1;
+  grid-row: 1;
+  font-weight: 600;
+}
+.group-admin-section-sub {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+.group-admin-section-caret {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Back link shown above a drilled-in section on mobile. Foreground
+   colour (not --accent — that's a low-alpha wash) with an underline
+   on hover so it reads as a link without being garish. */
+.group-admin-back {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 6px 14px;
-  min-height: 32px;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  gap: 4px;
   background: transparent;
-  color: var(--muted);
+  border: 0;
+  color: inherit;
+  padding: 4px 6px;
+  margin: -4px 0 8px -6px;
   font: inherit;
-  font-size: var(--font-base);
-  font-weight: 500;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
-.group-admin-tabs button:not(.active):hover {
-  background: var(--wash-soft);
-  color: var(--surface-fg);
+.group-admin-back:hover {
+  text-decoration: underline;
 }
-.group-admin-tabs button.active {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--surface-fg);
-  font-weight: 600;
-  /* Step 1px below the strip baseline so the chip overlaps the border. */
-  margin-bottom: -1px;
-  padding-bottom: 7px;
-  z-index: 2;
+.group-admin-back:focus-visible {
+  outline: 2px solid var(--accent-strong, #4f8cff);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .group-admin-field {
