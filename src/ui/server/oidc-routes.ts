@@ -35,6 +35,7 @@ import { requestUserApproval } from '../../modules/permissions/user-approval.js'
 import { buildSessionCookie, createUiSessionForUser } from './auth.js';
 import { getBranding } from './branding.js';
 import { getOidcProvider, listConfiguredProviders } from './oidc/registry.js';
+import { postLoginRedirect } from './onboarding.js';
 
 const STATE_COOKIE = 'oidc_state';
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -435,8 +436,9 @@ async function handleCallback(
 
 function completeLogin(res: http.ServerResponse, userId: string, next: string, secureCookie: boolean): void {
   const session = createUiSessionForUser(userId);
+  const destination = postLoginRedirect(userId, next);
   res.writeHead(303, {
-    Location: next,
+    Location: destination,
     'Set-Cookie': [buildSessionCookie(session.token, secureCookie), clearStateCookie(secureCookie)],
   });
   res.end();

@@ -65,16 +65,20 @@ export interface MessagingGroup {
 // ── Identity & privilege ──
 
 /**
- * User = a messaging-platform identifier. Namespaced so distinct channels
- * with numeric IDs don't collide: "phone:+1555...", "tg:123", "discord:456",
- * "email:a@x.com". A single human with a phone AND a telegram handle has
- * two separate users — no cross-channel linking (yet).
+ * User = a person. `id` is an opaque UUID v4 generated server-side — never
+ * construct it from a channel handle. Channel handles live in the separate
+ * `identities` table ((channel, handle) → user_id), and a single human may
+ * own many: a phone, a telegram handle, and a web (OIDC) login can all map
+ * to one user. Link channels via the UI settings flow or a channel deep-link
+ * claim (see src/modules/permissions/identity-claim.ts).
  */
 export interface User {
   id: string;
-  kind: string; // 'phone' | 'email' | 'discord' | 'telegram' | 'matrix' | ...
+  kind: string; // primary channel type, informational: 'phone' | 'email' | 'discord' | ...
   display_name: string | null;
   created_at: string;
+  /** Timestamp when the user completed first-login onboarding (NULL = pending). */
+  onboarded_at?: string | null;
 }
 
 export type UserRoleKind = 'owner' | 'admin';

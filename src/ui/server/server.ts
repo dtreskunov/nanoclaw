@@ -25,6 +25,7 @@ import {
 } from './auth.js';
 import { purgeExpired } from './db.js';
 import { handleOidcRoute, renderLoginPage } from './oidc-routes.js';
+import { handleOnboarding } from './onboarding.js';
 import { handleSettings } from './settings.js';
 import { handle as chatHandle, CHAT_MOUNT_PREFIX, handleChatUpgrade } from './chat/routes.js';
 
@@ -106,6 +107,14 @@ export function startUi(): void {
 
   // Settings (identity linking, etc.) — server-rendered, no SPA.
   mountHandler(`${UI_MOUNT_PREFIX}/settings`, withAccessLog('settings', handleSettings));
+
+  // First-login onboarding wizard (splash + display name / agent naming).
+  // Server-rendered, mounted outside the chat SPA so completeLogin can
+  // redirect here before the user ever loads the chat bundle.
+  mountHandler(
+    `${UI_MOUNT_PREFIX}/onboarding`,
+    withAccessLog('onboarding', (req, res) => handleOnboarding(req, res)),
+  );
 
   // Root convenience redirect — '/' → chat. Only fires on exact '/' because
   // the mount matcher requires `pathname === prefix || startsWith(prefix + '/')`,

@@ -33,6 +33,17 @@ export function updateDisplayName(id: string, displayName: string): void {
   getDb().prepare('UPDATE users SET display_name = ? WHERE id = ?').run(displayName, id);
 }
 
+export function isUserOnboarded(id: string): boolean {
+  const row = getDb().prepare('SELECT onboarded_at FROM users WHERE id = ?').get(id) as
+    | { onboarded_at: string | null }
+    | undefined;
+  return !!row?.onboarded_at;
+}
+
+export function markUserOnboarded(id: string): void {
+  getDb().prepare("UPDATE users SET onboarded_at = COALESCE(onboarded_at, datetime('now')) WHERE id = ?").run(id);
+}
+
 export function deleteUser(id: string): void {
   getDb().prepare('DELETE FROM users WHERE id = ?').run(id);
 }
