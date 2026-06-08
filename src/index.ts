@@ -13,6 +13,8 @@ import { migrateGroupsToClaudeLocal } from './claude-md-compose.js';
 import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
+import { adoptRunningContainers } from './container-runner.js';
+import { getActiveSessions } from './db/sessions.js';
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
 import { createDeliveryBridge } from './delivery-bridge.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
@@ -86,7 +88,13 @@ async function main(): Promise<void> {
 
   // 2. Container runtime
   ensureContainerRuntimeRunning();
-  cleanupOrphans();
+  // Reconcile containers from the previous host run: adopt any whose
+  // session is still active (preserves in-flight turn state across
+  // graceful host restarts), stop the rest. See container-runner.ts:
+  // adoptRunningContainers for why the adoption side is needed.
+  const activeSessionIds = new Set(getActiveSessions().map((s) => s.id));
+  const adopted = cleanupOrphans((sid) => activeSessionIds.has(sid));
+  adoptRunningContainers(adopted);
 
   // 3. Channel adapters
   await initChannelAdapters((adapter: ChannelAdapter): ChannelSetup => {

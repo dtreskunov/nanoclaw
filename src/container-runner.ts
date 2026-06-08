@@ -58,7 +58,10 @@ import type { AgentGroup, Session } from './types.js';
 const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
 
 /** Active containers tracked by session ID. */
-const activeContainers = new Map<string, { process: ChildProcess; containerName: string }>();
+const activeContainers = new Map<
+  string,
+  { process: ChildProcess; containerName: string; adopted?: boolean }
+>();
 
 /**
  * In-flight wake promises, keyed by session id. Deduplicates concurrent
@@ -158,6 +161,7 @@ async function spawnContainer(session: Session): Promise<void> {
     provider,
     contribution,
     agentIdentifier,
+    session.id,
   );
 
   log.info('Spawning container', { sessionId: session.id, agentGroup: agentGroup.name, containerName });
@@ -249,7 +253,68 @@ export function killContainer(sessionId: string, reason: string, onExit?: () => 
   try {
     stopContainer(entry.containerName);
   } catch {
-    entry.process.kill('SIGKILL');
+    if (entry.adopted) {
+      // Adopted entries' process is a `docker wait` watcher — killing it
+      // doesn't stop the container, so fall back to `docker kill <name>`.
+      try {
+        execSync(`docker kill ${entry.containerName}`, { stdio: 'pipe' });
+      } catch (err) {
+        log.warn('docker kill fallback failed for adopted container', {
+          sessionId,
+          containerName: entry.containerName,
+          err,
+        });
+      }
+    } else {
+      entry.process.kill('SIGKILL');
+    }
+  }
+}
+
+/**
+ * Re-attach to containers that survived a host restart.
+ *
+ * For each `{ name, sessionId }` returned by `cleanupOrphans`, spawn a
+ * `docker wait <name>` watcher and register it in `activeContainers`.
+ * The watcher exits when the container exits, so the existing close
+ * lifecycle (markContainerStopped + map cleanup + typing refresh stop)
+ * fires identically to a freshly-spawned container.
+ *
+ * Without this, `isContainerRunning(sessionId)` would return false after
+ * host restart (the map is empty), host-sweep would think no container is
+ * running, and `wakeContainer` would spawn a SECOND container against the
+ * same session DB — two writers on outbound.db, racy double-replies.
+ */
+export function adoptRunningContainers(adopt: Array<{ name: string; sessionId: string }>): void {
+  for (const { name, sessionId } of adopt) {
+    if (activeContainers.has(sessionId)) {
+      // Should not happen on startup (map is empty), but be safe.
+      log.warn('Skipping adoption — session already has an active container', {
+        sessionId,
+        containerName: name,
+      });
+      continue;
+    }
+    // `docker wait` blocks on stdout until the container exits, then prints
+    // the exit code. We don't care about the output — only the process's
+    // close event, which fires when the container is gone.
+    const watcher = spawn(CONTAINER_RUNTIME_BIN, ['wait', name], { stdio: 'ignore' });
+    activeContainers.set(sessionId, { process: watcher, containerName: name, adopted: true });
+    markContainerRunning(sessionId);
+
+    watcher.on('close', (code) => {
+      activeContainers.delete(sessionId);
+      markContainerStopped(sessionId);
+      stopTypingRefresh(sessionId);
+      log.info('Adopted container exited', { sessionId, code, containerName: name });
+    });
+
+    watcher.on('error', (err) => {
+      activeContainers.delete(sessionId);
+      markContainerStopped(sessionId);
+      stopTypingRefresh(sessionId);
+      log.error('Adopted container watcher error', { sessionId, containerName: name, err });
+    });
   }
 }
 
@@ -495,9 +560,26 @@ async function buildContainerArgs(
   containerConfig: import('./container-config.js').ContainerConfig,
   provider: string,
   providerContribution: ProviderContainerContribution,
-  agentIdentifier?: string,
+  agentIdentifier: string | undefined,
+  sessionId: string,
 ): Promise<string[]> {
-  const args: string[] = ['run', '--rm', '--name', containerName, '--label', CONTAINER_INSTALL_LABEL];
+  // Session/agent-group labels let `adoptRunningContainers` (called at host
+  // startup) match each running container back to its session in the DB.
+  // Without these labels, a graceful host restart can't tell which surviving
+  // container belongs to which session and would either kill them all
+  // (losing in-flight turn state) or risk spawning duplicates.
+  const args: string[] = [
+    'run',
+    '--rm',
+    '--name',
+    containerName,
+    '--label',
+    CONTAINER_INSTALL_LABEL,
+    '--label',
+    `nanoclaw-session=${sessionId}`,
+    '--label',
+    `nanoclaw-agent-group=${agentGroup.id}`,
+  ];
 
   // Rootless Podman: UID 0 inside the container maps to the host user
   // (e.g. denis/1000). The Dockerfile sets USER node (UID 1000) which would

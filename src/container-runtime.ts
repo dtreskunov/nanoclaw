@@ -138,33 +138,69 @@ export function ensureContainerRuntimeRunning(): void {
 }
 
 /**
- * Kill orphaned NanoClaw containers from THIS install's previous runs.
+ * Reconcile containers from THIS install left behind by a previous host run.
  *
- * Scoped by label `nanoclaw-install=<slug>` so a crash-looping peer install
- * cannot reap our containers, and we cannot reap theirs. The label is
- * stamped onto every container at spawn time — see container-runner.ts.
+ * Each container is stamped at spawn time with `nanoclaw-session=<id>`
+ * (see container-runner.ts). On startup we:
+ *
+ *   1. List containers labeled with our install slug
+ *      (`nanoclaw-install=<slug>`).
+ *   2. For each, read the `nanoclaw-session` label.
+ *   3. If that session is still live (predicate returns true) — return it
+ *      as "adopt": the host re-attaches via a `docker wait` watcher so the
+ *      in-flight turn state inside the container is preserved across the
+ *      restart. The caller (container-runner) handles the attach.
+ *   4. Otherwise — stop the container.
+ *
+ * Scoping by install label means a crash-looping peer install cannot reap
+ * our containers and we cannot reap theirs.
+ *
+ * Returns the set of containers the caller should adopt. Never throws.
  */
-export function cleanupOrphans(): void {
+export interface RunningContainer {
+  name: string;
+  sessionId: string;
+}
+
+export function cleanupOrphans(isSessionLive: (sessionId: string) => boolean): RunningContainer[] {
+  const adopt: RunningContainer[] = [];
   try {
+    // Tab-separated so we can split safely; container names can't contain
+    // tabs. The Go template needs the field name in quotes for `--format`.
     const output = execSync(
-      `${CONTAINER_RUNTIME_BIN} ps --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}'`,
+      `${CONTAINER_RUNTIME_BIN} ps --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}\t{{.Label "nanoclaw-session"}}'`,
       {
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf-8',
       },
     );
-    const orphans = output.trim().split('\n').filter(Boolean);
-    for (const name of orphans) {
+    const lines = output.trim().split('\n').filter(Boolean);
+    const stopped: string[] = [];
+    for (const line of lines) {
+      const [name, sessionId] = line.split('\t');
+      if (!name) continue;
+      if (sessionId && isSessionLive(sessionId)) {
+        adopt.push({ name, sessionId });
+        continue;
+      }
       try {
         stopContainer(name);
+        stopped.push(name);
       } catch {
         /* already stopped */
       }
     }
-    if (orphans.length > 0) {
-      log.info('Stopped orphaned containers', { count: orphans.length, names: orphans });
+    if (stopped.length > 0) {
+      log.info('Stopped orphaned containers', { count: stopped.length, names: stopped });
+    }
+    if (adopt.length > 0) {
+      log.info('Adopted running containers from previous host run', {
+        count: adopt.length,
+        names: adopt.map((a) => a.name),
+      });
     }
   } catch (err) {
-    log.warn('Failed to clean up orphaned containers', { err });
+    log.warn('Failed to reconcile orphaned containers', { err });
   }
+  return adopt;
 }
