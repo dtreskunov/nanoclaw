@@ -77,6 +77,27 @@ function clipOneLine(s: unknown, max = 60): string {
 }
 
 /**
+ * Map an OpenCode `finish` reason to a human-readable message used when the
+ * turn ended with no user-visible text. Exported for tests.
+ */
+export function describeFinishReason(finish: string): string {
+  switch (finish) {
+    case 'length':
+      return 'Model hit its max output tokens before producing a reply (often after a long reasoning step). Try a shorter prompt or a model with a higher output cap.';
+    case 'content-filter':
+    case 'content_filter':
+      return 'Model stopped due to a content filter and produced no reply.';
+    case 'tool-calls':
+    case 'tool_calls':
+      return 'Model ended with a pending tool call but no reply text.';
+    case 'error':
+      return 'Model finished with an error and produced no reply.';
+    default:
+      return `Model finished with reason "${finish}" and produced no reply.`;
+  }
+}
+
+/**
  * Map an OpenCode part-update to a short human hint, or null if the part
  * isn't progress-worthy. Pure function — exported for unit tests.
  *
@@ -447,6 +468,7 @@ export class OpenCodeProvider implements AgentProvider {
 
         const partTextByMessageId = new Map<string, string>();
         const roleByMessageId = new Map<string, string>();
+        const finishByMessageId = new Map<string, string>();
         const progress = new ProgressThrottle();
         const seenReasoning = new Set<string>();
         let lastAssistantUsage: import('./types.js').TurnUsage | null = null;
@@ -488,9 +510,11 @@ export class OpenCodeProvider implements AgentProvider {
                   cost?: number;
                   tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
                   modelID?: string;
+                  finish?: string;
                 } | undefined;
                 if (info?.id && info?.role) {
                   roleByMessageId.set(info.id, info.role);
+                  if (info.finish) finishByMessageId.set(info.id, info.finish);
                   // Capture usage from the last assistant message.
                   if (info.role === 'assistant' && (typeof info.cost === 'number' || info.tokens)) {
                     lastAssistantUsage = {
@@ -620,6 +644,16 @@ export class OpenCodeProvider implements AgentProvider {
         if (lastAssistantUsage) {
           yield { type: 'usage', data: lastAssistantUsage };
           lastAssistantUsage = null;
+        }
+        // Empty text + non-stop finish = silent drop. Convert to an error so
+        // the poll-loop's unsurfacedError path tells the user what happened
+        // (e.g. "length" = model hit max_output_tokens before producing any
+        // user-visible text — common with heavy-reasoning models like
+        // minimax-m3 capped low on OpenRouter).
+        const lastFinish = lastAssistantId ? finishByMessageId.get(lastAssistantId) : undefined;
+        if (!resultText && lastFinish && lastFinish !== 'stop') {
+          const reasonMsg = describeFinishReason(lastFinish);
+          yield { type: 'error', message: reasonMsg, retryable: false, classification: `opencode:finish:${lastFinish}` };
         }
         yield { type: 'result', text: resultText || null };
       }
