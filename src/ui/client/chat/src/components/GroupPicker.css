@@ -1,95 +1,41 @@
-/* Horizontally scrollable group strip styled as browser-style tabs.
-   Inactive tabs are flat against the header; the active tab "lifts"
-   with a rounded top, a visible background tint, and steps 1px below
-   the strip baseline to overlap the header's bottom border. */
+/* GroupPicker — consumer-specific styles on top of the shared TabBar.
+   The chrome (strip overflow, chip chrome, dropdown button) lives in
+   TabBar.css; this file only adds the bits that are specific to the
+   agent-group picker: how it slots into the header, the active-tab
+   "lift" onto the header border, and color overrides for the trailing
+   "More agents…" / "+ New agent" extras. The "More agents" modal
+   (GroupPickerModal) keeps its own list styling. */
 
-.group-strip {
-  display: flex; align-items: flex-end; gap: 2px;
-  overflow: hidden;
-  flex: 1; min-width: 0;
-  padding: 0 4px;
+/* Header slot: the strip and the mobile dropdown both take the flex:1
+   middle slot of <header>. min-width:0 lets the strip's overflow:auto
+   actually clip and scroll instead of pushing the flex parent. */
+.group-strip { flex: 1; min-width: 0; }
+
+/* Strip-specific: align with the header baseline so the active tab's
+   bottom border overlaps the header's bottom border (8px header
+   padding + 1px header border = 9px). Also drop the strip's own
+   underline — the header border already provides it. */
+nav.tab-bar-strip.group-strip {
   align-self: stretch;
-  /* Push the chip baseline down to (and 1px past) the header border so
-     the active tab can sit on top of it. 8px header padding + 1px
-     border = 9px. */
   margin-bottom: -9px;
-}
-.group-strip::-webkit-scrollbar { display: none; }
-
-.group-chip {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 5px 12px 6px; min-height: 36px;
-  border: 1px solid transparent; border-bottom: 0;
-  border-radius: 8px 8px 0 0;
-  background: transparent; color: inherit; cursor: pointer;
-  font-family: inherit; white-space: nowrap; flex-shrink: 1; min-width: 48px;
-  position: relative;
-  transition: background 0.1s, border-color 0.1s;
-  overflow: hidden;
-}
-.group-chip:not(.active):hover {
-  background: var(--wash-soft);
+  border-bottom: 0;
 }
 
-.group-chip.active {
-  background: var(--surface);
-  border-color: var(--border);
-  flex-shrink: 0;
-  /* Step 1px below the strip baseline so the chip overlaps the
-     header's bottom border. */
-  margin-bottom: -1px;
-  padding-bottom: 7px;
-  z-index: 1;
-}
+/* Trailing extras (e.g. "+ Agent group") inherit the default `.tab-item`
+   chrome so they read as another tab in the strip. The leading "+"
+   distinguishes them as an action; no extra styling needed here. */
 
-/* Trailing "More agents…" tab — opens the picker modal filtered to
-   non-member groups. Same chrome as a regular tab; muted text. */
-.group-chip-more { color: var(--muted); }
-.group-chip-more .chip-name { font-weight: 500; }
-
-/* "+ New agent" creator chip — owner/global-admin only. */
-.group-chip-new { color: var(--accent, #4f8cff); }
-.group-chip-new .chip-name { font-weight: 500; }
-
-.chip-name { font-size: var(--font-base); font-weight: 500; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.group-chip.active .chip-name { font-weight: 600; }
-.chip-sub {
-  font-size: var(--font-2xs); line-height: 1.2;
-  color: var(--muted); letter-spacing: 0.01em;
-  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-}
-
-/* Mobile: hide the strip and show the single active-group button instead. */
-.active-group-btn { display: none; }
-
+/* The "More agents" eye button — desktop-only. `header .icon-btn` in
+   Header.css forces `display:inline-flex` at higher specificity, so the
+   override has to match the `header` ancestor to win. */
 @media (max-width: 720px) {
-  .group-strip.desktop-only { display: none; }
-
-  .active-group-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    flex: 1; min-width: 0; min-height: 44px;
-    padding: 4px 10px; border: 0; border-radius: var(--radius-lg);
-    background: var(--wash-subtle); color: inherit; cursor: pointer;
-    font-family: inherit; text-align: left;
-  }
-  .active-group-btn:hover { background: var(--wash); }
-  .active-group-btn.is-admin-visible { opacity: 0.7; }
-  .agb-stack {
-    display: flex; flex-direction: column; min-width: 0;
-    flex: 1; overflow: hidden;
-  }
-  .agb-name {
-    font-size: var(--font-lg); font-weight: 600; line-height: 1.2;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .agb-sub {
-    font-size: var(--font-xs); line-height: 1.2; color: var(--muted);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .agb-caret { font-size: var(--font-sm); color: var(--muted); flex-shrink: 0; }
+  header .more-agents-btn { display: none; }
 }
 
-/* Modal list (mobile group picker). */
+/* The "More agents" modal — opened from the extras button to browse
+   non-member admin groups. Still uses the legacy DOM (intentionally not
+   a TabBar, because it's a full searchable list of groups + a
+   primary-action footer, not a section picker). */
 .group-picker-modal .group-picker-list {
   padding: 8px; display: flex; flex-direction: column; gap: 2px;
 }

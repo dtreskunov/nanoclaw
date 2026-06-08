@@ -7,7 +7,7 @@ import {
   settingsOpen,
 } from '../state';
 import { BRAND } from '../brand';
-import { GroupStrip, ActiveGroupButton } from './GroupPicker';
+import { GroupStrip, MoreAgentsButton } from './GroupPicker';
 
 export function Header() {
   const admin = isAdmin.value;
@@ -21,7 +21,7 @@ export function Header() {
       >{'\u2630'}</button>
       <span class="brand">{BRAND.name}</span>
       <GroupStrip />
-      <ActiveGroupButton />
+      <MoreAgentsButton />
       {admin ? (
         <button
           type="button"

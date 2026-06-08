@@ -18256,6 +18256,166 @@ function CreateGroupModal() {
   ) });
 }
 
+// src/components/TabBar.tsx
+function TabBar(props) {
+  const { ariaLabel, activeId, items, onSelect, extras, className, mobileSheetTitle } = props;
+  const navRef = A2(null);
+  const [sheetOpen, setSheetOpen] = h2(false);
+  y2(() => {
+    const nav2 = navRef.current;
+    if (!nav2) return;
+    const el = nav2.querySelector('[aria-selected="true"]');
+    if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeId]);
+  y2(() => {
+    if (!sheetOpen) return;
+    const onKey = (e4) => {
+      if (e4.key === "Escape") setSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen]);
+  const activeItem = items.find((it) => it.id === activeId) ?? null;
+  const dropdownLabel = activeItem?.label ?? "";
+  const sheetTitle = mobileSheetTitle ?? ariaLabel;
+  const cls = (base) => className ? `${base} ${className}` : base;
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4(
+      "nav",
+      {
+        ref: navRef,
+        class: cls("tab-bar-strip"),
+        role: "tablist",
+        "aria-label": ariaLabel,
+        children: [
+          items.map((it) => {
+            const isActive = it.id === activeId;
+            return /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                role: "tab",
+                "aria-selected": isActive,
+                title: it.title,
+                class: `tab-item${isActive ? " active" : ""}${it.className ? ` ${it.className}` : ""}`,
+                onClick: () => onSelect(it.id),
+                children: [
+                  /* @__PURE__ */ u4("span", { class: "tab-item-label", children: it.label }),
+                  it.sublabel ? /* @__PURE__ */ u4("span", { class: "tab-item-sublabel", children: it.sublabel }) : null
+                ]
+              },
+              it.id
+            );
+          }),
+          extras?.map((ex) => /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              title: ex.title,
+              "aria-haspopup": ex.ariaHaspopup,
+              class: `tab-item tab-extra${ex.className ? ` ${ex.className}` : ""}`,
+              onClick: ex.onClick,
+              children: [
+                /* @__PURE__ */ u4("span", { class: "tab-item-label", children: ex.label }),
+                ex.sublabel ? /* @__PURE__ */ u4("span", { class: "tab-item-sublabel", children: ex.sublabel }) : null
+              ]
+            },
+            ex.key
+          ))
+        ]
+      }
+    ),
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: cls("tab-bar-dropdown"),
+        "aria-label": ariaLabel,
+        "aria-haspopup": "dialog",
+        "aria-expanded": sheetOpen,
+        onClick: () => setSheetOpen(true),
+        children: [
+          /* @__PURE__ */ u4("span", { class: "tab-bar-dropdown-label", children: dropdownLabel }),
+          /* @__PURE__ */ u4("span", { class: "tab-bar-dropdown-caret", "aria-hidden": "true", children: "\u25BE" })
+        ]
+      }
+    ),
+    sheetOpen ? /* @__PURE__ */ u4(
+      TabBarSheet,
+      {
+        title: sheetTitle,
+        items,
+        extras,
+        activeId,
+        onSelect: (id) => {
+          setSheetOpen(false);
+          onSelect(id);
+        },
+        onExtra: (ex) => {
+          setSheetOpen(false);
+          ex.onClick();
+        },
+        onClose: () => setSheetOpen(false)
+      }
+    ) : null
+  ] });
+}
+function TabBarSheet(props) {
+  const { title, items, extras, activeId, onSelect, onExtra, onClose } = props;
+  const onBackdrop = (e4) => {
+    if (e4.target.classList.contains("settings-backdrop")) onClose();
+  };
+  return /* @__PURE__ */ u4("div", { class: "settings-backdrop tab-bar-sheet-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4(
+    "div",
+    {
+      class: "settings-modal tab-bar-sheet",
+      role: "dialog",
+      "aria-label": title,
+      style: "max-width:480px",
+      children: [
+        /* @__PURE__ */ u4("header", { class: "settings-head", children: [
+          /* @__PURE__ */ u4("span", { class: "title", children: title }),
+          /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: onClose, children: "\u2715" })
+        ] }),
+        /* @__PURE__ */ u4("div", { class: "settings-body tab-bar-sheet-list", children: [
+          items.map((it) => {
+            const isActive = it.id === activeId;
+            return /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: `tab-bar-sheet-row${isActive ? " active" : ""}${it.className ? ` ${it.className}` : ""}`,
+                "aria-current": isActive ? "true" : void 0,
+                title: it.title,
+                onClick: () => onSelect(it.id),
+                children: [
+                  /* @__PURE__ */ u4("span", { class: "tab-bar-sheet-row-name", children: it.label }),
+                  it.sublabel ? /* @__PURE__ */ u4("span", { class: "tab-bar-sheet-row-sub", children: it.sublabel }) : null
+                ]
+              },
+              it.id
+            );
+          }),
+          extras?.length ? /* @__PURE__ */ u4(k, { children: [
+            /* @__PURE__ */ u4("div", { class: "tab-bar-sheet-divider", "aria-hidden": "true" }),
+            extras.map((ex) => /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                class: `tab-bar-sheet-row tab-bar-sheet-extra${ex.className ? ` ${ex.className}` : ""}`,
+                title: ex.title,
+                onClick: () => onExtra(ex),
+                children: /* @__PURE__ */ u4("span", { class: "tab-bar-sheet-row-name", children: ex.label })
+              },
+              ex.key
+            ))
+          ] }) : null
+        ] })
+      ]
+    }
+  ) });
+}
+
 // src/components/GroupPicker.tsx
 function isNonMember(g8) {
   return g8.hasContent === false;
@@ -18286,86 +18446,64 @@ function GroupStrip() {
   const active = all.find((g8) => g8.id === groupId.value);
   const hasActiveNonMember = active && isNonMember(active);
   const stripGroups = hasActiveNonMember ? [...memberGroups, active] : memberGroups;
-  const nonMemberCount = elevated ? all.filter(isNonMember).length : 0;
-  const showMore = nonMemberCount > 0;
+  const items = stripGroups.map((g8) => {
+    const { parts, isAdminOnly } = chipParts(g8, elevated);
+    const sublabel = parts.join(" \xB7 ");
+    return {
+      id: g8.id,
+      label: g8.name,
+      sublabel: sublabel || void 0,
+      title: tipFor(g8, isAdminOnly),
+      className: isAdminOnly ? "is-admin-visible" : void 0
+    };
+  });
+  const extras = [];
+  if (elevated) {
+    extras.push({
+      key: "new",
+      label: "New Agent\u2026",
+      sublabel: "\xA0",
+      title: "Create a new agent group",
+      ariaHaspopup: "dialog",
+      onClick: () => {
+        createGroupOpen.value = true;
+      },
+      className: "group-extra-new"
+    });
+  }
   const pick = (gid) => {
     if (gid !== groupId.value) selectGroup(gid).catch(console.error);
   };
-  return /* @__PURE__ */ u4("nav", { class: "group-strip desktop-only", role: "tablist", "aria-label": "Agent groups", children: [
-    stripGroups.map((g8) => {
-      const isActive = g8.id === groupId.value;
-      const isAdminOnly = elevated && isNonMember(g8);
-      const sub = g8.lastActivityAt ? fmtRelative(g8.lastActivityAt) : "";
-      return /* @__PURE__ */ u4(
-        "button",
-        {
-          type: "button",
-          role: "tab",
-          "aria-selected": isActive,
-          class: `group-chip${isActive ? " active" : ""}`,
-          title: tipFor(g8, isAdminOnly),
-          onClick: () => pick(g8.id),
-          children: [
-            /* @__PURE__ */ u4("span", { class: "chip-name", children: g8.name }),
-            sub ? /* @__PURE__ */ u4("span", { class: "chip-sub", children: sub }) : null
-          ]
-        },
-        g8.id
-      );
-    }),
-    showMore ? /* @__PURE__ */ u4(
-      "button",
-      {
-        type: "button",
-        class: "group-chip group-chip-more",
-        title: `Show ${nonMemberCount} more agent group${nonMemberCount === 1 ? "" : "s"} you can administer`,
-        "aria-haspopup": "dialog",
-        onClick: () => openModal("non-members"),
-        children: /* @__PURE__ */ u4("span", { class: "chip-name", children: [
-          "More agents",
-          "\u2026"
-        ] })
-      }
-    ) : null,
-    elevated ? /* @__PURE__ */ u4(
-      "button",
-      {
-        type: "button",
-        class: "group-chip group-chip-new",
-        title: "Create a new agent group",
-        "aria-haspopup": "dialog",
-        onClick: () => {
-          createGroupOpen.value = true;
-        },
-        children: /* @__PURE__ */ u4("span", { class: "chip-name", children: "+ New agent" })
-      }
-    ) : null
-  ] });
+  return /* @__PURE__ */ u4(
+    TabBar,
+    {
+      ariaLabel: "Agent groups",
+      mobileSheetTitle: "Agent groups",
+      activeId: active?.id ?? null,
+      items,
+      onSelect: pick,
+      extras: extras.length ? extras : void 0,
+      className: "group-strip"
+    }
+  );
 }
-function ActiveGroupButton() {
-  nowTick.value;
+function MoreAgentsButton() {
   const elevated = isElevatedUser.value;
   const all = groups.value;
-  const visible = elevated ? all : all.filter((g8) => !isNonMember(g8));
-  const active = all.find((g8) => g8.id === groupId.value) ?? visible[0];
-  if (!active) return null;
-  const { parts, isAdminOnly } = chipParts(active, elevated);
-  const subtitle = parts.join(" \xB7 ");
+  if (!elevated) return null;
+  const nonMemberCount = all.filter(isNonMember).length;
+  if (nonMemberCount === 0) return null;
+  const tip = `Groups belonging to other users (${nonMemberCount})`;
   return /* @__PURE__ */ u4(
     "button",
     {
       type: "button",
-      class: `active-group-btn mobile-only${isAdminOnly ? " is-admin-visible" : ""}`,
-      "aria-label": "Switch agent group",
+      class: "icon-btn more-agents-btn",
+      "aria-label": tip,
+      title: tip,
       "aria-haspopup": "dialog",
-      onClick: () => openModal("all"),
-      children: [
-        /* @__PURE__ */ u4("span", { class: "agb-stack", children: [
-          /* @__PURE__ */ u4("span", { class: "agb-name", children: active.name }),
-          subtitle ? /* @__PURE__ */ u4("span", { class: "agb-sub", children: subtitle }) : null
-        ] }),
-        /* @__PURE__ */ u4("span", { class: "agb-caret", "aria-hidden": "true", children: "\u25BE" })
-      ]
+      onClick: () => openModal("non-members"),
+      children: "\u{1F441}\uFE0F"
     }
   );
 }
@@ -18430,26 +18568,7 @@ function GroupPickerModal() {
             },
             g8.id
           );
-        }) }),
-        elevated ? /* @__PURE__ */ u4(
-          "footer",
-          {
-            class: "settings-foot",
-            style: "display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)",
-            children: /* @__PURE__ */ u4(
-              "button",
-              {
-                type: "button",
-                class: "primary",
-                onClick: () => {
-                  close();
-                  createGroupOpen.value = true;
-                },
-                children: "+ New agent group"
-              }
-            )
-          }
-        ) : null
+        }) })
       ]
     }
   ) });
@@ -18474,7 +18593,7 @@ function Header() {
     ),
     /* @__PURE__ */ u4("span", { class: "brand", children: BRAND.name }),
     /* @__PURE__ */ u4(GroupStrip, {}),
-    /* @__PURE__ */ u4(ActiveGroupButton, {}),
+    /* @__PURE__ */ u4(MoreAgentsButton, {}),
     admin ? /* @__PURE__ */ u4(
       "button",
       {
@@ -21617,6 +21736,13 @@ function ModelSelector({ value, provider, placeholder, disabled, apiBasePath, in
 }
 
 // src/components/GroupAdmin.tsx
+var TAB_ITEMS = [
+  { id: "models", label: "Models", sublabel: "Provider, model, voice" },
+  { id: "settings", label: "Settings", sublabel: "Image, scope, public site" },
+  { id: "members", label: "Members", sublabel: "Who can use this group" },
+  { id: "roles", label: "Admins", sublabel: "Admins for this group" },
+  { id: "destinations", label: "Destinations", sublabel: "Where this group can send messages" }
+];
 var PROVIDER_INFO = {
   claude: "Claude \u2014 Anthropic models via the official SDK. Uses your OneCLI-injected Anthropic API key.",
   opencode: "OpenCode \u2014 multi-provider gateway (OpenRouter, DeepSeek, OpenCode Zen, Anthropic, etc.) selected by host OPENCODE_PROVIDER. Wire prefix is handled automatically."
@@ -21667,12 +21793,13 @@ function errMsg2(d5, fallback) {
 function GroupAdmin() {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
-  const [tab, setTab] = h2("models");
+  const mobile = isMobile.value;
+  const [tab, setTab] = h2(() => isMobile.value ? null : "models");
   const actionsRef = A2(null);
   const [, forceRender] = h2(0);
   const [closeConfirmOpen, setCloseConfirmOpen] = h2(false);
   y2(() => {
-    setTab("models");
+    setTab(isMobile.value ? null : "models");
     setCloseConfirmOpen(false);
   }, [open, gid]);
   useBackButtonCloses(open, () => {
@@ -21715,19 +21842,36 @@ function GroupAdmin() {
         /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: attemptClose, children: "\u2715" })
       ] })
     ] }),
-    /* @__PURE__ */ u4("nav", { class: "group-admin-tabs", children: [
-      /* @__PURE__ */ u4("button", { type: "button", class: tab === "models" ? "active" : "", onClick: () => setTab("models"), children: "Models" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: tab === "settings" ? "active" : "", onClick: () => setTab("settings"), children: "Settings" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: tab === "members" ? "active" : "", onClick: () => setTab("members"), children: "Members" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: tab === "roles" ? "active" : "", onClick: () => setTab("roles"), children: "Admins" }),
-      /* @__PURE__ */ u4("button", { type: "button", class: tab === "destinations" ? "active" : "", onClick: () => setTab("destinations"), children: "Destinations" })
-    ] }),
-    /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+    !mobile ? /* @__PURE__ */ u4(
+      TabBar,
+      {
+        ariaLabel: "Group settings sections",
+        mobileSheetTitle: "Settings sections",
+        activeId: tab,
+        items: TAB_ITEMS,
+        onSelect: (id) => setTab(id),
+        className: "group-admin-tab-bar"
+      }
+    ) : null,
+    /* @__PURE__ */ u4("div", { class: "settings-body", children: mobile && tab === null ? /* @__PURE__ */ u4(MobileSectionList, { items: TAB_ITEMS, onSelect: (id) => setTab(id) }) : /* @__PURE__ */ u4(k, { children: [
+      mobile && tab !== null ? /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "group-admin-back",
+          onClick: () => setTab(null),
+          "aria-label": "Back to sections",
+          children: [
+            /* @__PURE__ */ u4("span", { "aria-hidden": "true", children: "\u2039" }),
+            " Sections"
+          ]
+        }
+      ) : null,
       tab === "models" || tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: hardClose, onActions: setActions }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
       tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null,
       tab === "destinations" ? /* @__PURE__ */ u4(DestinationsTab, { gid }) : null
-    ] }),
+    ] }) }),
     closeConfirmOpen ? /* @__PURE__ */ u4(
       "div",
       {
@@ -21761,6 +21905,23 @@ function GroupAdmin() {
       }
     ) : null
   ] }) });
+}
+function MobileSectionList({ items, onSelect }) {
+  return /* @__PURE__ */ u4("div", { class: "group-admin-section-list", role: "list", children: items.map((it) => /* @__PURE__ */ u4(
+    "button",
+    {
+      type: "button",
+      role: "listitem",
+      class: "group-admin-section-row",
+      onClick: () => onSelect(it.id),
+      children: [
+        /* @__PURE__ */ u4("span", { class: "group-admin-section-name", children: it.label }),
+        it.sublabel ? /* @__PURE__ */ u4("span", { class: "group-admin-section-sub", children: it.sublabel }) : null,
+        /* @__PURE__ */ u4("span", { class: "group-admin-section-caret", "aria-hidden": "true", children: "\u203A" })
+      ]
+    },
+    it.id
+  )) });
 }
 function SettingsTab({ gid, section, onClose, onActions }) {
   const [data, setData] = h2(null);

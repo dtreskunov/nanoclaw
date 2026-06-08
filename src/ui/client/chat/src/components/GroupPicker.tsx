@@ -1,4 +1,5 @@
-// Group picker — desktop strip + mobile single-button + modal.
+// Group picker — header tab bar (TabBar component handles desktop strip
+// vs mobile dropdown) plus the "More agents" non-member browser modal.
 import { useEffect } from 'preact/hooks';
 import type { JSX } from 'preact';
 
@@ -15,6 +16,7 @@ import { selectGroup } from '../actions';
 import { fmtRelative, fmtAbsolute } from '../utils';
 import type { Group } from '../types';
 import { createGroupOpen } from './CreateGroupModal';
+import { TabBar, type TabItem, type TabExtra } from './TabBar';
 
 function isNonMember(g: Group): boolean {
   return g.hasContent === false;
@@ -46,7 +48,7 @@ function openModal(mode: 'all' | 'non-members'): void {
   groupPickerOpen.value = true;
 }
 
-export function GroupStrip() {
+export function GroupStrip(): JSX.Element | null {
   const elevated = isElevatedUser.value;
   // Subscribe so relative times refresh.
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
@@ -60,85 +62,69 @@ export function GroupStrip() {
   const stripGroups: Group[] = hasActiveNonMember
     ? [...memberGroups, active]
     : memberGroups;
-  const nonMemberCount = elevated ? all.filter(isNonMember).length : 0;
-  const showMore = nonMemberCount > 0;
+
+  const items: TabItem[] = stripGroups.map((g) => {
+    const { parts, isAdminOnly } = chipParts(g, elevated);
+    const sublabel = parts.join(' \u00B7 ');
+    return {
+      id: g.id,
+      label: g.name,
+      sublabel: sublabel || undefined,
+      title: tipFor(g, isAdminOnly),
+      className: isAdminOnly ? 'is-admin-visible' : undefined,
+    };
+  });
+
+  const extras: TabExtra[] = [];
+  if (elevated) {
+    extras.push({
+      key: 'new',
+      label: 'New Agent\u2026',
+      sublabel: '\u00A0',
+      title: 'Create a new agent group',
+      ariaHaspopup: 'dialog',
+      onClick: () => { createGroupOpen.value = true; },
+      className: 'group-extra-new',
+    });
+  }
 
   const pick = (gid: string): void => {
     if (gid !== groupId.value) selectGroup(gid).catch(console.error);
   };
 
   return (
-    <nav class="group-strip desktop-only" role="tablist" aria-label="Agent groups">
-      {stripGroups.map((g) => {
-        const isActive = g.id === groupId.value;
-        const isAdminOnly = elevated && isNonMember(g);
-        const sub = g.lastActivityAt ? fmtRelative(g.lastActivityAt) : '';
-        return (
-          <button
-            type="button"
-            key={g.id}
-            role="tab"
-            aria-selected={isActive}
-            class={`group-chip${isActive ? ' active' : ''}`}
-            title={tipFor(g, isAdminOnly)}
-            onClick={() => pick(g.id)}
-          >
-            <span class="chip-name">{g.name}</span>
-            {sub ? <span class="chip-sub">{sub}</span> : null}
-          </button>
-        );
-      })}
-      {showMore ? (
-        <button
-          type="button"
-          class="group-chip group-chip-more"
-          title={`Show ${nonMemberCount} more agent group${nonMemberCount === 1 ? '' : 's'} you can administer`}
-          aria-haspopup="dialog"
-          onClick={() => openModal('non-members')}
-        >
-          <span class="chip-name">More agents{'\u2026'}</span>
-        </button>
-      ) : null}
-      {elevated ? (
-        <button
-          type="button"
-          class="group-chip group-chip-new"
-          title="Create a new agent group"
-          aria-haspopup="dialog"
-          onClick={() => { createGroupOpen.value = true; }}
-        >
-          <span class="chip-name">{'\u002B New agent'}</span>
-        </button>
-      ) : null}
-    </nav>
+    <TabBar
+      ariaLabel="Agent groups"
+      mobileSheetTitle="Agent groups"
+      activeId={active?.id ?? null}
+      items={items}
+      onSelect={pick}
+      extras={extras.length ? extras : undefined}
+      className="group-strip"
+    />
   );
 }
 
-export function ActiveGroupButton() {
-  // Subscribe so the label refreshes with activity time.
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  nowTick.value;
+// Header icon button for elevated users that opens the GroupPickerModal
+// in `non-members` mode (groups they administer but aren't a member of
+// — hence "belong to other users"). Hidden when there are no such
+// groups, so the header stays clean for regular users.
+export function MoreAgentsButton(): JSX.Element | null {
   const elevated = isElevatedUser.value;
   const all = groups.value;
-  const visible = elevated ? all : all.filter((g) => !isNonMember(g));
-  const active = all.find((g) => g.id === groupId.value) ?? visible[0];
-  if (!active) return null;
-  const { parts, isAdminOnly } = chipParts(active, elevated);
-  const subtitle = parts.join(' \u00B7 ');
+  if (!elevated) return null;
+  const nonMemberCount = all.filter(isNonMember).length;
+  if (nonMemberCount === 0) return null;
+  const tip = `Groups belonging to other users (${nonMemberCount})`;
   return (
     <button
       type="button"
-      class={`active-group-btn mobile-only${isAdminOnly ? ' is-admin-visible' : ''}`}
-      aria-label="Switch agent group"
+      class="icon-btn more-agents-btn"
+      aria-label={tip}
+      title={tip}
       aria-haspopup="dialog"
-      onClick={() => openModal('all')}
-    >
-      <span class="agb-stack">
-        <span class="agb-name">{active.name}</span>
-        {subtitle ? <span class="agb-sub">{subtitle}</span> : null}
-      </span>
-      <span class="agb-caret" aria-hidden="true">{'\u25BE'}</span>
-    </button>
+      onClick={() => openModal('non-members')}
+    >{'\uD83D\uDC41\uFE0F'}</button>
   );
 }
 
@@ -208,23 +194,6 @@ export function GroupPickerModal() {
             );
           })}
         </div>
-        {elevated ? (
-          <footer
-            class="settings-foot"
-            style="display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--border)"
-          >
-            <button
-              type="button"
-              class="primary"
-              onClick={() => {
-                close();
-                createGroupOpen.value = true;
-              }}
-            >
-              {'\u002B New agent group'}
-            </button>
-          </footer>
-        ) : null}
       </div>
     </div>
   );
