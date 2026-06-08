@@ -68,6 +68,7 @@ export function backfillContainerConfigs(): void {
       cli_scope: 'group',
       voice_mode: 'off',
       transcription_model: null,
+      model_params: '{}',
       updated_at: new Date().toISOString(),
     };
 

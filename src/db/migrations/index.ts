@@ -29,6 +29,7 @@ import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js
 import { moduleContainerConfigsPip } from './module-container-configs-pip.js';
 import { moduleContainerConfigsVoiceMode } from './module-container-configs-voice-mode.js';
 import { moduleContainerConfigsTranscriptionModel } from './module-container-configs-transcription-model.js';
+import { moduleContainerConfigsModelParams } from './module-container-configs-model-params.js';
 import { moduleResendThreadRoots } from './module-resend-thread-roots.js';
 
 export interface Migration {
@@ -67,6 +68,7 @@ const migrations: Migration[] = [
   moduleContainerConfigsPip,
   moduleContainerConfigsVoiceMode,
   moduleContainerConfigsTranscriptionModel,
+  moduleContainerConfigsModelParams,
 ];
 
 export function runMigrations(db: Database.Database): void {

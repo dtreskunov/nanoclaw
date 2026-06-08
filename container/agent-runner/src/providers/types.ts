@@ -50,6 +50,13 @@ export interface ProviderOptions {
    * through to the underlying SDK. If omitted, the SDK default is used.
    */
   effort?: string;
+  /**
+   * Freeform provider-knob bag from `container_configs.model_params`.
+   * Always an object. Providers pick out keys they understand and ignore
+   * the rest (with a one-shot startup warn). Common keys: `max_tokens`,
+   * `temperature`, `top_p`, `thinking_budget_tokens`.
+   */
+  modelParams?: Record<string, unknown>;
 }
 
 /** A file attachment to include inline alongside the text prompt. */

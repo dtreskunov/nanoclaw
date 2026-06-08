@@ -19,6 +19,7 @@ const JSON_COLUMNS = new Set([
   'packages_npm',
   'packages_pip',
   'additional_mounts',
+  'model_params',
 ]);
 
 export function getContainerConfig(agentGroupId: string): ContainerConfigRow | undefined {
@@ -38,11 +39,11 @@ export function createContainerConfig(config: ContainerConfigRow): void {
       `INSERT INTO container_configs (
         agent_group_id, provider, model, effort, image_tag, assistant_name,
         max_messages_per_prompt, skills, mcp_servers, packages_apt, packages_npm,
-        packages_pip, additional_mounts, updated_at
+        packages_pip, additional_mounts, model_params, updated_at
       ) VALUES (
         @agent_group_id, @provider, @model, @effort, @image_tag, @assistant_name,
         @max_messages_per_prompt, @skills, @mcp_servers, @packages_apt, @packages_npm,
-        @packages_pip, @additional_mounts, @updated_at
+        @packages_pip, @additional_mounts, @model_params, @updated_at
       )`,
     )
     .run(config);
@@ -96,10 +97,17 @@ export function updateContainerConfigScalars(
     .run(values);
 }
 
-/** Overwrite a JSON column wholesale. Used for skills, mcp_servers, packages_*, additional_mounts. */
+/** Overwrite a JSON column wholesale. Used for skills, mcp_servers, packages_*, additional_mounts, model_params. */
 export function updateContainerConfigJson(
   agentGroupId: string,
-  column: 'skills' | 'mcp_servers' | 'packages_apt' | 'packages_npm' | 'packages_pip' | 'additional_mounts',
+  column:
+    | 'skills'
+    | 'mcp_servers'
+    | 'packages_apt'
+    | 'packages_npm'
+    | 'packages_pip'
+    | 'additional_mounts'
+    | 'model_params',
   value: unknown,
 ): void {
   if (!JSON_COLUMNS.has(column)) throw new Error(`Invalid JSON column: ${column}`);

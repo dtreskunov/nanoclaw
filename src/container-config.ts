@@ -56,6 +56,12 @@ export interface ContainerConfig {
   effort?: string;
   voiceMode?: string;
   transcriptionModel?: string;
+  /**
+   * Freeform provider knobs (e.g. `{ max_tokens: 8192 }`). Mirrors the
+   * `model_params` JSON column in `container_configs`. Always present as
+   * an object so providers can spread it without a null check.
+   */
+  modelParams?: Record<string, unknown>;
 }
 
 /**
@@ -68,6 +74,25 @@ function envFallback(name: string): string | undefined {
   if (process.env[name] !== undefined) return process.env[name];
   const file = readEnvFile([name]);
   return file[name];
+}
+
+/**
+ * Parse the `model_params` JSON column. Tolerant: returns `{}` for null,
+ * empty, malformed, or non-object payloads. Providers spread the result
+ * directly so we never want to surface a parse error here \u2014 a bad value
+ * would silently disable every other knob.
+ */
+function parseModelParams(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // fall through
+  }
+  return {};
 }
 
 /**
@@ -97,6 +122,7 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     effort: row.effort ?? envFallback('DEFAULT_EFFORT'),
     voiceMode: row.voice_mode,
     transcriptionModel: row.transcription_model ?? envFallback('DEFAULT_TRANSCRIPTION_MODEL'),
+    modelParams: parseModelParams(row.model_params),
   };
 }
 

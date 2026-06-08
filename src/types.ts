@@ -37,6 +37,13 @@ export interface ContainerConfigRow {
   cli_scope: string; // 'disabled' | 'group' | 'global'
   voice_mode: string; // 'off' | 'transcribe' | 'audio'
   transcription_model: string | null;
+  /**
+   * Provider-knob bag (JSON). Freeform key/value pairs the active provider
+   * may interpret (e.g. `max_tokens`, `temperature`, `top_p`,
+   * `thinking_budget_tokens`). Unknown keys are tolerated — providers log a
+   * one-shot warning at startup. Flat namespace; not provider-scoped.
+   */
+  model_params: string; // JSON: Record<string, unknown>
   updated_at: string;
 }
 

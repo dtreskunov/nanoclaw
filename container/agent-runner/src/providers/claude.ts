@@ -347,6 +347,7 @@ export class ClaudeProvider implements AgentProvider {
   private additionalDirectories?: string[];
   private model?: string;
   private effort?: string;
+  private modelParams: Record<string, unknown>;
 
   constructor(options: ProviderOptions = {}) {
     this.assistantName = options.assistantName;
@@ -354,6 +355,7 @@ export class ClaudeProvider implements AgentProvider {
     this.additionalDirectories = options.additionalDirectories;
     this.model = options.model;
     this.effort = options.effort;
+    this.modelParams = options.modelParams ?? {};
     this.env = {
       ...(options.env ?? {}),
       CLAUDE_CODE_AUTO_COMPACT_WINDOW,
