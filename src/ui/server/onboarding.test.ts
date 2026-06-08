@@ -286,9 +286,10 @@ describe('POST /ui/onboarding', () => {
     expect(isUserOnboarded('u7')).toBe(false);
   });
 
-  it('still marks the user onboarded when no per-user agent group exists', async () => {
+  it('still marks the user onboarded when no per-user agent group exists and no OIDC link is present', async () => {
     seedUser('u8', 'Hedy Lamarr');
-    // No seedPerUserGroup call.
+    // No seedPerUserGroup call and no OIDC link, so there's nothing to
+    // lazy-provision from — should still onboard cleanly.
     mockUserId = 'u8';
 
     const raw = new URLSearchParams({ groupName: 'X', assistantName: 'Y' }).toString();
@@ -298,6 +299,50 @@ describe('POST /ui/onboarding', () => {
     });
     expect(res.status()).toBe(303);
     expect(isUserOnboarded('u8')).toBe(true);
+    const cnt = getDb().prepare('SELECT COUNT(*) AS n FROM agent_groups').get() as { n: number };
+    expect(cnt.n).toBe(0);
+  });
+
+  it('lazy-provisions a per-user agent group when the user has an OIDC link but no surviving group', async () => {
+    seedUser('u11', 'Radia Perlman');
+    // OIDC link but NO seedPerUserGroup — emulates an archived per-user
+    // group, or a user that predates auto-provisioning.
+    insertOidcLink({ provider: 'google', sub: '99099', user_id: 'u11', email: null, claims: null });
+    mockUserId = 'u11';
+
+    const raw = new URLSearchParams({
+      groupName: 'Spanning Tree',
+      assistantName: 'STP',
+    }).toString();
+    const res = await call('POST', '/ui/onboarding', {
+      contentType: 'application/x-www-form-urlencoded',
+      raw,
+    });
+    expect(res.status()).toBe(303);
+    expect(isUserOnboarded('u11')).toBe(true);
+
+    const groups = getDb().prepare('SELECT id, name, folder FROM agent_groups').all() as Array<{
+      id: string;
+      name: string;
+      folder: string;
+    }>;
+    expect(groups).toHaveLength(1);
+    expect(groups[0].folder).toBe('google-99099');
+    expect(groups[0].name).toBe('Spanning Tree');
+
+    const cfg = getContainerConfig(groups[0].id);
+    expect(cfg?.assistant_name).toBe('STP');
+
+    // User should now have a scoped-admin role + membership on the new
+    // group, so listAccessibleAgentGroups returns it.
+    const role = getDb()
+      .prepare(`SELECT 1 FROM user_roles WHERE user_id = ? AND role = 'admin' AND agent_group_id = ?`)
+      .get('u11', groups[0].id);
+    expect(role).toBeTruthy();
+    const member = getDb()
+      .prepare('SELECT 1 FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
+      .get('u11', groups[0].id);
+    expect(member).toBeTruthy();
   });
 });
 

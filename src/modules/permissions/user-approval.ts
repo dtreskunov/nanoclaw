@@ -32,7 +32,8 @@
  *   - Delivery adapter missing.
  */
 import { normalizeOptions, type RawOption } from '../../channels/ask-question.js';
-import { createAgentGroup } from '../../db/agent-groups.js';
+import { createAgentGroup, getAgentGroupByFolder } from '../../db/agent-groups.js';
+import { getDb } from '../../db/connection.js';
 import { updateContainerConfigScalars } from '../../db/container-configs.js';
 import { getDeliveryAdapter } from '../../delivery.js';
 import { initGroupFilesystem } from '../../group-init.js';
@@ -40,7 +41,9 @@ import { log } from '../../log.js';
 import { registerResponseHandler, type ResponsePayload } from '../../response-registry.js';
 import { getBranding } from '../../ui/server/branding.js';
 import { pickApprovalDelivery, pickApprover } from '../approvals/primitive.js';
+import { addMember } from './db/agent-group-members.js';
 import { getIdentity } from './db/identities.js';
+import { getOidcLinksForUser } from './db/oidc-links.js';
 import {
   approvePendingUser,
   getPendingApproval,
@@ -48,7 +51,7 @@ import {
   setApprover,
   type PendingUserApproval,
 } from './db/pending-user-approvals.js';
-import { isGlobalAdmin, isOwner } from './db/user-roles.js';
+import { grantRole, isGlobalAdmin, isOwner } from './db/user-roles.js';
 
 const APPROVAL_OPTIONS: RawOption[] = [
   { label: 'Approve', selectedLabel: '✅ Approved', value: 'approve' },
@@ -88,7 +91,6 @@ export interface ScaffoldPerUserAgentGroupInput {
   displayName: string | null;
   email: string | null;
 }
-
 /**
  * Create the agent_groups row for a freshly-approved user. DB-only — the
  * filesystem init (`initGroupFilesystem`) is intentionally split out so it
@@ -142,6 +144,81 @@ export function initPerUserAgentGroupFs(agentGroupId: string, folder: string): v
   if (assistantName) {
     updateContainerConfigScalars(agentGroupId, { assistant_name: assistantName });
   }
+}
+
+// ── Per-user agent group lookup / lazy-provision ─────────────────────────
+
+/**
+ * Locate the per-user agent group for `userId`. The folder slug pattern is
+ * `<provider>-<sub>`, keyed on OIDC subject pairs, so we walk the user's
+ * OIDC links and look up the first agent_group whose folder matches.
+ * Returns null if the user has no OIDC links, or if none of them point at
+ * a surviving agent group (e.g. the group was archived).
+ */
+export function findPerUserAgentGroupId(userId: string): string | null {
+  const links = getOidcLinksForUser(userId);
+  for (const link of links) {
+    const folder = userAgentGroupFolder(link.provider, link.sub);
+    const group = getAgentGroupByFolder(folder);
+    if (group) return group.id;
+  }
+  return null;
+}
+
+/**
+ * Lazy-provision the per-user agent group for `userId` when it's missing
+ * but at least one OIDC link is present. Recovers the cohort whose
+ * per-user group never existed (user predates the auto-provisioning
+ * commit) or was archived. Mirrors what `approvePendingUser` would have
+ * done: DB rows in a transaction, FS init afterwards.
+ *
+ * Returns the agent_group_id (existing or newly created), or null when
+ * the user has no OIDC link to derive a stable folder slug from.
+ */
+export function ensurePerUserAgentGroup(userId: string): string | null {
+  const existing = findPerUserAgentGroupId(userId);
+  if (existing) return existing;
+
+  const links = getOidcLinksForUser(userId);
+  if (links.length === 0) return null;
+  const link = links[0];
+  const folder = userAgentGroupFolder(link.provider, link.sub);
+  const now = new Date().toISOString();
+
+  let agentGroupId = '';
+  getDb().transaction(() => {
+    agentGroupId = scaffoldPerUserAgentGroupDb({
+      provider: link.provider,
+      sub: link.sub,
+      displayName: null,
+      email: link.email,
+    });
+    grantRole({
+      user_id: userId,
+      role: 'admin',
+      agent_group_id: agentGroupId,
+      granted_by: userId,
+      granted_at: now,
+    });
+    addMember({
+      user_id: userId,
+      agent_group_id: agentGroupId,
+      added_by: userId,
+      added_at: now,
+    });
+  })();
+
+  try {
+    initPerUserAgentGroupFs(agentGroupId, folder);
+  } catch (err) {
+    log.error('ensurePerUserAgentGroup: fs init failed', { userId, agentGroupId, err });
+  }
+  log.info('ensurePerUserAgentGroup: provisioned missing per-user agent group', {
+    userId,
+    agentGroupId,
+    folder,
+  });
+  return agentGroupId;
 }
 
 // ── Approval card delivery ───────────────────────────────────────────────

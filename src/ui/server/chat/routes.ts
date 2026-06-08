@@ -17,6 +17,7 @@ import { getSession } from '../../../db/sessions.js';
 import { log } from '../../../log.js';
 import { listAccessibleAgentGroups, canAccessAgentGroup } from '../../../modules/permissions/access.js';
 import { grantRole, hasAdminPrivilege, isGlobalAdmin, isOwner } from '../../../modules/permissions/db/user-roles.js';
+import { isUserOnboarded } from '../../../modules/permissions/db/users.js';
 import { createGroup, GroupCreateError } from '../../../modules/groups/create.js';
 import { deleteSubscriptionByEndpoint, upsertSubscription } from '../../../modules/push/db.js';
 import { pushAvailable, vapidPublicKey } from '../../../modules/push/sender.js';
@@ -157,11 +158,11 @@ function redirectToLogin(ctx: Ctx): void {
 }
 
 // Static + public.
-on('GET', '/', (ctx) => serveStatic(ctx, 'index.html'));
-on('GET', '/index.html', (ctx) => serveStatic(ctx, 'index.html'));
+on('GET', '/', (ctx) => serveShell(ctx, 'index.html'));
+on('GET', '/index.html', (ctx) => serveShell(ctx, 'index.html'));
 // Web Share Target landing — the manifest points /ui/chat/share here.
 // We serve the SPA shell; the client reads the share params from the URL.
-on('GET', '/share', (ctx) => serveStatic(ctx, 'index.html'));
+on('GET', '/share', (ctx) => serveShell(ctx, 'index.html'));
 on('GET', '/manifest.webmanifest', (ctx) => serveStatic(ctx, 'manifest.webmanifest'));
 on('GET', '/icon.svg', (ctx) => serveStatic(ctx, 'icon.svg'));
 on('GET', '/icon-192.png', (ctx) => serveStatic(ctx, 'icon-192.png'));
@@ -1256,6 +1257,25 @@ function safeDecode(s: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * SPA shell entrypoint. Same as serveStatic but redirects authenticated
+ * users who haven't completed onboarding to the wizard first. Without
+ * this gate, users with a live session cookie skip OIDC's
+ * `postLoginRedirect` and land straight in the chat app — where, if the
+ * per-user agent group doesn't exist, they see "No accessible groups."
+ * Unauthenticated requests fall through to the SPA, which handles its
+ * own login flow.
+ */
+function serveShell(ctx: Ctx, relName: string): void {
+  const session = authenticate(ctx.req);
+  if (session && !isUserOnboarded(session.userId)) {
+    ctx.res.writeHead(303, { Location: '/ui/onboarding', 'Cache-Control': 'no-store' });
+    ctx.res.end();
+    return;
+  }
+  return serveStatic(ctx, relName);
 }
 
 function serveStatic(ctx: Ctx, relName: string): void {

@@ -20,10 +20,9 @@
 import http from 'http';
 
 import { log } from '../../log.js';
-import { getAgentGroupByFolder, updateAgentGroup } from '../../db/agent-groups.js';
+import { updateAgentGroup } from '../../db/agent-groups.js';
 import { updateContainerConfigScalars } from '../../db/container-configs.js';
-import { getOidcLinksForUser } from '../../modules/permissions/db/oidc-links.js';
-import { userAgentGroupFolder } from '../../modules/permissions/user-approval.js';
+import { ensurePerUserAgentGroup } from '../../modules/permissions/user-approval.js';
 import { getUser, isUserOnboarded, markUserOnboarded, updateDisplayName } from '../../modules/permissions/db/users.js';
 
 import { authenticate } from './auth.js';
@@ -171,18 +170,15 @@ function renderPage(prefill: OnboardingPrefill, errorMessage: string | null): st
 }
 
 /**
- * Locate the per-user agent group provisioned by `approvePendingUser`.
- * Returns null if no OIDC link exists or the matching folder has no
- * agent_group row (which would mean the user wasn't auto-provisioned).
+ * Locate (or lazy-create) the per-user agent group provisioned by
+ * `approvePendingUser`. We delegate to `ensurePerUserAgentGroup` so that
+ * users whose group was never created (predate auto-provisioning) or was
+ * archived get one minted on the spot — otherwise the onboarding wizard
+ * would silently complete and the user would land in chat with zero
+ * accessible groups.
  */
 function findPerUserAgentGroupId(userId: string): string | null {
-  const links = getOidcLinksForUser(userId);
-  for (const link of links) {
-    const folder = userAgentGroupFolder(link.provider, link.sub);
-    const group = getAgentGroupByFolder(folder);
-    if (group) return group.id;
-  }
-  return null;
+  return ensurePerUserAgentGroup(userId);
 }
 
 async function readUrlEncodedBody(req: http.IncomingMessage, max = 16 * 1024): Promise<URLSearchParams> {
