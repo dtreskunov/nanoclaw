@@ -96,7 +96,7 @@ ncl help
 
 | Resource | Verbs | What it is |
 |----------|-------|------------|
-| groups | list, get, create, update, delete, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package | Agent groups (workspace, personality, container config) |
+| groups | list, get, create, update, delete, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package, config set-param/unset-param | Agent groups (workspace, personality, container config) |
 | messaging-groups | list, get, create, update, delete | A single chat/channel on one platform |
 | wirings | list, get, create, update, delete | Links a messaging group to an agent group (session mode, triggers) |
 | users | list, get, create, update | Platform identities (`<channel>:<handle>`) |
@@ -129,7 +129,9 @@ A second tier (direct source-level self-edits via a draft/activate flow) is plan
 
 ## Container Config
 
-Per-agent-group container runtime config (provider, model, packages, MCP servers, mounts, etc.) lives in the `container_configs` table in the central DB. Materialized to `groups/<folder>/container.json` at spawn time so the container runner can read it. Managed via `ncl groups config get/update` and the self-mod MCP tools.
+Per-agent-group container runtime config (provider, model, packages, MCP servers, mounts, `model_params`, etc.) lives in the `container_configs` table in the central DB. Materialized to `groups/<folder>/container.json` at spawn time so the container runner can read it. Managed via `ncl groups config get/update`, `set-param`/`unset-param` (for `model_params`), and the self-mod MCP tools.
+
+**`model_params`** — JSON bag of per-group model behavior knobs (`max_tokens`, `temperature`, `top_p`, `top_k`, `frequency_penalty`, `presence_penalty`, `seed`, `stop` on OpenCode; `max_tokens`, `thinking_budget_tokens` on Claude). The provider warns once on container start about any key it doesn't recognize. Set via `ncl groups config set-param --key <k> --value <v>` (value parsed as JSON first, then string fallback); clear via `ncl groups config unset-param --key <k>`. Both require admin approval; on approve the container restarts. UI patch endpoint: `PATCH /api/groups/<id>/config/model-params` (full-replacement). Wire surfaces: `src/container-config.ts` (`parseModelParams`), `src/cli/resources/groups.ts` (`set-param`/`unset-param`), `src/ui/server/chat/group-admin.ts` (`handlePatchModelParams`), `container/agent-runner/src/providers/opencode.ts` (`pickModelOptionsForOpenCode`), `container/agent-runner/src/providers/claude.ts` (`paramsToClaudeEnv`, `paramsToClaudeThinking`).
 
 **`cli_scope`** — controls what the agent can do with `ncl` from inside the container:
 

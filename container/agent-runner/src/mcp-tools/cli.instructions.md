@@ -20,7 +20,7 @@ Run `ncl help` for the full list. Common resources:
 
 | Resource | Verbs | What it is |
 |----------|-------|------------|
-| groups | list, get, archive, update, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package | Agent groups (workspace, personality, container config) |
+| groups | list, get, archive, update, restart, config get/update, config add-mcp-server/remove-mcp-server, config add-package/remove-package, config set-param/unset-param | Agent groups (workspace, personality, container config) |
 | sessions | list, get, search | Active sessions + message history search |
 | destinations | list, add, remove | Where an agent group can send messages |
 | members | list, add, remove | Unprivileged access gate for an agent group |
@@ -86,6 +86,9 @@ ncl groups archive                              # archive yourself (--id auto-fi
 ncl groups config update --model claude-sonnet-4-5-20250514
 ncl groups config add-mcp-server --name rss --command npx --args '["some-rss-mcp"]'
 ncl groups config add-package --npm some-package
+ncl groups config set-param --key max_tokens --value 8192     # cap output length
+ncl groups config set-param --key temperature --value 0.3     # OpenCode only
+ncl groups config unset-param --key temperature
 ncl members add --user telegram:jane
 
 # Host-only — DO NOT attempt; ask the operator instead
