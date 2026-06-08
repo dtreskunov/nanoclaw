@@ -169,55 +169,79 @@ async function spawnContainer(session: Session): Promise<void> {
   // immediate kill before the new container touches the file itself.
   fs.rmSync(heartbeatPath(agentGroup.id, session.id), { force: true });
 
-  const container = spawn(CONTAINER_RUNTIME_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-
-  activeContainers.set(session.id, { process: container, containerName });
-  markContainerRunning(session.id);
-
-  // Buffer last N stderr lines so a non-zero exit can surface them. The
-  // container runs with --rm, so logs are gone after exit; without this,
-  // fatal startup errors (bad provider, missing dep) are invisible.
-  const stderrTail: string[] = [];
-  const STDERR_TAIL_MAX = 40;
-  container.stderr?.on('data', (data) => {
-    for (const line of data.toString().trim().split('\n')) {
-      if (!line) continue;
-      log.debug(line, { container: agentGroup.folder });
-      stderrTail.push(line);
-      if (stderrTail.length > STDERR_TAIL_MAX) stderrTail.shift();
-    }
+  // Detached mode (`-d` in buildContainerArgs). `docker run -d` exits as
+  // soon as the container is created with the container ID on stdout, or
+  // non-zero with create/pull errors on stderr. The actual lifecycle is
+  // tracked by a separate `docker wait` watcher (see attachWatcher) so the
+  // container has no foreground console attachment to break when the host
+  // restarts — that broken-console death is exactly what made adopted
+  // containers die ~10s after a graceful host restart (conmon: "Failed to
+  // write to remote console socket").
+  const runProc = spawn(CONTAINER_RUNTIME_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let runStderr = '';
+  runProc.stderr?.on('data', (data) => {
+    runStderr += data.toString();
+  });
+  runProc.stdout?.on('data', () => {
+    /* container ID; not needed — we know the name */
   });
 
-  // stdout is unused in v2 (all IO is via session DB)
-  container.stdout?.on('data', () => {});
-
-  // No host-side idle timeout. Stale/stuck detection is driven by the host
-  // sweep reading heartbeat mtime + processing_ack claim age + container_state
-  // (see src/host-sweep.ts). This avoids killing long-running legitimate work
-  // on a wall-clock timer.
-
-  container.on('close', (code) => {
-    activeContainers.delete(session.id);
-    markContainerStopped(session.id);
-    stopTypingRefresh(session.id);
-    log.info('Container exited', { sessionId: session.id, code, containerName });
-    // 137 = SIGKILL (clean kill via killContainer). Anything else non-zero
-    // is an unexpected exit — surface buffered stderr so the cause is visible.
-    if (code !== 0 && code !== 137 && code !== null && stderrTail.length > 0) {
-      log.warn('Container exited unexpectedly — stderr tail', {
-        sessionId: session.id,
-        containerName,
-        code,
-        stderr: stderrTail.join('\n'),
-      });
-    }
+  const runCode: number | null = await new Promise((resolve) => {
+    runProc.once('close', (code) => resolve(code));
+    runProc.once('error', (err) => {
+      log.error('docker run spawn error', { sessionId: session.id, err });
+      resolve(-1);
+    });
   });
 
-  container.on('error', (err) => {
-    activeContainers.delete(session.id);
+  if (runCode !== 0) {
+    const tail = runStderr.trim().split('\n').slice(-20).join('\n');
+    log.warn('Container failed to start (docker run exited non-zero)', {
+      sessionId: session.id,
+      containerName,
+      code: runCode,
+      stderr: tail,
+    });
+    // Make sure no stale row says we're running.
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
-    log.error('Container spawn error', { sessionId: session.id, err });
+    return;
+  }
+
+  // Now the container is running detached. Attach the lifecycle watcher;
+  // the close handler registered here is the single source of cleanup.
+  attachContainerWatcher(session.id, containerName);
+}
+
+/**
+ * Attach a `docker wait <name>` watcher to a running container and register
+ * it in `activeContainers`. The watcher's `close` event fires when the
+ * container exits — the one place that drives markContainerStopped, the
+ * activeContainers delete, and typing-refresh shutdown. Used by both the
+ * fresh-spawn path (after `docker run -d` succeeds) and adoption.
+ *
+ * No host-side idle timeout. Stale/stuck detection is driven by the host
+ * sweep reading heartbeat mtime + processing_ack claim age + container_state
+ * (see src/host-sweep.ts). This avoids killing long-running legitimate work
+ * on a wall-clock timer.
+ */
+function attachContainerWatcher(sessionId: string, containerName: string): void {
+  const watcher = spawn(CONTAINER_RUNTIME_BIN, ['wait', containerName], { stdio: 'ignore' });
+  activeContainers.set(sessionId, { process: watcher, containerName });
+  markContainerRunning(sessionId);
+
+  watcher.on('close', (code) => {
+    activeContainers.delete(sessionId);
+    markContainerStopped(sessionId);
+    stopTypingRefresh(sessionId);
+    log.info('Container exited', { sessionId, code, containerName });
+  });
+
+  watcher.on('error', (err) => {
+    activeContainers.delete(sessionId);
+    markContainerStopped(sessionId);
+    stopTypingRefresh(sessionId);
+    log.error('Container watcher error', { sessionId, containerName, err });
   });
 }
 
@@ -227,14 +251,16 @@ export function killContainer(sessionId: string, reason: string, onExit?: () => 
   if (!entry) return;
 
   if (onExit) {
+    // entry.process is the `docker wait` watcher — its close fires when the
+    // container exits, which is exactly the signal onExit cares about.
     entry.process.once('close', onExit);
   }
 
   log.info('Killing container', { sessionId, reason, containerName: entry.containerName });
 
-  // Forensic snapshot before kill — the container's stdout/stderr is lost on
-  // --rm exit, so a stuck agent leaves no trace otherwise. Limited to silent-
-  // stuck reasons so normal shutdowns stay quiet.
+  // Forensic snapshot before kill — the container runs with --rm so its
+  // filesystem and per-container log entries cease to be queryable once it's
+  // gone. Limited to silent-stuck reasons so normal shutdowns stay quiet.
   if (reason === 'absolute-ceiling' || reason === 'claim-stuck') {
     const procs = dumpContainerProcesses(entry.containerName);
     if (procs) {
@@ -250,20 +276,17 @@ export function killContainer(sessionId: string, reason: string, onExit?: () => 
   try {
     stopContainer(entry.containerName);
   } catch {
-    if (entry.adopted) {
-      // Adopted entries' process is a `docker wait` watcher — killing it
-      // doesn't stop the container, so fall back to `docker kill <name>`.
-      try {
-        execSync(`docker kill ${entry.containerName}`, { stdio: 'pipe' });
-      } catch (err) {
-        log.warn('docker kill fallback failed for adopted container', {
-          sessionId,
-          containerName: entry.containerName,
-          err,
-        });
-      }
-    } else {
-      entry.process.kill('SIGKILL');
+    // `docker stop` failed (container already gone, daemon error, etc.).
+    // Killing the watcher subprocess does nothing to the container, so
+    // escalate with `docker kill <name>`.
+    try {
+      execSync(`${CONTAINER_RUNTIME_BIN} kill ${entry.containerName}`, { stdio: 'pipe' });
+    } catch (err) {
+      log.warn('docker kill fallback failed', {
+        sessionId,
+        containerName: entry.containerName,
+        err,
+      });
     }
   }
 }
@@ -292,26 +315,8 @@ export function adoptRunningContainers(adopt: Array<{ name: string; sessionId: s
       });
       continue;
     }
-    // `docker wait` blocks on stdout until the container exits, then prints
-    // the exit code. We don't care about the output — only the process's
-    // close event, which fires when the container is gone.
-    const watcher = spawn(CONTAINER_RUNTIME_BIN, ['wait', name], { stdio: 'ignore' });
-    activeContainers.set(sessionId, { process: watcher, containerName: name, adopted: true });
-    markContainerRunning(sessionId);
-
-    watcher.on('close', (code) => {
-      activeContainers.delete(sessionId);
-      markContainerStopped(sessionId);
-      stopTypingRefresh(sessionId);
-      log.info('Adopted container exited', { sessionId, code, containerName: name });
-    });
-
-    watcher.on('error', (err) => {
-      activeContainers.delete(sessionId);
-      markContainerStopped(sessionId);
-      stopTypingRefresh(sessionId);
-      log.error('Adopted container watcher error', { sessionId, containerName: name, err });
-    });
+    log.info('Adopting running container', { sessionId, containerName: name });
+    attachContainerWatcher(sessionId, name);
   }
 }
 
@@ -560,6 +565,12 @@ async function buildContainerArgs(
   agentIdentifier: string | undefined,
   sessionId: string,
 ): Promise<string[]> {
+  // -d (detached): the container has no foreground console attached to the
+  // host process. Critical for surviving host restarts — a foreground attach
+  // dies when the host process dies, conmon's broken-console writes then
+  // kill the container ~10s later, defeating adoption. Lifecycle is tracked
+  // by a separate `docker wait` watcher (see attachContainerWatcher).
+  //
   // Session/agent-group labels let `adoptRunningContainers` (called at host
   // startup) match each running container back to its session in the DB.
   // Without these labels, a graceful host restart can't tell which surviving
@@ -567,6 +578,7 @@ async function buildContainerArgs(
   // (losing in-flight turn state) or risk spawning duplicates.
   const args: string[] = [
     'run',
+    '-d',
     '--rm',
     '--name',
     containerName,
