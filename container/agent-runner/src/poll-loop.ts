@@ -593,6 +593,15 @@ async function processQuery(
   // it can be linked to the last outbound row written this turn.
   let pendingUsage: import('./providers/types.js').TurnUsage | null = null;
 
+  // Per-push batch queue. Each push (initial + every follow-up) enqueues
+  // its ids + routing. On `result` we drain the queue — only then are the
+  // rows markCompleted'd. Earlier code marked follow-ups completed at push
+  // time, which lost them silently when the provider collapsed multiple
+  // queued prompts into one turn (OpenCode in particular) — the rows
+  // looked "done" to the host but no reply was ever dispatched.
+  type QueuedBatch = { ids: string[]; routing: RoutingContext };
+  const turnBatchQueue: QueuedBatch[] = [{ ids: initialBatchIds, routing }];
+
   // Snapshot the outbound seq so the result handler can detect whether MCP
   // tools wrote anything this turn. Without this, an agent that calls
   // send_file / send_message and then returns a chatty final-text gets
@@ -716,7 +725,16 @@ async function processQuery(
         turnActive = true;
         try { clearTurnEnded(); } catch { /* best-effort */ }
         query.push(prompt, followUpFiles.length > 0 ? followUpFiles : undefined);
-        markCompleted(keptIds);
+        // Enqueue this push as its own batch. We do NOT markCompleted here —
+        // that happens when the corresponding `result` event drains the
+        // queue. Marking at push time loses messages whose prompts the
+        // provider collapsed into a single turn (no separate result fires).
+        // setCurrentInReplyTo is deliberately NOT updated here: in-flight
+        // MCP `send_message` calls from the still-running prior turn must
+        // continue to thread under that turn's batch, not jump ahead to
+        // this newly-queued one. The result handler advances setCurrent
+        // when this batch's turn actually begins.
+        turnBatchQueue.push({ ids: keptIds, routing: extractRouting(keep) });
       } catch (err) {
         // Without this catch the rejection escapes the void IIFE and Node
         // terminates the container on unhandled-rejection. The initial-batch
@@ -836,12 +854,27 @@ async function processQuery(
         // warming the heartbeat so the host marks the agent idle and the
         // typing indicator clears. A follow-up push below will re-arm it.
         turnActive = false;
-        // Mark the initial batch completed now so the host sweep doesn't see
-        // stale 'processing' claims while the query stays open for
-        // follow-up pushes. The agent may have responded via MCP
-        // (send_message) mid-turn, or the message may not need a response
-        // at all — either way the turn is finished.
-        markCompleted(initialBatchIds);
+        // Drain queued batches. Providers may collapse multiple queued
+        // prompts into a single turn (notably OpenCode: multiple
+        // promptAsync calls on the same session can be answered by one
+        // assistant response → one session.idle → one result), so we
+        // mark all currently-queued batches completed and dispatch the
+        // reply under the most recent batch's routing. If a provider
+        // does run separate turns per push, the queue only ever has one
+        // batch when each result fires and this collapses to the
+        // single-batch case.
+        let resultRouting = routing;
+        const drainedIds: string[] = [];
+        while (turnBatchQueue.length > 0) {
+          const head = turnBatchQueue.shift()!;
+          drainedIds.push(...head.ids);
+          resultRouting = head.routing;
+        }
+        if (drainedIds.length > 0) markCompleted(drainedIds);
+        // Update MCP send_message routing for any subsequent turn the
+        // provider may run within this query (e.g. on the nudge push
+        // below, or a still-queued follow-up that arrived in the gap).
+        setCurrentInReplyTo(resultRouting.inReplyTo);
         if (event.text) {
           // If the agent already wrote a real user-facing reply this turn
           // via MCP tools (send_message / send_file), treat any unwrapped
@@ -855,7 +888,7 @@ async function processQuery(
           // then leaves its actual answer unwrapped would have the nudge
           // suppressed and the answer silently dropped.
           const mcpWroteReply = countTurnContentMessages(outboundMaxAtTurnStart) > 0;
-          const { sent, hasUnwrapped } = dispatchResultText(event.text, routing);
+          const { sent, hasUnwrapped } = dispatchResultText(event.text, resultRouting);
           if (sent > 0) sentAny = true;
           if (mcpWroteReply) {
             sentAny = true;
@@ -1029,18 +1062,29 @@ function dispatchResultText(text: string, routing: RoutingContext): { sent: numb
 function sendToDestination(dest: DestinationEntry, body: string, routing: RoutingContext): void {
   const platformId = dest.type === 'channel' ? dest.platformId! : dest.agentGroupId!;
   const channelType = dest.type === 'channel' ? dest.channelType! : 'agent';
-  // Resolve thread_id per-destination from the most recent inbound message
-  // that came from this same channel+platform. In agent-shared sessions,
-  // different destinations have different thread contexts — using a single
-  // routing.threadId would stamp one channel's thread onto another.
-  const destRouting = resolveDestinationThread(channelType, platformId);
+  // Same-channel reply: thread under the exact message the agent is
+  // responding to. Cross-channel (agent-shared sessions, broadcasts):
+  // look up that channel's most recent inbound for thread_id. The
+  // trigger's in_reply_to doesn't apply across channels, so leave it
+  // null in that case rather than pinning the reply to an unrelated
+  // message in the other channel.
+  let threadId: string | null;
+  let inReplyTo: string | null;
+  if (channelType === routing.channelType && platformId === routing.platformId) {
+    threadId = routing.threadId;
+    inReplyTo = routing.inReplyTo;
+  } else {
+    const destRouting = resolveDestinationThread(channelType, platformId);
+    threadId = destRouting?.threadId ?? null;
+    inReplyTo = destRouting?.inReplyTo ?? null;
+  }
   writeMessageOut({
     id: generateId(),
-    in_reply_to: destRouting?.inReplyTo ?? routing.inReplyTo,
+    in_reply_to: inReplyTo,
     kind: 'chat',
     platform_id: platformId,
     channel_type: channelType,
-    thread_id: destRouting?.threadId ?? null,
+    thread_id: threadId,
     content: JSON.stringify({ text: body }),
   });
 }
