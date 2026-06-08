@@ -34,6 +34,122 @@ const SESSION_STATUS_RETRY_ERROR_AFTER = 3;
 const STALE_SESSION_RE =
   /no conversation found|ENOENT.*\.jsonl|session.*not found|NotFoundError|connection reset|ECONNRESET|404|event timeout/i;
 
+// ── Progress hints ────────────────────────────────────────────────────────
+// OpenCode emits very chatty SSE (tool calls, reasoning, streaming text).
+// We translate selected events into one-line `progress` ProviderEvents that
+// the poll-loop persists to session_state.progress, which the host typing
+// module reads as a hint next to the typing dots. This is the only signal
+// the user sees during long tool-heavy turns, so keep strings short and
+// throttle to avoid thrashing the per-session SQLite file.
+
+type OpenCodePart = {
+  id?: string;
+  type?: string;
+  messageID?: string;
+  text?: string;
+  tool?: string;
+  state?: { input?: Record<string, unknown> };
+};
+
+/** Reasoning-part ids we've already announced. Reset per-turn by the
+ *  caller; module-level only because we keep the formatter pure-ish. */
+const TEXT_PROGRESS_STEP = 500;
+
+function basename(p: unknown): string {
+  if (typeof p !== 'string' || !p) return '';
+  const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
+function shortHost(u: unknown): string {
+  if (typeof u !== 'string' || !u) return '';
+  try {
+    return new URL(u).hostname || u.slice(0, 40);
+  } catch {
+    return u.slice(0, 40);
+  }
+}
+
+function clipOneLine(s: unknown, max = 60): string {
+  if (typeof s !== 'string') return '';
+  const flat = s.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? flat.slice(0, max - 1) + '…' : flat;
+}
+
+/**
+ * Map an OpenCode part-update to a short human hint, or null if the part
+ * isn't progress-worthy. Pure function — exported for unit tests.
+ *
+ * `textLen` is the running length of the assistant's text part (so we can
+ * emit "Writing reply…" only when the streamed text crosses a 500-char
+ * step). `seenReasoning` is the set of reasoning-part ids already
+ * announced, so we yield "Thinking…" at most once per reasoning part.
+ */
+export function formatProgressFromPart(
+  part: OpenCodePart | undefined,
+  textLen: number,
+  seenReasoning: Set<string>,
+): string | null {
+  if (!part || !part.type) return null;
+  const inp = part.state?.input ?? {};
+  switch (part.type) {
+    case 'tool': {
+      const tool = part.tool || '';
+      if (!tool) return null;
+      // MCP tools come through as `<server>_<name>` or `<server>__<name>`;
+      // we want a readable "server.name" rendering.
+      if (tool.startsWith('mcp__')) {
+        const rest = tool.slice(5);
+        const [server, ...name] = rest.split('__');
+        return `Calling \`${server}.${name.join('.') || rest}\``;
+      }
+      switch (tool) {
+        case 'read': return `Reading \`${basename(inp.filePath)}\``;
+        case 'write': return `Writing \`${basename(inp.filePath)}\``;
+        case 'edit': return `Editing \`${basename(inp.filePath)}\``;
+        case 'bash': return `Running \`${clipOneLine(inp.command)}\``;
+        case 'grep': return `Searching for \`${clipOneLine(inp.pattern, 40)}\``;
+        case 'glob': return `Globbing \`${clipOneLine(inp.pattern, 40)}\``;
+        case 'webfetch': return `Fetching \`${shortHost(inp.url)}\``;
+        case 'task': return `Subagent: \`${clipOneLine(inp.description ?? inp.prompt, 40)}\``;
+        case 'todowrite': return 'Updating todos';
+        default: return `Running \`${tool}\``;
+      }
+    }
+    case 'reasoning': {
+      const id = part.id || '';
+      if (!id || seenReasoning.has(id)) return null;
+      seenReasoning.add(id);
+      return 'Thinking…';
+    }
+    case 'text': {
+      if (!part.text || textLen <= 0) return null;
+      // Yield once per 500-char step so we don't thrash on every delta.
+      // The caller computes textLen *after* updating its running map.
+      if (textLen < TEXT_PROGRESS_STEP) return null;
+      return 'Writing reply…';
+    }
+    default:
+      return null;
+  }
+}
+
+/** Per-turn throttle: dedupe by message and rate-limit to ~1 yield/sec. */
+export class ProgressThrottle {
+  private lastMsg = '';
+  private lastAt = 0;
+  constructor(private readonly minIntervalMs = 1000, private readonly now: () => number = Date.now) {}
+
+  next(msg: string | null): string | null {
+    if (!msg) return null;
+    const t = this.now();
+    if (msg === this.lastMsg && t - this.lastAt < this.minIntervalMs) return null;
+    this.lastMsg = msg;
+    this.lastAt = t;
+    return msg;
+  }
+}
+
 function killProcessTree(proc: ChildProcess): void {
   if (!proc.pid) return;
   try {
@@ -331,6 +447,8 @@ export class OpenCodeProvider implements AgentProvider {
 
         const partTextByMessageId = new Map<string, string>();
         const roleByMessageId = new Map<string, string>();
+        const progress = new ProgressThrottle();
+        const seenReasoning = new Set<string>();
         let lastAssistantUsage: import('./types.js').TurnUsage | null = null;
         let lastEventAt = Date.now();
         let eventTimedOut = false;
@@ -389,15 +507,22 @@ export class OpenCodeProvider implements AgentProvider {
                 break;
               }
               case 'message.part.updated': {
-                const part = ev.properties.part as { type?: string; messageID?: string; text?: string } | undefined;
+                const part = ev.properties.part as OpenCodePart | undefined;
                 if (part?.type === 'text' && part.messageID && part.text) {
                   partTextByMessageId.set(part.messageID, part.text);
                 }
+                const textLen = part?.type === 'text' && part?.messageID
+                  ? (partTextByMessageId.get(part.messageID)?.length ?? 0)
+                  : 0;
+                const hint = progress.next(formatProgressFromPart(part, textLen, seenReasoning));
+                if (hint) yield { type: 'progress', message: hint };
                 break;
               }
               case 'permission.updated': {
                 const perm = ev.properties as { id?: string; sessionID?: string };
                 if (perm.sessionID === sessionId && perm.id) {
+                  const hint = progress.next('Requesting permission…');
+                  if (hint) yield { type: 'progress', message: hint };
                   try {
                     await client.postSessionIdPermissionsPermissionId({
                       path: { id: sessionId, permissionID: perm.id },
