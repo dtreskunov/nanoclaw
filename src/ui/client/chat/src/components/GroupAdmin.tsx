@@ -44,6 +44,8 @@ interface SettingsResponse {
     voice_mode: string | null;
     transcription_model: string | null;
   };
+  /** Freeform provider knobs. Edited via PATCH /model-params or `ncl groups config set-param`. */
+  modelParams: Record<string, unknown>;
   defaults: {
     provider: string | null;
     model: string | null;

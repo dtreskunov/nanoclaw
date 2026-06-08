@@ -33,6 +33,7 @@ function presentConfig(row: ContainerConfigRow): Record<string, unknown> {
     packages_pip: JSON.parse(row.packages_pip),
     additional_mounts: JSON.parse(row.additional_mounts),
     cli_scope: row.cli_scope,
+    model_params: JSON.parse(row.model_params),
     updated_at: row.updated_at,
   };
 }
@@ -380,6 +381,67 @@ registerResource({
           removed: { apt: apt || null, npm: npm || null, pip: pip || null },
           note: 'Image rebuild required for package changes to take effect.',
         };
+      },
+    },
+    'config set-param': {
+      access: 'approval',
+      description:
+        'Set a model parameter (provider knob) for a group. Requires `ncl groups restart` to take effect. ' +
+        'Use --id <group-id> --key <name> --value <value>. ' +
+        'Value is parsed as JSON first (so `8192`, `true`, `0.7`, `["a","b"]` come through typed); ' +
+        'if JSON parsing fails it is stored as a string. ' +
+        'Common keys: max_tokens, temperature, top_p, thinking_budget_tokens (Claude), reasoning_effort. ' +
+        'Unknown keys are accepted — the active provider warns and ignores them at startup.',
+      handler: async (args) => {
+        const id = args.id as string;
+        if (!id) throw new Error('--id is required');
+        const key = args.key as string;
+        if (!key) throw new Error('--key is required');
+        if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(key)) {
+          throw new Error(`--key must be a dotted identifier (letters, digits, _, .), got: ${key}`);
+        }
+        if (args.value === undefined) throw new Error('--value is required');
+
+        const row = getContainerConfig(id);
+        if (!row) throw new Error(`No container config for group: ${id}`);
+
+        const raw = String(args.value);
+        let value: unknown;
+        try {
+          value = JSON.parse(raw);
+        } catch {
+          value = raw;
+        }
+
+        const params = JSON.parse(row.model_params) as Record<string, unknown>;
+        params[key] = value;
+        updateContainerConfigJson(id, 'model_params', params);
+
+        return { set: { [key]: value }, model_params: params };
+      },
+    },
+    'config unset-param': {
+      access: 'approval',
+      description:
+        'Remove a model parameter from a group. Requires `ncl groups restart` to take effect. ' +
+        'Use --id <group-id> --key <name>.',
+      handler: async (args) => {
+        const id = args.id as string;
+        if (!id) throw new Error('--id is required');
+        const key = args.key as string;
+        if (!key) throw new Error('--key is required');
+
+        const row = getContainerConfig(id);
+        if (!row) throw new Error(`No container config for group: ${id}`);
+
+        const params = JSON.parse(row.model_params) as Record<string, unknown>;
+        if (!(key in params)) {
+          return { removed: null, note: `Key "${key}" was not set`, model_params: params };
+        }
+        delete params[key];
+        updateContainerConfigJson(id, 'model_params', params);
+
+        return { removed: key, model_params: params };
       },
     },
   },

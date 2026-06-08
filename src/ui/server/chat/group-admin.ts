@@ -20,7 +20,11 @@ import { restartAgentGroupContainers } from '../../../container-restart.js';
 import { getDb } from '../../../db/connection.js';
 import { getAgentGroup, getAgentGroupBySiteSlug, updateAgentGroup } from '../../../db/agent-groups.js';
 import { getMessagingGroup } from '../../../db/messaging-groups.js';
-import { getContainerConfig, updateContainerConfigScalars } from '../../../db/container-configs.js';
+import {
+  getContainerConfig,
+  updateContainerConfigJson,
+  updateContainerConfigScalars,
+} from '../../../db/container-configs.js';
 import { log } from '../../../log.js';
 import { archiveAgentGroup } from '../../../modules/archive/archive-group.js';
 import {
@@ -156,6 +160,7 @@ async function dispatch(
 
   if (rest === '/settings' && method === 'GET') return handleGetSettings(res, gid, actorUserId);
   if (rest === '/settings' && method === 'PATCH') return handlePatchSettings(req, res, actorUserId, gid);
+  if (rest === '/model-params' && method === 'PATCH') return handlePatchModelParams(req, res, actorUserId, gid);
   if (rest === '/restart' && method === 'POST') return handleRestart(req, res, actorUserId, gid);
   if (rest === '/archive' && method === 'POST') return handleArchive(req, res, actorUserId, gid);
 
@@ -215,6 +220,8 @@ interface SettingsResponse {
     | 'voice_mode'
     | 'transcription_model'
   >;
+  /** Freeform provider knobs (e.g. `{ max_tokens: 8192 }`). Edited via PATCH /model-params. */
+  modelParams: Record<string, unknown>;
   /** Resolved defaults for nullable config fields (shown as placeholders). */
   defaults: {
     provider: string | null;
@@ -294,6 +301,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
       voice_mode: cfg.voice_mode,
       transcription_model: cfg.transcription_model,
     },
+    modelParams: parseModelParams(cfg.model_params),
     defaults: {
       provider: defaultProvider,
       model: defaultModel ? bareIdForResponse(defaultProvider, defaultModel) : null,
@@ -499,6 +507,82 @@ async function handlePatchSettings(
     payload: { ...agentGroupUpdates, ...updates } as Record<string, unknown>,
   });
   await handleGetSettings(res, gid, actorUserId);
+}
+
+/**
+ * Parse the model_params JSON column for the wire. Tolerant — a corrupt
+ * value surfaces as {} rather than crashing the settings GET. Mirrors the
+ * runner-side defaults so the UI shows the same view providers consume.
+ */
+function parseModelParams(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const v = JSON.parse(raw);
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+  } catch {
+    /* fall through */
+  }
+  return {};
+}
+
+const MODEL_PARAM_KEY_RE = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+const MAX_MODEL_PARAM_KEYS = 64;
+
+/** True if v is a JSON primitive (number, string, boolean, null). */
+function isPrimitive(v: unknown): boolean {
+  return v === null || typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean';
+}
+
+/**
+ * PATCH /model-params — full replacement of the model_params bag.
+ * Body: `{ params: Record<string, unknown> }`. Each value must be a
+ * primitive or an array of primitives; nested objects are rejected so the
+ * stored shape stays predictable for providers reading it.
+ */
+async function handlePatchModelParams(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+): Promise<void> {
+  const body = (await readJsonBody(req)) as { params?: unknown };
+  if (!body.params || typeof body.params !== 'object' || Array.isArray(body.params)) {
+    throw new BadRequest('params must be an object');
+  }
+  const input = body.params as Record<string, unknown>;
+  const keys = Object.keys(input);
+  if (keys.length > MAX_MODEL_PARAM_KEYS) {
+    throw new BadRequest(`too many keys (max ${MAX_MODEL_PARAM_KEYS})`);
+  }
+  const cleaned: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (!MODEL_PARAM_KEY_RE.test(k)) {
+      throw new BadRequest(`invalid key "${k}" — must match /^[a-zA-Z_][a-zA-Z0-9_.]*$/`);
+    }
+    const v = input[k];
+    if (isPrimitive(v)) {
+      cleaned[k] = v;
+    } else if (Array.isArray(v) && v.every(isPrimitive)) {
+      cleaned[k] = v;
+    } else {
+      throw new BadRequest(`value for "${k}" must be a primitive or array of primitives`);
+    }
+  }
+
+  const cfg = getContainerConfig(gid);
+  if (!cfg) {
+    writeJson(res, 500, { error: 'container_config_missing' });
+    return;
+  }
+  updateContainerConfigJson(gid, 'model_params', cleaned);
+  recordAdminAction({
+    actorUserId,
+    action: 'group_model_params_update',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: { params: cleaned },
+  });
+  writeJson(res, 200, { modelParams: cleaned });
 }
 
 async function handleRestart(
