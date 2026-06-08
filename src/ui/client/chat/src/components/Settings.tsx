@@ -53,6 +53,8 @@ interface ChallengeResponse {
 }
 interface Status { ok?: string; err?: string }
 
+interface ProfileResponse { displayName?: string | null; error?: string; message?: string }
+
 export function Settings() {
   const open = settingsOpen.value;
   const [identities, setIdentities] = useState<Identity[]>([]);
@@ -65,6 +67,9 @@ export function Settings() {
   const [deepLink, setDeepLink] = useState<{ id: string; channel: string; url: string; expiresAt: string } | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
+  const [displayName, setDisplayName] = useState<string>('');
+  const [savedDisplayName, setSavedDisplayName] = useState<string>('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   async function refresh(): Promise<void> {
     const r = await jget<IdentitiesResponse>(`${API}/identities`);
@@ -90,7 +95,34 @@ export function Settings() {
     setDeepLink(null);
     setCode('');
     refresh();
+    (async () => {
+      const r = await jget<ProfileResponse>(`${API}/profile`);
+      if (r.ok) {
+        const name = (r.data.displayName || '').trim();
+        setDisplayName(name);
+        setSavedDisplayName(name);
+      }
+    })();
   }, [open]);
+
+  async function saveProfile(): Promise<void> {
+    const trimmed = displayName.trim();
+    if (!trimmed || trimmed === savedDisplayName) return;
+    setSavingProfile(true);
+    setStatus(null);
+    try {
+      const r = await jsend<ProfileResponse>(`${API}/profile`, 'PATCH', { displayName: trimmed });
+      if (!r.ok) {
+        setStatus({ err: r.data.message || r.data.error || `HTTP ${r.status}` });
+        return;
+      }
+      const next = (r.data.displayName || trimmed).trim();
+      setDisplayName(next);
+      setSavedDisplayName(next);
+      me.value = next;
+      showToast('Display name updated');
+    } finally { setSavingProfile(false); }
+  }
 
   async function startLink(): Promise<void> {
     if (!handle.trim()) { setStatus({ err: 'Enter a handle.' }); return; }
@@ -190,6 +222,24 @@ export function Settings() {
           <button type="button" class="icon-btn" aria-label="Close" onClick={close}>{'\u2715'}</button>
         </header>
         <div class="settings-body">
+          <section>
+            <h3>Profile</h3>
+            <div class="settings-row">
+              <input
+                type="text"
+                placeholder="Display name"
+                maxlength={80}
+                value={displayName}
+                onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setDisplayName(e.currentTarget.value)}
+              />
+              <button
+                onClick={saveProfile}
+                disabled={savingProfile || !displayName.trim() || displayName.trim() === savedDisplayName}
+              >Save</button>
+            </div>
+            <p class="muted">Shown in {BRAND.name} chat headers and approval messages. Does not change how channels address you.</p>
+          </section>
+
           <section>
             <h3>Notifications</h3>
             <label class="settings-row">

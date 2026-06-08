@@ -1,5 +1,6 @@
 /**
- * Settings handler — currently scoped to identity linking (Phase 4b).
+ * Settings handler — currently scoped to identity linking (Phase 4b)
+ * and profile (display name).
  *
  * Routes (all under `/ui/settings`):
  *
@@ -8,6 +9,8 @@
  *   POST   /ui/settings/api/identities/link/start               → {channel, handle}
  *   POST   /ui/settings/api/identities/link/verify              → {challengeId, code}
  *   DELETE /ui/settings/api/identities/:channel/:handle         → unlink
+ *   GET    /ui/settings/api/profile                             → { displayName }
+ *   PATCH  /ui/settings/api/profile                             → { displayName }
  *
  * All routes require an authenticated UI session — unauthenticated
  * requests get 401 from the API and a 303 → /ui/login from the HTML
@@ -49,11 +52,13 @@ import {
 } from '../../modules/permissions/db/identity-link-challenges.js';
 import { sendHandleDm } from '../../modules/permissions/handle-dm.js';
 import { buildDeepLink, hasDeepLinkBuilder } from '../../modules/permissions/identity-link-deeplinks.js';
+import { getUser, updateDisplayName } from '../../modules/permissions/db/users.js';
 
 import { authenticate } from './auth.js';
 import { getBranding } from './branding.js';
 
 const SETTINGS_PREFIX = '/ui/settings';
+const PROFILE_NAME_MAX = 80;
 
 export async function handleSettings(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -248,6 +253,26 @@ async function handleApi(
       log.info('identity unlinked', { userId, channel, handle });
       return json(res, 200, { ok: true });
     }
+  }
+
+  // Profile — read + update display name. Kept here (rather than in the
+  // chat routes module) so it sits alongside the other Settings-modal
+  // endpoints. The onboarding wizard sets display_name once on first
+  // sign-in; this is the only post-onboarding edit surface.
+  if (req.method === 'GET' && pathname === '/profile') {
+    const user = getUser(userId);
+    return json(res, 200, { displayName: user?.display_name ?? null });
+  }
+  if (req.method === 'PATCH' && pathname === '/profile') {
+    const body = await readJson(req);
+    const raw = body && typeof body.displayName === 'string' ? body.displayName : '';
+    const trimmed = raw.trim().slice(0, PROFILE_NAME_MAX);
+    if (!trimmed) {
+      return json(res, 400, { error: 'display_name_required', message: 'Display name cannot be empty.' });
+    }
+    updateDisplayName(userId, trimmed);
+    log.info('profile display_name updated', { userId });
+    return json(res, 200, { displayName: trimmed });
   }
 
   json(res, 404, { error: 'not_found' });

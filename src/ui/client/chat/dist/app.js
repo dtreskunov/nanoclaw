@@ -20797,6 +20797,9 @@ function Settings() {
   const [deepLink, setDeepLink] = h2(null);
   const [status, setStatus] = h2(null);
   const [busy, setBusy] = h2(false);
+  const [displayName, setDisplayName] = h2("");
+  const [savedDisplayName, setSavedDisplayName] = h2("");
+  const [savingProfile, setSavingProfile] = h2(false);
   async function refresh() {
     const r4 = await jget(`${API}/identities`);
     if (!r4.ok) {
@@ -20818,7 +20821,35 @@ function Settings() {
     setDeepLink(null);
     setCode("");
     refresh();
+    (async () => {
+      const r4 = await jget(`${API}/profile`);
+      if (r4.ok) {
+        const name = (r4.data.displayName || "").trim();
+        setDisplayName(name);
+        setSavedDisplayName(name);
+      }
+    })();
   }, [open]);
+  async function saveProfile() {
+    const trimmed = displayName.trim();
+    if (!trimmed || trimmed === savedDisplayName) return;
+    setSavingProfile(true);
+    setStatus(null);
+    try {
+      const r4 = await jsend(`${API}/profile`, "PATCH", { displayName: trimmed });
+      if (!r4.ok) {
+        setStatus({ err: r4.data.message || r4.data.error || `HTTP ${r4.status}` });
+        return;
+      }
+      const next = (r4.data.displayName || trimmed).trim();
+      setDisplayName(next);
+      setSavedDisplayName(next);
+      me.value = next;
+      showToast("Display name updated");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
   async function startLink() {
     if (!handle.trim()) {
       setStatus({ err: "Enter a handle." });
@@ -20929,6 +20960,34 @@ function Settings() {
       /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: close, children: "\u2715" })
     ] }),
     /* @__PURE__ */ u4("div", { class: "settings-body", children: [
+      /* @__PURE__ */ u4("section", { children: [
+        /* @__PURE__ */ u4("h3", { children: "Profile" }),
+        /* @__PURE__ */ u4("div", { class: "settings-row", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              type: "text",
+              placeholder: "Display name",
+              maxlength: 80,
+              value: displayName,
+              onInput: (e4) => setDisplayName(e4.currentTarget.value)
+            }
+          ),
+          /* @__PURE__ */ u4(
+            "button",
+            {
+              onClick: saveProfile,
+              disabled: savingProfile || !displayName.trim() || displayName.trim() === savedDisplayName,
+              children: "Save"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("p", { class: "muted", children: [
+          "Shown in ",
+          BRAND.name,
+          " chat headers and approval messages. Does not change how channels address you."
+        ] })
+      ] }),
       /* @__PURE__ */ u4("section", { children: [
         /* @__PURE__ */ u4("h3", { children: "Notifications" }),
         /* @__PURE__ */ u4("label", { class: "settings-row", children: [
