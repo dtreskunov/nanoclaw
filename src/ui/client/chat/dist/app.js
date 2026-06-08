@@ -15554,6 +15554,7 @@ var refs = {
   reconnectTimer: null,
   reconnectAttempt: 0,
   syncTimer: null,
+  wsPingTimer: null,
   seenIds: /* @__PURE__ */ new Set(),
   suppressHashCount: 0,
   uploadDragDepth: 0,
@@ -17760,6 +17761,15 @@ function connectChatWs() {
     const wasReconnect = refs.reconnectAttempt > 0;
     refs.reconnectAttempt = 0;
     chatStatus.value = "connected";
+    if (refs.wsPingTimer) clearInterval(refs.wsPingTimer);
+    refs.wsPingTimer = setInterval(() => {
+      if (refs.ws !== ws) return;
+      if (ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send('{"kind":"ping"}');
+      } catch {
+      }
+    }, 25e3);
     if (wasReconnect) {
       refetchThreadHistory(true).catch((err) => console.error("reconnect catchup failed", err));
     }
@@ -17767,6 +17777,10 @@ function connectChatWs() {
   ws.onclose = () => {
     if (refs.ws !== ws) return;
     refs.ws = null;
+    if (refs.wsPingTimer) {
+      clearInterval(refs.wsPingTimer);
+      refs.wsPingTimer = null;
+    }
     isTyping.value = false;
     typingHint.value = "";
     if (groupId.value !== gid || threadId.value !== tid) return;

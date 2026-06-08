@@ -560,6 +560,19 @@ function connectChatWs(): void {
     const wasReconnect = refs.reconnectAttempt > 0;
     refs.reconnectAttempt = 0;
     chatStatus.value = 'connected';
+    // App-level keepalive: any frame keeps an intermediary's idle timer
+    // from closing the socket. Server also sends ws pings, but the
+    // browser doesn't expose ws.ping(), so push a tiny JSON frame.
+    if (refs.wsPingTimer) clearInterval(refs.wsPingTimer);
+    refs.wsPingTimer = setInterval(() => {
+      if (refs.ws !== ws) return;
+      if (ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send('{"kind":"ping"}');
+      } catch {
+        // socket closing — onclose will clear the timer
+      }
+    }, 25000);
     if (wasReconnect) {
       refetchThreadHistory(true).catch((err) => console.error('reconnect catchup failed', err));
     }
@@ -567,6 +580,10 @@ function connectChatWs(): void {
   ws.onclose = () => {
     if (refs.ws !== ws) return;
     refs.ws = null;
+    if (refs.wsPingTimer) {
+      clearInterval(refs.wsPingTimer);
+      refs.wsPingTimer = null;
+    }
     isTyping.value = false;
     typingHint.value = '';
     if (groupId.value !== gid || threadId.value !== tid) return;

@@ -106,6 +106,7 @@ export interface Refs {
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   reconnectAttempt: number;
   syncTimer: ReturnType<typeof setInterval> | null;
+  wsPingTimer: ReturnType<typeof setInterval> | null;
   seenIds: Set<string>;
   suppressHashCount: number;
   uploadDragDepth: number;
@@ -117,6 +118,7 @@ export const refs: Refs = {
   reconnectTimer: null,
   reconnectAttempt: 0,
   syncTimer: null,
+  wsPingTimer: null,
   seenIds: new Set<string>(),
   suppressHashCount: 0,
   uploadDragDepth: 0,

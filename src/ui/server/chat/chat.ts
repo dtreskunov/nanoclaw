@@ -2009,6 +2009,37 @@ function deleteChatThread(userId: string, groupId: string, threadId: string): bo
 
 const wss = new WebSocketServer({ noServer: true });
 
+// Keepalive: send a ws-level ping to every open client every 30s. Browsers
+// auto-respond with pong, so any intermediary (Cloudflare, nginx, LB) sees
+// frames in both directions and won't drop the socket for idleness. A
+// client that misses two consecutive pings (no pong, no inbound message)
+// is considered dead and terminated.
+const WS_PING_INTERVAL_MS = 30_000;
+interface KeepaliveWs extends WebSocket {
+  isAlive?: boolean;
+}
+const wsKeepaliveTimer = setInterval(() => {
+  for (const client of wss.clients as Set<KeepaliveWs>) {
+    if (client.readyState !== client.OPEN) continue;
+    if (client.isAlive === false) {
+      try {
+        client.terminate();
+      } catch {
+        // already gone
+      }
+      continue;
+    }
+    client.isAlive = false;
+    try {
+      client.ping();
+    } catch {
+      // socket may have just closed
+    }
+  }
+}, WS_PING_INTERVAL_MS);
+if (typeof wsKeepaliveTimer.unref === 'function') wsKeepaliveTimer.unref();
+wss.on('close', () => clearInterval(wsKeepaliveTimer));
+
 /** Match `/ui/chat/api/groups/<groupId>/chat/<thread>/ws` on upgrade. */
 function matchChatWsPath(pathname: string): { groupId: string; threadId: string } | null {
   const m = pathname.match(/^\/ui\/chat\/api\/groups\/([^/]+)\/chat\/([^/]+)\/ws$/);
@@ -2170,6 +2201,17 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
     },
   };
   const unsubscribe = subscribeWeb(ctx.platformId, ctx.threadId, subscriber);
+
+  // Mark socket alive and refresh liveness on any inbound frame (pong from
+  // the auto-response to our ping, or an app-level ping from the client).
+  const keepalive = ws as WebSocket & { isAlive?: boolean };
+  keepalive.isAlive = true;
+  ws.on('pong', () => {
+    keepalive.isAlive = true;
+  });
+  ws.on('message', () => {
+    keepalive.isAlive = true;
+  });
 
   ws.on('close', () => unsubscribe());
   ws.on('error', (err) => log.warn('web chat ws error', { err }));
