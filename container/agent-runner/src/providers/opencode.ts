@@ -11,6 +11,46 @@ function log(msg: string): void {
   console.error(`[opencode-provider] ${msg}`);
 }
 
+// ── Model parameters (model_params bag) ──────────────────────────────────
+// Keys that map to the per-model `options` bag OpenCode hands to the
+// underlying AI SDK (provider.<name>.models.<id>.options). Unknown keys
+// are tolerated — we warn once at startup and drop them.
+const MODEL_LEVEL_PARAM_KEYS = new Set<string>([
+  'max_tokens',
+  'temperature',
+  'top_p',
+  'top_k',
+  'frequency_penalty',
+  'presence_penalty',
+  'stop',
+  'seed',
+]);
+
+/**
+ * Pick only the AI-SDK passthrough keys from the model_params bag. Returns
+ * an empty object when nothing applies so callers can spread unconditionally.
+ * Exported for unit tests.
+ */
+export function pickModelOptionsForOpenCode(
+  modelParams: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!modelParams) return {};
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(modelParams)) {
+    if (MODEL_LEVEL_PARAM_KEYS.has(k)) out[k] = modelParams[k];
+  }
+  return out;
+}
+
+let warnedUnknownKeys = false;
+function warnUnknownModelParamsOnce(modelParams: Record<string, unknown> | undefined): void {
+  if (warnedUnknownKeys || !modelParams) return;
+  const unknown = Object.keys(modelParams).filter((k) => !MODEL_LEVEL_PARAM_KEYS.has(k));
+  if (unknown.length === 0) return;
+  warnedUnknownKeys = true;
+  log(`ignoring unknown model_params: ${unknown.join(', ')} (recognized: ${[...MODEL_LEVEL_PARAM_KEYS].join(', ')})`);
+}
+
 /**
  * OpenCode sessions persist under XDG_DATA_HOME (mounted per-session on the
  * host). When a session is resumed across container restarts, OpenCode
@@ -246,25 +286,44 @@ function buildOpenCodeConfig(options: ProviderOptions): Record<string, unknown> 
 
   const providerModelId = model ? model.replace(new RegExp(`^${provider}/`), '') : undefined;
   const providerSmallModelId = smallModel ? smallModel.replace(new RegExp(`^${provider}/`), '') : undefined;
-  const modelsToRegister = [providerModelId, providerSmallModelId]
-    .filter(Boolean)
-    .filter((mid, i, a) => a.indexOf(mid as string) === i);
+  const modelsToRegister: string[] = [providerModelId, providerSmallModelId].filter(
+    (m): m is string => typeof m === 'string' && m.length > 0,
+  );
+  // Drop duplicates while preserving first-seen order.
+  const dedupedModels = modelsToRegister.filter((mid, i, a) => a.indexOf(mid) === i);
 
-  const providerOptions: Record<string, unknown> =
-    provider === 'anthropic'
-      ? {}
-      : {
-          [provider]: {
-            options: { apiKey: 'placeholder', baseURL: proxyUrl },
-            ...(modelsToRegister.length > 0
-              ? {
-                  models: Object.fromEntries(
-                    modelsToRegister.map((mid) => [mid, { id: mid, name: mid, tool_call: true }]),
-                  ),
-                }
-              : {}),
-          },
-        };
+  const modelOptions = pickModelOptionsForOpenCode(options.modelParams);
+  const hasModelOptions = Object.keys(modelOptions).length > 0;
+  warnUnknownModelParamsOnce(options.modelParams);
+
+  // Build per-model entries. Only the main model gets the modelParams
+  // options applied — the small model (used for compaction/summaries) keeps
+  // its defaults so a tiny output cap on the chat model doesn't truncate
+  // background tasks.
+  const buildModelEntry = (mid: string): Record<string, unknown> => {
+    const base: Record<string, unknown> = { id: mid, name: mid, tool_call: true };
+    if (hasModelOptions && mid === providerModelId) base.options = modelOptions;
+    return base;
+  };
+
+  let providerOptions: Record<string, unknown>;
+  if (provider === 'anthropic') {
+    // For the anthropic-direct path we don't override `options` (no API key
+    // swap) but we DO register a model entry when modelParams need to apply.
+    providerOptions =
+      hasModelOptions && providerModelId
+        ? { anthropic: { models: { [providerModelId]: buildModelEntry(providerModelId) } } }
+        : {};
+  } else {
+    providerOptions = {
+      [provider]: {
+        options: { apiKey: 'placeholder', baseURL: proxyUrl },
+        ...(dedupedModels.length > 0
+          ? { models: Object.fromEntries(dedupedModels.map((mid) => [mid, buildModelEntry(mid)])) }
+          : {}),
+      },
+    };
+  }
 
   const mcp = mcpServersToOpenCodeConfig(options.mcpServers);
 
@@ -308,6 +367,7 @@ function runtimeConfigKey(options: ProviderOptions): string {
     model: options.model || process.env.OPENCODE_MODEL,
     small: process.env.OPENCODE_SMALL_MODEL,
     op: process.env.OPENCODE_PROVIDER,
+    modelOptions: pickModelOptionsForOpenCode(options.modelParams),
   });
 }
 

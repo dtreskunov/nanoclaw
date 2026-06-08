@@ -12,6 +12,55 @@ function log(msg: string): void {
   console.error(`[claude-provider] ${msg}`);
 }
 
+// ── Model parameters (model_params bag) ────────────────────────────────
+// Keys this provider knows how to apply. `max_tokens` is plumbed via
+// ANTHROPIC_MAX_TOKENS (the Claude Code CLI honors that env), since the
+// agent-SDK doesn't expose a per-query output cap. `thinking_budget_tokens`
+// becomes `thinking: { type: 'enabled', budgetTokens: n }`.
+const CLAUDE_KNOWN_PARAM_KEYS = new Set<string>(['max_tokens', 'thinking_budget_tokens']);
+
+/**
+ * Pure: map model_params to env-var entries the Claude Code CLI honors.
+ * Today: `max_tokens` -> `ANTHROPIC_MAX_TOKENS`. Returns `{}` when nothing
+ * applies. Exported for tests.
+ */
+export function paramsToClaudeEnv(modelParams: Record<string, unknown> | undefined): Record<string, string> {
+  if (!modelParams) return {};
+  const out: Record<string, string> = {};
+  const maxTokens = modelParams.max_tokens;
+  if (typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0) {
+    out.ANTHROPIC_MAX_TOKENS = String(Math.floor(maxTokens));
+  }
+  return out;
+}
+
+/**
+ * Pure: map `thinking_budget_tokens` to the SDK `thinking` option. Returns
+ * undefined to mean "don't pass `thinking`" (let the SDK default apply).
+ * Exported for tests.
+ */
+export function paramsToClaudeThinking(
+  modelParams: Record<string, unknown> | undefined,
+): { type: 'enabled'; budgetTokens: number } | undefined {
+  if (!modelParams) return undefined;
+  const budget = modelParams.thinking_budget_tokens;
+  if (typeof budget === 'number' && Number.isFinite(budget) && budget > 0) {
+    return { type: 'enabled', budgetTokens: Math.floor(budget) };
+  }
+  return undefined;
+}
+
+let warnedUnknownClaudeKeys = false;
+function warnUnknownClaudeParamsOnce(modelParams: Record<string, unknown> | undefined): void {
+  if (warnedUnknownClaudeKeys || !modelParams) return;
+  const unknown = Object.keys(modelParams).filter((k) => !CLAUDE_KNOWN_PARAM_KEYS.has(k));
+  if (unknown.length === 0) return;
+  warnedUnknownClaudeKeys = true;
+  log(
+    `ignoring unknown model_params: ${unknown.join(', ')} (recognized: ${[...CLAUDE_KNOWN_PARAM_KEYS].join(', ')})`,
+  );
+}
+
 // Deferred SDK builtins that either sidestep nanoclaw's own scheduling or
 // don't fit our async message-passing model (they're designed for Claude
 // Code's interactive UI and would hang here).
@@ -356,11 +405,13 @@ export class ClaudeProvider implements AgentProvider {
     this.model = options.model;
     this.effort = options.effort;
     this.modelParams = options.modelParams ?? {};
+    warnUnknownClaudeParamsOnce(this.modelParams);
     this.env = {
       ...(options.env ?? {}),
       CLAUDE_CODE_AUTO_COMPACT_WINDOW,
       MCP_TIMEOUT: MCP_TIMEOUT_MS,
       MCP_TOOL_TIMEOUT: MCP_TOOL_TIMEOUT_MS,
+      ...paramsToClaudeEnv(this.modelParams),
     };
   }
 
@@ -410,6 +461,8 @@ export class ClaudeProvider implements AgentProvider {
 
     const instructions = input.systemContext?.instructions;
 
+    const thinking = paramsToClaudeThinking(this.modelParams);
+
     const sdkResult = sdkQuery({
       prompt: stream,
       options: {
@@ -427,6 +480,7 @@ export class ClaudeProvider implements AgentProvider {
         model: this.model,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         effort: this.effort as any,
+        ...(thinking ? { thinking } : {}),
         // In rootless-podman-on-LXC we run as --user=0:0 so host bind mounts
         // are accessible. Claude Code refuses bypassPermissions as root, so
         // fall back to 'auto' which still honours allowedTools/disallowedTools.
