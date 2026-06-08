@@ -58,10 +58,7 @@ import type { AgentGroup, Session } from './types.js';
 const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
 
 /** Active containers tracked by session ID. */
-const activeContainers = new Map<
-  string,
-  { process: ChildProcess; containerName: string; adopted?: boolean }
->();
+const activeContainers = new Map<string, { process: ChildProcess; containerName: string; adopted?: boolean }>();
 
 /**
  * In-flight wake promises, keyed by session id. Deduplicates concurrent
