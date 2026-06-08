@@ -11,6 +11,23 @@ function log(msg: string): void {
   console.error(`[opencode-provider] ${msg}`);
 }
 
+/**
+ * OpenCode sessions persist under XDG_DATA_HOME (mounted per-session on the
+ * host). When a session is resumed across container restarts, OpenCode
+ * defaults the next turn's model to whatever the previous assistant turn
+ * used — silently ignoring the new server-level `model` config. To honor
+ * per-group model changes we pass `body.model` on every prompt.
+ */
+function resolveModelForPrompt(
+  optionModel: string | undefined,
+): { providerID: string; modelID: string } | undefined {
+  const provider = process.env.OPENCODE_PROVIDER || 'anthropic';
+  const fullModel = optionModel || process.env.OPENCODE_MODEL;
+  if (!fullModel) return undefined;
+  const modelID = fullModel.replace(new RegExp(`^${provider}/`), '');
+  return { providerID: provider, modelID };
+}
+
 const SESSION_STATUS_RETRY_ERROR_AFTER = 3;
 
 /** Stale / dead OpenCode session heuristics (complement Claude-centric host patterns). */
@@ -299,9 +316,13 @@ export class OpenCodeProvider implements AgentProvider {
           initialFiles = undefined; // Only send on first prompt
         }
 
+        const modelSelection = resolveModelForPrompt(self.options.model);
         const promptRes = await client.session.promptAsync({
           path: { id: sessionId },
-          body: { parts: parts as any },
+          body: {
+            parts: parts as any,
+            ...(modelSelection ? { model: modelSelection } : {}),
+          },
         });
         if (promptRes.error) {
           self.activeSessionId = undefined;
