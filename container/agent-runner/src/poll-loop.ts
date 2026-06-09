@@ -946,6 +946,21 @@ async function processQuery(
     done = true;
     clearInterval(pollHandle);
     clearInterval(liveHandle);
+    // Drain any queued follow-up batches that never reached a `result`
+    // event. Without this, when the SDK throws mid-turn the outer catch
+    // only marks the initial batch completed (via runPollLoop's
+    // `markCompleted(processingIds)`), and any messages pushed into the
+    // active query during the failure window stay markProcessing'd in
+    // inbound.db forever — they never re-fire and never get acknowledged.
+    // markCompleted is INSERT OR REPLACE, so re-marking the initial batch
+    // here is harmless.
+    const orphanedIds: string[] = [];
+    while (turnBatchQueue.length > 0) {
+      orphanedIds.push(...turnBatchQueue.shift()!.ids);
+    }
+    if (orphanedIds.length > 0) {
+      try { markCompleted(orphanedIds); } catch { /* best-effort */ }
+    }
     // Atomic continuation rollback. The `init` handler persisted the new
     // SDK session id immediately (for mid-turn crash recovery), but if the
     // turn never reached a `result` event — the stream errored out or the
