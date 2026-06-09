@@ -471,7 +471,8 @@ function renderFailedTurnReplay(failed: { prompt: string; error: string; recorde
     failed.prompt,
     `</user_message_that_was_not_processed>`,
     `<provider_error>${failed.error}</provider_error>`,
-    `<note>The provider rejected ONLY the single user turn shown above. Your earlier conversation history (everything before that turn) is intact and resumed normally — do not claim you have forgotten it. The user was already told that one turn was not processed. Acknowledge the failure briefly only if directly relevant; do not silently retry the failed action.</note>`,
+    `<note>The provider rejected only the single user turn shown above. Your earlier conversation history is intact — do not claim you have forgotten it. The user has already seen a one-line "your message couldn't be processed" notice, so you do not need to re-explain the failure.`,
+    `\nThe user's intent in that failed turn still stands. Now: actually do what they asked, using your tools. If their current message is a retry/prod ("try again", "you there?", "all done?", etc.), interpret it as "complete the work from the failed turn" — do NOT respond with a verbal-only acknowledgement ("on it", "continuing", "doing it now", "yep, here") and end the turn without making the actual change. If their current message is unrelated, address that instead.</note>`,
     `</previous_turn_failed>`,
   ].join('\n');
 }
