@@ -1,7 +1,7 @@
 import { readEnvFile } from '../../../env.js';
 import { updateContainerConfigScalars } from '../../../db/container-configs.js';
 import type { ContainerConfigRow } from '../../../types.js';
-import { bareIdForResponse, dbValueFromBareId, getModelDetails } from './models-catalog.js';
+import { bareIdForResponse, getModelDetails } from './models-catalog.js';
 
 export type EffectiveVoiceMode = 'off' | 'transcribe' | 'audio';
 
@@ -22,11 +22,14 @@ export async function deriveVoiceModeForConfig(
   cfg: Pick<ContainerConfigRow, 'provider' | 'model' | 'voice_mode' | 'transcription_model'> | undefined,
 ): Promise<EffectiveVoiceMode> {
   if (!cfg) return 'off';
-  const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL']);
+  const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL', 'DEFAULT_TRANSCRIPTION_MODEL']);
   const provider = cfg.provider ?? envDefaults.DEFAULT_PROVIDER ?? 'claude';
-  const model =
-    cfg.model ?? (envDefaults.DEFAULT_MODEL ? dbValueFromBareId(provider, envDefaults.DEFAULT_MODEL) : null);
-  return deriveVoiceMode(provider, model, cfg.transcription_model ?? null);
+  // DEFAULT_MODEL in .env is the DB wire value (already provider-prefixed
+  // for opencode), so use it as-is — running it through dbValueFromBareId
+  // would double-prefix.
+  const model = cfg.model ?? envDefaults.DEFAULT_MODEL ?? null;
+  const transcriptionModel = cfg.transcription_model ?? envDefaults.DEFAULT_TRANSCRIPTION_MODEL ?? null;
+  return deriveVoiceMode(provider, model, transcriptionModel);
 }
 
 export async function reconcileVoiceMode(

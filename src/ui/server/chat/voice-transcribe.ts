@@ -37,25 +37,29 @@ function getApiKey(): string | undefined {
  * Stream transcription of an audio buffer via OpenRouter.
  * Yields partial transcript text as it arrives from the API.
  *
- * Uses the OneCLI proxy to inject the API key. Falls back to a local
- * OPENROUTER_API_KEY if the proxy is unavailable.
+ * Uses the OneCLI proxy to inject the API key. When `agentIdentifier` is
+ * provided, credentials are scoped to that agent's vault assignment; the
+ * caller is responsible for ensuring the OneCLI agent exists. Falls back
+ * to a local OPENROUTER_API_KEY if the proxy is unavailable.
  */
 export async function* streamTranscribe(
   audioBuffer: Buffer,
   mime: string,
   model?: string | null,
+  agentIdentifier?: string,
 ): AsyncGenerator<string> {
   const format = MIME_TO_FORMAT[mime];
   if (!format) throw new Error(`unsupported_mime: ${mime}`);
   if (audioBuffer.length === 0) throw new Error('empty_audio');
 
-  const useProxy = await isProxyAvailable();
+  const useProxy = await isProxyAvailable(agentIdentifier);
   const apiKey = useProxy ? undefined : getApiKey();
   if (!useProxy && !apiKey) throw new Error('missing_api_key');
 
   const b64 = audioBuffer.toString('base64');
+  const envDefault = readEnvFile(['DEFAULT_TRANSCRIPTION_MODEL']).DEFAULT_TRANSCRIPTION_MODEL;
   const body = {
-    model: model || DEFAULT_MODEL,
+    model: model || envDefault || DEFAULT_MODEL,
     stream: true,
     messages: [
       {
@@ -81,6 +85,7 @@ export async function* streamTranscribe(
     headers,
     body: JSON.stringify(body),
     timeout: TIMEOUT_MS,
+    agent: agentIdentifier,
   });
 
   if (!res.ok) {

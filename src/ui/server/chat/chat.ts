@@ -52,13 +52,21 @@ import { setResendPendingWebOverride } from '../../../channels/resend.js';
 import type { OutboundMessage } from '../../../channels/adapter.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
 import { streamTranscribe } from './voice-transcribe.js';
+import { ensureOneCliAgent } from './onecli-proxy.js';
 import { reconcileVoiceMode } from './voice-mode.js';
 import fs from 'fs';
 
 function appendTranscriptDelta(text: string, delta: string): string {
   if (!text || !delta) return text + delta;
   if (/\s$/.test(text) || /^\s/.test(delta)) return text + delta;
-  if (/[\p{L}\p{N}]$/u.test(text) && /^[\p{L}\p{N}]/u.test(delta)) return `${text} ${delta}`;
+  // LLM transcription tokens occasionally arrive without their leading space,
+  // producing "Hello.World" or "okay,let's". Insert one when the boundary
+  // looks like a word break — the previous chunk ends in a letter/digit or a
+  // sentence-final / closing punctuation mark, and the new chunk starts with
+  // a letter/digit or an opening bracket/quote.
+  const endsWord = /[\p{L}\p{N}.,!?;:)\]}"]$/u.test(text);
+  const startsWord = /^[\p{L}\p{N}([{"]/u.test(delta);
+  if (endsWord && startsWord) return `${text} ${delta}`;
   return text + delta;
 }
 
@@ -445,7 +453,12 @@ export async function handleChatRequest(
       });
       let fullText = '';
       try {
-        for await (const delta of streamTranscribe(file.buffer, file.contentType, cfg.transcription_model)) {
+        // Scope transcription credentials to the agent group: the OneCLI
+        // proxy injects whichever vault entries that agent has access to.
+        // Mirrors container-runner.ts — identifier is always agentGroup.id.
+        const group = getAgentGroup(m.groupId);
+        if (group) await ensureOneCliAgent(group.name, group.id);
+        for await (const delta of streamTranscribe(file.buffer, file.contentType, cfg.transcription_model, m.groupId)) {
           const nextText = appendTranscriptDelta(fullText, delta);
           const normalizedDelta = nextText.slice(fullText.length);
           fullText = nextText;

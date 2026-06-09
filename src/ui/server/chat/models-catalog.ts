@@ -248,12 +248,10 @@ export function dbValueFromBareId(agentProvider: string | null, bareId: string |
   if (bareId == null || bareId === '') return null;
   if (agentProvider === 'opencode') {
     const prefix = opencodeUpstream();
-    if (prefix) {
-      // Be tolerant — if the user pasted a value already containing the
-      // prefix, accept it as-is.
-      if (bareId.startsWith(prefix + '/')) return bareId;
-      return `${prefix}/${bareId}`;
-    }
+    // Always prepend — the bare id may itself start with `<prefix>/`
+    // (e.g. OpenRouter's `openrouter/free` router model), so a "tolerant"
+    // skip would conflate two different DB values.
+    if (prefix) return `${prefix}/${bareId}`;
   }
   return bareId;
 }
