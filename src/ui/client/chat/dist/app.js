@@ -19071,7 +19071,9 @@ function hasSpeechRecognition() {
 function appendTranscriptDelta(text, delta) {
   if (!text || !delta) return text + delta;
   if (/\s$/.test(text) || /^\s/.test(delta)) return text + delta;
-  if (/[\p{L}\p{N}]$/u.test(text) && /^[\p{L}\p{N}]/u.test(delta)) return `${text} ${delta}`;
+  const endsWord = /[\p{L}\p{N}.,!?;:)\]}"]$/u.test(text);
+  const startsWord = /^[\p{L}\p{N}([{"]/u.test(delta);
+  if (endsWord && startsWord) return `${text} ${delta}`;
   return text + delta;
 }
 var mediaRecorder = null;
@@ -21795,9 +21797,13 @@ function ModelSelector({ value, provider, placeholder, disabled, apiBasePath, in
 }
 
 // src/components/GroupAdmin.tsx
+var SETTINGS_SECTIONS = /* @__PURE__ */ new Set(["models", "settings", "packages", "mcp", "skills"]);
 var TAB_ITEMS = [
   { id: "models", label: "Models", sublabel: "Provider, model, voice" },
   { id: "settings", label: "Settings", sublabel: "Image, scope, public site" },
+  { id: "packages", label: "Packages", sublabel: "apt / npm / pip in the image" },
+  { id: "mcp", label: "MCP servers", sublabel: "External tools wired to the agent" },
+  { id: "skills", label: "Skills", sublabel: "Container skills mounted at runtime" },
   { id: "members", label: "Members", sublabel: "Who can use this group" },
   { id: "roles", label: "Admins", sublabel: "Admins for this group" },
   { id: "destinations", label: "Destinations", sublabel: "Where this group can send messages" }
@@ -21897,7 +21903,7 @@ function GroupAdmin() {
     /* @__PURE__ */ u4("header", { class: "settings-head", children: [
       /* @__PURE__ */ u4("span", { class: "title", children: title }),
       /* @__PURE__ */ u4("div", { class: "settings-head-actions", children: [
-        (tab === "models" || tab === "settings") && ha ? /* @__PURE__ */ u4(k, { children: /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) }) }) : null,
+        tab !== null && SETTINGS_SECTIONS.has(tab) && ha ? /* @__PURE__ */ u4(k, { children: /* @__PURE__ */ u4(Tooltip, { text: ha.canSave ? "Save changes" : "Nothing to save", children: /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Save", onClick: ha.apply, disabled: ha.busy || !ha.canSave, children: "\u2713" }) }) }) : null,
         /* @__PURE__ */ u4("button", { type: "button", class: "icon-btn", "aria-label": "Close", onClick: attemptClose, children: "\u2715" })
       ] })
     ] }),
@@ -21926,7 +21932,7 @@ function GroupAdmin() {
           ]
         }
       ) : null,
-      tab === "models" || tab === "settings" ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: hardClose, onActions: setActions }) : null,
+      tab !== null && SETTINGS_SECTIONS.has(tab) ? /* @__PURE__ */ u4(SettingsTab, { gid, section: tab, onClose: hardClose, onActions: setActions }) : null,
       tab === "members" ? /* @__PURE__ */ u4(MembersTab, { gid }) : null,
       tab === "roles" ? /* @__PURE__ */ u4(RolesTab, { gid }) : null,
       tab === "destinations" ? /* @__PURE__ */ u4(DestinationsTab, { gid }) : null
@@ -21988,6 +21994,10 @@ function SettingsTab({ gid, section, onClose, onActions }) {
   const [draftName, setDraftName] = h2("");
   const [siteEnabled, setSiteEnabled] = h2(false);
   const [siteSlug, setSiteSlug] = h2("");
+  const [draftModelParams, setDraftModelParams] = h2({});
+  const [draftPackages, setDraftPackages] = h2({ apt: [], npm: [], pip: [] });
+  const [draftMcpServers, setDraftMcpServers] = h2({});
+  const [draftSkills, setDraftSkills] = h2([]);
   const [busy, setBusy] = h2(false);
   const [images, setImages] = h2(null);
   async function refresh() {
@@ -22003,6 +22013,14 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       setDraftName(r4.data.name);
       setSiteEnabled(r4.data.site.enabled);
       setSiteSlug(r4.data.site.slug ?? "");
+      setDraftModelParams(r4.data.modelParams);
+      setDraftPackages({
+        apt: [...r4.data.packages?.apt ?? []],
+        npm: [...r4.data.packages?.npm ?? []],
+        pip: [...r4.data.packages?.pip ?? []]
+      });
+      setDraftMcpServers({ ...r4.data.mcpServers ?? {} });
+      setDraftSkills(r4.data.skills === "all" ? "all" : [...r4.data.skills ?? []]);
     } finally {
       setBusy(false);
     }
@@ -22039,7 +22057,13 @@ function SettingsTab({ gid, section, onClose, onActions }) {
     "effort",
     "image_tag",
     "assistant_name",
-    "max_messages_per_prompt"
+    "max_messages_per_prompt",
+    "model_params",
+    "mcp_servers",
+    "skills",
+    "packages_apt",
+    "packages_npm",
+    "packages_pip"
   ]);
   function changedFields() {
     const out = /* @__PURE__ */ new Set();
@@ -22052,12 +22076,21 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       if (siteEnabled !== data.site.enabled) out.add("site_enabled");
       if (data.actorIsElevated && siteSlug.trim() !== (data.site.slug ?? "")) out.add("site_slug");
     }
+    if (JSON.stringify(draftModelParams) !== JSON.stringify(data.modelParams ?? {})) out.add("model_params");
+    const dataPkg = data.packages ?? { apt: [], npm: [], pip: [] };
+    if (JSON.stringify(draftPackages.apt) !== JSON.stringify(dataPkg.apt)) out.add("packages_apt");
+    if (JSON.stringify(draftPackages.npm) !== JSON.stringify(dataPkg.npm)) out.add("packages_npm");
+    if (JSON.stringify(draftPackages.pip) !== JSON.stringify(dataPkg.pip)) out.add("packages_pip");
+    if (JSON.stringify(draftMcpServers) !== JSON.stringify(data.mcpServers ?? {})) out.add("mcp_servers");
+    if (JSON.stringify(draftSkills) !== JSON.stringify(data.skills ?? [])) out.add("skills");
     return out;
   }
   const pending2 = changedFields();
   const changed = pending2.size > 0;
   const needsRestart = [...pending2].some((f5) => RESTART_REQUIRING_FIELDS.has(f5));
-  const needsRebuild = pending2.has("image_tag") && draft.image_tag != null && !!images && !images.images.some((i5) => i5.value === draft.image_tag);
+  const imageRebuildNeeded = pending2.has("image_tag") && draft.image_tag != null && !!images && !images.images.some((i5) => i5.value === draft.image_tag);
+  const packagesChanged = pending2.has("packages_apt") || pending2.has("packages_npm") || pending2.has("packages_pip");
+  const needsRebuild = imageRebuildNeeded || packagesChanged;
   const [confirmOpen, setConfirmOpen] = h2(false);
   const [restartChecked, setRestartChecked] = h2(false);
   const [rebuildChecked, setRebuildChecked] = h2(false);
@@ -22081,7 +22114,16 @@ function SettingsTab({ gid, section, onClose, onActions }) {
     if (!draft) return;
     setBusy(true);
     try {
-      if (changed) {
+      const JSON_FIELDS = /* @__PURE__ */ new Set([
+        "model_params",
+        "mcp_servers",
+        "skills",
+        "packages_apt",
+        "packages_npm",
+        "packages_pip"
+      ]);
+      const settingsChanged = [...pending2].some((f5) => !JSON_FIELDS.has(f5));
+      if (settingsChanged) {
         const body = { ...draft };
         if (data && draftName.trim() !== data.name) body.name = draftName.trim();
         if (pending2.has("site_enabled")) body.site_enabled = siteEnabled;
@@ -22091,12 +22133,59 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
           return;
         }
-        setData(r4.data);
-        setDraft({ ...r4.data.config });
-        setDraftName(r4.data.name);
-        setSiteEnabled(r4.data.site.enabled);
-        setSiteSlug(r4.data.site.slug ?? "");
-        groups.value = groups.value.map((g8) => g8.id === gid ? { ...g8, name: r4.data.name } : g8);
+      }
+      if (pending2.has("model_params")) {
+        const r4 = await call(
+          apiPath(gid, "/model-params"),
+          "PATCH",
+          { params: draftModelParams }
+        );
+        if (!r4.ok) {
+          showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+          return;
+        }
+      }
+      if (pending2.has("packages_apt") || pending2.has("packages_npm") || pending2.has("packages_pip")) {
+        const body = {};
+        if (pending2.has("packages_apt")) body.apt = draftPackages.apt;
+        if (pending2.has("packages_npm")) body.npm = draftPackages.npm;
+        if (pending2.has("packages_pip")) body.pip = draftPackages.pip;
+        const r4 = await call(apiPath(gid, "/packages"), "PATCH", body);
+        if (!r4.ok) {
+          showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+          return;
+        }
+      }
+      if (pending2.has("mcp_servers")) {
+        const r4 = await call(apiPath(gid, "/mcp-servers"), "PATCH", { servers: draftMcpServers });
+        if (!r4.ok) {
+          showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+          return;
+        }
+      }
+      if (pending2.has("skills")) {
+        const r4 = await call(apiPath(gid, "/skills"), "PATCH", { skills: draftSkills });
+        if (!r4.ok) {
+          showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
+          return;
+        }
+      }
+      const fresh = await call(apiPath(gid, "/settings"));
+      if (fresh.ok) {
+        setData(fresh.data);
+        setDraft({ ...fresh.data.config });
+        setDraftName(fresh.data.name);
+        setSiteEnabled(fresh.data.site.enabled);
+        setSiteSlug(fresh.data.site.slug ?? "");
+        setDraftModelParams(fresh.data.modelParams);
+        setDraftPackages({
+          apt: [...fresh.data.packages?.apt ?? []],
+          npm: [...fresh.data.packages?.npm ?? []],
+          pip: [...fresh.data.packages?.pip ?? []]
+        });
+        setDraftMcpServers({ ...fresh.data.mcpServers ?? {} });
+        setDraftSkills(fresh.data.skills === "all" ? "all" : [...fresh.data.skills ?? []]);
+        groups.value = groups.value.map((g8) => g8.id === gid ? { ...g8, name: fresh.data.name } : g8);
       }
       if (effectiveRebuild || effectiveRestart) {
         const r4 = await runRestart(effectiveRebuild);
@@ -22197,7 +22286,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         ModelSelector,
         {
           value: draft.model,
-          provider,
+          provider: provider ?? data.defaults.provider,
           placeholder: data.defaults.model ? `default: ${data.defaults.model}` : "pick or type a model id",
           disabled: busy,
           apiBasePath: apiPath(gid, ""),
@@ -22215,7 +22304,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
             {
               value: draft.transcription_model,
               provider: "openrouter",
-              placeholder: "google/gemini-2.0-flash-lite-001",
+              placeholder: data.defaults.transcription_model || "google/gemini-2.0-flash-lite-001",
               disabled: busy,
               apiBasePath: apiPath(gid, ""),
               inputModality: "audio",
@@ -22229,8 +22318,9 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         {
           gid,
           provider: draft.provider,
-          initial: data.modelParams,
-          onSaved: (next) => setData((d5) => d5 ? { ...d5, modelParams: next } : d5)
+          value: draftModelParams,
+          busy,
+          onChange: setDraftModelParams
         }
       )
     ] }) : null,
@@ -22388,6 +22478,30 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         }
       ) })
     ] }) : null,
+    section === "packages" ? /* @__PURE__ */ u4(
+      PackagesSection,
+      {
+        value: draftPackages,
+        busy,
+        onChange: setDraftPackages
+      }
+    ) : null,
+    section === "mcp" ? /* @__PURE__ */ u4(
+      McpServersSection,
+      {
+        value: draftMcpServers,
+        busy,
+        onChange: setDraftMcpServers
+      }
+    ) : null,
+    section === "skills" ? /* @__PURE__ */ u4(
+      SkillsSection,
+      {
+        value: draftSkills,
+        busy,
+        onChange: setDraftSkills
+      }
+    ) : null,
     /* @__PURE__ */ u4("div", { class: "settings-row group-admin-actions", style: "margin-top:16px", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: changed ? `${pending2.size} unsaved change${pending2.size === 1 ? "" : "s"}. Click Save (\u2713) above to review and apply.` : "No unsaved changes." }) }),
     confirmOpen ? /* @__PURE__ */ u4(
       "div",
@@ -22960,17 +23074,6 @@ function paramsToRows(params) {
     valueText: typeof v5 === "string" ? v5 : JSON.stringify(v5)
   }));
 }
-function rowsEqualParams(rows, params) {
-  const keys = Object.keys(params);
-  if (rows.length !== keys.length) return false;
-  for (const r4 of rows) {
-    if (!(r4.key in params)) return false;
-    const stored = params[r4.key];
-    const storedText = typeof stored === "string" ? stored : JSON.stringify(stored);
-    if (storedText !== r4.valueText) return false;
-  }
-  return true;
-}
 function parseRowValue(raw) {
   const trimmed = raw.trim();
   if (trimmed === "") return "";
@@ -22980,28 +23083,60 @@ function parseRowValue(raw) {
     return raw;
   }
 }
+function rowsToParams(rows) {
+  const out = {};
+  const seen = /* @__PURE__ */ new Set();
+  for (const r4 of rows) {
+    const k4 = r4.key.trim();
+    if (k4 === "" && r4.valueText.trim() === "") continue;
+    if (!k4 || !MODEL_PARAM_KEY_RE.test(k4) || seen.has(k4)) continue;
+    seen.add(k4);
+    out[k4] = parseRowValue(r4.valueText);
+  }
+  return out;
+}
 function ModelParamsEditor({
   gid,
   provider,
-  initial,
-  onSaved
+  value,
+  busy,
+  onChange
 }) {
-  const [rows, setRows] = h2(() => paramsToRows(initial));
-  const [busy, setBusy] = h2(false);
+  const [rows, setRows] = h2(() => paramsToRows(value));
+  const lastEmittedRef = A2(JSON.stringify(value));
   y2(() => {
-    setRows(paramsToRows(initial));
-  }, [initial]);
+    const incoming = JSON.stringify(value);
+    if (incoming === lastEmittedRef.current) return;
+    setRows(paramsToRows(value));
+    lastEmittedRef.current = incoming;
+  }, [value]);
   const recognized = provider ? MODEL_PARAM_RECOGNIZED[provider] ?? [] : [];
+  function emit(next) {
+    const params = rowsToParams(next);
+    lastEmittedRef.current = JSON.stringify(params);
+    onChange(params);
+  }
   function update(uid, patch) {
-    setRows((rs) => rs.map((r4) => r4.uid === uid ? { ...r4, ...patch } : r4));
+    setRows((rs) => {
+      const next = rs.map((r4) => r4.uid === uid ? { ...r4, ...patch } : r4);
+      emit(next);
+      return next;
+    });
   }
   function remove(uid) {
-    setRows((rs) => rs.filter((r4) => r4.uid !== uid));
+    setRows((rs) => {
+      const next = rs.filter((r4) => r4.uid !== uid);
+      emit(next);
+      return next;
+    });
   }
   function addBlank(presetKey = "") {
-    setRows((rs) => [...rs, { uid: nextRowUid(), key: presetKey, valueText: "" }]);
+    setRows((rs) => {
+      const next = [...rs, { uid: nextRowUid(), key: presetKey, valueText: "" }];
+      emit(next);
+      return next;
+    });
   }
-  const dirty = !rowsEqualParams(rows, initial);
   const issues = [];
   const seenKeys = /* @__PURE__ */ new Set();
   for (const r4 of rows) {
@@ -23020,34 +23155,6 @@ function ModelParamsEditor({
       continue;
     }
     seenKeys.add(k4);
-  }
-  const canSave = dirty && issues.length === 0 && !busy;
-  async function save() {
-    setBusy(true);
-    try {
-      const params = {};
-      for (const r5 of rows) {
-        const k4 = r5.key.trim();
-        if (k4 === "" && r5.valueText.trim() === "") continue;
-        params[k4] = parseRowValue(r5.valueText);
-      }
-      const r4 = await call(
-        apiPath(gid, "/model-params"),
-        "PATCH",
-        { params }
-      );
-      if (!r4.ok) {
-        showToast(errMsg2(r4.data, `HTTP ${r4.status}`), "err");
-        return;
-      }
-      onSaved(r4.data.modelParams);
-      showToast("Saved. Restart sessions for the change to take effect.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  function reset() {
-    setRows(paramsToRows(initial));
   }
   const suggestions = recognized.filter((k4) => !rows.some((r4) => r4.key.trim() === k4));
   return /* @__PURE__ */ u4(
@@ -23122,15 +23229,558 @@ function ModelParamsEditor({
             ))
           ] }) : null
         ] }),
-        issues.length > 0 ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: issues[0] }) : null,
-        dirty ? /* @__PURE__ */ u4("div", { class: "ga-mp-save", children: [
-          /* @__PURE__ */ u4("button", { type: "button", disabled: busy, onClick: reset, children: "Reset" }),
-          /* @__PURE__ */ u4("button", { type: "button", class: "primary", disabled: !canSave, onClick: save, children: busy ? "Saving\u2026" : "Save parameters" }),
-          /* @__PURE__ */ u4(Tooltip, { text: "Saving updates model_params immediately, but the running container won't pick it up until you restart it (Settings \u2192 Restart, or `ncl groups restart`).", children: /* @__PURE__ */ u4("span", { class: "info-icon", "aria-label": "More info", children: "i" }) })
-        ] }) : null
+        issues.length > 0 ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: issues[0] }) : null
       ] })
     }
   );
+}
+var PACKAGE_TOKEN_RE = /^[A-Za-z0-9@._/+=<>~^!*-]+$/;
+var MCP_NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+var SKILL_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+function PackagesSection({
+  value,
+  busy,
+  onChange
+}) {
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+      "Packages baked into the container image. Changes require an image rebuild \u2014 the Apply dialog suggests rebuild when any list here changes. Mirrors",
+      " ",
+      /* @__PURE__ */ u4("code", { children: "ncl groups config add-package / remove-package" }),
+      "."
+    ] }) }),
+    /* @__PURE__ */ u4(
+      PackageListField,
+      {
+        label: "apt packages",
+        info: "Debian packages installed via apt-get in the agent image. Example: ripgrep, jq, postgresql-client.",
+        items: value.apt,
+        disabled: busy,
+        onChange: (apt) => onChange({ ...value, apt })
+      }
+    ),
+    /* @__PURE__ */ u4(
+      PackageListField,
+      {
+        label: "npm packages",
+        info: "Node packages installed globally via pnpm/npm in the agent image. Example: typescript@5, prettier.",
+        items: value.npm,
+        disabled: busy,
+        onChange: (npm) => onChange({ ...value, npm })
+      }
+    ),
+    /* @__PURE__ */ u4(
+      PackageListField,
+      {
+        label: "pip packages",
+        info: "Python packages installed via pip in the agent image. Example: requests, pandas==2.0.0.",
+        items: value.pip,
+        disabled: busy,
+        onChange: (pip) => onChange({ ...value, pip })
+      }
+    )
+  ] });
+}
+function PackageListField({
+  label,
+  info,
+  items,
+  disabled,
+  onChange
+}) {
+  const [draft, setDraft] = h2("");
+  const trimmed = draft.trim();
+  const isDup = trimmed !== "" && items.includes(trimmed);
+  const isInvalid = trimmed !== "" && !PACKAGE_TOKEN_RE.test(trimmed);
+  const canAdd = trimmed !== "" && !isDup && !isInvalid;
+  function add() {
+    if (!canAdd) return;
+    onChange([...items, trimmed]);
+    setDraft("");
+  }
+  function remove(idx) {
+    onChange(items.filter((_6, i5) => i5 !== idx));
+  }
+  return /* @__PURE__ */ u4(Field, { label, info, children: /* @__PURE__ */ u4("div", { class: "group-admin-stack ga-model-params", children: [
+    items.length === 0 ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "No packages." }) : /* @__PURE__ */ u4("ul", { class: "ga-chip-list", children: items.map((p5, i5) => /* @__PURE__ */ u4("li", { class: "ga-chip", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-chip-label", children: p5 }),
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "ga-chip-remove",
+          "aria-label": `Remove ${p5}`,
+          disabled,
+          onClick: () => remove(i5),
+          children: "\u2715"
+        }
+      )
+    ] }, `${p5}-${i5}`)) }),
+    /* @__PURE__ */ u4("div", { class: "ga-mp-actions", children: [
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          class: "ga-chip-input",
+          placeholder: "package name (e.g. ripgrep, jq, requests==2.31)",
+          value: draft,
+          disabled,
+          onInput: (e4) => setDraft(e4.currentTarget.value),
+          onKeyDown: (e4) => {
+            if (e4.key === "Enter") {
+              e4.preventDefault();
+              add();
+            }
+          }
+        }
+      ),
+      /* @__PURE__ */ u4("button", { type: "button", disabled: disabled || !canAdd, onClick: add, children: "+ Add" })
+    ] }),
+    isInvalid ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: [
+      '"',
+      trimmed,
+      '" has invalid characters.'
+    ] }) : isDup ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: [
+      '"',
+      trimmed,
+      '" is already in the list.'
+    ] }) : null
+  ] }) });
+}
+function McpServersSection({
+  value,
+  busy,
+  onChange
+}) {
+  const names = Object.keys(value);
+  const [newName, setNewName] = h2("");
+  const trimmedNew = newName.trim();
+  const newNameInvalid = trimmedNew !== "" && !MCP_NAME_RE.test(trimmedNew);
+  const newNameDup = trimmedNew !== "" && trimmedNew in value;
+  const canAdd = trimmedNew !== "" && !newNameInvalid && !newNameDup;
+  function addServer() {
+    if (!canAdd) return;
+    onChange({ ...value, [trimmedNew]: { command: "" } });
+    setNewName("");
+  }
+  function removeServer(name) {
+    const next = { ...value };
+    delete next[name];
+    onChange(next);
+  }
+  function updateServer(name, patch) {
+    onChange({ ...value, [name]: patch });
+  }
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+      "MCP (Model Context Protocol) servers wired into this group's agents. Restart required to take effect \u2014 the SDK builds the MCP map at session start. Mirrors",
+      " ",
+      /* @__PURE__ */ u4("code", { children: "ncl groups config add-mcp-server / remove-mcp-server" }),
+      "."
+    ] }) }),
+    names.length === 0 ? /* @__PURE__ */ u4("p", { class: "group-admin-help", style: "margin:8px 0 16px", children: "No MCP servers configured." }) : names.map((name) => /* @__PURE__ */ u4(
+      McpServerCard,
+      {
+        name,
+        value: value[name],
+        disabled: busy,
+        onChange: (next) => updateServer(name, next),
+        onRemove: () => removeServer(name)
+      },
+      name
+    )),
+    /* @__PURE__ */ u4(Field, { label: "Add server", info: "Name is the key the agent uses to reference this server's tools. Letters, digits, _, ., - only.", children: [
+      /* @__PURE__ */ u4("div", { class: "ga-mp-actions", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "text",
+            class: "ga-chip-input",
+            placeholder: "server name (e.g. context7, fetch)",
+            value: newName,
+            disabled: busy,
+            onInput: (e4) => setNewName(e4.currentTarget.value),
+            onKeyDown: (e4) => {
+              if (e4.key === "Enter") {
+                e4.preventDefault();
+                addServer();
+              }
+            }
+          }
+        ),
+        /* @__PURE__ */ u4("button", { type: "button", disabled: busy || !canAdd, onClick: addServer, children: "+ Add server" })
+      ] }),
+      newNameInvalid ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: "Name must start with a letter or _, then letters/digits/_/./-." }) : newNameDup ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: [
+        '"',
+        trimmedNew,
+        '" already exists.'
+      ] }) : null
+    ] })
+  ] });
+}
+function McpServerCard({
+  name,
+  value,
+  disabled,
+  onChange,
+  onRemove
+}) {
+  const rawType = value.type;
+  const type = rawType === "http" || rawType === "sse" ? rawType : "stdio";
+  function setType(next) {
+    if (next === "stdio") {
+      const stdio = value;
+      onChange({
+        type: "stdio",
+        command: stdio.command ?? "",
+        ...stdio.args ? { args: stdio.args } : {},
+        ...stdio.env ? { env: stdio.env } : {},
+        ...value.instructions ? { instructions: value.instructions } : {}
+      });
+    } else {
+      const http = value;
+      onChange({
+        type: next,
+        url: http.url ?? "",
+        ...http.headers ? { headers: http.headers } : {},
+        ...value.instructions ? { instructions: value.instructions } : {}
+      });
+    }
+  }
+  return /* @__PURE__ */ u4("div", { class: "ga-mcp-card", children: [
+    /* @__PURE__ */ u4("div", { class: "ga-mcp-card-head", children: [
+      /* @__PURE__ */ u4("strong", { class: "ga-mcp-card-name", children: name }),
+      /* @__PURE__ */ u4(
+        "select",
+        {
+          class: "ga-mcp-type",
+          value: type,
+          disabled,
+          onChange: (e4) => setType(e4.currentTarget.value),
+          children: [
+            /* @__PURE__ */ u4("option", { value: "stdio", children: "stdio" }),
+            /* @__PURE__ */ u4("option", { value: "http", children: "http" }),
+            /* @__PURE__ */ u4("option", { value: "sse", children: "sse" })
+          ]
+        }
+      ),
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "icon-btn",
+          "aria-label": `Remove ${name}`,
+          disabled,
+          onClick: onRemove,
+          children: "\u2715"
+        }
+      )
+    ] }),
+    type === "stdio" ? /* @__PURE__ */ u4(
+      McpStdioFields,
+      {
+        value,
+        disabled,
+        onChange
+      }
+    ) : /* @__PURE__ */ u4(
+      McpHttpFields,
+      {
+        value,
+        disabled,
+        onChange
+      }
+    ),
+    /* @__PURE__ */ u4("label", { class: "ga-mcp-row", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-mcp-row-label", children: "instructions" }),
+      /* @__PURE__ */ u4(
+        "textarea",
+        {
+          class: "ga-mcp-textarea",
+          placeholder: "optional one-line description shown to the agent",
+          rows: 2,
+          value: value.instructions ?? "",
+          disabled,
+          onInput: (e4) => {
+            const v5 = e4.currentTarget.value;
+            onChange({ ...value, instructions: v5 || void 0 });
+          }
+        }
+      )
+    ] })
+  ] });
+}
+function McpStdioFields({
+  value,
+  disabled,
+  onChange
+}) {
+  const argsText = value.args ? JSON.stringify(value.args) : "";
+  const envText = value.env ? JSON.stringify(value.env, null, 2) : "";
+  const [argsDraft, setArgsDraft] = h2(argsText);
+  const [envDraft, setEnvDraft] = h2(envText);
+  y2(() => {
+    setArgsDraft(value.args ? JSON.stringify(value.args) : "");
+  }, [JSON.stringify(value.args ?? [])]);
+  y2(() => {
+    setEnvDraft(value.env ? JSON.stringify(value.env, null, 2) : "");
+  }, [JSON.stringify(value.env ?? {})]);
+  const argsParsed = parseJsonStringArray(argsDraft);
+  const envParsed = parseJsonStringMap(envDraft);
+  function commitArgs(text) {
+    setArgsDraft(text);
+    const parsed = parseJsonStringArray(text);
+    if (parsed.ok) {
+      const next = { ...value };
+      if (parsed.value.length === 0) delete next.args;
+      else next.args = parsed.value;
+      onChange(next);
+    }
+  }
+  function commitEnv(text) {
+    setEnvDraft(text);
+    const parsed = parseJsonStringMap(text);
+    if (parsed.ok) {
+      const next = { ...value };
+      if (Object.keys(parsed.value).length === 0) delete next.env;
+      else next.env = parsed.value;
+      onChange(next);
+    }
+  }
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("label", { class: "ga-mcp-row", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-mcp-row-label", children: "command" }),
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          class: "ga-mcp-input",
+          placeholder: "e.g. npx, uvx, /usr/local/bin/my-tool",
+          value: value.command ?? "",
+          disabled,
+          onInput: (e4) => onChange({ ...value, command: e4.currentTarget.value })
+        }
+      )
+    ] }),
+    /* @__PURE__ */ u4("label", { class: "ga-mcp-row", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-mcp-row-label", children: "args (JSON array)" }),
+      /* @__PURE__ */ u4(
+        "textarea",
+        {
+          class: `ga-mcp-textarea${argsParsed.ok ? "" : " ga-mp-key-unknown"}`,
+          placeholder: '["-y","@my/mcp-server"]',
+          rows: 2,
+          value: argsDraft,
+          disabled,
+          onInput: (e4) => commitArgs(e4.currentTarget.value)
+        }
+      ),
+      !argsParsed.ok ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: argsParsed.error }) : null
+    ] }),
+    /* @__PURE__ */ u4("label", { class: "ga-mcp-row", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-mcp-row-label", children: "env (JSON object)" }),
+      /* @__PURE__ */ u4(
+        "textarea",
+        {
+          class: `ga-mcp-textarea${envParsed.ok ? "" : " ga-mp-key-unknown"}`,
+          placeholder: '{"FOO":"bar"}',
+          rows: 3,
+          value: envDraft,
+          disabled,
+          onInput: (e4) => commitEnv(e4.currentTarget.value)
+        }
+      ),
+      !envParsed.ok ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: envParsed.error }) : null
+    ] })
+  ] });
+}
+function McpHttpFields({
+  value,
+  disabled,
+  onChange
+}) {
+  const headersText = value.headers ? JSON.stringify(value.headers, null, 2) : "";
+  const [headersDraft, setHeadersDraft] = h2(headersText);
+  y2(() => {
+    setHeadersDraft(value.headers ? JSON.stringify(value.headers, null, 2) : "");
+  }, [JSON.stringify(value.headers ?? {})]);
+  const headersParsed = parseJsonStringMap(headersDraft);
+  const urlInvalid = value.url && !/^https?:\/\//.test(value.url);
+  function commitHeaders(text) {
+    setHeadersDraft(text);
+    const parsed = parseJsonStringMap(text);
+    if (parsed.ok) {
+      const next = { ...value };
+      if (Object.keys(parsed.value).length === 0) delete next.headers;
+      else next.headers = parsed.value;
+      onChange(next);
+    }
+  }
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("label", { class: "ga-mcp-row", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-mcp-row-label", children: "url" }),
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          class: `ga-mcp-input${urlInvalid ? " ga-mp-key-unknown" : ""}`,
+          placeholder: "https://example.com/mcp",
+          value: value.url ?? "",
+          disabled,
+          onInput: (e4) => onChange({ ...value, url: e4.currentTarget.value })
+        }
+      ),
+      urlInvalid ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: "URL must start with http:// or https://" }) : null
+    ] }),
+    /* @__PURE__ */ u4("label", { class: "ga-mcp-row", children: [
+      /* @__PURE__ */ u4("span", { class: "ga-mcp-row-label", children: "headers (JSON object)" }),
+      /* @__PURE__ */ u4(
+        "textarea",
+        {
+          class: `ga-mcp-textarea${headersParsed.ok ? "" : " ga-mp-key-unknown"}`,
+          placeholder: '{"Authorization":"Bearer \u2026"}',
+          rows: 3,
+          value: headersDraft,
+          disabled,
+          onInput: (e4) => commitHeaders(e4.currentTarget.value)
+        }
+      ),
+      !headersParsed.ok ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: headersParsed.error }) : null
+    ] })
+  ] });
+}
+function parseJsonStringArray(text) {
+  const t4 = text.trim();
+  if (t4 === "") return { ok: true, value: [] };
+  let parsed;
+  try {
+    parsed = JSON.parse(t4);
+  } catch (e4) {
+    return { ok: false, error: `Not valid JSON: ${e4.message}` };
+  }
+  if (!Array.isArray(parsed)) return { ok: false, error: "Must be a JSON array" };
+  for (const v5 of parsed) {
+    if (typeof v5 !== "string") return { ok: false, error: "All array entries must be strings" };
+  }
+  return { ok: true, value: parsed };
+}
+function parseJsonStringMap(text) {
+  const t4 = text.trim();
+  if (t4 === "") return { ok: true, value: {} };
+  let parsed;
+  try {
+    parsed = JSON.parse(t4);
+  } catch (e4) {
+    return { ok: false, error: `Not valid JSON: ${e4.message}` };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "Must be a JSON object" };
+  }
+  for (const v5 of Object.values(parsed)) {
+    if (typeof v5 !== "string") return { ok: false, error: "All values must be strings" };
+  }
+  return { ok: true, value: parsed };
+}
+function SkillsSection({
+  value,
+  busy,
+  onChange
+}) {
+  const isAll = value === "all";
+  const list = isAll ? [] : value;
+  const [draft, setDraft] = h2("");
+  const trimmed = draft.trim();
+  const isInvalid = trimmed !== "" && !SKILL_SLUG_RE.test(trimmed);
+  const isDup = trimmed !== "" && list.includes(trimmed);
+  const canAdd = !isAll && trimmed !== "" && !isInvalid && !isDup;
+  function add() {
+    if (!canAdd) return;
+    onChange([...list, trimmed]);
+    setDraft("");
+  }
+  function remove(idx) {
+    onChange(list.filter((_6, i5) => i5 !== idx));
+  }
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
+      'Container skills mounted into every session in this group. Restart required to take effect \u2014 skill mounts are computed at container spawn. Use "all" to mount every available container skill, or pick specific slugs from ',
+      /* @__PURE__ */ u4("code", { children: "container/skills/" }),
+      "."
+    ] }) }),
+    /* @__PURE__ */ u4(Field, { label: "Selection", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+      /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "radio",
+            name: "skills-mode",
+            checked: isAll,
+            disabled: busy,
+            onChange: () => onChange("all")
+          }
+        ),
+        /* @__PURE__ */ u4("span", { children: "All available skills" })
+      ] }),
+      /* @__PURE__ */ u4("label", { class: "group-admin-check", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "radio",
+            name: "skills-mode",
+            checked: !isAll,
+            disabled: busy,
+            onChange: () => onChange([])
+          }
+        ),
+        /* @__PURE__ */ u4("span", { children: "Specific skills only" })
+      ] })
+    ] }) }),
+    !isAll ? /* @__PURE__ */ u4(Field, { label: "Skills", info: "Slug per skill (lowercase a\u2013z, 0\u20139, hyphen). Must match a folder under container/skills/ or a group-local skill.", children: /* @__PURE__ */ u4("div", { class: "group-admin-stack ga-model-params", children: [
+      list.length === 0 ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "No skills selected." }) : /* @__PURE__ */ u4("ul", { class: "ga-chip-list", children: list.map((s5, i5) => /* @__PURE__ */ u4("li", { class: "ga-chip", children: [
+        /* @__PURE__ */ u4("span", { class: "ga-chip-label", children: s5 }),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            class: "ga-chip-remove",
+            "aria-label": `Remove ${s5}`,
+            disabled: busy,
+            onClick: () => remove(i5),
+            children: "\u2715"
+          }
+        )
+      ] }, `${s5}-${i5}`)) }),
+      /* @__PURE__ */ u4("div", { class: "ga-mp-actions", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "text",
+            class: "ga-chip-input",
+            placeholder: "skill slug (e.g. welcome, agent-browser)",
+            value: draft,
+            disabled: busy,
+            onInput: (e4) => setDraft(e4.currentTarget.value),
+            onKeyDown: (e4) => {
+              if (e4.key === "Enter") {
+                e4.preventDefault();
+                add();
+              }
+            }
+          }
+        ),
+        /* @__PURE__ */ u4("button", { type: "button", disabled: busy || !canAdd, onClick: add, children: "+ Add" })
+      ] }),
+      isInvalid ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: [
+        '"',
+        trimmed,
+        '" must be lowercase a\u2013z, 0\u20139, hyphen.'
+      ] }) : isDup ? /* @__PURE__ */ u4("p", { class: "ga-confirm-warn", children: [
+        '"',
+        trimmed,
+        '" is already in the list.'
+      ] }) : null
+    ] }) }) : null
+  ] });
 }
 
 // src/panels.ts
