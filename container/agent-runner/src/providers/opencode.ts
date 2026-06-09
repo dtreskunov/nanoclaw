@@ -429,6 +429,10 @@ export class OpenCodeProvider implements AgentProvider {
 
   private readonly options: ProviderOptions;
   private activeSessionId: string | undefined;
+  // Lazy memoized Map<"providerID/modelID", { context, output }>. Populated
+  // once via client.config.providers() and reused for every subsequent turn
+  // — model metadata doesn't change inside a container's lifetime.
+  private modelLimitsPromise: Promise<Map<string, { context: number; output: number }>> | null = null;
 
   constructor(options: ProviderOptions = {}) {
     this.options = options;
@@ -437,6 +441,45 @@ export class OpenCodeProvider implements AgentProvider {
   isSessionInvalid(err: unknown): boolean {
     const msg = err instanceof Error ? err.message : String(err);
     return STALE_SESSION_RE.test(msg);
+  }
+
+  private async getModelLimits(
+    client: OpencodeClient,
+    providerID: string | undefined,
+    modelID: string | undefined,
+  ): Promise<{ context_window?: number; max_output_tokens?: number }> {
+    if (!providerID || !modelID) return {};
+    if (!this.modelLimitsPromise) {
+      this.modelLimitsPromise = (async () => {
+        const out = new Map<string, { context: number; output: number }>();
+        try {
+          const res = await client.config.providers();
+          const providers = (res.data?.providers ?? []) as Array<{
+            id: string;
+            models?: Record<string, { limit?: { context?: number; output?: number } }>;
+          }>;
+          for (const p of providers) {
+            for (const [mid, model] of Object.entries(p.models ?? {})) {
+              const ctx = model?.limit?.context;
+              const outTok = model?.limit?.output;
+              if (ctx || outTok) {
+                out.set(`${p.id}/${mid}`, { context: ctx ?? 0, output: outTok ?? 0 });
+              }
+            }
+          }
+        } catch (err) {
+          log(`Failed to fetch model limits: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        return out;
+      })();
+    }
+    const map = await this.modelLimitsPromise;
+    const hit = map.get(`${providerID}/${modelID}`);
+    if (!hit) return {};
+    return {
+      context_window: hit.context > 0 ? hit.context : undefined,
+      max_output_tokens: hit.output > 0 ? hit.output : undefined,
+    };
   }
 
   query(input: QueryInput): AgentQuery {
@@ -532,6 +575,10 @@ export class OpenCodeProvider implements AgentProvider {
         const progress = new ProgressThrottle();
         const seenReasoning = new Set<string>();
         let lastAssistantUsage: import('./types.js').TurnUsage | null = null;
+        // Captured separately so the limits-lookup at yield-time has the
+        // provider id (TurnUsage itself doesn't carry it).
+        let lastAssistantProviderID: string | undefined;
+        let lastAssistantModelID: string | undefined;
         let lastEventAt = Date.now();
         let eventTimedOut = false;
         let timeoutReject: ((err: Error) => void) | undefined;
@@ -569,6 +616,7 @@ export class OpenCodeProvider implements AgentProvider {
                   id?: string; role?: string;
                   cost?: number;
                   tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
+                  providerID?: string;
                   modelID?: string;
                   finish?: string;
                 } | undefined;
@@ -586,6 +634,8 @@ export class OpenCodeProvider implements AgentProvider {
                       reasoning_tokens: info.tokens?.reasoning,
                       model: info.modelID ?? '',
                     };
+                    lastAssistantProviderID = info.providerID;
+                    lastAssistantModelID = info.modelID;
                   }
                 }
                 break;
@@ -684,6 +734,7 @@ export class OpenCodeProvider implements AgentProvider {
             const info = (msgRes.data?.info ?? msgRes.data) as {
               cost?: number;
               tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
+              providerID?: string;
               modelID?: string;
             } | undefined;
             if (info && (typeof info.cost === 'number' || info.tokens)) {
@@ -696,12 +747,20 @@ export class OpenCodeProvider implements AgentProvider {
                 reasoning_tokens: info.tokens?.reasoning,
                 model: info.modelID ?? '',
               };
+              if (info.providerID) lastAssistantProviderID = info.providerID;
+              if (info.modelID) lastAssistantModelID = info.modelID;
             }
           } catch (err) {
             log(`Failed to refresh final assistant usage: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
         if (lastAssistantUsage) {
+          // Enrich with model limits so the host can render context/output
+          // budget bars and warn before the agent runs into a hard cap.
+          // Best-effort: missing limits stay undefined.
+          const limits = await self.getModelLimits(client, lastAssistantProviderID, lastAssistantModelID);
+          if (limits.context_window !== undefined) lastAssistantUsage.context_window = limits.context_window;
+          if (limits.max_output_tokens !== undefined) lastAssistantUsage.max_output_tokens = limits.max_output_tokens;
           yield { type: 'usage', data: lastAssistantUsage };
           lastAssistantUsage = null;
         }
