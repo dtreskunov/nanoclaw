@@ -19,11 +19,16 @@ import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
 import { TabBar, type TabItem } from './TabBar';
 
-type Tab = 'models' | 'settings' | 'members' | 'roles' | 'destinations';
+type Tab = 'models' | 'settings' | 'packages' | 'mcp' | 'skills' | 'members' | 'roles' | 'destinations';
+
+const SETTINGS_SECTIONS = new Set<Tab>(['models', 'settings', 'packages', 'mcp', 'skills']);
 
 const TAB_ITEMS: TabItem[] = [
   { id: 'models', label: 'Models', sublabel: 'Provider, model, voice' },
   { id: 'settings', label: 'Settings', sublabel: 'Image, scope, public site' },
+  { id: 'packages', label: 'Packages', sublabel: 'apt / npm / pip in the image' },
+  { id: 'mcp', label: 'MCP servers', sublabel: 'External tools wired to the agent' },
+  { id: 'skills', label: 'Skills', sublabel: 'Container skills mounted at runtime' },
   { id: 'members', label: 'Members', sublabel: 'Who can use this group' },
   { id: 'roles', label: 'Admins', sublabel: 'Admins for this group' },
   { id: 'destinations', label: 'Destinations', sublabel: 'Where this group can send messages' },
@@ -35,6 +40,23 @@ interface HeaderActions {
   busy: boolean;
   canSave: boolean;
 }
+
+interface McpStdioServerDto {
+  type?: 'stdio';
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  instructions?: string;
+}
+
+interface McpHttpServerDto {
+  type: 'http' | 'sse';
+  url: string;
+  headers?: Record<string, string>;
+  instructions?: string;
+}
+
+type McpServerConfigDto = McpStdioServerDto | McpHttpServerDto;
 
 
 interface SettingsResponse {
@@ -56,10 +78,17 @@ interface SettingsResponse {
   };
   /** Freeform provider knobs. Edited via PATCH /model-params or `ncl groups config set-param`. */
   modelParams: Record<string, unknown>;
+  /** Installed packages — image rebuild required to take effect. */
+  packages: { apt: string[]; npm: string[]; pip: string[] };
+  /** Per-group MCP servers — restart required to take effect. */
+  mcpServers: Record<string, McpServerConfigDto>;
+  /** Container skill selection. `'all'` mounts every available container skill. */
+  skills: string[] | 'all';
   defaults: {
     provider: string | null;
     model: string | null;
     image_tag: string | null;
+    transcription_model: string | null;
   };
   validProviders: string[];
   validCliScopes: string[];
@@ -224,7 +253,7 @@ export function GroupAdmin(): JSX.Element | null {
         <header class="settings-head">
           <span class="title">{title}</span>
           <div class="settings-head-actions">
-            {(tab === 'models' || tab === 'settings') && ha ? (
+            {tab !== null && SETTINGS_SECTIONS.has(tab) && ha ? (
               <>
                 <Tooltip text={ha.canSave ? 'Save changes' : 'Nothing to save'}>
                   <button type="button" class="icon-btn" aria-label="Save" onClick={ha.apply} disabled={ha.busy || !ha.canSave}>&#x2713;</button>
@@ -259,8 +288,8 @@ export function GroupAdmin(): JSX.Element | null {
                   <span aria-hidden="true">{'\u2039'}</span> Sections
                 </button>
               ) : null}
-              {(tab === 'models' || tab === 'settings')
-                ? <SettingsTab gid={gid} section={tab} onClose={hardClose} onActions={setActions} />
+              {tab !== null && SETTINGS_SECTIONS.has(tab)
+                ? <SettingsTab gid={gid} section={tab as 'models' | 'settings' | 'packages' | 'mcp' | 'skills'} onClose={hardClose} onActions={setActions} />
                 : null}
               {tab === 'members' ? <MembersTab gid={gid} /> : null}
               {tab === 'roles' ? <RolesTab gid={gid} /> : null}
@@ -328,12 +357,16 @@ function MobileSectionList({ items, onSelect }: { items: TabItem[]; onSelect: (i
 
 // ── Settings ──────────────────────────────────────────────────────────────
 
-function SettingsTab({ gid, section, onClose, onActions }: { gid: string; section: 'models' | 'settings'; onClose: () => void; onActions: (a: HeaderActions | null) => void }): JSX.Element {
+function SettingsTab({ gid, section, onClose, onActions }: { gid: string; section: 'models' | 'settings' | 'packages' | 'mcp' | 'skills'; onClose: () => void; onActions: (a: HeaderActions | null) => void }): JSX.Element {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [draft, setDraft] = useState<SettingsResponse['config'] | null>(null);
   const [draftName, setDraftName] = useState('');
   const [siteEnabled, setSiteEnabled] = useState(false);
   const [siteSlug, setSiteSlug] = useState('');
+  const [draftModelParams, setDraftModelParams] = useState<Record<string, unknown>>({});
+  const [draftPackages, setDraftPackages] = useState<{ apt: string[]; npm: string[]; pip: string[] }>({ apt: [], npm: [], pip: [] });
+  const [draftMcpServers, setDraftMcpServers] = useState<Record<string, McpServerConfigDto>>({});
+  const [draftSkills, setDraftSkills] = useState<string[] | 'all'>([]);
   const [busy, setBusy] = useState(false);
   const [images, setImages] = useState<ImagesResponse | null>(null);
 
@@ -347,6 +380,14 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
       setDraftName(r.data.name);
       setSiteEnabled(r.data.site.enabled);
       setSiteSlug(r.data.site.slug ?? '');
+      setDraftModelParams(r.data.modelParams);
+      setDraftPackages({
+        apt: [...(r.data.packages?.apt ?? [])],
+        npm: [...(r.data.packages?.npm ?? [])],
+        pip: [...(r.data.packages?.pip ?? [])],
+      });
+      setDraftMcpServers({ ...(r.data.mcpServers ?? {}) });
+      setDraftSkills(r.data.skills === 'all' ? 'all' : [...(r.data.skills ?? [])]);
     } finally { setBusy(false); }
   }
 
@@ -377,8 +418,11 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
   }
 
   // Which fields actually require a container restart to take effect?
+  // model_params, mcp_servers, skills, and packages all need restart; only
+  // packages require an image rebuild (handled separately via needsRebuild).
   const RESTART_REQUIRING_FIELDS = new Set([
     'provider', 'model', 'effort', 'image_tag', 'assistant_name', 'max_messages_per_prompt',
+    'model_params', 'mcp_servers', 'skills', 'packages_apt', 'packages_npm', 'packages_pip',
   ]);
 
   function changedFields(): Set<string> {
@@ -392,19 +436,28 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
       if (siteEnabled !== data.site.enabled) out.add('site_enabled');
       if (data.actorIsElevated && siteSlug.trim() !== (data.site.slug ?? '')) out.add('site_slug');
     }
+    // JSON columns — compare by serialized form so key order doesn't matter.
+    if (JSON.stringify(draftModelParams) !== JSON.stringify(data.modelParams ?? {})) out.add('model_params');
+    const dataPkg = data.packages ?? { apt: [], npm: [], pip: [] };
+    if (JSON.stringify(draftPackages.apt) !== JSON.stringify(dataPkg.apt)) out.add('packages_apt');
+    if (JSON.stringify(draftPackages.npm) !== JSON.stringify(dataPkg.npm)) out.add('packages_npm');
+    if (JSON.stringify(draftPackages.pip) !== JSON.stringify(dataPkg.pip)) out.add('packages_pip');
+    if (JSON.stringify(draftMcpServers) !== JSON.stringify(data.mcpServers ?? {})) out.add('mcp_servers');
+    if (JSON.stringify(draftSkills) !== JSON.stringify(data.skills ?? [])) out.add('skills');
     return out;
   }
   const pending = changedFields();
   const changed = pending.size > 0;
   // Restart needed if any restart-requiring field changed.
   const needsRestart = [...pending].some((f) => RESTART_REQUIRING_FIELDS.has(f));
-  // Rebuild is auto-suggested only when the new image_tag isn't in the
-  // local image list (the only common "rebuild from this UI" scenario —
-  // package / MCP / Dockerfile changes go through the CLI).
-  const needsRebuild = pending.has('image_tag')
+  // Rebuild auto-suggested when (a) the new image_tag isn't in the local image
+  // list, or (b) any package list changed (apt/npm/pip).
+  const imageRebuildNeeded = pending.has('image_tag')
     && draft.image_tag != null
     && !!images
     && !images.images.some((i) => i.value === draft.image_tag);
+  const packagesChanged = pending.has('packages_apt') || pending.has('packages_npm') || pending.has('packages_pip');
+  const needsRebuild = imageRebuildNeeded || packagesChanged;
 
   // Restart / rebuild are confirmed in a dialog opened on Apply, rather than
   // toggled inline in the form. The checkboxes default to checked when the
@@ -444,20 +497,63 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
     if (!draft) return;
     setBusy(true);
     try {
-      // Save config changes.
-      if (changed) {
+      // Split saves by endpoint. Each is full-replace on its slice. /settings
+      // covers scalar config + name + site; the others mirror their CLI
+      // counterparts (set-param / add-package / add-mcp-server).
+      const JSON_FIELDS = new Set([
+        'model_params', 'mcp_servers', 'skills',
+        'packages_apt', 'packages_npm', 'packages_pip',
+      ]);
+      const settingsChanged = [...pending].some((f) => !JSON_FIELDS.has(f));
+
+      if (settingsChanged) {
         const body: Record<string, unknown> = { ...draft };
         if (data && draftName.trim() !== data.name) body.name = draftName.trim();
         if (pending.has('site_enabled')) body.site_enabled = siteEnabled;
         if (pending.has('site_slug')) body.site_slug = siteSlug.trim() || null;
         const r = await call<SettingsResponse>(apiPath(gid, '/settings'), 'PATCH', body);
         if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
-        setData(r.data);
-        setDraft({ ...r.data.config });
-        setDraftName(r.data.name);
-        setSiteEnabled(r.data.site.enabled);
-        setSiteSlug(r.data.site.slug ?? '');
-        groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: r.data.name } : g);
+      }
+      if (pending.has('model_params')) {
+        const r = await call<{ modelParams: Record<string, unknown> }>(
+          apiPath(gid, '/model-params'), 'PATCH', { params: draftModelParams },
+        );
+        if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      }
+      if (pending.has('packages_apt') || pending.has('packages_npm') || pending.has('packages_pip')) {
+        const body: Record<string, string[]> = {};
+        if (pending.has('packages_apt')) body.apt = draftPackages.apt;
+        if (pending.has('packages_npm')) body.npm = draftPackages.npm;
+        if (pending.has('packages_pip')) body.pip = draftPackages.pip;
+        const r = await call<unknown>(apiPath(gid, '/packages'), 'PATCH', body);
+        if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      }
+      if (pending.has('mcp_servers')) {
+        const r = await call<unknown>(apiPath(gid, '/mcp-servers'), 'PATCH', { servers: draftMcpServers });
+        if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      }
+      if (pending.has('skills')) {
+        const r = await call<unknown>(apiPath(gid, '/skills'), 'PATCH', { skills: draftSkills });
+        if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
+      }
+
+      // Re-fetch so all drafts re-baseline from authoritative server state.
+      const fresh = await call<SettingsResponse>(apiPath(gid, '/settings'));
+      if (fresh.ok) {
+        setData(fresh.data);
+        setDraft({ ...fresh.data.config });
+        setDraftName(fresh.data.name);
+        setSiteEnabled(fresh.data.site.enabled);
+        setSiteSlug(fresh.data.site.slug ?? '');
+        setDraftModelParams(fresh.data.modelParams);
+        setDraftPackages({
+          apt: [...(fresh.data.packages?.apt ?? [])],
+          npm: [...(fresh.data.packages?.npm ?? [])],
+          pip: [...(fresh.data.packages?.pip ?? [])],
+        });
+        setDraftMcpServers({ ...(fresh.data.mcpServers ?? {}) });
+        setDraftSkills(fresh.data.skills === 'all' ? 'all' : [...(fresh.data.skills ?? [])]);
+        groups.value = groups.value.map((g) => g.id === gid ? { ...g, name: fresh.data.name } : g);
       }
       // Restart / rebuild as chosen in the confirmation dialog.
       if (effectiveRebuild || effectiveRestart) {
@@ -563,7 +659,7 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           <Field label="Model">
             <ModelSelector
               value={draft.model}
-              provider={provider}
+              provider={provider ?? data.defaults.provider}
               placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
               disabled={busy}
               apiBasePath={apiPath(gid, '')}
@@ -579,7 +675,7 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
             <ModelSelector
               value={draft.transcription_model}
               provider="openrouter"
-              placeholder="google/gemini-2.0-flash-lite-001"
+              placeholder={data.defaults.transcription_model || 'google/gemini-2.0-flash-lite-001'}
               disabled={busy}
               apiBasePath={apiPath(gid, '')}
               inputModality="audio"
@@ -590,8 +686,9 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           <ModelParamsEditor
             gid={gid}
             provider={draft.provider}
-            initial={data.modelParams}
-            onSaved={(next) => setData((d) => (d ? { ...d, modelParams: next } : d))}
+            value={draftModelParams}
+            busy={busy}
+            onChange={setDraftModelParams}
           />
         </>
       ) : null}
@@ -751,6 +848,30 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
         </button>
       </div>
         </>
+      ) : null}
+
+      {section === 'packages' ? (
+        <PackagesSection
+          value={draftPackages}
+          busy={busy}
+          onChange={setDraftPackages}
+        />
+      ) : null}
+
+      {section === 'mcp' ? (
+        <McpServersSection
+          value={draftMcpServers}
+          busy={busy}
+          onChange={setDraftMcpServers}
+        />
+      ) : null}
+
+      {section === 'skills' ? (
+        <SkillsSection
+          value={draftSkills}
+          busy={busy}
+          onChange={setDraftSkills}
+        />
       ) : null}
 
       <div class="settings-row group-admin-actions" style="margin-top:16px">
@@ -1411,18 +1532,6 @@ function paramsToRows(params: Record<string, unknown>): ParamRow[] {
   }));
 }
 
-function rowsEqualParams(rows: ParamRow[], params: Record<string, unknown>): boolean {
-  const keys = Object.keys(params);
-  if (rows.length !== keys.length) return false;
-  for (const r of rows) {
-    if (!(r.key in params)) return false;
-    const stored = params[r.key];
-    const storedText = typeof stored === 'string' ? stored : JSON.stringify(stored);
-    if (storedText !== r.valueText) return false;
-  }
-  return true;
-}
-
 /** Mirror the server's parse: JSON first, string fallback. */
 function parseRowValue(raw: string): unknown {
   const trimmed = raw.trim();
@@ -1430,36 +1539,73 @@ function parseRowValue(raw: string): unknown {
   try { return JSON.parse(trimmed); } catch { return raw; }
 }
 
+function rowsToParams(rows: ParamRow[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const k = r.key.trim();
+    if (k === '' && r.valueText.trim() === '') continue;
+    if (!k || !MODEL_PARAM_KEY_RE.test(k) || seen.has(k)) continue;
+    seen.add(k);
+    out[k] = parseRowValue(r.valueText);
+  }
+  return out;
+}
+
 function ModelParamsEditor({
   gid,
   provider,
-  initial,
-  onSaved,
+  value,
+  busy,
+  onChange,
 }: {
   gid: string;
   provider: string | null;
-  initial: Record<string, unknown>;
-  onSaved: (next: Record<string, unknown>) => void;
+  value: Record<string, unknown>;
+  busy: boolean;
+  onChange: (next: Record<string, unknown>) => void;
 }): JSX.Element {
-  const [rows, setRows] = useState<ParamRow[]>(() => paramsToRows(initial));
-  const [busy, setBusy] = useState(false);
+  const [rows, setRows] = useState<ParamRow[]>(() => paramsToRows(value));
+  // Track the last JSON we emitted so external re-baselining (parent refresh /
+  // save success) resets rows, but our own onChange echo doesn't.
+  const lastEmittedRef = useRef<string>(JSON.stringify(value));
 
-  // Reset rows when the underlying config changes (refresh, save).
-  useEffect(() => { setRows(paramsToRows(initial)); }, [initial]);
+  useEffect(() => {
+    const incoming = JSON.stringify(value);
+    if (incoming === lastEmittedRef.current) return;
+    setRows(paramsToRows(value));
+    lastEmittedRef.current = incoming;
+  }, [value]);
 
   const recognized = provider ? MODEL_PARAM_RECOGNIZED[provider] ?? [] : [];
 
-  function update(uid: number, patch: Partial<Pick<ParamRow, 'key' | 'valueText'>>): void {
-    setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, ...patch } : r)));
-  }
-  function remove(uid: number): void {
-    setRows((rs) => rs.filter((r) => r.uid !== uid));
-  }
-  function addBlank(presetKey: string = ''): void {
-    setRows((rs) => [...rs, { uid: nextRowUid(), key: presetKey, valueText: '' }]);
+  function emit(next: ParamRow[]): void {
+    const params = rowsToParams(next);
+    lastEmittedRef.current = JSON.stringify(params);
+    onChange(params);
   }
 
-  const dirty = !rowsEqualParams(rows, initial);
+  function update(uid: number, patch: Partial<Pick<ParamRow, 'key' | 'valueText'>>): void {
+    setRows((rs) => {
+      const next = rs.map((r) => (r.uid === uid ? { ...r, ...patch } : r));
+      emit(next);
+      return next;
+    });
+  }
+  function remove(uid: number): void {
+    setRows((rs) => {
+      const next = rs.filter((r) => r.uid !== uid);
+      emit(next);
+      return next;
+    });
+  }
+  function addBlank(presetKey: string = ''): void {
+    setRows((rs) => {
+      const next = [...rs, { uid: nextRowUid(), key: presetKey, valueText: '' }];
+      emit(next);
+      return next;
+    });
+  }
 
   // Validation: duplicate keys, bad key format, empty key with non-empty value.
   const issues: string[] = [];
@@ -1472,29 +1618,6 @@ function ModelParamsEditor({
     if (seenKeys.has(k)) { issues.push(`Duplicate key "${k}".`); continue; }
     seenKeys.add(k);
   }
-  const canSave = dirty && issues.length === 0 && !busy;
-
-  async function save(): Promise<void> {
-    setBusy(true);
-    try {
-      const params: Record<string, unknown> = {};
-      for (const r of rows) {
-        const k = r.key.trim();
-        if (k === '' && r.valueText.trim() === '') continue;
-        params[k] = parseRowValue(r.valueText);
-      }
-      const r = await call<{ modelParams: Record<string, unknown> }>(
-        apiPath(gid, '/model-params'),
-        'PATCH',
-        { params },
-      );
-      if (!r.ok) { showToast(errMsg(r.data, `HTTP ${r.status}`), 'err'); return; }
-      onSaved(r.data.modelParams);
-      showToast('Saved. Restart sessions for the change to take effect.');
-    } finally { setBusy(false); }
-  }
-
-  function reset(): void { setRows(paramsToRows(initial)); }
 
   const suggestions = recognized.filter((k) => !rows.some((r) => r.key.trim() === k));
 
@@ -1580,19 +1703,601 @@ function ModelParamsEditor({
         {issues.length > 0 ? (
           <p class="ga-confirm-warn">{issues[0]}</p>
         ) : null}
+      </div>
+    </Field>
+  );
+}
 
-        {dirty ? (
-          <div class="ga-mp-save">
-            <button type="button" disabled={busy} onClick={reset}>Reset</button>
-            <button type="button" class="primary" disabled={!canSave} onClick={save}>
-              {busy ? 'Saving…' : 'Save parameters'}
-            </button>
-            <Tooltip text="Saving updates model_params immediately, but the running container won't pick it up until you restart it (Settings → Restart, or `ncl groups restart`).">
-              <span class="info-icon" aria-label="More info">i</span>
-            </Tooltip>
-          </div>
+// ---------------------------------------------------------------------------
+// Packages / MCP / Skills editors (per-group container_configs JSON columns)
+// ---------------------------------------------------------------------------
+
+// Liberal but bounded: covers `pkg`, `pkg@1.2.3`, `@scope/pkg`, `pkg>=1`, etc.
+const PACKAGE_TOKEN_RE = /^[A-Za-z0-9@._/+=<>~^!*-]+$/;
+const MCP_NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+const SKILL_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+function PackagesSection({
+  value,
+  busy,
+  onChange,
+}: {
+  value: { apt: string[]; npm: string[]; pip: string[] };
+  busy: boolean;
+  onChange: (next: { apt: string[]; npm: string[]; pip: string[] }) => void;
+}): JSX.Element {
+  return (
+    <>
+      <div class="group-admin-toolbar">
+        <p class="group-admin-help">
+          Packages baked into the container image. Changes require an image rebuild — the Apply
+          dialog suggests rebuild when any list here changes. Mirrors{' '}
+          <code>ncl groups config add-package / remove-package</code>.
+        </p>
+      </div>
+      <PackageListField
+        label="apt packages"
+        info="Debian packages installed via apt-get in the agent image. Example: ripgrep, jq, postgresql-client."
+        items={value.apt}
+        disabled={busy}
+        onChange={(apt) => onChange({ ...value, apt })}
+      />
+      <PackageListField
+        label="npm packages"
+        info="Node packages installed globally via pnpm/npm in the agent image. Example: typescript@5, prettier."
+        items={value.npm}
+        disabled={busy}
+        onChange={(npm) => onChange({ ...value, npm })}
+      />
+      <PackageListField
+        label="pip packages"
+        info="Python packages installed via pip in the agent image. Example: requests, pandas==2.0.0."
+        items={value.pip}
+        disabled={busy}
+        onChange={(pip) => onChange({ ...value, pip })}
+      />
+    </>
+  );
+}
+
+function PackageListField({
+  label,
+  info,
+  items,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  info: string;
+  items: string[];
+  disabled: boolean;
+  onChange: (next: string[]) => void;
+}): JSX.Element {
+  const [draft, setDraft] = useState('');
+  const trimmed = draft.trim();
+  const isDup = trimmed !== '' && items.includes(trimmed);
+  const isInvalid = trimmed !== '' && !PACKAGE_TOKEN_RE.test(trimmed);
+  const canAdd = trimmed !== '' && !isDup && !isInvalid;
+
+  function add(): void {
+    if (!canAdd) return;
+    onChange([...items, trimmed]);
+    setDraft('');
+  }
+
+  function remove(idx: number): void {
+    onChange(items.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <Field label={label} info={info}>
+      <div class="group-admin-stack ga-model-params">
+        {items.length === 0 ? (
+          <p class="group-admin-help">No packages.</p>
+        ) : (
+          <ul class="ga-chip-list">
+            {items.map((p, i) => (
+              <li key={`${p}-${i}`} class="ga-chip">
+                <span class="ga-chip-label">{p}</span>
+                <button
+                  type="button"
+                  class="ga-chip-remove"
+                  aria-label={`Remove ${p}`}
+                  disabled={disabled}
+                  onClick={() => remove(i)}
+                >
+                  {'\u2715'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div class="ga-mp-actions">
+          <input
+            type="text"
+            class="ga-chip-input"
+            placeholder="package name (e.g. ripgrep, jq, requests==2.31)"
+            value={draft}
+            disabled={disabled}
+            onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setDraft(e.currentTarget.value)}
+            onKeyDown={(e: JSX.TargetedKeyboardEvent<HTMLInputElement>) => {
+              if (e.key === 'Enter') { e.preventDefault(); add(); }
+            }}
+          />
+          <button type="button" disabled={disabled || !canAdd} onClick={add}>
+            + Add
+          </button>
+        </div>
+        {isInvalid ? (
+          <p class="ga-confirm-warn">"{trimmed}" has invalid characters.</p>
+        ) : isDup ? (
+          <p class="ga-confirm-warn">"{trimmed}" is already in the list.</p>
         ) : null}
       </div>
     </Field>
+  );
+}
+
+function McpServersSection({
+  value,
+  busy,
+  onChange,
+}: {
+  value: Record<string, McpServerConfigDto>;
+  busy: boolean;
+  onChange: (next: Record<string, McpServerConfigDto>) => void;
+}): JSX.Element {
+  const names = Object.keys(value);
+  const [newName, setNewName] = useState('');
+  const trimmedNew = newName.trim();
+  const newNameInvalid = trimmedNew !== '' && !MCP_NAME_RE.test(trimmedNew);
+  const newNameDup = trimmedNew !== '' && trimmedNew in value;
+  const canAdd = trimmedNew !== '' && !newNameInvalid && !newNameDup;
+
+  function addServer(): void {
+    if (!canAdd) return;
+    onChange({ ...value, [trimmedNew]: { command: '' } });
+    setNewName('');
+  }
+
+  function removeServer(name: string): void {
+    const next = { ...value };
+    delete next[name];
+    onChange(next);
+  }
+
+  function updateServer(name: string, patch: McpServerConfigDto): void {
+    onChange({ ...value, [name]: patch });
+  }
+
+  return (
+    <>
+      <div class="group-admin-toolbar">
+        <p class="group-admin-help">
+          MCP (Model Context Protocol) servers wired into this group's agents. Restart required to
+          take effect — the SDK builds the MCP map at session start. Mirrors{' '}
+          <code>ncl groups config add-mcp-server / remove-mcp-server</code>.
+        </p>
+      </div>
+
+      {names.length === 0 ? (
+        <p class="group-admin-help" style="margin:8px 0 16px">No MCP servers configured.</p>
+      ) : (
+        names.map((name) => (
+          <McpServerCard
+            key={name}
+            name={name}
+            value={value[name]!}
+            disabled={busy}
+            onChange={(next) => updateServer(name, next)}
+            onRemove={() => removeServer(name)}
+          />
+        ))
+      )}
+
+      <Field label="Add server" info="Name is the key the agent uses to reference this server's tools. Letters, digits, _, ., - only.">
+        <div class="ga-mp-actions">
+          <input
+            type="text"
+            class="ga-chip-input"
+            placeholder="server name (e.g. context7, fetch)"
+            value={newName}
+            disabled={busy}
+            onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setNewName(e.currentTarget.value)}
+            onKeyDown={(e: JSX.TargetedKeyboardEvent<HTMLInputElement>) => {
+              if (e.key === 'Enter') { e.preventDefault(); addServer(); }
+            }}
+          />
+          <button type="button" disabled={busy || !canAdd} onClick={addServer}>
+            + Add server
+          </button>
+        </div>
+        {newNameInvalid ? (
+          <p class="ga-confirm-warn">Name must start with a letter or _, then letters/digits/_/./-.</p>
+        ) : newNameDup ? (
+          <p class="ga-confirm-warn">"{trimmedNew}" already exists.</p>
+        ) : null}
+      </Field>
+    </>
+  );
+}
+
+function McpServerCard({
+  name,
+  value,
+  disabled,
+  onChange,
+  onRemove,
+}: {
+  name: string;
+  value: McpServerConfigDto;
+  disabled: boolean;
+  onChange: (next: McpServerConfigDto) => void;
+  onRemove: () => void;
+}): JSX.Element {
+  const rawType = (value as { type?: string }).type;
+  const type: 'stdio' | 'http' | 'sse' =
+    rawType === 'http' || rawType === 'sse' ? rawType : 'stdio';
+
+  function setType(next: 'stdio' | 'http' | 'sse'): void {
+    if (next === 'stdio') {
+      const stdio = value as McpStdioServerDto;
+      onChange({
+        type: 'stdio',
+        command: stdio.command ?? '',
+        ...(stdio.args ? { args: stdio.args } : {}),
+        ...(stdio.env ? { env: stdio.env } : {}),
+        ...(value.instructions ? { instructions: value.instructions } : {}),
+      });
+    } else {
+      const http = value as McpHttpServerDto;
+      onChange({
+        type: next,
+        url: http.url ?? '',
+        ...(http.headers ? { headers: http.headers } : {}),
+        ...(value.instructions ? { instructions: value.instructions } : {}),
+      });
+    }
+  }
+
+  return (
+    <div class="ga-mcp-card">
+      <div class="ga-mcp-card-head">
+        <strong class="ga-mcp-card-name">{name}</strong>
+        <select
+          class="ga-mcp-type"
+          value={type}
+          disabled={disabled}
+          onChange={(e: JSX.TargetedEvent<HTMLSelectElement>) =>
+            setType(e.currentTarget.value as 'stdio' | 'http' | 'sse')
+          }
+        >
+          <option value="stdio">stdio</option>
+          <option value="http">http</option>
+          <option value="sse">sse</option>
+        </select>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label={`Remove ${name}`}
+          disabled={disabled}
+          onClick={onRemove}
+        >
+          {'\u2715'}
+        </button>
+      </div>
+
+      {type === 'stdio' ? (
+        <McpStdioFields
+          value={value as McpStdioServerDto}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      ) : (
+        <McpHttpFields
+          value={value as McpHttpServerDto}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      )}
+
+      <label class="ga-mcp-row">
+        <span class="ga-mcp-row-label">instructions</span>
+        <textarea
+          class="ga-mcp-textarea"
+          placeholder="optional one-line description shown to the agent"
+          rows={2}
+          value={value.instructions ?? ''}
+          disabled={disabled}
+          onInput={(e: JSX.TargetedEvent<HTMLTextAreaElement>) => {
+            const v = e.currentTarget.value;
+            onChange({ ...value, instructions: v || undefined } as McpServerConfigDto);
+          }}
+        />
+      </label>
+    </div>
+  );
+}
+
+function McpStdioFields({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: McpStdioServerDto;
+  disabled: boolean;
+  onChange: (next: McpStdioServerDto) => void;
+}): JSX.Element {
+  const argsText = value.args ? JSON.stringify(value.args) : '';
+  const envText = value.env ? JSON.stringify(value.env, null, 2) : '';
+  const [argsDraft, setArgsDraft] = useState(argsText);
+  const [envDraft, setEnvDraft] = useState(envText);
+
+  // External re-baseline (refresh after save) → reset drafts.
+  useEffect(() => { setArgsDraft(value.args ? JSON.stringify(value.args) : ''); }, [JSON.stringify(value.args ?? [])]);
+  useEffect(() => { setEnvDraft(value.env ? JSON.stringify(value.env, null, 2) : ''); }, [JSON.stringify(value.env ?? {})]);
+
+  const argsParsed = parseJsonStringArray(argsDraft);
+  const envParsed = parseJsonStringMap(envDraft);
+
+  function commitArgs(text: string): void {
+    setArgsDraft(text);
+    const parsed = parseJsonStringArray(text);
+    if (parsed.ok) {
+      const next: McpStdioServerDto = { ...value };
+      if (parsed.value.length === 0) delete next.args;
+      else next.args = parsed.value;
+      onChange(next);
+    }
+  }
+  function commitEnv(text: string): void {
+    setEnvDraft(text);
+    const parsed = parseJsonStringMap(text);
+    if (parsed.ok) {
+      const next: McpStdioServerDto = { ...value };
+      if (Object.keys(parsed.value).length === 0) delete next.env;
+      else next.env = parsed.value;
+      onChange(next);
+    }
+  }
+
+  return (
+    <>
+      <label class="ga-mcp-row">
+        <span class="ga-mcp-row-label">command</span>
+        <input
+          type="text"
+          class="ga-mcp-input"
+          placeholder="e.g. npx, uvx, /usr/local/bin/my-tool"
+          value={value.command ?? ''}
+          disabled={disabled}
+          onInput={(e: JSX.TargetedEvent<HTMLInputElement>) =>
+            onChange({ ...value, command: e.currentTarget.value })
+          }
+        />
+      </label>
+      <label class="ga-mcp-row">
+        <span class="ga-mcp-row-label">args (JSON array)</span>
+        <textarea
+          class={`ga-mcp-textarea${argsParsed.ok ? '' : ' ga-mp-key-unknown'}`}
+          placeholder='["-y","@my/mcp-server"]'
+          rows={2}
+          value={argsDraft}
+          disabled={disabled}
+          onInput={(e: JSX.TargetedEvent<HTMLTextAreaElement>) => commitArgs(e.currentTarget.value)}
+        />
+        {!argsParsed.ok ? <p class="ga-confirm-warn">{argsParsed.error}</p> : null}
+      </label>
+      <label class="ga-mcp-row">
+        <span class="ga-mcp-row-label">env (JSON object)</span>
+        <textarea
+          class={`ga-mcp-textarea${envParsed.ok ? '' : ' ga-mp-key-unknown'}`}
+          placeholder='{"FOO":"bar"}'
+          rows={3}
+          value={envDraft}
+          disabled={disabled}
+          onInput={(e: JSX.TargetedEvent<HTMLTextAreaElement>) => commitEnv(e.currentTarget.value)}
+        />
+        {!envParsed.ok ? <p class="ga-confirm-warn">{envParsed.error}</p> : null}
+      </label>
+    </>
+  );
+}
+
+function McpHttpFields({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: McpHttpServerDto;
+  disabled: boolean;
+  onChange: (next: McpHttpServerDto) => void;
+}): JSX.Element {
+  const headersText = value.headers ? JSON.stringify(value.headers, null, 2) : '';
+  const [headersDraft, setHeadersDraft] = useState(headersText);
+  useEffect(() => { setHeadersDraft(value.headers ? JSON.stringify(value.headers, null, 2) : ''); }, [JSON.stringify(value.headers ?? {})]);
+  const headersParsed = parseJsonStringMap(headersDraft);
+  const urlInvalid = value.url && !/^https?:\/\//.test(value.url);
+
+  function commitHeaders(text: string): void {
+    setHeadersDraft(text);
+    const parsed = parseJsonStringMap(text);
+    if (parsed.ok) {
+      const next: McpHttpServerDto = { ...value };
+      if (Object.keys(parsed.value).length === 0) delete next.headers;
+      else next.headers = parsed.value;
+      onChange(next);
+    }
+  }
+
+  return (
+    <>
+      <label class="ga-mcp-row">
+        <span class="ga-mcp-row-label">url</span>
+        <input
+          type="text"
+          class={`ga-mcp-input${urlInvalid ? ' ga-mp-key-unknown' : ''}`}
+          placeholder="https://example.com/mcp"
+          value={value.url ?? ''}
+          disabled={disabled}
+          onInput={(e: JSX.TargetedEvent<HTMLInputElement>) =>
+            onChange({ ...value, url: e.currentTarget.value })
+          }
+        />
+        {urlInvalid ? <p class="ga-confirm-warn">URL must start with http:// or https://</p> : null}
+      </label>
+      <label class="ga-mcp-row">
+        <span class="ga-mcp-row-label">headers (JSON object)</span>
+        <textarea
+          class={`ga-mcp-textarea${headersParsed.ok ? '' : ' ga-mp-key-unknown'}`}
+          placeholder='{"Authorization":"Bearer …"}'
+          rows={3}
+          value={headersDraft}
+          disabled={disabled}
+          onInput={(e: JSX.TargetedEvent<HTMLTextAreaElement>) => commitHeaders(e.currentTarget.value)}
+        />
+        {!headersParsed.ok ? <p class="ga-confirm-warn">{headersParsed.error}</p> : null}
+      </label>
+    </>
+  );
+}
+
+type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+function parseJsonStringArray(text: string): ParseResult<string[]> {
+  const t = text.trim();
+  if (t === '') return { ok: true, value: [] };
+  let parsed: unknown;
+  try { parsed = JSON.parse(t); } catch (e) { return { ok: false, error: `Not valid JSON: ${(e as Error).message}` }; }
+  if (!Array.isArray(parsed)) return { ok: false, error: 'Must be a JSON array' };
+  for (const v of parsed) {
+    if (typeof v !== 'string') return { ok: false, error: 'All array entries must be strings' };
+  }
+  return { ok: true, value: parsed as string[] };
+}
+
+function parseJsonStringMap(text: string): ParseResult<Record<string, string>> {
+  const t = text.trim();
+  if (t === '') return { ok: true, value: {} };
+  let parsed: unknown;
+  try { parsed = JSON.parse(t); } catch (e) { return { ok: false, error: `Not valid JSON: ${(e as Error).message}` }; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { ok: false, error: 'Must be a JSON object' };
+  }
+  for (const v of Object.values(parsed as Record<string, unknown>)) {
+    if (typeof v !== 'string') return { ok: false, error: 'All values must be strings' };
+  }
+  return { ok: true, value: parsed as Record<string, string> };
+}
+
+function SkillsSection({
+  value,
+  busy,
+  onChange,
+}: {
+  value: string[] | 'all';
+  busy: boolean;
+  onChange: (next: string[] | 'all') => void;
+}): JSX.Element {
+  const isAll = value === 'all';
+  const list = isAll ? [] : value;
+  const [draft, setDraft] = useState('');
+  const trimmed = draft.trim();
+  const isInvalid = trimmed !== '' && !SKILL_SLUG_RE.test(trimmed);
+  const isDup = trimmed !== '' && list.includes(trimmed);
+  const canAdd = !isAll && trimmed !== '' && !isInvalid && !isDup;
+
+  function add(): void {
+    if (!canAdd) return;
+    onChange([...list, trimmed]);
+    setDraft('');
+  }
+  function remove(idx: number): void {
+    onChange(list.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <>
+      <div class="group-admin-toolbar">
+        <p class="group-admin-help">
+          Container skills mounted into every session in this group. Restart required to take
+          effect — skill mounts are computed at container spawn. Use "all" to mount every
+          available container skill, or pick specific slugs from <code>container/skills/</code>.
+        </p>
+      </div>
+
+      <Field label="Selection">
+        <div class="group-admin-stack">
+          <label class="group-admin-check">
+            <input
+              type="radio"
+              name="skills-mode"
+              checked={isAll}
+              disabled={busy}
+              onChange={() => onChange('all')}
+            />
+            <span>All available skills</span>
+          </label>
+          <label class="group-admin-check">
+            <input
+              type="radio"
+              name="skills-mode"
+              checked={!isAll}
+              disabled={busy}
+              onChange={() => onChange([])}
+            />
+            <span>Specific skills only</span>
+          </label>
+        </div>
+      </Field>
+
+      {!isAll ? (
+        <Field label="Skills" info="Slug per skill (lowercase a–z, 0–9, hyphen). Must match a folder under container/skills/ or a group-local skill.">
+          <div class="group-admin-stack ga-model-params">
+            {list.length === 0 ? (
+              <p class="group-admin-help">No skills selected.</p>
+            ) : (
+              <ul class="ga-chip-list">
+                {list.map((s, i) => (
+                  <li key={`${s}-${i}`} class="ga-chip">
+                    <span class="ga-chip-label">{s}</span>
+                    <button
+                      type="button"
+                      class="ga-chip-remove"
+                      aria-label={`Remove ${s}`}
+                      disabled={busy}
+                      onClick={() => remove(i)}
+                    >
+                      {'\u2715'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div class="ga-mp-actions">
+              <input
+                type="text"
+                class="ga-chip-input"
+                placeholder="skill slug (e.g. welcome, agent-browser)"
+                value={draft}
+                disabled={busy}
+                onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setDraft(e.currentTarget.value)}
+                onKeyDown={(e: JSX.TargetedKeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') { e.preventDefault(); add(); }
+                }}
+              />
+              <button type="button" disabled={busy || !canAdd} onClick={add}>
+                + Add
+              </button>
+            </div>
+            {isInvalid ? (
+              <p class="ga-confirm-warn">"{trimmed}" must be lowercase a–z, 0–9, hyphen.</p>
+            ) : isDup ? (
+              <p class="ga-confirm-warn">"{trimmed}" is already in the list.</p>
+            ) : null}
+          </div>
+        </Field>
+      ) : null}
+    </>
   );
 }

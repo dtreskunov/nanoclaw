@@ -57,6 +57,7 @@ import { requestApproval } from '../../../modules/approvals/primitive.js';
 import type { Session } from '../../../types.js';
 import type { AgentGroup, ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
+import type { McpServerConfig } from '../../../container-config.js';
 import { SELECTABLE_AGENT_PROVIDERS, VALID_AGENT_PROVIDERS } from './agent-providers.js';
 import { recordAdminAction } from './audit.js';
 import { listImages } from './image-catalog.js';
@@ -161,6 +162,9 @@ async function dispatch(
   if (rest === '/settings' && method === 'GET') return handleGetSettings(res, gid, actorUserId);
   if (rest === '/settings' && method === 'PATCH') return handlePatchSettings(req, res, actorUserId, gid);
   if (rest === '/model-params' && method === 'PATCH') return handlePatchModelParams(req, res, actorUserId, gid);
+  if (rest === '/packages' && method === 'PATCH') return handlePatchPackages(req, res, actorUserId, gid);
+  if (rest === '/mcp-servers' && method === 'PATCH') return handlePatchMcpServers(req, res, actorUserId, gid);
+  if (rest === '/skills' && method === 'PATCH') return handlePatchSkills(req, res, actorUserId, gid);
   if (rest === '/restart' && method === 'POST') return handleRestart(req, res, actorUserId, gid);
   if (rest === '/archive' && method === 'POST') return handleArchive(req, res, actorUserId, gid);
 
@@ -222,11 +226,18 @@ interface SettingsResponse {
   >;
   /** Freeform provider knobs (e.g. `{ max_tokens: 8192 }`). Edited via PATCH /model-params. */
   modelParams: Record<string, unknown>;
+  /** Installed packages — image rebuild required to take effect. */
+  packages: { apt: string[]; npm: string[]; pip: string[] };
+  /** Per-group MCP servers — restart required to take effect. */
+  mcpServers: Record<string, McpServerConfig>;
+  /** Container skill selection. `'all'` mounts every available container skill. */
+  skills: string[] | 'all';
   /** Resolved defaults for nullable config fields (shown as placeholders). */
   defaults: {
     provider: string | null;
     model: string | null;
     image_tag: string | null;
+    transcription_model: string | null;
   };
   validProviders: readonly string[];
   validCliScopes: readonly string[];
@@ -279,9 +290,10 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
   }
 
   // Resolve effective defaults for fields the UI shows as placeholders.
-  const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL']);
+  const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL', 'DEFAULT_TRANSCRIPTION_MODEL']);
   const defaultProvider = envDefaults.DEFAULT_PROVIDER || 'claude';
   const defaultModel = envDefaults.DEFAULT_MODEL || null;
+  const defaultTranscriptionModel = envDefaults.DEFAULT_TRANSCRIPTION_MODEL || null;
   const defaultImage = CONTAINER_IMAGE || null;
 
   const body: SettingsResponse = {
@@ -302,10 +314,18 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
       transcription_model: cfg.transcription_model,
     },
     modelParams: parseModelParams(cfg.model_params),
+    packages: {
+      apt: parseStringArray(cfg.packages_apt),
+      npm: parseStringArray(cfg.packages_npm),
+      pip: parseStringArray(cfg.packages_pip),
+    },
+    mcpServers: parseMcpServers(cfg.mcp_servers),
+    skills: parseSkills(cfg.skills),
     defaults: {
       provider: defaultProvider,
       model: defaultModel ? bareIdForResponse(defaultProvider, defaultModel) : null,
       image_tag: defaultImage,
+      transcription_model: defaultTranscriptionModel,
     },
     validProviders: SELECTABLE_PROVIDERS,
     validCliScopes: VALID_CLI_SCOPES,
@@ -473,17 +493,17 @@ async function handlePatchSettings(
 
   if ('transcription_model' in updates || 'provider' in updates || 'model' in updates) {
     const existing = getContainerConfig(gid);
-    const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL']);
+    const envDefaults = readEnvFile(['DEFAULT_PROVIDER', 'DEFAULT_MODEL', 'DEFAULT_TRANSCRIPTION_MODEL']);
     const effectiveProvider = updates.provider ?? existing?.provider ?? envDefaults.DEFAULT_PROVIDER ?? 'claude';
-    const effectiveModel =
-      'model' in updates
-        ? updates.model
-        : (existing?.model ??
-          (envDefaults.DEFAULT_MODEL ? dbValueFromBareId(effectiveProvider, envDefaults.DEFAULT_MODEL) : null));
+    // DEFAULT_MODEL in .env is the DB wire value — use as-is.
+    const effectiveModel = 'model' in updates ? updates.model : (existing?.model ?? envDefaults.DEFAULT_MODEL ?? null);
+    // Fall back to DEFAULT_TRANSCRIPTION_MODEL so clearing the per-group
+    // override re-enables voice (mirrors voice-mode.ts:deriveVoiceModeForConfig
+    // and the env fallback already used by streamTranscribe).
     const effectiveTranscriptionModel =
       'transcription_model' in updates
-        ? (updates.transcription_model ?? null)
-        : (existing?.transcription_model ?? null);
+        ? (updates.transcription_model ?? envDefaults.DEFAULT_TRANSCRIPTION_MODEL ?? null)
+        : (existing?.transcription_model ?? envDefaults.DEFAULT_TRANSCRIPTION_MODEL ?? null);
     updates.voice_mode = await deriveVoiceMode(effectiveProvider, effectiveModel ?? null, effectiveTranscriptionModel);
   }
 
@@ -519,6 +539,40 @@ function parseModelParams(raw: string | null | undefined): Record<string, unknow
   try {
     const v = JSON.parse(raw);
     if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+  } catch {
+    /* fall through */
+  }
+  return {};
+}
+
+function parseStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v as string[];
+  } catch {
+    /* fall through */
+  }
+  return [];
+}
+
+function parseSkills(raw: string | null | undefined): string[] | 'all' {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    if (v === 'all') return 'all';
+    if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v as string[];
+  } catch {
+    /* fall through */
+  }
+  return [];
+}
+
+function parseMcpServers(raw: string | null | undefined): Record<string, McpServerConfig> {
+  if (!raw) return {};
+  try {
+    const v = JSON.parse(raw);
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, McpServerConfig>;
   } catch {
     /* fall through */
   }
@@ -583,6 +637,271 @@ async function handlePatchModelParams(
     payload: { params: cleaned },
   });
   writeJson(res, 200, { modelParams: cleaned });
+}
+
+// ── packages / mcp servers / skills ───────────────────────────────────────
+
+const MAX_PACKAGES_PER_KIND = 200;
+const MAX_PACKAGE_LEN = 200;
+const PACKAGE_TOKEN_RE = /^[A-Za-z0-9@._/+=<>~^!*-]+$/;
+
+const MAX_MCP_SERVERS = 32;
+const MCP_NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+const MAX_MCP_NAME_LEN = 64;
+
+const SKILL_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+const MAX_SKILL_SLUG_LEN = 64;
+const MAX_SKILLS = 64;
+
+function cleanPackageList(label: string, raw: unknown): string[] {
+  if (!Array.isArray(raw)) throw new BadRequest(`${label} must be an array of strings`);
+  if (raw.length > MAX_PACKAGES_PER_KIND) {
+    throw new BadRequest(`${label} too long (max ${MAX_PACKAGES_PER_KIND})`);
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== 'string') throw new BadRequest(`${label} entries must be strings`);
+    const v = item.trim();
+    if (v === '') continue;
+    if (v.length > MAX_PACKAGE_LEN) {
+      throw new BadRequest(`${label}: "${v.slice(0, 32)}…" exceeds ${MAX_PACKAGE_LEN} chars`);
+    }
+    if (!PACKAGE_TOKEN_RE.test(v)) {
+      throw new BadRequest(`${label}: "${v}" has invalid characters`);
+    }
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
+/**
+ * PATCH /packages — full replacement of each provided package list.
+ * Body: `{ apt?: string[]; npm?: string[]; pip?: string[] }`. Lists omitted
+ * from the body are left unchanged. Image rebuild required to take effect
+ * — the UI confirm dialog defaults rebuild=on when packages change.
+ */
+async function handlePatchPackages(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+): Promise<void> {
+  const body = (await readJsonBody(req)) as { apt?: unknown; npm?: unknown; pip?: unknown };
+  const cfg = getContainerConfig(gid);
+  if (!cfg) {
+    writeJson(res, 500, { error: 'container_config_missing' });
+    return;
+  }
+
+  const written: Partial<Record<'apt' | 'npm' | 'pip', string[]>> = {};
+  if ('apt' in body) written.apt = cleanPackageList('apt', body.apt);
+  if ('npm' in body) written.npm = cleanPackageList('npm', body.npm);
+  if ('pip' in body) written.pip = cleanPackageList('pip', body.pip);
+
+  if (Object.keys(written).length === 0) {
+    throw new BadRequest('provide at least one of: apt, npm, pip');
+  }
+
+  if (written.apt) updateContainerConfigJson(gid, 'packages_apt', written.apt);
+  if (written.npm) updateContainerConfigJson(gid, 'packages_npm', written.npm);
+  if (written.pip) updateContainerConfigJson(gid, 'packages_pip', written.pip);
+
+  recordAdminAction({
+    actorUserId,
+    action: 'group_packages_update',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: written as Record<string, unknown>,
+  });
+
+  const fresh = getContainerConfig(gid)!;
+  writeJson(res, 200, {
+    packages: {
+      apt: parseStringArray(fresh.packages_apt),
+      npm: parseStringArray(fresh.packages_npm),
+      pip: parseStringArray(fresh.packages_pip),
+    },
+  });
+}
+
+function cleanMcpServers(raw: unknown): Record<string, McpServerConfig> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new BadRequest('servers must be an object keyed by server name');
+  }
+  const input = raw as Record<string, unknown>;
+  const names = Object.keys(input);
+  if (names.length > MAX_MCP_SERVERS) {
+    throw new BadRequest(`too many MCP servers (max ${MAX_MCP_SERVERS})`);
+  }
+  const out: Record<string, McpServerConfig> = {};
+  for (const name of names) {
+    if (name.length === 0 || name.length > MAX_MCP_NAME_LEN) {
+      throw new BadRequest(`MCP server name "${name}" must be 1–${MAX_MCP_NAME_LEN} chars`);
+    }
+    if (!MCP_NAME_RE.test(name)) {
+      throw new BadRequest(`MCP server name "${name}" must match ${MCP_NAME_RE.source}`);
+    }
+    const cfg = input[name];
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+      throw new BadRequest(`MCP server "${name}" must be an object`);
+    }
+    out[name] = cleanOneMcpServer(name, cfg as Record<string, unknown>);
+  }
+  return out;
+}
+
+function cleanOneMcpServer(name: string, cfg: Record<string, unknown>): McpServerConfig {
+  const typeRaw = cfg.type;
+  const type = typeof typeRaw === 'string' ? typeRaw : 'stdio';
+  if (type !== 'stdio' && type !== 'http' && type !== 'sse') {
+    throw new BadRequest(`MCP server "${name}": type must be stdio, http, or sse`);
+  }
+  const instructions = cfg.instructions == null ? undefined : String(cfg.instructions);
+  if (instructions !== undefined && instructions.length > 2000) {
+    throw new BadRequest(`MCP server "${name}": instructions too long (max 2000)`);
+  }
+
+  if (type === 'http' || type === 'sse') {
+    if (typeof cfg.url !== 'string' || cfg.url.trim() === '') {
+      throw new BadRequest(`MCP server "${name}": url is required for ${type} transport`);
+    }
+    const url = cfg.url.trim();
+    if (!/^https?:\/\//.test(url)) {
+      throw new BadRequest(`MCP server "${name}": url must start with http:// or https://`);
+    }
+    const headers = cleanStringStringMap(`MCP server "${name}" headers`, cfg.headers);
+    const out: McpServerConfig = { type, url };
+    if (Object.keys(headers).length > 0) out.headers = headers;
+    if (instructions !== undefined) out.instructions = instructions;
+    return out;
+  }
+
+  // stdio
+  if (typeof cfg.command !== 'string' || cfg.command.trim() === '') {
+    throw new BadRequest(`MCP server "${name}": command is required for stdio transport`);
+  }
+  const command = cfg.command.trim();
+  const args = cleanStringArray(`MCP server "${name}" args`, cfg.args);
+  const env = cleanStringStringMap(`MCP server "${name}" env`, cfg.env);
+  const out: McpServerConfig = { command };
+  if (args.length > 0) out.args = args;
+  if (Object.keys(env).length > 0) out.env = env;
+  if (instructions !== undefined) out.instructions = instructions;
+  return out;
+}
+
+function cleanStringArray(label: string, raw: unknown): string[] {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw new BadRequest(`${label} must be an array of strings`);
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'string') throw new BadRequest(`${label} entries must be strings`);
+    out.push(v);
+  }
+  return out;
+}
+
+function cleanStringStringMap(label: string, raw: unknown): Record<string, string> {
+  if (raw == null) return {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new BadRequest(`${label} must be an object of string values`);
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== 'string') throw new BadRequest(`${label}: value for "${k}" must be a string`);
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * PATCH /mcp-servers — full replacement of the mcp_servers map.
+ * Body: `{ servers: Record<string, McpServerConfig> }`. Restart required to
+ * take effect — Claude Agent SDK builds the MCP server map at session start.
+ */
+async function handlePatchMcpServers(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+): Promise<void> {
+  const body = (await readJsonBody(req)) as { servers?: unknown };
+  if (!('servers' in body)) throw new BadRequest('servers is required');
+  const cleaned = cleanMcpServers(body.servers);
+
+  const cfg = getContainerConfig(gid);
+  if (!cfg) {
+    writeJson(res, 500, { error: 'container_config_missing' });
+    return;
+  }
+  updateContainerConfigJson(gid, 'mcp_servers', cleaned);
+  recordAdminAction({
+    actorUserId,
+    action: 'group_mcp_servers_update',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: { servers: cleaned } as Record<string, unknown>,
+  });
+  writeJson(res, 200, { mcpServers: cleaned });
+}
+
+/**
+ * PATCH /skills — full replacement of the skills selection.
+ * Body: `{ skills: string[] | 'all' }`. Restart required to take effect —
+ * mounts are computed at container spawn.
+ */
+async function handlePatchSkills(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  actorUserId: string,
+  gid: string,
+): Promise<void> {
+  const body = (await readJsonBody(req)) as { skills?: unknown };
+  if (!('skills' in body)) throw new BadRequest('skills is required');
+  const raw = body.skills;
+  let cleaned: string[] | 'all';
+  if (raw === 'all') {
+    cleaned = 'all';
+  } else if (Array.isArray(raw)) {
+    if (raw.length > MAX_SKILLS) throw new BadRequest(`too many skills (max ${MAX_SKILLS})`);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of raw) {
+      if (typeof item !== 'string') throw new BadRequest('skills entries must be strings');
+      const v = item.trim();
+      if (v === '') continue;
+      if (v.length > MAX_SKILL_SLUG_LEN) {
+        throw new BadRequest(`skill "${v.slice(0, 32)}…" exceeds ${MAX_SKILL_SLUG_LEN} chars`);
+      }
+      if (!SKILL_SLUG_RE.test(v)) {
+        throw new BadRequest(`skill "${v}" must be a slug: lowercase a-z, 0-9, hyphen`);
+      }
+      if (seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+    }
+    cleaned = out;
+  } else {
+    throw new BadRequest('skills must be "all" or an array of slugs');
+  }
+
+  const cfg = getContainerConfig(gid);
+  if (!cfg) {
+    writeJson(res, 500, { error: 'container_config_missing' });
+    return;
+  }
+  updateContainerConfigJson(gid, 'skills', cleaned);
+  recordAdminAction({
+    actorUserId,
+    action: 'group_skills_update',
+    targetKind: 'agent_group',
+    targetId: gid,
+    payload: { skills: cleaned } as Record<string, unknown>,
+  });
+  writeJson(res, 200, { skills: cleaned });
 }
 
 async function handleRestart(

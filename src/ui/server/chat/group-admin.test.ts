@@ -263,3 +263,167 @@ describe('POST /api/groups/:gid/admin/archive', () => {
     expect(res.status()).toBe(403);
   });
 });
+
+function seedOwnedGroup(gid: string, folder: string, owner = 'web:owner'): void {
+  seedUser(owner);
+  grantRole({
+    user_id: owner,
+    role: 'owner',
+    agent_group_id: null,
+    granted_by: owner,
+    granted_at: NOW(),
+  });
+  seedGroup(gid, folder);
+  mockUserId = owner;
+}
+
+function getJsonCol(gid: string, col: string): unknown {
+  const row = getDb().prepare(`SELECT ${col} AS v FROM container_configs WHERE agent_group_id = ?`).get(gid) as {
+    v: string;
+  };
+  return JSON.parse(row.v);
+}
+
+describe('PATCH /api/groups/:gid/admin/packages', () => {
+  it('replaces only the lists present in the body, dedupes, trims', async () => {
+    seedOwnedGroup('ag-pkg', 'pkg-grp');
+
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-pkg/admin/packages', {
+      apt: ['ripgrep', 'jq', 'ripgrep', '  jq  '],
+      npm: ['typescript@5'],
+    });
+    expect(res.status()).toBe(200);
+    const body = res.body() as { packages: { apt: string[]; npm: string[]; pip: string[] } };
+    expect(body.packages.apt).toEqual(['ripgrep', 'jq']);
+    expect(body.packages.npm).toEqual(['typescript@5']);
+    expect(body.packages.pip).toEqual([]);
+    expect(getJsonCol('ag-pkg', 'packages_apt')).toEqual(['ripgrep', 'jq']);
+    expect(getJsonCol('ag-pkg', 'packages_npm')).toEqual(['typescript@5']);
+    // pip not in body — left unchanged at default [].
+    expect(getJsonCol('ag-pkg', 'packages_pip')).toEqual([]);
+  });
+
+  it('rejects invalid characters in a package name', async () => {
+    seedOwnedGroup('ag-pkg2', 'pkg2-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-pkg2/admin/packages', {
+      apt: ['ok', 'bad name'],
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  it('rejects when no list is provided', async () => {
+    seedOwnedGroup('ag-pkg3', 'pkg3-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-pkg3/admin/packages', {});
+    expect(res.status()).toBe(400);
+  });
+});
+
+describe('PATCH /api/groups/:gid/admin/mcp-servers', () => {
+  it('accepts a stdio server with args/env and a http server with headers', async () => {
+    seedOwnedGroup('ag-mcp', 'mcp-grp');
+
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-mcp/admin/mcp-servers', {
+      servers: {
+        context7: {
+          command: 'npx',
+          args: ['-y', '@upstash/context7-mcp'],
+          env: { FOO: 'bar' },
+          instructions: 'fetch docs',
+        },
+        remote: {
+          type: 'http',
+          url: 'https://example.com/mcp',
+          headers: { Authorization: 'Bearer x' },
+        },
+      },
+    });
+    expect(res.status()).toBe(200);
+    const stored = getJsonCol('ag-mcp', 'mcp_servers') as Record<string, unknown>;
+    expect(Object.keys(stored).sort()).toEqual(['context7', 'remote']);
+    expect((stored.context7 as { command: string }).command).toBe('npx');
+    expect((stored.remote as { url: string }).url).toBe('https://example.com/mcp');
+  });
+
+  it('rejects an http server missing url', async () => {
+    seedOwnedGroup('ag-mcp2', 'mcp2-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-mcp2/admin/mcp-servers', {
+      servers: { broken: { type: 'http' } },
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  it('rejects an invalid server name', async () => {
+    seedOwnedGroup('ag-mcp3', 'mcp3-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-mcp3/admin/mcp-servers', {
+      servers: { '1bad': { command: 'x' } },
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  it('full-replaces the map (empty body wipes existing servers)', async () => {
+    seedOwnedGroup('ag-mcp4', 'mcp4-grp');
+    await call('PATCH', '/ui/chat/api/groups/ag-mcp4/admin/mcp-servers', {
+      servers: { one: { command: 'x' } },
+    });
+    expect(Object.keys(getJsonCol('ag-mcp4', 'mcp_servers') as object)).toEqual(['one']);
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-mcp4/admin/mcp-servers', { servers: {} });
+    expect(res.status()).toBe(200);
+    expect(getJsonCol('ag-mcp4', 'mcp_servers')).toEqual({});
+  });
+});
+
+describe('PATCH /api/groups/:gid/admin/skills', () => {
+  it('accepts "all"', async () => {
+    seedOwnedGroup('ag-sk', 'sk-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-sk/admin/skills', { skills: 'all' });
+    expect(res.status()).toBe(200);
+    expect(getJsonCol('ag-sk', 'skills')).toBe('all');
+  });
+
+  it('accepts a slug array, dedupes', async () => {
+    seedOwnedGroup('ag-sk2', 'sk2-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-sk2/admin/skills', {
+      skills: ['welcome', 'agent-browser', 'welcome'],
+    });
+    expect(res.status()).toBe(200);
+    expect(getJsonCol('ag-sk2', 'skills')).toEqual(['welcome', 'agent-browser']);
+  });
+
+  it('rejects uppercase / invalid slugs', async () => {
+    seedOwnedGroup('ag-sk3', 'sk3-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-sk3/admin/skills', {
+      skills: ['Welcome'],
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  it('rejects an object value', async () => {
+    seedOwnedGroup('ag-sk4', 'sk4-grp');
+    const res = await call('PATCH', '/ui/chat/api/groups/ag-sk4/admin/skills', {
+      skills: { foo: 'bar' },
+    });
+    expect(res.status()).toBe(400);
+  });
+});
+
+describe('GET /api/groups/:gid/admin/settings (extended fields)', () => {
+  it('returns packages, mcpServers, and skills slices', async () => {
+    seedOwnedGroup('ag-get', 'get-grp');
+    await call('PATCH', '/ui/chat/api/groups/ag-get/admin/packages', { apt: ['jq'] });
+    await call('PATCH', '/ui/chat/api/groups/ag-get/admin/mcp-servers', {
+      servers: { fetch: { command: 'fetch-mcp' } },
+    });
+    await call('PATCH', '/ui/chat/api/groups/ag-get/admin/skills', { skills: ['welcome'] });
+
+    const res = await call('GET', '/ui/chat/api/groups/ag-get/admin/settings');
+    expect(res.status()).toBe(200);
+    const body = res.body() as {
+      packages: { apt: string[]; npm: string[]; pip: string[] };
+      mcpServers: Record<string, unknown>;
+      skills: string[] | 'all';
+    };
+    expect(body.packages.apt).toEqual(['jq']);
+    expect(Object.keys(body.mcpServers)).toEqual(['fetch']);
+    expect(body.skills).toEqual(['welcome']);
+  });
+});
