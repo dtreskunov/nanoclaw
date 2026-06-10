@@ -71,8 +71,12 @@ interface ServerMessage {
  * resolves often hits a dead element. Poll briefly with rAF instead
  * (budget ~3s — enough for a typical WS handshake, not so long that a
  * later user click steals focus back from us).
+ *
+ * No-op on mobile: focusing the textarea pops up the OS keyboard, which
+ * is unwanted on load / thread-switch. The user taps to type explicitly.
  */
 function focusComposerSoon(): void {
+  if (isMobile.value) return;
   let tries = 0;
   const attempt = (): void => {
     const el = document.getElementById('chat-input') as HTMLTextAreaElement | null;
