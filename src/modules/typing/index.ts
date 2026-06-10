@@ -22,7 +22,15 @@
  */
 import fs from 'fs';
 
-import { heartbeatPath, readSessionProgress, readSessionTurnEndedAt } from '../../session-manager.js';
+import { getRunningSessions } from '../../db/sessions.js';
+import { getMessagingGroup } from '../../db/messaging-groups.js';
+import { log } from '../../log.js';
+import {
+  heartbeatPath,
+  isSessionProcessing,
+  readSessionProgress,
+  readSessionTurnEndedAt,
+} from '../../session-manager.js';
 
 const TYPING_REFRESH_MS = 4000;
 /**
@@ -185,4 +193,38 @@ export function stopTypingRefresh(sessionId: string): void {
   clearInterval(entry.interval);
   typingRefreshers.delete(sessionId);
   triggerClearTyping(entry.channelType, entry.platformId, entry.threadId).catch(() => {});
+}
+
+/**
+ * Restart typing refreshers for any session whose container was adopted
+ * across a host restart and is still mid-turn (`processing_ack` has a
+ * `processing` row). The in-memory `typingRefreshers` map doesn't
+ * survive the host process, so without this the UI sees no typing
+ * indicator until the next inbound message even though the agent is
+ * actively working.
+ *
+ * Idle adopted sessions are skipped — only the ones genuinely in the
+ * middle of a turn get a refresher, so we don't flash dots for ~15s on
+ * every restart.
+ *
+ * Safe to call once at startup after the channel adapter is wired
+ * (`setTypingAdapter` has been called). No-op if called before then —
+ * typing fires would silently drop.
+ */
+export function resumeTypingForRunningSessions(): void {
+  if (!adapter) return;
+  let resumed = 0;
+  for (const session of getRunningSessions()) {
+    try {
+      if (!isSessionProcessing(session.agent_group_id, session.id)) continue;
+      if (!session.messaging_group_id) continue;
+      const mg = getMessagingGroup(session.messaging_group_id);
+      if (!mg) continue;
+      startTypingRefresh(session.id, session.agent_group_id, mg.channel_type, mg.platform_id, session.thread_id);
+      resumed++;
+    } catch (err) {
+      log.warn('Failed to resume typing for session', { sessionId: session.id, err });
+    }
+  }
+  if (resumed > 0) log.info('Resumed typing refreshers after host restart', { count: resumed });
 }

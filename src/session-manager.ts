@@ -490,6 +490,33 @@ export function readSessionTurnEndedAt(agentGroupId: string, sessionId: string):
 }
 
 /**
+ * Returns true when the container has at least one in-flight turn
+ * (a row in `processing_ack` still marked `processing`). Used at host
+ * startup to decide whether to resume the typing indicator for an
+ * adopted session — the in-memory typing refresher map doesn't survive
+ * a host restart, so without this we'd leave the dots off until the
+ * next inbound message even though the agent is still working.
+ */
+export function isSessionProcessing(agentGroupId: string, sessionId: string): boolean {
+  let db: Database.Database | undefined;
+  try {
+    db = openOutboundDb(agentGroupId, sessionId);
+    const row = db
+      .prepare("SELECT 1 FROM processing_ack WHERE status = 'processing' LIMIT 1")
+      .get() as { 1: number } | undefined;
+    return !!row;
+  } catch {
+    return false;
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
  * @deprecated Use openInboundDb / openOutboundDb instead.
  */
 export function openSessionDb(agentGroupId: string, sessionId: string): Database.Database {

@@ -19,6 +19,7 @@ import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, st
 import { createDeliveryBridge } from './delivery-bridge.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
 import { ensureVapidKeys } from './modules/push/bootstrap.js';
+import { resumeTypingForRunningSessions } from './modules/typing/index.js';
 import { routeInbound } from './router.js';
 import { initSearchDb, closeSearchDb } from './search-index.js';
 import { log } from './log.js';
@@ -154,6 +155,11 @@ async function main(): Promise<void> {
   // 4. Delivery adapter bridge — dispatches to channel adapters
   const deliveryAdapter = createDeliveryBridge({ getChannelAdapter });
   setDeliveryAdapter(deliveryAdapter);
+
+  // 4a. Resume typing indicators for any session whose container was
+  //     adopted across a host restart and is still mid-turn — the
+  //     in-memory typingRefreshers map doesn't survive process restart.
+  resumeTypingForRunningSessions();
 
   // 5. Start delivery polls
   startActiveDeliveryPoll();
