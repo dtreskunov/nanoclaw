@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { GROUPS_DIR } from './config.js';
+import { GROUPS_DIR, PAGES_BASE_DOMAIN } from './config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { readEnvFile } from './env.js';
@@ -62,6 +62,13 @@ export interface ContainerConfig {
    * an object so providers can spread it without a null check.
    */
   modelParams?: Record<string, unknown>;
+  /**
+   * Public FQDN this group's static website is served at, when the website
+   * feature is configured (`PAGES_BASE_DOMAIN` set) AND this group has it
+   * enabled with a slug allocated. Otherwise undefined. The `site-website`
+   * skill keys off this to derive the publish path and URL.
+   */
+  siteFqdn?: string;
 }
 
 /**
@@ -123,6 +130,10 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     voiceMode: row.voice_mode,
     transcriptionModel: row.transcription_model ?? envFallback('DEFAULT_TRANSCRIPTION_MODEL'),
     modelParams: parseModelParams(row.model_params),
+    siteFqdn:
+      PAGES_BASE_DOMAIN && group.site_enabled && group.site_slug
+        ? `${group.site_slug}.${PAGES_BASE_DOMAIN}`
+        : undefined,
   };
 }
 
