@@ -395,6 +395,52 @@ describe('routeAgentMessage return-path', () => {
     expect(JSON.parse(s2Rows[0].content).text).toBe('self-note');
   });
 
+  it('byte-identical squelch: drops a verbatim re-send to the same peer', async () => {
+    // Seed one outbound a2a row in S1's messages_out targeting B. The
+    // squelch reads messages_out (container-side writes) for the prior, so
+    // we have to write it directly here — routeAgentMessage only writes to
+    // the *target's* messages_in, not the source's messages_out.
+    const sameContent = JSON.stringify({ text: '👍' });
+    const outDb = new Database(path.join(sessionDir(A, S1.id), 'outbound.db'));
+    outDb
+      .prepare(
+        `INSERT INTO messages_out (id, seq, kind, timestamp, platform_id, channel_type, thread_id, content)
+         VALUES ('prior-ack', 1, 'chat', ?, ?, 'agent', NULL, ?)`,
+      )
+      .run(now(), B, sameContent);
+    outDb.close();
+
+    await routeAgentMessage({ id: 'duplicate-ack', platform_id: B, content: sameContent, in_reply_to: null }, S1);
+
+    // Suppressed — nothing reaches B.
+    expect(readInbound(B, SB.id)).toHaveLength(0);
+  });
+
+  it('byte-identical squelch: different content to the same peer goes through', async () => {
+    const outDb = new Database(path.join(sessionDir(A, S1.id), 'outbound.db'));
+    outDb
+      .prepare(
+        `INSERT INTO messages_out (id, seq, kind, timestamp, platform_id, channel_type, thread_id, content)
+         VALUES ('prior', 1, 'chat', ?, ?, 'agent', NULL, ?)`,
+      )
+      .run(now(), B, JSON.stringify({ text: 'first thought' }));
+    outDb.close();
+
+    await routeAgentMessage(
+      {
+        id: 'substantive-followup',
+        platform_id: B,
+        content: JSON.stringify({ text: 'second thought, refined' }),
+        in_reply_to: null,
+      },
+      S1,
+    );
+
+    const bRows = readInbound(B, SB.id);
+    expect(bRows).toHaveLength(1);
+    expect(JSON.parse(bRows[0].content).text).toBe('second thought, refined');
+  });
+
   it('BUG: no volume cap on a2a routing — unbounded ping-pong is allowed (#2063)', async () => {
     // Two agents can exchange unlimited messages with no rate limit or loop
     // detection. This test documents the gap — it should FAIL once #2063 lands.

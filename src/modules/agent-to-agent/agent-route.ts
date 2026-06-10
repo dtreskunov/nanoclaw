@@ -27,7 +27,13 @@ import { getInboundSourceSessionId, getMostRecentPeerSourceSessionId } from '../
 import { getSession } from '../../db/sessions.js';
 import { wakeContainer } from '../../container-runner.js';
 import { log } from '../../log.js';
-import { openInboundDb, resolveSession, sessionDir, writeSessionMessage } from '../../session-manager.js';
+import {
+  openInboundDb,
+  openOutboundDb,
+  resolveSession,
+  sessionDir,
+  writeSessionMessage,
+} from '../../session-manager.js';
 import type { Session } from '../../types.js';
 import { hasDestination } from './db/agent-destinations.js';
 
@@ -175,6 +181,36 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
   if (!getAgentGroup(targetAgentGroupId)) {
     throw new Error(`target agent group ${targetAgentGroupId} not found for message ${msg.id}`);
   }
+
+  // Drop a byte-identical re-send to the same peer. Catches agent-to-agent
+  // ack pingpong ("👍" → "👍" → ...) without trying to detect substantive
+  // loops. Looks at the immediately prior outbound in this session targeting
+  // the same peer agent group; if the content string matches verbatim, the
+  // model has nothing new to add and the duplicate would just wake the peer
+  // for another empty turn.
+  const outDb = openOutboundDb(session.agent_group_id, session.id);
+  try {
+    const prior = outDb
+      .prepare(
+        `SELECT id, content FROM messages_out
+          WHERE channel_type = 'agent' AND platform_id = ? AND id != ?
+          ORDER BY seq DESC LIMIT 1`,
+      )
+      .get(targetAgentGroupId, msg.id) as { id: string; content: string } | undefined;
+    if (prior && prior.content === msg.content) {
+      log.warn('A2A duplicate suppressed (byte-identical to prior outbound)', {
+        from: session.agent_group_id,
+        sourceSession: session.id,
+        to: targetAgentGroupId,
+        messageId: msg.id,
+        priorMessageId: prior.id,
+      });
+      return;
+    }
+  } finally {
+    outDb.close();
+  }
+
   const targetSession = resolveTargetSession(msg, session, targetAgentGroupId);
   const a2aMsgId = `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
