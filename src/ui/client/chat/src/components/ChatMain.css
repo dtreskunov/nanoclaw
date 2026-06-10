@@ -111,74 +111,112 @@
 .chat-main .pending .item button { padding: 0 4px; border: 0; background: transparent; cursor: pointer; color: inherit; font-size: var(--font-lg); line-height: 1; }
 .chat-main form { display: flex; gap: 6px; padding-block: 8px; border-top: 1px solid var(--border); min-height: var(--bottom-row-h); align-items: flex-end; }
 .chat-main form > button { height: 32px; flex-shrink: 0; }
-.chat-main textarea { flex: 1; min-width: 0; min-height: 32px; max-height: 200px; resize: none; overflow-y: auto; padding: 5px 8px; font: inherit; border: 1px solid var(--border); border-radius: var(--radius-md); background: transparent; color: inherit; }
+/* Textarea reserves left room for the +-menu trigger and right room for
+   the mic + Send buttons that sit inside the wrap as absolute overlays.
+   Text won't wrap *around* the buttons (textareas don't support that),
+   but the padding keeps text from ever colliding with them, and the
+   bottom-anchored buttons stay clear of growing multi-line drafts. */
+.chat-main textarea { width: 100%; box-sizing: border-box; min-width: 0; min-height: 32px; max-height: 200px; resize: none; overflow-y: auto; padding: 5px 70px 5px 38px; font: inherit; border: 1px solid var(--border); border-radius: var(--radius-md); background: transparent; color: inherit; }
+/* While recording the mic widens to fit the mm:ss timer — bump right
+   padding so text never collides with it. */
+.chat-main .composer-input-wrap.recording textarea { padding-right: 92px; }
+/* Multi-line mode: text gets the full width, buttons get their own row
+   along the bottom. Recovers the ~108px of side padding for long drafts
+   at the cost of one button-row height. */
+.chat-main .composer-input-wrap.multi-line textarea { padding: 5px 8px 36px 8px; }
+.chat-main .composer-input-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
 .chat-main textarea::placeholder {
   color: var(--muted);
   opacity: 0.7;
 }
 .chat-main #chat-send {
-  background: transparent;
-  border: 1px solid var(--border);
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-strong, var(--accent));
+  border: 0;
   border-radius: var(--radius-md);
-  padding: 0 12px;
+  padding: 0;
   cursor: pointer;
-  color: inherit;
+  color: var(--accent-fg, #fff);
   font: inherit;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  z-index: 2;
+  transition: opacity 0.15s, background 0.15s;
 }
+.chat-main #chat-send:hover:not(:disabled) { opacity: 0.9; }
+.chat-main #chat-send:disabled { opacity: 0.35; cursor: not-allowed; }
 .chat-main #chat-mic {
+  position: absolute;
+  right: 36px;
+  bottom: 3px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
-  padding: 0 12px;
   cursor: pointer;
   color: inherit;
   font: inherit;
   font-size: 18px;
-  transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
   touch-action: none;
   user-select: none;
+  /* Stay above the textarea so taps reach the button. */
+  z-index: 1;
 }
-.chat-main #chat-mic.active {
-  background: rgba(220, 38, 38, 0.12);
-  border-color: rgb(220, 38, 38);
-}
-.chat-main #chat-recording-indicator {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
+.chat-main #chat-mic:hover:not(:disabled) { opacity: 1; background: var(--wash); }
+.chat-main #chat-mic:disabled { opacity: 0.35; cursor: not-allowed; }
+.chat-main #chat-mic.recording {
+  /* Widen so the mm:ss timer fits. width:auto + min-width keeps the
+     button square when idle. */
+  width: auto;
+  min-width: 44px;
   padding: 0 8px;
-  font-size: var(--font-sm);
+  opacity: 1;
   color: rgb(220, 38, 38);
-}
-.chat-main .recording-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgb(220, 38, 38);
-  animation: pulse-dot 1s infinite;
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-.chat-main .recording-time {
+  background: rgba(220, 38, 38, 0.12);
+  font-size: 12px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.chat-main #chat-transcribing-indicator {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 8px;
-  font-size: var(--font-sm);
-  color: var(--fg-muted);
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.chat-main #chat-mic.transcribing {
+  opacity: 1;
+  background: var(--wash);
+}
+.chat-main #chat-mic.transcribing:disabled { opacity: 1; cursor: progress; }
+.chat-main .mic-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--fg);
+  border-radius: 50%;
+  animation: mic-spin 0.8s linear infinite;
+}
+@keyframes mic-spin { to { transform: rotate(360deg); } }
+/* Recording timer text inside the mic button. */
+.chat-main .recording-time {
+  font-variant-numeric: tabular-nums;
 }
 .chat-main form.recording {
   border-color: rgba(220, 38, 38, 0.4);
@@ -187,6 +225,86 @@
 .chat-main form.ws-down > button { opacity: 0.55; cursor: not-allowed; }
 .chat-main.drag-active { outline: 2px dashed var(--accent-strong); outline-offset: -4px; }
 
+/* Composer "+" menu */
+.chat-main .composer-plus {
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  z-index: 2;
+}
+.chat-main .composer-plus-trigger {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: inherit;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+.chat-main .composer-plus-trigger:hover:not(:disabled) { opacity: 1; background: var(--wash); }
+.chat-main .composer-plus-trigger:disabled { opacity: 0.35; cursor: not-allowed; }
+.chat-main .composer-plus.open .composer-plus-trigger {
+  opacity: 1;
+  background: var(--wash);
+}
+.chat-main .composer-plus-panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  z-index: 50;
+  background: var(--surface);
+  color: var(--surface-fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 24px var(--shadow-color);
+  padding: 4px 0;
+}
+.chat-main .composer-plus-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 8px 14px;
+  font-size: var(--font-sm);
+  line-height: 1.4;
+  color: inherit;
+  text-align: left;
+  font-family: inherit;
+}
+.chat-main .composer-plus-item:hover:not(:disabled) { background: var(--wash); }
+.chat-main .composer-plus-item .ico { width: 18px; text-align: center; }
+.chat-main #chat-recording-indicator.recording-stop-btn {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  border-radius: var(--radius-md);
+  color: rgb(220, 38, 38);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.chat-main #chat-recording-indicator.recording-stop-btn:hover {
+  background: rgba(220, 38, 38, 0.16);
+}
+.chat-main #chat-recording-indicator .recording-stop-label {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: var(--font-sm);
+  padding: 0 8px;
+}
+
 @media (max-width: 720px) {
   .chat-main .msg { max-width: 90%; font-size: var(--font-lg); }
   .chat-main form {
@@ -194,10 +312,17 @@
     gap: 8px;
     align-items: flex-end;
   }
-  .chat-main #chat-attach { min-width: 44px; min-height: 44px; font-size: 20px; padding: 0; flex-shrink: 0; }
-  .chat-main #chat-send { min-width: 56px; min-height: 44px; font-weight: 600; flex-shrink: 0; }
-  .chat-main #chat-mic { min-width: 56px; min-height: 44px; font-size: 22px; flex-shrink: 0; }
-  .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 10px; } /* 16px prevents iOS zoom on focus */
+  /* On mobile, all three composer buttons get the 44px tappable target.
+     Textarea padding grows to reserve room: 48px left for +, 96px right
+     for mic (40) + Send (40) + gaps. */
+  .chat-main .composer-plus-trigger { width: 40px; height: 40px; font-size: 26px; }
+  .chat-main .composer-plus { left: 4px; bottom: 2px; }
+  .chat-main #chat-send { width: 40px; height: 40px; right: 4px; bottom: 2px; font-size: 22px; }
+  .chat-main #chat-mic { width: 40px; height: 40px; right: 48px; bottom: 2px; font-size: 22px; }
+  .chat-main textarea { min-height: 44px; font-size: 16px; padding: 10px 96px 10px 48px; } /* 16px prevents iOS zoom on focus */
+  .chat-main .composer-input-wrap.recording textarea { padding-right: 120px; }
+  .chat-main .composer-input-wrap.multi-line textarea { padding: 10px 10px 48px 10px; }
+  .chat-main #chat-mic.recording { min-width: 56px; font-size: 14px; }
 }
 
 .chat-main .approvals-banner { border-bottom: 1px solid var(--border); background: var(--wash); padding-block: 8px; display: flex; flex-direction: column; gap: 6px; }

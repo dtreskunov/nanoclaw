@@ -7,7 +7,7 @@ import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
   pendingQuestions, respondingQuestionIds,
-  highlightMessageId, searchQuery, voiceMode,
+  highlightMessageId, searchQuery, voiceMode, isMobile,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
 import { renderMarkdown, rewriteFileLinks, highlightTextNodes, fmtBytesShort } from '../utils';
@@ -16,7 +16,8 @@ import {
   navFile, removePinnedPath, clearPinnedContext, respondApproval, respondQuestion,
   openChat,
 } from '../actions';
-import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia, transcribeViaServer } from '../recorder';
+import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia, hasSpeechRecognition, transcribeViaServer } from '../recorder';
+import { ComposerPlusMenu } from './ComposerPlusMenu';
 import { RelativeTime } from './RelativeTime';
 import type { ChatMessage, TurnUsage } from '../types';
 
@@ -335,11 +336,25 @@ function QuestionCard() {
   );
 }
 
+// Detect refusal-style output from a misconfigured server-side transcription
+// model (e.g. a chat LLM standing in for whisper). These should never reach
+// the composer.
+const REFUSAL_PATTERNS = [
+  /^i'?m sorry,? (but )?i (can'?t|cannot)/i,
+  /^i (can'?t|cannot) (process|transcribe|help|assist|fulfill|comply)/i,
+  /^sorry,? (but )?i (can'?t|cannot)/i,
+  /^as an ai (language )?model/i,
+  /^i (do not|don'?t) have the ability to/i,
+];
+function looksLikeRefusal(text: string): boolean {
+  const head = text.slice(0, 200);
+  return REFUSAL_PATTERNS.some((re) => re.test(head));
+}
+
 function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [inputHasText, setInputHasText] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const cameraRef = useRef<HTMLInputElement | null>(null);
   const isWeb = !channelType.value || channelType.value === 'web';
   const showComposer = isWeb || canSend.value;
   // Web threads send over the WebSocket; if it isn't connected, block input
@@ -352,7 +367,6 @@ function Composer() {
   const autosize = (): void => {
     const el = inputRef.current;
     if (!el) return;
-    setInputHasText(!!el.value.trim());
     // When empty, size to min-height. Chrome's scrollHeight reflects the
     // placeholder when value is empty, which makes a long/wrapping
     // placeholder (e.g. the wsDown 'Reconnecting…') puff the box to two
@@ -360,6 +374,7 @@ function Composer() {
     if (!el.value) {
       el.style.height = '';
       el.style.overflowY = 'hidden';
+      setMultiLine(false);
       return;
     }
     el.style.height = 'auto';
@@ -368,6 +383,9 @@ function Composer() {
     // overflow:auto with subpixel borders triggers a phantom scrollbar even
     // below the cap; only show it when actually capped.
     el.style.overflowY = h >= 200 ? 'auto' : 'hidden';
+    // Threshold tracks the single-line scrollHeight (~30px on desktop
+    // with padding:5px + 1.4 line-height). Two lines push it past ~50.
+    setMultiLine(h > 44);
   };
   // Mount + width-change observer. The empty-value early return inside
   // autosize() means we don't need to re-run on focus or on wsDown
@@ -402,12 +420,16 @@ function Composer() {
     sendChat(fullText, files).catch(console.error);
   };
   const onKey = (ev: JSX.TargetedKeyboardEvent<HTMLTextAreaElement>): void => {
-    if (ev.key === 'Enter' && !ev.shiftKey) {
+    // On mobile, Enter inserts a newline (matches platform keyboard
+    // convention — Send is the dedicated button). On desktop, Enter sends
+    // and Shift+Enter inserts a newline.
+    if (ev.key === 'Enter' && !ev.shiftKey && !isMobile.value) {
       ev.preventDefault();
       ev.currentTarget.form?.requestSubmit();
     }
   };
   const onAttachClick = (): void => fileRef.current?.click();
+  const onPhotoClick = (): void => cameraRef.current?.click();
   const onFileChange = (ev: JSX.TargetedEvent<HTMLInputElement>): void => {
     addPendingFiles(Array.from(ev.currentTarget.files || []), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
     ev.currentTarget.value = '';
@@ -419,64 +441,145 @@ function Composer() {
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
 
-  // ── PTT logic ──────────────────────────────────────────────────────
+  // ── Voice capture ──────────────────────────────────────────────────
+  // Two paths share the recorder:
+  //   - mic button (PTT or tap-toggle): always transcribes, inserts text
+  //     into the composer for editing. Never auto-sends.
+  //   - + menu "Record audio attachment": records a blob and adds it as a
+  //     pending file (only available when the responding model accepts
+  //     audio — voiceMode === 'audio').
   const vm = voiceMode.value;
-  const hasPending = pending.value.length > 0;
-  const micCapable = vm !== 'off' && hasGetUserMedia();
-  // Focused (or with content to send) → Send button; idle → Microphone.
-  const showSend = !micCapable || focused || inputHasText || hasPending;
-  const showMic = micCapable && !showSend;
-  const micDisabled = inputHasText || hasPending || composerDisabled;
+  const serverTranscribeAvailable = vm !== 'off';
+  const micCapable = hasGetUserMedia() && (serverTranscribeAvailable || hasSpeechRecognition());
   const recording = isRecording.value;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdModeRef = useRef(false);
+  // 'mic' = transcribe-to-composer; 'attach' = blob-only attachment.
+  const recordingModeRef = useRef<'mic' | 'attach' | null>(null);
+  const attachRecording = recording && recordingModeRef.current === 'attach';
 
   const transcribingRef = useRef(false);
   const [transcribeStatus, setTranscribeStatus] = useState('');
+  // True once the textarea has grown beyond a single line. Triggers the
+  // "buttons get their own row" layout: textarea uses full width for
+  // text, +/mic/Send sit in a dedicated strip at the bottom.
+  const [multiLine, setMultiLine] = useState(false);
+  // Holds transcript text that arrived while the textarea was unmounted
+  // (replaced by the recording or transcribing indicator). Drained by the
+  // useEffect below once the textarea re-mounts.
+  const pendingInsertRef = useRef<string | null>(null);
+
+  const doInsert = (el: HTMLTextAreaElement, text: string): void => {
+    const cur = el.value;
+    // Insert at the caret (or replace the current selection). When the
+    // textarea has never been focused, selectionStart/End sit at 0 by
+    // default — fall back to end-of-text so dictation doesn't land before
+    // typed content.
+    const hasFocus = document.activeElement === el;
+    const start = hasFocus ? (el.selectionStart ?? cur.length) : cur.length;
+    const end = hasFocus ? (el.selectionEnd ?? start) : cur.length;
+    const before = cur.slice(0, start);
+    const after = cur.slice(end);
+    const leftPad = before && !/\s$/.test(before) ? ' ' : '';
+    const rightPad = after && !/^\s/.test(after) ? ' ' : '';
+    const insert = leftPad + text + rightPad;
+    el.value = before + insert + after;
+    autosize();
+    const caret = (before + insert).length;
+    // Skip .focus() on mobile so the OS keyboard doesn't pop up after
+    // dictation. The user taps the textarea explicitly if they want to
+    // edit. Desktop benefits from focus so they can keep typing.
+    if (!isMobile.value) {
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    }
+  };
+
+  // Drain pendingInsert after every render. Re-runs whenever the textarea
+  // becomes available (recording → false, transcribeStatus → '').
+  useEffect(() => {
+    if (pendingInsertRef.current == null) return;
+    const el = inputRef.current;
+    if (!el) return;
+    const text = pendingInsertRef.current;
+    pendingInsertRef.current = null;
+    doInsert(el, text);
+  });
+
+  const insertIntoComposer = (text: string): void => {
+    const el = inputRef.current;
+    if (el) {
+      doInsert(el, text);
+      return;
+    }
+    // Textarea is currently hidden behind the recording / transcribing
+    // indicator. Stash the text and let the useEffect insert it once the
+    // textarea re-mounts.
+    const queued = pendingInsertRef.current;
+    pendingInsertRef.current = queued ? `${queued} ${text}` : text;
+  };
+
+  const attachAudioBlob = (blob: Blob): void => {
+    const rawType = blob.type.split(';')[0] || 'audio/mp4';
+    const ext = rawType.includes('ogg') ? 'ogg' : rawType.includes('mp4') ? 'm4a' : rawType.includes('wav') ? 'wav' : 'webm';
+    const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: rawType });
+    addPendingFiles([file], UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+  };
 
   const finishRecording = async (): Promise<void> => {
+    const mode = recordingModeRef.current;
+    recordingModeRef.current = null;
     const result = await stopRecording();
     if (!result) {
       chatStatus.value = 'too short — discarded';
       setTimeout(() => { if (chatStatus.value === 'too short — discarded') chatStatus.value = 'connected'; }, 2000);
       return;
     }
-    if (vm === 'transcribe') {
-      // Prefer client-side transcript if available; otherwise use server.
-      if (result.transcript) {
-        sendChat(result.transcript, null).catch(console.error);
-      } else {
-        if (!groupId.value || !threadId.value) return;
-        transcribingRef.current = true;
-        setTranscribeStatus('transcribing…');
-        transcribeViaServer(result.blob, groupId.value, threadId.value, {
-          onPartial: (delta) => {
-            setTranscribeStatus((prev) => {
-              const cur = prev === 'transcribing…' ? '' : prev;
-              return cur + delta;
-            });
-          },
-          onDone: (_fullText) => {
-            transcribingRef.current = false;
-            setTranscribeStatus('');
-          },
-          onError: (err) => {
-            transcribingRef.current = false;
-            setTranscribeStatus('');
-            chatStatus.value = `transcription failed: ${err}`;
-            setTimeout(() => { if (chatStatus.value.startsWith('transcription failed')) chatStatus.value = 'connected'; }, 3000);
-          },
-        });
-      }
-    } else if (vm === 'audio') {
-      const rawType = result.blob.type.split(';')[0] || 'audio/mp4';
-      const ext = rawType.includes('ogg') ? 'ogg' : rawType.includes('mp4') ? 'm4a' : rawType.includes('wav') ? 'wav' : 'webm';
-      const file = new File([result.blob], `voice-${Date.now()}.${ext}`, { type: rawType });
-      sendChat('', [{ name: file.name, size: file.size, file }]).catch(console.error);
+    if (mode === 'attach') {
+      attachAudioBlob(result.blob);
+      return;
     }
+    // mic mode → transcribe to composer. Prefer client transcript;
+    // fall back to server when a transcription model is configured.
+    if (result.transcript) {
+      insertIntoComposer(result.transcript);
+      return;
+    }
+    if (!serverTranscribeAvailable) {
+      chatStatus.value = 'transcription unavailable';
+      setTimeout(() => { if (chatStatus.value === 'transcription unavailable') chatStatus.value = 'connected'; }, 3000);
+      return;
+    }
+    if (!groupId.value || !threadId.value) return;
+    transcribingRef.current = true;
+    setTranscribeStatus('transcribing…');
+    transcribeViaServer(result.blob, groupId.value, threadId.value, {
+      onPartial: (delta) => {
+        setTranscribeStatus((prev) => {
+          const cur = prev === 'transcribing…' ? '' : prev;
+          return cur + delta;
+        });
+      },
+      onDone: (fullText) => {
+        transcribingRef.current = false;
+        setTranscribeStatus('');
+        const trimmed = fullText.trim();
+        if (!trimmed || trimmed === '[inaudible]') return;
+        if (looksLikeRefusal(trimmed)) {
+          chatStatus.value = 'transcription unclear — try again';
+          setTimeout(() => { if (chatStatus.value === 'transcription unclear — try again') chatStatus.value = 'connected'; }, 3000);
+          return;
+        }
+        insertIntoComposer(trimmed);
+      },
+      onError: (err) => {
+        transcribingRef.current = false;
+        setTranscribeStatus('');
+        chatStatus.value = `transcription failed: ${err}`;
+        setTimeout(() => { if (chatStatus.value.startsWith('transcription failed')) chatStatus.value = 'connected'; }, 3000);
+      },
+    });
   };
-
-  const shouldUseClientSpeech = vm === 'transcribe';
 
   const onMicPointerDown = (ev: PointerEvent): void => {
     ev.preventDefault();
@@ -485,7 +588,8 @@ function Composer() {
     holdTimerRef.current = setTimeout(() => {
       // Held > 300ms → hold mode
       holdModeRef.current = true;
-      startRecording(shouldUseClientSpeech).catch(console.error);
+      recordingModeRef.current = 'mic';
+      startRecording(true).catch(console.error);
     }, 300);
   };
 
@@ -495,15 +599,16 @@ function Composer() {
       holdTimerRef.current = null;
     }
     if (holdModeRef.current) {
-      // Release after hold → stop & send
+      // Release after hold → stop & transcribe
       holdModeRef.current = false;
       finishRecording().catch(console.error);
     } else if (recording) {
-      // Tap while recording (toggle mode) → stop & send
+      // Tap while recording (toggle mode) → stop & transcribe
       finishRecording().catch(console.error);
     } else {
       // Short tap → toggle mode start
-      startRecording(shouldUseClientSpeech).catch(console.error);
+      recordingModeRef.current = 'mic';
+      startRecording(true).catch(console.error);
     }
   };
 
@@ -514,8 +619,25 @@ function Composer() {
     }
     if (holdModeRef.current || recording) {
       cancelRecording();
+      recordingModeRef.current = null;
       holdModeRef.current = false;
     }
+  };
+
+  const startAudioAttachRecording = async (): Promise<void> => {
+    if (recording) return;
+    recordingModeRef.current = 'attach';
+    const ok = await startRecording(false);
+    if (!ok) {
+      recordingModeRef.current = null;
+      chatStatus.value = 'microphone unavailable';
+      setTimeout(() => { if (chatStatus.value === 'microphone unavailable') chatStatus.value = 'connected'; }, 3000);
+    }
+  };
+
+  const stopAttachRecording = (): void => {
+    if (recordingModeRef.current !== 'attach') return;
+    finishRecording().catch(console.error);
   };
 
   const fmtDuration = (ms: number): string => {
@@ -533,65 +655,87 @@ function Composer() {
       class={`${composerDisabled ? 'ws-down' : ''} ${recording ? 'recording' : ''}`}
     >
       <input type="file" id="chat-file" multiple hidden ref={fileRef} onChange={onFileChange} />
-      <button
-        type="button"
-        id="chat-attach"
-        title={composerDisabled ? (hasQuestion ? 'Answer the question above' : 'Disconnected') : 'Attach files'}
-        aria-label="Attach files"
-        onClick={onAttachClick}
-        disabled={composerDisabled || recording}
-      >{'\uD83D\uDCCE'}</button>
-      {recording ? (
-        <div id="chat-recording-indicator">
-          <span class="recording-dot"></span>
-          <span class="recording-time">{fmtDuration(recordingDuration.value)}</span>
-        </div>
-      ) : transcribeStatus ? (
-        <div id="chat-transcribing-indicator">
-          <span class="transcribing-text">{transcribeStatus}</span>
-        </div>
-      ) : (
-        <textarea
-          id="chat-input"
-          rows={1}
-          placeholder={hasQuestion ? 'Answer the question above to continue\u2026' : wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
-          ref={inputRef}
-          onInput={autosize}
-          onKeyDown={onKey}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
-          autocomplete="off"
-          disabled={hasQuestion}
-        ></textarea>
-      )}
-      {showMic ? (
+      <input
+        type="file"
+        id="chat-camera"
+        accept="image/*"
+        capture="environment"
+        hidden
+        ref={cameraRef}
+        onChange={onFileChange}
+      />
+      {attachRecording ? (
         <button
           type="button"
-          id="chat-mic"
-          class={recording ? 'active' : ''}
-          title={recording
-            ? 'Release to send'
-            : wsDown
-              ? 'Disconnected'
-              : inputHasText
-                ? 'Clear the message to record voice'
-                : hasPending
-                  ? 'Remove pending files to record voice'
-                  : 'Hold to record, tap to toggle'}
-          aria-label={recording ? 'Stop recording' : 'Record voice message'}
-          disabled={micDisabled && !recording}
-          onPointerDown={onMicPointerDown as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
-          onPointerUp={onMicPointerUp as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
-          onPointerCancel={onMicPointerCancel as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
-        >{'\uD83C\uDF99\uFE0F'}</button>
+          id="chat-recording-indicator"
+          class="recording-stop-btn"
+          onClick={stopAttachRecording}
+          title="Tap to stop recording"
+        >
+          <span class="recording-dot"></span>
+          <span class="recording-time">{fmtDuration(recordingDuration.value)}</span>
+          <span class="recording-stop-label">Stop</span>
+        </button>
       ) : (
-        <button
-          type="submit"
-          id="chat-send"
-          disabled={composerDisabled || recording}
-          onMouseDown={(e) => e.preventDefault()}
-        >Send</button>
+        <div class={'composer-input-wrap' + (multiLine ? ' multi-line' : '') + (recording ? ' recording' : '') + (transcribeStatus ? ' transcribing' : '')}>
+          {/* Textarea stays mounted across recording/transcribing states so
+              the user's drafted text is never lost. Indicators render on
+              top of it. The +, mic, and Send buttons are absolutely
+              positioned inside this wrap to save horizontal space; the
+              textarea reserves room for them via padding-left/right. */}
+          <textarea
+            id="chat-input"
+            rows={1}
+            placeholder={hasQuestion ? 'Answer the question above to continue\u2026' : wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
+            ref={inputRef}
+            onInput={autosize}
+            onKeyDown={onKey}
+            onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
+            autocomplete="off"
+            disabled={hasQuestion}
+          ></textarea>
+          <ComposerPlusMenu
+            disabled={composerDisabled || recording}
+            title={composerDisabled ? (hasQuestion ? 'Answer the question above' : 'Disconnected') : 'Add\u2026'}
+            showRecordAudio={vm === 'audio' && hasGetUserMedia()}
+            onUploadFile={onAttachClick}
+            onTakePhoto={onPhotoClick}
+            onRecordAudio={() => { startAudioAttachRecording().catch(console.error); }}
+          />
+          {micCapable ? (
+            <button
+              type="button"
+              id="chat-mic"
+              class={'mic-overlay' + (recording ? ' recording' : '') + (transcribeStatus ? ' transcribing' : '')}
+              title={recording
+                ? 'Tap to stop and transcribe'
+                : transcribeStatus
+                  ? 'Transcribing\u2026'
+                  : wsDown
+                    ? 'Disconnected'
+                    : 'Hold to record, tap to toggle'}
+              aria-label={recording ? 'Stop recording' : transcribeStatus ? 'Transcribing' : 'Record voice message'}
+              disabled={(composerDisabled && !recording) || !!transcribeStatus}
+              onPointerDown={onMicPointerDown as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
+              onPointerUp={onMicPointerUp as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
+              onPointerCancel={onMicPointerCancel as unknown as JSX.PointerEventHandler<HTMLButtonElement>}
+            >
+              {recording
+                ? <span class="recording-time">{fmtDuration(recordingDuration.value)}</span>
+                : transcribeStatus
+                  ? <span class="mic-spinner" aria-hidden="true"></span>
+                  : '\uD83C\uDF99\uFE0F'}
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            id="chat-send"
+            aria-label="Send"
+            title="Send"
+            disabled={composerDisabled || recording}
+            onMouseDown={(e) => e.preventDefault()}
+          >{'\u2191'}</button>
+        </div>
       )}
     </form>
   );

@@ -17370,6 +17370,7 @@ function urlBase64ToUint8Array(base64String) {
 
 // src/actions.ts
 function focusComposerSoon() {
+  if (isMobile.value) return;
   let tries = 0;
   const attempt = () => {
     const el = document.getElementById("chat-input");
@@ -19275,6 +19276,12 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
     const decoder = new TextDecoder();
     let buf = "";
     let fullText = "";
+    let doneFired = false;
+    const fireDone = (text) => {
+      if (doneFired) return;
+      doneFired = true;
+      callbacks.onDone(text);
+    };
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -19295,7 +19302,7 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
               fullText = nextText;
               callbacks.onPartial(normalizedDelta);
             } else if (eventType === "done" && parsed.text) {
-              callbacks.onDone(parsed.text);
+              fireDone(parsed.text);
             } else if (eventType === "error") {
               callbacks.onError(parsed.error || "transcription_failed");
             }
@@ -19306,7 +19313,7 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
       }
     }
     if (fullText && !controller.signal.aborted) {
-      callbacks.onDone(fullText);
+      fireDone(fullText);
     }
   }).catch((err) => {
     if (!controller.signal.aborted) {
@@ -19314,6 +19321,73 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
     }
   });
   return controller;
+}
+
+// src/components/ComposerPlusMenu.tsx
+function ComposerPlusMenu({
+  disabled,
+  title,
+  showRecordAudio,
+  onUploadFile,
+  onTakePhoto,
+  onRecordAudio
+}) {
+  const [open, setOpen] = h2(false);
+  const wrapRef = A2(null);
+  y2(() => {
+    if (!open) return void 0;
+    const onDoc = (ev) => {
+      if (wrapRef.current && !wrapRef.current.contains(ev.target)) setOpen(false);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const pick = (fn2) => (ev) => {
+    ev.stopPropagation();
+    setOpen(false);
+    fn2();
+  };
+  return /* @__PURE__ */ u4("div", { class: "composer-plus" + (open ? " open" : ""), ref: wrapRef, children: [
+    /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        id: "chat-attach",
+        class: "composer-plus-trigger",
+        title: title || "Add\u2026",
+        "aria-label": "Add",
+        "aria-haspopup": "menu",
+        "aria-expanded": open,
+        disabled,
+        onClick: (ev) => {
+          ev.stopPropagation();
+          setOpen((o4) => !o4);
+        },
+        children: "+"
+      }
+    ),
+    open ? /* @__PURE__ */ u4("div", { class: "composer-plus-panel", role: "menu", children: [
+      /* @__PURE__ */ u4("button", { type: "button", class: "composer-plus-item", role: "menuitem", onClick: pick(onTakePhoto), children: [
+        /* @__PURE__ */ u4("span", { class: "ico", children: "\u{1F4F7}" }),
+        /* @__PURE__ */ u4("span", { class: "lbl", children: "Take photo" })
+      ] }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "composer-plus-item", role: "menuitem", onClick: pick(onUploadFile), children: [
+        /* @__PURE__ */ u4("span", { class: "ico", children: "\u{1F4CE}" }),
+        /* @__PURE__ */ u4("span", { class: "lbl", children: "Upload file" })
+      ] }),
+      showRecordAudio ? /* @__PURE__ */ u4("button", { type: "button", class: "composer-plus-item", role: "menuitem", onClick: pick(onRecordAudio), children: [
+        /* @__PURE__ */ u4("span", { class: "ico", children: "\u{1F399}\uFE0F" }),
+        /* @__PURE__ */ u4("span", { class: "lbl", children: "Record audio attachment" })
+      ] }) : null
+    ] }) : null
+  ] });
 }
 
 // src/components/ChatMain.tsx
@@ -19573,11 +19647,21 @@ function QuestionCard() {
     )) })
   ] }, q5.questionId)) });
 }
+var REFUSAL_PATTERNS = [
+  /^i'?m sorry,? (but )?i (can'?t|cannot)/i,
+  /^i (can'?t|cannot) (process|transcribe|help|assist|fulfill|comply)/i,
+  /^sorry,? (but )?i (can'?t|cannot)/i,
+  /^as an ai (language )?model/i,
+  /^i (do not|don'?t) have the ability to/i
+];
+function looksLikeRefusal(text) {
+  const head = text.slice(0, 200);
+  return REFUSAL_PATTERNS.some((re) => re.test(head));
+}
 function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
-  const [inputHasText, setInputHasText] = h2(false);
-  const [focused, setFocused] = h2(false);
+  const cameraRef = A2(null);
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
   const wsDown = isWeb && chatStatus.value !== "connected";
@@ -19586,16 +19670,17 @@ function Composer() {
   const autosize = () => {
     const el = inputRef.current;
     if (!el) return;
-    setInputHasText(!!el.value.trim());
     if (!el.value) {
       el.style.height = "";
       el.style.overflowY = "hidden";
+      setMultiLine(false);
       return;
     }
     el.style.height = "auto";
     const h5 = Math.min(el.scrollHeight, 200);
     el.style.height = h5 + "px";
     el.style.overflowY = h5 >= 200 ? "auto" : "hidden";
+    setMultiLine(h5 > 44);
   };
   y2(() => {
     autosize();
@@ -19620,12 +19705,13 @@ function Composer() {
     sendChat(fullText, files).catch(console.error);
   };
   const onKey = (ev) => {
-    if (ev.key === "Enter" && !ev.shiftKey) {
+    if (ev.key === "Enter" && !ev.shiftKey && !isMobile.value) {
       ev.preventDefault();
       ev.currentTarget.form?.requestSubmit();
     }
   };
   const onAttachClick = () => fileRef.current?.click();
+  const onPhotoClick = () => cameraRef.current?.click();
   const onFileChange = (ev) => {
     addPendingFiles(Array.from(ev.currentTarget.files || []), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
     ev.currentTarget.value = "";
@@ -19637,17 +19723,61 @@ function Composer() {
     addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
   const vm = voiceMode.value;
-  const hasPending = pending.value.length > 0;
-  const micCapable = vm !== "off" && hasGetUserMedia();
-  const showSend = !micCapable || focused || inputHasText || hasPending;
-  const showMic = micCapable && !showSend;
-  const micDisabled = inputHasText || hasPending || composerDisabled;
+  const serverTranscribeAvailable = vm !== "off";
+  const micCapable = hasGetUserMedia() && (serverTranscribeAvailable || hasSpeechRecognition());
   const recording = isRecording.value;
   const holdTimerRef = A2(null);
   const holdModeRef = A2(false);
+  const recordingModeRef = A2(null);
+  const attachRecording = recording && recordingModeRef.current === "attach";
   const transcribingRef = A2(false);
   const [transcribeStatus, setTranscribeStatus] = h2("");
+  const [multiLine, setMultiLine] = h2(false);
+  const pendingInsertRef = A2(null);
+  const doInsert = (el, text) => {
+    const cur = el.value;
+    const hasFocus = document.activeElement === el;
+    const start = hasFocus ? el.selectionStart ?? cur.length : cur.length;
+    const end = hasFocus ? el.selectionEnd ?? start : cur.length;
+    const before = cur.slice(0, start);
+    const after = cur.slice(end);
+    const leftPad = before && !/\s$/.test(before) ? " " : "";
+    const rightPad = after && !/^\s/.test(after) ? " " : "";
+    const insert = leftPad + text + rightPad;
+    el.value = before + insert + after;
+    autosize();
+    const caret = (before + insert).length;
+    if (!isMobile.value) {
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    }
+  };
+  y2(() => {
+    if (pendingInsertRef.current == null) return;
+    const el = inputRef.current;
+    if (!el) return;
+    const text = pendingInsertRef.current;
+    pendingInsertRef.current = null;
+    doInsert(el, text);
+  });
+  const insertIntoComposer = (text) => {
+    const el = inputRef.current;
+    if (el) {
+      doInsert(el, text);
+      return;
+    }
+    const queued = pendingInsertRef.current;
+    pendingInsertRef.current = queued ? `${queued} ${text}` : text;
+  };
+  const attachAudioBlob = (blob) => {
+    const rawType = blob.type.split(";")[0] || "audio/mp4";
+    const ext = rawType.includes("ogg") ? "ogg" : rawType.includes("mp4") ? "m4a" : rawType.includes("wav") ? "wav" : "webm";
+    const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: rawType });
+    addPendingFiles([file], UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+  };
   const finishRecording = async () => {
+    const mode = recordingModeRef.current;
+    recordingModeRef.current = null;
     const result = await stopRecording();
     if (!result) {
       chatStatus.value = "too short \u2014 discarded";
@@ -19656,49 +19786,63 @@ function Composer() {
       }, 2e3);
       return;
     }
-    if (vm === "transcribe") {
-      if (result.transcript) {
-        sendChat(result.transcript, null).catch(console.error);
-      } else {
-        if (!groupId.value || !threadId.value) return;
-        transcribingRef.current = true;
-        setTranscribeStatus("transcribing\u2026");
-        transcribeViaServer(result.blob, groupId.value, threadId.value, {
-          onPartial: (delta) => {
-            setTranscribeStatus((prev) => {
-              const cur = prev === "transcribing\u2026" ? "" : prev;
-              return cur + delta;
-            });
-          },
-          onDone: (_fullText) => {
-            transcribingRef.current = false;
-            setTranscribeStatus("");
-          },
-          onError: (err) => {
-            transcribingRef.current = false;
-            setTranscribeStatus("");
-            chatStatus.value = `transcription failed: ${err}`;
-            setTimeout(() => {
-              if (chatStatus.value.startsWith("transcription failed")) chatStatus.value = "connected";
-            }, 3e3);
-          }
-        });
-      }
-    } else if (vm === "audio") {
-      const rawType = result.blob.type.split(";")[0] || "audio/mp4";
-      const ext = rawType.includes("ogg") ? "ogg" : rawType.includes("mp4") ? "m4a" : rawType.includes("wav") ? "wav" : "webm";
-      const file = new File([result.blob], `voice-${Date.now()}.${ext}`, { type: rawType });
-      sendChat("", [{ name: file.name, size: file.size, file }]).catch(console.error);
+    if (mode === "attach") {
+      attachAudioBlob(result.blob);
+      return;
     }
+    if (result.transcript) {
+      insertIntoComposer(result.transcript);
+      return;
+    }
+    if (!serverTranscribeAvailable) {
+      chatStatus.value = "transcription unavailable";
+      setTimeout(() => {
+        if (chatStatus.value === "transcription unavailable") chatStatus.value = "connected";
+      }, 3e3);
+      return;
+    }
+    if (!groupId.value || !threadId.value) return;
+    transcribingRef.current = true;
+    setTranscribeStatus("transcribing\u2026");
+    transcribeViaServer(result.blob, groupId.value, threadId.value, {
+      onPartial: (delta) => {
+        setTranscribeStatus((prev) => {
+          const cur = prev === "transcribing\u2026" ? "" : prev;
+          return cur + delta;
+        });
+      },
+      onDone: (fullText) => {
+        transcribingRef.current = false;
+        setTranscribeStatus("");
+        const trimmed = fullText.trim();
+        if (!trimmed || trimmed === "[inaudible]") return;
+        if (looksLikeRefusal(trimmed)) {
+          chatStatus.value = "transcription unclear \u2014 try again";
+          setTimeout(() => {
+            if (chatStatus.value === "transcription unclear \u2014 try again") chatStatus.value = "connected";
+          }, 3e3);
+          return;
+        }
+        insertIntoComposer(trimmed);
+      },
+      onError: (err) => {
+        transcribingRef.current = false;
+        setTranscribeStatus("");
+        chatStatus.value = `transcription failed: ${err}`;
+        setTimeout(() => {
+          if (chatStatus.value.startsWith("transcription failed")) chatStatus.value = "connected";
+        }, 3e3);
+      }
+    });
   };
-  const shouldUseClientSpeech = vm === "transcribe";
   const onMicPointerDown = (ev) => {
     ev.preventDefault();
     ev.currentTarget.setPointerCapture(ev.pointerId);
     holdModeRef.current = false;
     holdTimerRef.current = setTimeout(() => {
       holdModeRef.current = true;
-      startRecording(shouldUseClientSpeech).catch(console.error);
+      recordingModeRef.current = "mic";
+      startRecording(true).catch(console.error);
     }, 300);
   };
   const onMicPointerUp = () => {
@@ -19712,7 +19856,8 @@ function Composer() {
     } else if (recording) {
       finishRecording().catch(console.error);
     } else {
-      startRecording(shouldUseClientSpeech).catch(console.error);
+      recordingModeRef.current = "mic";
+      startRecording(true).catch(console.error);
     }
   };
   const onMicPointerCancel = () => {
@@ -19722,8 +19867,25 @@ function Composer() {
     }
     if (holdModeRef.current || recording) {
       cancelRecording();
+      recordingModeRef.current = null;
       holdModeRef.current = false;
     }
+  };
+  const startAudioAttachRecording = async () => {
+    if (recording) return;
+    recordingModeRef.current = "attach";
+    const ok = await startRecording(false);
+    if (!ok) {
+      recordingModeRef.current = null;
+      chatStatus.value = "microphone unavailable";
+      setTimeout(() => {
+        if (chatStatus.value === "microphone unavailable") chatStatus.value = "connected";
+      }, 3e3);
+    }
+  };
+  const stopAttachRecording = () => {
+    if (recordingModeRef.current !== "attach") return;
+    finishRecording().catch(console.error);
   };
   const fmtDuration = (ms) => {
     const s5 = Math.floor(ms / 1e3);
@@ -19741,60 +19903,87 @@ function Composer() {
       children: [
         /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
         /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "file",
+            id: "chat-camera",
+            accept: "image/*",
+            capture: "environment",
+            hidden: true,
+            ref: cameraRef,
+            onChange: onFileChange
+          }
+        ),
+        attachRecording ? /* @__PURE__ */ u4(
           "button",
           {
             type: "button",
-            id: "chat-attach",
-            title: composerDisabled ? hasQuestion ? "Answer the question above" : "Disconnected" : "Attach files",
-            "aria-label": "Attach files",
-            onClick: onAttachClick,
-            disabled: composerDisabled || recording,
-            children: "\u{1F4CE}"
+            id: "chat-recording-indicator",
+            class: "recording-stop-btn",
+            onClick: stopAttachRecording,
+            title: "Tap to stop recording",
+            children: [
+              /* @__PURE__ */ u4("span", { class: "recording-dot" }),
+              /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) }),
+              /* @__PURE__ */ u4("span", { class: "recording-stop-label", children: "Stop" })
+            ]
           }
-        ),
-        recording ? /* @__PURE__ */ u4("div", { id: "chat-recording-indicator", children: [
-          /* @__PURE__ */ u4("span", { class: "recording-dot" }),
-          /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) })
-        ] }) : transcribeStatus ? /* @__PURE__ */ u4("div", { id: "chat-transcribing-indicator", children: /* @__PURE__ */ u4("span", { class: "transcribing-text", children: transcribeStatus }) }) : /* @__PURE__ */ u4(
-          "textarea",
-          {
-            id: "chat-input",
-            rows: 1,
-            placeholder: hasQuestion ? "Answer the question above to continue\u2026" : wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
-            ref: inputRef,
-            onInput: autosize,
-            onKeyDown: onKey,
-            onFocus: () => setFocused(true),
-            onBlur: () => setFocused(false),
-            onPaste,
-            autocomplete: "off",
-            disabled: hasQuestion
-          }
-        ),
-        showMic ? /* @__PURE__ */ u4(
-          "button",
-          {
-            type: "button",
-            id: "chat-mic",
-            class: recording ? "active" : "",
-            title: recording ? "Release to send" : wsDown ? "Disconnected" : inputHasText ? "Clear the message to record voice" : hasPending ? "Remove pending files to record voice" : "Hold to record, tap to toggle",
-            "aria-label": recording ? "Stop recording" : "Record voice message",
-            disabled: micDisabled && !recording,
-            onPointerDown: onMicPointerDown,
-            onPointerUp: onMicPointerUp,
-            onPointerCancel: onMicPointerCancel,
-            children: "\u{1F399}\uFE0F"
-          }
-        ) : /* @__PURE__ */ u4(
-          "button",
-          {
-            type: "submit",
-            id: "chat-send",
-            disabled: composerDisabled || recording,
-            onMouseDown: (e4) => e4.preventDefault(),
-            children: "Send"
-          }
-        )
+        ) : /* @__PURE__ */ u4("div", { class: "composer-input-wrap" + (multiLine ? " multi-line" : "") + (recording ? " recording" : "") + (transcribeStatus ? " transcribing" : ""), children: [
+          /* @__PURE__ */ u4(
+            "textarea",
+            {
+              id: "chat-input",
+              rows: 1,
+              placeholder: hasQuestion ? "Answer the question above to continue\u2026" : wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
+              ref: inputRef,
+              onInput: autosize,
+              onKeyDown: onKey,
+              onPaste,
+              autocomplete: "off",
+              disabled: hasQuestion
+            }
+          ),
+          /* @__PURE__ */ u4(
+            ComposerPlusMenu,
+            {
+              disabled: composerDisabled || recording,
+              title: composerDisabled ? hasQuestion ? "Answer the question above" : "Disconnected" : "Add\u2026",
+              showRecordAudio: vm === "audio" && hasGetUserMedia(),
+              onUploadFile: onAttachClick,
+              onTakePhoto: onPhotoClick,
+              onRecordAudio: () => {
+                startAudioAttachRecording().catch(console.error);
+              }
+            }
+          ),
+          micCapable ? /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              id: "chat-mic",
+              class: "mic-overlay" + (recording ? " recording" : "") + (transcribeStatus ? " transcribing" : ""),
+              title: recording ? "Tap to stop and transcribe" : transcribeStatus ? "Transcribing\u2026" : wsDown ? "Disconnected" : "Hold to record, tap to toggle",
+              "aria-label": recording ? "Stop recording" : transcribeStatus ? "Transcribing" : "Record voice message",
+              disabled: composerDisabled && !recording || !!transcribeStatus,
+              onPointerDown: onMicPointerDown,
+              onPointerUp: onMicPointerUp,
+              onPointerCancel: onMicPointerCancel,
+              children: recording ? /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) }) : transcribeStatus ? /* @__PURE__ */ u4("span", { class: "mic-spinner", "aria-hidden": "true" }) : "\u{1F399}\uFE0F"
+            }
+          ) : null,
+          /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "submit",
+              id: "chat-send",
+              "aria-label": "Send",
+              title: "Send",
+              disabled: composerDisabled || recording,
+              onMouseDown: (e4) => e4.preventDefault(),
+              children: "\u2191"
+            }
+          )
+        ] })
       ]
     }
   );
