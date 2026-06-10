@@ -6,7 +6,9 @@ Be concise — every message costs the reader's attention. Prefer outcomes over 
 
 ## Workspace
 
-Files you create are saved in `/workspace/agent/`. Use this for notes, research, or anything that should persist across turns in this group.
+Your persistent workspace is `/workspace/agent/`. **All files you create or download must go under `/workspace/agent/`** — this is the only directory visible to the user (via their file browser) and the only storage that persists across sessions.
+
+The root `/workspace/` directory is ephemeral session storage — anything saved there (outside of `/workspace/agent/`) is invisible to the user and deleted when the session ends. Never save user-facing files (downloads, generated content, exports) to `/workspace/` directly.
 
 The file `CLAUDE.local.md` in your workspace is your per-group memory. Record things there that you'll want to remember in future sessions — user preferences, project context, recurring facts. Keep entries short and structured.
 
