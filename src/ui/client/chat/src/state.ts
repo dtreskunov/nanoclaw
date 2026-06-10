@@ -12,6 +12,7 @@ import type {
   ToastMessage,
   PendingFile,
   PendingApprovalDto,
+  PendingQuestionDto,
   ChannelMetaEntry,
   SearchResult,
 } from './types';
@@ -99,6 +100,8 @@ export const nowTick: Signal<number> = signal(Date.now());
 export const pinnedContext: Signal<string[]> = signal<string[]>([]);
 export const pendingApprovals: Signal<PendingApprovalDto[]> = signal<PendingApprovalDto[]>([]);
 export const respondingApprovalIds: Signal<Set<string>> = signal<Set<string>>(new Set());
+export const pendingQuestions: Signal<PendingQuestionDto[]> = signal<PendingQuestionDto[]>([]);
+export const respondingQuestionIds: Signal<Set<string>> = signal<Set<string>>(new Set());
 
 // ── non-reactive refs (mutated outside render) ──────────────────────
 export interface Refs {

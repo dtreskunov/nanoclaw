@@ -829,6 +829,36 @@ export function readChatHistory(
           });
           continue;
         }
+        if (r.kind === 'chat-sdk') {
+          // Structured interactive messages (ask_question, send_card).
+          // Render as a plain text bubble using the question text or card fallback.
+          let text = '';
+          try {
+            const c = JSON.parse(r.content) as {
+              type?: string;
+              title?: string;
+              question?: string;
+              fallbackText?: string;
+            };
+            if (c?.type === 'ask_question') {
+              text = c.question || c.title || '';
+            } else if (c?.type === 'card') {
+              text = c.fallbackText || '';
+            }
+          } catch {
+            /* ignore */
+          }
+          if (text) {
+            messages.push({
+              direction: 'out',
+              id: r.id,
+              timestamp: r.timestamp,
+              text,
+              files: undefined,
+            });
+          }
+          continue;
+        }
         if (r.kind !== 'chat' && r.kind !== 'text') continue;
         const parsed = parseOutboundContent(r.content);
         const usage = usageMap.get(r.id);
@@ -2164,6 +2194,23 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
         // parsed content (delivery.ts has already JSON.parsed it).
         const c = (typeof message.content === 'object' && message.content) as { file_paths?: unknown } | undefined;
         const filePaths: unknown[] = Array.isArray(c?.file_paths) ? c!.file_paths! : [];
+
+        // For chat-sdk messages (ask_question, send_card), include the
+        // structured content so the client can render interactive cards
+        // without an extra sync round-trip.
+        let question: { questionId: string; title: string; options: { label: string; value: string }[] } | undefined;
+        if (message.kind === 'chat-sdk' && typeof message.content === 'object' && message.content) {
+          const sdk = message.content as {
+            type?: string;
+            questionId?: string;
+            title?: string;
+            options?: { label: string; value: string }[];
+          };
+          if (sdk.type === 'ask_question' && sdk.questionId && sdk.title && Array.isArray(sdk.options)) {
+            question = { questionId: sdk.questionId, title: sdk.title, options: sdk.options };
+          }
+        }
+
         ws.send(
           JSON.stringify({
             kind: 'outbound',
@@ -2177,6 +2224,7 @@ function attachChatSocket(ws: WebSocket, ctx: ChatContext): void {
                 path: typeof filePaths[i] === 'string' ? (filePaths[i] as string) : undefined,
               })) ?? [],
             timestamp: new Date().toISOString(),
+            ...(question ? { question } : {}),
           }),
         );
       } catch (err) {

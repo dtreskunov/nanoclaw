@@ -6,13 +6,14 @@ import { useRef, useEffect, useState } from 'preact/hooks';
 import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
+  pendingQuestions, respondingQuestionIds,
   highlightMessageId, searchQuery, voiceMode,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
 import { renderMarkdown, rewriteFileLinks, highlightTextNodes, fmtBytesShort } from '../utils';
 import {
   sendChat, addPendingFiles, removePending, clearPending,
-  navFile, removePinnedPath, clearPinnedContext, respondApproval,
+  navFile, removePinnedPath, clearPinnedContext, respondApproval, respondQuestion,
   openChat,
 } from '../actions';
 import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia, transcribeViaServer } from '../recorder';
@@ -305,6 +306,35 @@ function PendingTray() {
   );
 }
 
+function QuestionCard() {
+  const questions = pendingQuestions.value;
+  const tid = threadId.value;
+  // Only show questions for the current thread.
+  const visible = questions.filter((q) => !q.threadId || q.threadId === tid);
+  if (visible.length === 0) return null;
+  const busy = respondingQuestionIds.value;
+  return (
+    <div class="question-card-tray">
+      {visible.map((q) => (
+        <div class="question-card" key={q.questionId}>
+          <div class="question-card-title">{q.title}</div>
+          <div class="question-card-actions">
+            {q.options.map((o) => (
+              <button
+                type="button"
+                class="question-card-btn"
+                disabled={busy.has(q.questionId)}
+                onClick={() => respondQuestion(q.questionId, o.value).catch(console.error)}
+                key={o.value}
+              >{o.label}</button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -316,6 +346,9 @@ function Composer() {
   // rather than silently dropping the message. Non-web channels post via
   // HTTP and don't care about chatStatus.
   const wsDown = isWeb && chatStatus.value !== 'connected';
+  // Disable composer while a question card is awaiting user response.
+  const hasQuestion = pendingQuestions.value.some((q) => !q.threadId || q.threadId === threadId.value);
+  const composerDisabled = wsDown || hasQuestion;
   const autosize = (): void => {
     const el = inputRef.current;
     if (!el) return;
@@ -393,7 +426,7 @@ function Composer() {
   // Focused (or with content to send) → Send button; idle → Microphone.
   const showSend = !micCapable || focused || inputHasText || hasPending;
   const showMic = micCapable && !showSend;
-  const micDisabled = inputHasText || hasPending || wsDown;
+  const micDisabled = inputHasText || hasPending || composerDisabled;
   const recording = isRecording.value;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdModeRef = useRef(false);
@@ -497,16 +530,16 @@ function Composer() {
       id="chat-form"
       onSubmit={onSubmit}
       style={showComposer ? '' : 'display:none'}
-      class={`${wsDown ? 'ws-down' : ''} ${recording ? 'recording' : ''}`}
+      class={`${composerDisabled ? 'ws-down' : ''} ${recording ? 'recording' : ''}`}
     >
       <input type="file" id="chat-file" multiple hidden ref={fileRef} onChange={onFileChange} />
       <button
         type="button"
         id="chat-attach"
-        title={wsDown ? 'Disconnected' : 'Attach files'}
+        title={composerDisabled ? (hasQuestion ? 'Answer the question above' : 'Disconnected') : 'Attach files'}
         aria-label="Attach files"
         onClick={onAttachClick}
-        disabled={wsDown || recording}
+        disabled={composerDisabled || recording}
       >{'\uD83D\uDCCE'}</button>
       {recording ? (
         <div id="chat-recording-indicator">
@@ -521,7 +554,7 @@ function Composer() {
         <textarea
           id="chat-input"
           rows={1}
-          placeholder={wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
+          placeholder={hasQuestion ? 'Answer the question above to continue\u2026' : wsDown ? 'Reconnecting\u2026' : 'Message the agent\u2026'}
           ref={inputRef}
           onInput={autosize}
           onKeyDown={onKey}
@@ -529,6 +562,7 @@ function Composer() {
           onBlur={() => setFocused(false)}
           onPaste={onPaste as unknown as JSX.ClipboardEventHandler<HTMLTextAreaElement>}
           autocomplete="off"
+          disabled={hasQuestion}
         ></textarea>
       )}
       {showMic ? (
@@ -555,7 +589,7 @@ function Composer() {
         <button
           type="submit"
           id="chat-send"
-          disabled={wsDown || recording}
+          disabled={composerDisabled || recording}
           onMouseDown={(e) => e.preventDefault()}
         >Send</button>
       )}
@@ -617,6 +651,7 @@ export function ChatMain() {
       <div class="status" id="chat-status">{chatStatus.value}</div>
       <ContextChip />
       <PendingTray />
+      <QuestionCard />
       <ReadonlyBanner />
       <Subnotice />
       <Composer />

@@ -15549,6 +15549,8 @@ var nowTick = y3(Date.now());
 var pinnedContext = y3([]);
 var pendingApprovals = y3([]);
 var respondingApprovalIds = y3(/* @__PURE__ */ new Set());
+var pendingQuestions = y3([]);
+var respondingQuestionIds = y3(/* @__PURE__ */ new Set());
 var refs = {
   ws: null,
   reconnectTimer: null,
@@ -17517,6 +17519,7 @@ async function runSync() {
     return;
   }
   if (Array.isArray(res.approvals)) pendingApprovals.value = res.approvals;
+  if (Array.isArray(res.questions)) pendingQuestions.value = res.questions;
   if (gid && groupId.value === gid && Array.isArray(res.threads)) {
     const serverIds = new Set(res.threads.map((t4) => t4.threadId));
     const ephemeral = threads.value.filter(
@@ -17815,6 +17818,33 @@ function connectChatWs() {
       return;
     }
     if (payload.kind === "outbound") {
+      if (payload.messageKind === "chat-sdk") {
+        if (payload.question) {
+          const q5 = {
+            questionId: payload.question.questionId,
+            title: payload.question.title,
+            question: payload.question.title,
+            options: payload.question.options,
+            threadId: threadId.value,
+            agentGroupId: groupId.value || "",
+            createdAt: payload.timestamp || (/* @__PURE__ */ new Date()).toISOString()
+          };
+          const existing = pendingQuestions.value;
+          if (!existing.some((e4) => e4.questionId === q5.questionId)) {
+            pendingQuestions.value = [...existing, q5];
+          }
+          isTyping.value = false;
+          typingHint.value = "";
+        } else {
+          const c5 = payload.content || {};
+          const text2 = typeof c5 === "string" ? c5 : c5.fallbackText || "";
+          if (text2) {
+            appendMsg("out", text2, payload.files || [], payload.timestamp || "", payload.id);
+            bumpActiveThread();
+          }
+        }
+        return;
+      }
       const c4 = payload.content || {};
       const text = typeof c4 === "string" ? c4 : c4.text || c4.markdown || "";
       const dir = payload.messageKind === "internal" ? "internal" : "out";
@@ -18115,6 +18145,32 @@ async function respondApproval(approvalId, value) {
     const cleared = new Set(respondingApprovalIds.value);
     cleared.delete(approvalId);
     respondingApprovalIds.value = cleared;
+  }
+}
+async function respondQuestion(questionId, value) {
+  if (respondingQuestionIds.value.has(questionId)) return;
+  const next = new Set(respondingQuestionIds.value);
+  next.add(questionId);
+  respondingQuestionIds.value = next;
+  pendingQuestions.value = pendingQuestions.value.filter((q5) => q5.questionId !== questionId);
+  try {
+    const res = await postJson(
+      `api/approvals/${encodeURIComponent(questionId)}/respond`,
+      { value }
+    );
+    if (!res.ok) throw new Error(res.data?.error || "HTTP " + res.status);
+  } catch (err) {
+    console.error("question respond failed", err);
+    chatStatus.value = "response failed: " + (err instanceof Error ? err.message : String(err));
+    setTimeout(() => {
+      if (chatStatus.value.startsWith("response failed")) chatStatus.value = "";
+    }, 4e3);
+    runSync().catch(() => {
+    });
+  } finally {
+    const cleared = new Set(respondingQuestionIds.value);
+    cleared.delete(questionId);
+    respondingQuestionIds.value = cleared;
   }
 }
 
@@ -19496,6 +19552,27 @@ function PendingTray() {
     /* @__PURE__ */ u4("button", { type: "button", title: "Remove", onClick: () => removePending(i5), children: "\xD7" })
   ] }, i5)) });
 }
+function QuestionCard() {
+  const questions = pendingQuestions.value;
+  const tid = threadId.value;
+  const visible = questions.filter((q5) => !q5.threadId || q5.threadId === tid);
+  if (visible.length === 0) return null;
+  const busy = respondingQuestionIds.value;
+  return /* @__PURE__ */ u4("div", { class: "question-card-tray", children: visible.map((q5) => /* @__PURE__ */ u4("div", { class: "question-card", children: [
+    /* @__PURE__ */ u4("div", { class: "question-card-title", children: q5.title }),
+    /* @__PURE__ */ u4("div", { class: "question-card-actions", children: q5.options.map((o4) => /* @__PURE__ */ u4(
+      "button",
+      {
+        type: "button",
+        class: "question-card-btn",
+        disabled: busy.has(q5.questionId),
+        onClick: () => respondQuestion(q5.questionId, o4.value).catch(console.error),
+        children: o4.label
+      },
+      o4.value
+    )) })
+  ] }, q5.questionId)) });
+}
 function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
@@ -19504,6 +19581,8 @@ function Composer() {
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
   const wsDown = isWeb && chatStatus.value !== "connected";
+  const hasQuestion = pendingQuestions.value.some((q5) => !q5.threadId || q5.threadId === threadId.value);
+  const composerDisabled = wsDown || hasQuestion;
   const autosize = () => {
     const el = inputRef.current;
     if (!el) return;
@@ -19562,7 +19641,7 @@ function Composer() {
   const micCapable = vm !== "off" && hasGetUserMedia();
   const showSend = !micCapable || focused || inputHasText || hasPending;
   const showMic = micCapable && !showSend;
-  const micDisabled = inputHasText || hasPending || wsDown;
+  const micDisabled = inputHasText || hasPending || composerDisabled;
   const recording = isRecording.value;
   const holdTimerRef = A2(null);
   const holdModeRef = A2(false);
@@ -19658,7 +19737,7 @@ function Composer() {
       id: "chat-form",
       onSubmit,
       style: showComposer ? "" : "display:none",
-      class: `${wsDown ? "ws-down" : ""} ${recording ? "recording" : ""}`,
+      class: `${composerDisabled ? "ws-down" : ""} ${recording ? "recording" : ""}`,
       children: [
         /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
         /* @__PURE__ */ u4(
@@ -19666,10 +19745,10 @@ function Composer() {
           {
             type: "button",
             id: "chat-attach",
-            title: wsDown ? "Disconnected" : "Attach files",
+            title: composerDisabled ? hasQuestion ? "Answer the question above" : "Disconnected" : "Attach files",
             "aria-label": "Attach files",
             onClick: onAttachClick,
-            disabled: wsDown || recording,
+            disabled: composerDisabled || recording,
             children: "\u{1F4CE}"
           }
         ),
@@ -19681,14 +19760,15 @@ function Composer() {
           {
             id: "chat-input",
             rows: 1,
-            placeholder: wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
+            placeholder: hasQuestion ? "Answer the question above to continue\u2026" : wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
             ref: inputRef,
             onInput: autosize,
             onKeyDown: onKey,
             onFocus: () => setFocused(true),
             onBlur: () => setFocused(false),
             onPaste,
-            autocomplete: "off"
+            autocomplete: "off",
+            disabled: hasQuestion
           }
         ),
         showMic ? /* @__PURE__ */ u4(
@@ -19710,7 +19790,7 @@ function Composer() {
           {
             type: "submit",
             id: "chat-send",
-            disabled: wsDown || recording,
+            disabled: composerDisabled || recording,
             onMouseDown: (e4) => e4.preventDefault(),
             children: "Send"
           }
@@ -19791,6 +19871,7 @@ function ChatMain() {
     /* @__PURE__ */ u4("div", { class: "status", id: "chat-status", children: chatStatus.value }),
     /* @__PURE__ */ u4(ContextChip, {}),
     /* @__PURE__ */ u4(PendingTray, {}),
+    /* @__PURE__ */ u4(QuestionCard, {}),
     /* @__PURE__ */ u4(ReadonlyBanner, {}),
     /* @__PURE__ */ u4(Subnotice, {}),
     /* @__PURE__ */ u4(Composer, {})

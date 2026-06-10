@@ -27,6 +27,8 @@ import {
   pinnedContext,
   pendingApprovals,
   respondingApprovalIds,
+  pendingQuestions,
+  respondingQuestionIds,
   searchQuery,
   searchResults,
   searchLoading,
@@ -48,6 +50,7 @@ import type {
   PreviewBlock,
   PendingFile,
   PendingApprovalDto,
+  PendingQuestionDto,
   WsPayload,
   SearchResult,
 } from './types';
@@ -233,6 +236,7 @@ export function startSyncPoll(): void {
 
 interface SyncResponse {
   approvals: PendingApprovalDto[];
+  questions?: PendingQuestionDto[];
   threads?: Thread[];
   threadMessages?: ServerMessage[];
 }
@@ -258,6 +262,7 @@ export async function runSync(): Promise<void> {
     return;
   }
   if (Array.isArray(res.approvals)) pendingApprovals.value = res.approvals;
+  if (Array.isArray(res.questions)) pendingQuestions.value = res.questions;
   if (gid && groupId.value === gid && Array.isArray(res.threads)) {
     // Preserve any client-only "(new thread)" entries — they have no
     // server session yet (no inbound message has been sent), so they
@@ -618,6 +623,38 @@ function connectChatWs(): void {
       return;
     }
     if (payload.kind === 'outbound') {
+      // chat-sdk messages (ask_question, send_card) need special handling.
+      if (payload.messageKind === 'chat-sdk') {
+        if (payload.question) {
+          // Directly append the question to pendingQuestions so the card
+          // renders immediately without waiting for the next sync.
+          const q: PendingQuestionDto = {
+            questionId: payload.question.questionId,
+            title: payload.question.title,
+            question: payload.question.title,
+            options: payload.question.options,
+            threadId: threadId.value,
+            agentGroupId: groupId.value || '',
+            createdAt: payload.timestamp || new Date().toISOString(),
+          };
+          const existing = pendingQuestions.value;
+          if (!existing.some((e) => e.questionId === q.questionId)) {
+            pendingQuestions.value = [...existing, q];
+          }
+          // Also clear typing since the agent is now waiting for user input.
+          isTyping.value = false;
+          typingHint.value = '';
+        } else {
+          // send_card or unknown chat-sdk — render fallbackText as bubble.
+          const c = payload.content || {};
+          const text = typeof c === 'string' ? c : (c as { fallbackText?: string }).fallbackText || '';
+          if (text) {
+            appendMsg('out', text, payload.files || [], payload.timestamp || '', payload.id);
+            bumpActiveThread();
+          }
+        }
+        return;
+      }
       const c = payload.content || {};
       const text = typeof c === 'string' ? c : c.text || c.markdown || '';
       const dir: Direction = payload.messageKind === 'internal' ? 'internal' : 'out';
@@ -985,5 +1022,35 @@ export async function respondApproval(approvalId: string, value: string): Promis
     const cleared = new Set(respondingApprovalIds.value);
     cleared.delete(approvalId);
     respondingApprovalIds.value = cleared;
+  }
+}
+
+export async function respondQuestion(questionId: string, value: string): Promise<void> {
+  if (respondingQuestionIds.value.has(questionId)) return;
+  const next = new Set(respondingQuestionIds.value);
+  next.add(questionId);
+  respondingQuestionIds.value = next;
+  // Optimistically remove the question card.
+  pendingQuestions.value = pendingQuestions.value.filter((q) => q.questionId !== questionId);
+  try {
+    // Reuse the approval respond endpoint — dispatchResponse routes to both handlers.
+    const res = await postJson<{ ok?: boolean; error?: string }>(
+      `api/approvals/${encodeURIComponent(questionId)}/respond`,
+      { value },
+    );
+    if (!res.ok) throw new Error(res.data?.error || 'HTTP ' + res.status);
+  } catch (err) {
+    console.error('question respond failed', err);
+    chatStatus.value = 'response failed: ' + (err instanceof Error ? err.message : String(err));
+    setTimeout(() => {
+      if (chatStatus.value.startsWith('response failed')) chatStatus.value = '';
+    }, 4000);
+    runSync().catch(() => {
+      /* ignore */
+    });
+  } finally {
+    const cleared = new Set(respondingQuestionIds.value);
+    cleared.delete(questionId);
+    respondingQuestionIds.value = cleared;
   }
 }

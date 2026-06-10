@@ -175,6 +175,16 @@ export interface PendingApprovalDto {
   createdAt: string;
 }
 
+export interface PendingQuestionDto {
+  questionId: string;
+  title: string;
+  question: string;
+  options: { label: string; value: string }[];
+  threadId: string | null;
+  agentGroupId: string;
+  createdAt: string;
+}
+
 export interface RouterApi {
   selectGroup: (gid: string) => Promise<void>;
   loadThreads: (gid: string) => Promise<void>;
@@ -197,4 +207,5 @@ export interface WsPayload {
   id?: string;
   messageKind?: 'internal' | 'final' | string;
   usage?: TurnUsage;
+  question?: { questionId: string; title: string; options: { label: string; value: string }[] };
 }
