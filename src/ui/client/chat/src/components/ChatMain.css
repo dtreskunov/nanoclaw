@@ -356,3 +356,105 @@
 .chat-main .question-card-btn { height: 32px; padding: 0 14px; border-radius: var(--radius-md); border: 1px solid var(--accent, #6366f1); background: var(--bg); color: var(--accent, #6366f1); cursor: pointer; font-size: var(--font-sm); font-weight: 500; transition: background 0.12s, color 0.12s; }
 .chat-main .question-card-btn:hover:not(:disabled) { background: var(--accent, #6366f1); color: #fff; }
 .chat-main .question-card-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Quick Capture — in-page camera modal */
+.qcap-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  /* Respect iOS safe areas (notch, home indicator) */
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.qcap-modal {
+  position: relative;
+  width: 100%; max-width: 720px;
+  height: 100%; max-height: 100%;
+  display: flex; flex-direction: column;
+  background: #000; color: #fff;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.qcap-close {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 40px; height: 40px;
+  background: rgba(0, 0, 0, 0.5); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 24px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.qcap-stage {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+.qcap-video, .qcap-preview {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.qcap-video.mirror { transform: scaleX(-1); }
+.qcap-error {
+  color: #fff; padding: 24px; text-align: center; font-size: var(--font-base);
+}
+.qcap-controls {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 16px 24px;
+  background: #000;
+}
+.qcap-shutter {
+  flex: 0 0 72px;
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 2px #fff inset;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s;
+}
+.qcap-shutter:active:not(:disabled) { transform: scale(0.92); }
+.qcap-shutter:disabled { opacity: 0.5; cursor: default; }
+.qcap-btn {
+  flex: 1;
+  height: 44px; padding: 0 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.12); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: var(--font-base); cursor: pointer;
+}
+.qcap-btn:hover { background: rgba(255, 255, 255, 0.2); }
+.qcap-btn.primary {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+}
+.qcap-btn.primary:hover { filter: brightness(1.1); }
+.qcap-btn.ghost {
+  flex: 0 0 auto;
+  width: 44px; padding: 0;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 20px;
+}
+/* Flip-camera pill: icon + text label, sized so it reads clearly without
+   dominating the controls row. Width is fixed so the shutter stays centered. */
+.qcap-flip {
+  flex: 0 0 auto;
+  width: 120px; height: 48px;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: var(--font-sm); font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.qcap-flip:hover { background: rgba(255, 255, 255, 0.22); }
+.qcap-flip:active { background: rgba(255, 255, 255, 0.28); }
+.qcap-flip-ico { font-size: 22px; line-height: 1; }
+.qcap-flip-lbl { white-space: nowrap; }
+.qcap-spacer { flex: 0 0 120px; }

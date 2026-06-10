@@ -1,7 +1,6 @@
 // Composer "+" menu — popover anchored to the + button in the chat composer.
-// Items: Take photo · Upload file · (conditionally) Record audio attachment.
-// Audio item is gated on `showRecordAudio` (only true when the responding
-// model accepts audio input).
+// Items: Quick capture (when getUserMedia exists) · Upload file ·
+// (conditionally) Record audio attachment.
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
@@ -9,8 +8,9 @@ interface Props {
   disabled?: boolean;
   title?: string;
   showRecordAudio: boolean;
+  showQuickCapture: boolean;
   onUploadFile: () => void;
-  onTakePhoto: () => void;
+  onQuickCapture: () => void;
   onRecordAudio: () => void;
 }
 
@@ -18,8 +18,9 @@ export function ComposerPlusMenu({
   disabled,
   title,
   showRecordAudio,
+  showQuickCapture,
   onUploadFile,
-  onTakePhoto,
+  onQuickCapture,
   onRecordAudio,
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -63,10 +64,12 @@ export function ComposerPlusMenu({
       >{'\u002B'}</button>
       {open ? (
         <div class="composer-plus-panel" role="menu">
-          <button type="button" class="composer-plus-item" role="menuitem" onClick={pick(onTakePhoto)}>
-            <span class="ico">{'\uD83D\uDCF7'}</span>
-            <span class="lbl">Take photo</span>
-          </button>
+          {showQuickCapture ? (
+            <button type="button" class="composer-plus-item" role="menuitem" onClick={pick(onQuickCapture)}>
+              <span class="ico">{'\uD83D\uDCF7'}</span>
+              <span class="lbl">Take photo</span>
+            </button>
+          ) : null}
           <button type="button" class="composer-plus-item" role="menuitem" onClick={pick(onUploadFile)}>
             <span class="ico">{'\uD83D\uDCCE'}</span>
             <span class="lbl">Upload file</span>

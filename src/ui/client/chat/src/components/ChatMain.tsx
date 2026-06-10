@@ -17,7 +17,9 @@ import {
   openChat,
 } from '../actions';
 import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia, hasSpeechRecognition, transcribeViaServer } from '../recorder';
+import { maybeCompressImage } from '../image-compress';
 import { ComposerPlusMenu } from './ComposerPlusMenu';
+import { QuickCapture } from './QuickCapture';
 import { RelativeTime } from './RelativeTime';
 import type { ChatMessage, TurnUsage } from '../types';
 
@@ -354,7 +356,7 @@ function looksLikeRefusal(text: string): boolean {
 function Composer() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const cameraRef = useRef<HTMLInputElement | null>(null);
+  const [quickCapture, setQuickCapture] = useState(false);
   const isWeb = !channelType.value || channelType.value === 'web';
   const showComposer = isWeb || canSend.value;
   // Web threads send over the WebSocket; if it isn't connected, block input
@@ -429,16 +431,33 @@ function Composer() {
     }
   };
   const onAttachClick = (): void => fileRef.current?.click();
-  const onPhotoClick = (): void => cameraRef.current?.click();
+  // Photo captures from a phone camera can be 10–50 MB raw HEIC/JPEG —
+  // big enough to either blow the browser's memory budget on upload or
+  // be silently dropped by the 25 MB server limit. Downscale + recompress
+  // image files before they enter the pending tray. Non-images pass
+  // through unchanged.
+  const ingestFiles = async (raw: File[]): Promise<void> => {
+    if (raw.length === 0) return;
+    const hasLarge = raw.some((f) => f.type.startsWith('image/') && f.size >= 1024 * 1024);
+    const prev = chatStatus.value;
+    if (hasLarge) chatStatus.value = 'processing photo\u2026';
+    try {
+      const processed = await Promise.all(raw.map((f) => f.type.startsWith('image/') ? maybeCompressImage(f) : Promise.resolve(f)));
+      addPendingFiles(processed, UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    } finally {
+      if (hasLarge && chatStatus.value === 'processing photo\u2026') chatStatus.value = prev;
+    }
+  };
   const onFileChange = (ev: JSX.TargetedEvent<HTMLInputElement>): void => {
-    addPendingFiles(Array.from(ev.currentTarget.files || []), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    const files = Array.from(ev.currentTarget.files || []);
     ev.currentTarget.value = '';
+    ingestFiles(files).catch(console.error);
   };
   const onPaste = (ev: ClipboardEvent): void => {
     const items = ev.clipboardData && ev.clipboardData.files;
     if (!items || items.length === 0) return;
     ev.preventDefault();
-    addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    ingestFiles(Array.from(items)).catch(console.error);
   };
 
   // ── Voice capture ──────────────────────────────────────────────────
@@ -648,6 +667,7 @@ function Composer() {
   };
 
   return (
+    <>
     <form
       id="chat-form"
       onSubmit={onSubmit}
@@ -655,15 +675,6 @@ function Composer() {
       class={`${composerDisabled ? 'ws-down' : ''} ${recording ? 'recording' : ''}`}
     >
       <input type="file" id="chat-file" multiple hidden ref={fileRef} onChange={onFileChange} />
-      <input
-        type="file"
-        id="chat-camera"
-        accept="image/*"
-        capture="environment"
-        hidden
-        ref={cameraRef}
-        onChange={onFileChange}
-      />
       {attachRecording ? (
         <button
           type="button"
@@ -698,8 +709,9 @@ function Composer() {
             disabled={composerDisabled || recording}
             title={composerDisabled ? (hasQuestion ? 'Answer the question above' : 'Disconnected') : 'Add\u2026'}
             showRecordAudio={vm === 'audio' && hasGetUserMedia()}
+            showQuickCapture={hasGetUserMedia()}
             onUploadFile={onAttachClick}
-            onTakePhoto={onPhotoClick}
+            onQuickCapture={() => setQuickCapture(true)}
             onRecordAudio={() => { startAudioAttachRecording().catch(console.error); }}
           />
           {micCapable ? (
@@ -738,6 +750,13 @@ function Composer() {
         </div>
       )}
     </form>
+    {quickCapture ? (
+      <QuickCapture
+        onCapture={(file) => { setQuickCapture(false); ingestFiles([file]).catch(console.error); }}
+        onClose={() => setQuickCapture(false)}
+      />
+    ) : null}
+    </>
   );
 }
 

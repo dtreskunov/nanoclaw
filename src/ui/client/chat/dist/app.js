@@ -19323,13 +19323,88 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
   return controller;
 }
 
+// src/image-compress.ts
+var MAX_DIM = 2048;
+var JPEG_QUALITY = 0.85;
+var MIN_SIZE_TO_COMPRESS = 1 * 1024 * 1024;
+var COMPRESSIBLE = /* @__PURE__ */ new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif"
+]);
+async function maybeCompressImage(file) {
+  if (!file.type || !COMPRESSIBLE.has(file.type.toLowerCase())) return file;
+  if (file.size < MIN_SIZE_TO_COMPRESS) return file;
+  try {
+    const bitmap = await loadBitmap(file);
+    try {
+      const { width, height } = fitWithin(bitmap.width, bitmap.height, MAX_DIM);
+      if (width === bitmap.width && height === bitmap.height && file.type === "image/jpeg" && file.size < 4 * 1024 * 1024) {
+        return file;
+      }
+      const blob = await drawAndEncode(bitmap, width, height);
+      if (!blob || blob.size >= file.size) return file;
+      const baseName = file.name.replace(/\.(heic|heif|png|webp|jpe?g)$/i, "") || "photo";
+      return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+    } finally {
+      if ("close" in bitmap && typeof bitmap.close === "function") bitmap.close();
+    }
+  } catch {
+    return file;
+  }
+}
+async function loadBitmap(file) {
+  if (typeof createImageBitmap === "function") {
+    return await createImageBitmap(file);
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("image_load_failed"));
+      el.src = url;
+    });
+    return await createImageBitmap(img);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+function fitWithin(w5, h5, max) {
+  if (w5 <= max && h5 <= max) return { width: w5, height: h5 };
+  const ratio = w5 > h5 ? max / w5 : max / h5;
+  return { width: Math.round(w5 * ratio), height: Math.round(h5 * ratio) };
+}
+async function drawAndEncode(bitmap, width, height) {
+  if (typeof OffscreenCanvas !== "undefined") {
+    const canvas2 = new OffscreenCanvas(width, height);
+    const ctx2 = canvas2.getContext("2d");
+    if (!ctx2) return null;
+    ctx2.drawImage(bitmap, 0, 0, width, height);
+    return await canvas2.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY });
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return await new Promise((resolve) => {
+    canvas.toBlob((b5) => resolve(b5), "image/jpeg", JPEG_QUALITY);
+  });
+}
+
 // src/components/ComposerPlusMenu.tsx
 function ComposerPlusMenu({
   disabled,
   title,
   showRecordAudio,
+  showQuickCapture,
   onUploadFile,
-  onTakePhoto,
+  onQuickCapture,
   onRecordAudio
 }) {
   const [open, setOpen] = h2(false);
@@ -19374,10 +19449,10 @@ function ComposerPlusMenu({
       }
     ),
     open ? /* @__PURE__ */ u4("div", { class: "composer-plus-panel", role: "menu", children: [
-      /* @__PURE__ */ u4("button", { type: "button", class: "composer-plus-item", role: "menuitem", onClick: pick(onTakePhoto), children: [
+      showQuickCapture ? /* @__PURE__ */ u4("button", { type: "button", class: "composer-plus-item", role: "menuitem", onClick: pick(onQuickCapture), children: [
         /* @__PURE__ */ u4("span", { class: "ico", children: "\u{1F4F7}" }),
         /* @__PURE__ */ u4("span", { class: "lbl", children: "Take photo" })
-      ] }),
+      ] }) : null,
       /* @__PURE__ */ u4("button", { type: "button", class: "composer-plus-item", role: "menuitem", onClick: pick(onUploadFile), children: [
         /* @__PURE__ */ u4("span", { class: "ico", children: "\u{1F4CE}" }),
         /* @__PURE__ */ u4("span", { class: "lbl", children: "Upload file" })
@@ -19388,6 +19463,153 @@ function ComposerPlusMenu({
       ] }) : null
     ] }) : null
   ] });
+}
+
+// src/components/QuickCapture.tsx
+var CAPTURE_WIDTH = 1280;
+var CAPTURE_HEIGHT = 960;
+var JPEG_QUALITY2 = 0.85;
+function QuickCapture({ onCapture, onClose }) {
+  const videoRef = A2(null);
+  const streamRef = A2(null);
+  const [error, setError] = h2(null);
+  const [preview, setPreview] = h2(null);
+  const [busy, setBusy] = h2(false);
+  const [facing, setFacing] = h2("environment");
+  y2(() => {
+    let cancelled = false;
+    const start = async () => {
+      try {
+        const stream2 = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: CAPTURE_WIDTH },
+            height: { ideal: CAPTURE_HEIGHT }
+          }
+        });
+        if (cancelled) {
+          stream2.getTracks().forEach((t4) => t4.stop());
+          return;
+        }
+        streamRef.current = stream2;
+        const v5 = videoRef.current;
+        if (v5) {
+          v5.srcObject = stream2;
+          v5.play().catch(() => void 0);
+        }
+      } catch (err) {
+        const name = err.name;
+        if (name === "NotAllowedError" || name === "SecurityError") {
+          setError("Camera permission denied");
+        } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+          setError("No camera available");
+        } else {
+          setError("Could not start camera");
+        }
+      }
+    };
+    start();
+    return () => {
+      cancelled = true;
+      const s5 = streamRef.current;
+      if (s5) {
+        s5.getTracks().forEach((t4) => t4.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [facing]);
+  y2(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview.url);
+    };
+  }, [preview]);
+  y2(() => {
+    const onKey = (ev) => {
+      if (ev.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const shoot = async () => {
+    const v5 = videoRef.current;
+    if (!v5 || busy) return;
+    const w5 = v5.videoWidth;
+    const h5 = v5.videoHeight;
+    if (!w5 || !h5) return;
+    setBusy(true);
+    try {
+      const canvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(w5, h5) : Object.assign(document.createElement("canvas"), { width: w5, height: h5 });
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no 2d context");
+      ctx.drawImage(v5, 0, 0, w5, h5);
+      let blob = null;
+      if (canvas instanceof OffscreenCanvas) {
+        blob = await canvas.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY2 });
+      } else {
+        blob = await new Promise(
+          (resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY2)
+        );
+      }
+      if (!blob) throw new Error("encode failed");
+      if (preview) URL.revokeObjectURL(preview.url);
+      setPreview({ url: URL.createObjectURL(blob), blob });
+    } catch (err) {
+      setError(err.message || "Capture failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const retake = () => {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  };
+  const use = () => {
+    if (!preview) return;
+    const file = new File([preview.blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+    setPreview(null);
+    URL.revokeObjectURL(preview.url);
+    onCapture(file);
+  };
+  const flip = () => setFacing((f5) => f5 === "environment" ? "user" : "environment");
+  const flipTarget = facing === "environment" ? "Front camera" : "Back camera";
+  const onBackdrop = (ev) => {
+    if (ev.target.classList.contains("qcap-backdrop")) onClose();
+  };
+  return /* @__PURE__ */ u4("div", { class: "qcap-backdrop", onClick: onBackdrop, children: /* @__PURE__ */ u4("div", { class: "qcap-modal", role: "dialog", "aria-label": "Quick capture", children: [
+    /* @__PURE__ */ u4("button", { type: "button", class: "qcap-close", onClick: onClose, "aria-label": "Close", children: "\xD7" }),
+    /* @__PURE__ */ u4("div", { class: "qcap-stage", children: error ? /* @__PURE__ */ u4("div", { class: "qcap-error", children: error }) : preview ? /* @__PURE__ */ u4("img", { class: "qcap-preview", src: preview.url, alt: "" }) : /* @__PURE__ */ u4(
+      "video",
+      {
+        class: "qcap-video" + (facing === "user" ? " mirror" : ""),
+        ref: videoRef,
+        playsInline: true,
+        muted: true,
+        autoplay: true
+      }
+    ) }),
+    /* @__PURE__ */ u4("div", { class: "qcap-controls", children: error ? /* @__PURE__ */ u4("button", { type: "button", class: "qcap-btn", onClick: onClose, children: "Close" }) : preview ? /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4("button", { type: "button", class: "qcap-btn", onClick: retake, children: "Retake" }),
+      /* @__PURE__ */ u4("button", { type: "button", class: "qcap-btn primary", onClick: use, children: "Use photo" })
+    ] }) : /* @__PURE__ */ u4(k, { children: [
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          class: "qcap-flip",
+          onClick: flip,
+          "aria-label": `Switch to ${flipTarget.toLowerCase()}`,
+          title: `Switch to ${flipTarget.toLowerCase()}`,
+          children: [
+            /* @__PURE__ */ u4("span", { class: "qcap-flip-ico", "aria-hidden": "true", children: "\u21BB" }),
+            /* @__PURE__ */ u4("span", { class: "qcap-flip-lbl", children: flipTarget })
+          ]
+        }
+      ),
+      /* @__PURE__ */ u4("button", { type: "button", class: "qcap-shutter", onClick: shoot, disabled: busy, "aria-label": "Capture" }),
+      /* @__PURE__ */ u4("span", { class: "qcap-spacer" })
+    ] }) })
+  ] }) });
 }
 
 // src/components/ChatMain.tsx
@@ -19661,7 +19883,7 @@ function looksLikeRefusal(text) {
 function Composer() {
   const inputRef = A2(null);
   const fileRef = A2(null);
-  const cameraRef = A2(null);
+  const [quickCapture, setQuickCapture] = h2(false);
   const isWeb = !channelType.value || channelType.value === "web";
   const showComposer = isWeb || canSend.value;
   const wsDown = isWeb && chatStatus.value !== "connected";
@@ -19711,16 +19933,28 @@ function Composer() {
     }
   };
   const onAttachClick = () => fileRef.current?.click();
-  const onPhotoClick = () => cameraRef.current?.click();
+  const ingestFiles = async (raw) => {
+    if (raw.length === 0) return;
+    const hasLarge = raw.some((f5) => f5.type.startsWith("image/") && f5.size >= 1024 * 1024);
+    const prev = chatStatus.value;
+    if (hasLarge) chatStatus.value = "processing photo\u2026";
+    try {
+      const processed = await Promise.all(raw.map((f5) => f5.type.startsWith("image/") ? maybeCompressImage(f5) : Promise.resolve(f5)));
+      addPendingFiles(processed, UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    } finally {
+      if (hasLarge && chatStatus.value === "processing photo\u2026") chatStatus.value = prev;
+    }
+  };
   const onFileChange = (ev) => {
-    addPendingFiles(Array.from(ev.currentTarget.files || []), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    const files = Array.from(ev.currentTarget.files || []);
     ev.currentTarget.value = "";
+    ingestFiles(files).catch(console.error);
   };
   const onPaste = (ev) => {
     const items = ev.clipboardData && ev.clipboardData.files;
     if (!items || items.length === 0) return;
     ev.preventDefault();
-    addPendingFiles(Array.from(items), UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
+    ingestFiles(Array.from(items)).catch(console.error);
   };
   const vm = voiceMode.value;
   const serverTranscribeAvailable = vm !== "off";
@@ -19893,100 +20127,101 @@ function Composer() {
     const sec = s5 % 60;
     return `${m6}:${sec.toString().padStart(2, "0")}`;
   };
-  return /* @__PURE__ */ u4(
-    "form",
-    {
-      id: "chat-form",
-      onSubmit,
-      style: showComposer ? "" : "display:none",
-      class: `${composerDisabled ? "ws-down" : ""} ${recording ? "recording" : ""}`,
-      children: [
-        /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "file",
-            id: "chat-camera",
-            accept: "image/*",
-            capture: "environment",
-            hidden: true,
-            ref: cameraRef,
-            onChange: onFileChange
-          }
-        ),
-        attachRecording ? /* @__PURE__ */ u4(
-          "button",
-          {
-            type: "button",
-            id: "chat-recording-indicator",
-            class: "recording-stop-btn",
-            onClick: stopAttachRecording,
-            title: "Tap to stop recording",
-            children: [
-              /* @__PURE__ */ u4("span", { class: "recording-dot" }),
-              /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) }),
-              /* @__PURE__ */ u4("span", { class: "recording-stop-label", children: "Stop" })
-            ]
-          }
-        ) : /* @__PURE__ */ u4("div", { class: "composer-input-wrap" + (multiLine ? " multi-line" : "") + (recording ? " recording" : "") + (transcribeStatus ? " transcribing" : ""), children: [
-          /* @__PURE__ */ u4(
-            "textarea",
-            {
-              id: "chat-input",
-              rows: 1,
-              placeholder: hasQuestion ? "Answer the question above to continue\u2026" : wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
-              ref: inputRef,
-              onInput: autosize,
-              onKeyDown: onKey,
-              onPaste,
-              autocomplete: "off",
-              disabled: hasQuestion
-            }
-          ),
-          /* @__PURE__ */ u4(
-            ComposerPlusMenu,
-            {
-              disabled: composerDisabled || recording,
-              title: composerDisabled ? hasQuestion ? "Answer the question above" : "Disconnected" : "Add\u2026",
-              showRecordAudio: vm === "audio" && hasGetUserMedia(),
-              onUploadFile: onAttachClick,
-              onTakePhoto: onPhotoClick,
-              onRecordAudio: () => {
-                startAudioAttachRecording().catch(console.error);
-              }
-            }
-          ),
-          micCapable ? /* @__PURE__ */ u4(
+  return /* @__PURE__ */ u4(k, { children: [
+    /* @__PURE__ */ u4(
+      "form",
+      {
+        id: "chat-form",
+        onSubmit,
+        style: showComposer ? "" : "display:none",
+        class: `${composerDisabled ? "ws-down" : ""} ${recording ? "recording" : ""}`,
+        children: [
+          /* @__PURE__ */ u4("input", { type: "file", id: "chat-file", multiple: true, hidden: true, ref: fileRef, onChange: onFileChange }),
+          attachRecording ? /* @__PURE__ */ u4(
             "button",
             {
               type: "button",
-              id: "chat-mic",
-              class: "mic-overlay" + (recording ? " recording" : "") + (transcribeStatus ? " transcribing" : ""),
-              title: recording ? "Tap to stop and transcribe" : transcribeStatus ? "Transcribing\u2026" : wsDown ? "Disconnected" : "Hold to record, tap to toggle",
-              "aria-label": recording ? "Stop recording" : transcribeStatus ? "Transcribing" : "Record voice message",
-              disabled: composerDisabled && !recording || !!transcribeStatus,
-              onPointerDown: onMicPointerDown,
-              onPointerUp: onMicPointerUp,
-              onPointerCancel: onMicPointerCancel,
-              children: recording ? /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) }) : transcribeStatus ? /* @__PURE__ */ u4("span", { class: "mic-spinner", "aria-hidden": "true" }) : "\u{1F399}\uFE0F"
+              id: "chat-recording-indicator",
+              class: "recording-stop-btn",
+              onClick: stopAttachRecording,
+              title: "Tap to stop recording",
+              children: [
+                /* @__PURE__ */ u4("span", { class: "recording-dot" }),
+                /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) }),
+                /* @__PURE__ */ u4("span", { class: "recording-stop-label", children: "Stop" })
+              ]
             }
-          ) : null,
-          /* @__PURE__ */ u4(
-            "button",
-            {
-              type: "submit",
-              id: "chat-send",
-              "aria-label": "Send",
-              title: "Send",
-              disabled: composerDisabled || recording,
-              onMouseDown: (e4) => e4.preventDefault(),
-              children: "\u2191"
-            }
-          )
-        ] })
-      ]
-    }
-  );
+          ) : /* @__PURE__ */ u4("div", { class: "composer-input-wrap" + (multiLine ? " multi-line" : "") + (recording ? " recording" : "") + (transcribeStatus ? " transcribing" : ""), children: [
+            /* @__PURE__ */ u4(
+              "textarea",
+              {
+                id: "chat-input",
+                rows: 1,
+                placeholder: hasQuestion ? "Answer the question above to continue\u2026" : wsDown ? "Reconnecting\u2026" : "Message the agent\u2026",
+                ref: inputRef,
+                onInput: autosize,
+                onKeyDown: onKey,
+                onPaste,
+                autocomplete: "off",
+                disabled: hasQuestion
+              }
+            ),
+            /* @__PURE__ */ u4(
+              ComposerPlusMenu,
+              {
+                disabled: composerDisabled || recording,
+                title: composerDisabled ? hasQuestion ? "Answer the question above" : "Disconnected" : "Add\u2026",
+                showRecordAudio: vm === "audio" && hasGetUserMedia(),
+                showQuickCapture: hasGetUserMedia(),
+                onUploadFile: onAttachClick,
+                onQuickCapture: () => setQuickCapture(true),
+                onRecordAudio: () => {
+                  startAudioAttachRecording().catch(console.error);
+                }
+              }
+            ),
+            micCapable ? /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                id: "chat-mic",
+                class: "mic-overlay" + (recording ? " recording" : "") + (transcribeStatus ? " transcribing" : ""),
+                title: recording ? "Tap to stop and transcribe" : transcribeStatus ? "Transcribing\u2026" : wsDown ? "Disconnected" : "Hold to record, tap to toggle",
+                "aria-label": recording ? "Stop recording" : transcribeStatus ? "Transcribing" : "Record voice message",
+                disabled: composerDisabled && !recording || !!transcribeStatus,
+                onPointerDown: onMicPointerDown,
+                onPointerUp: onMicPointerUp,
+                onPointerCancel: onMicPointerCancel,
+                children: recording ? /* @__PURE__ */ u4("span", { class: "recording-time", children: fmtDuration(recordingDuration.value) }) : transcribeStatus ? /* @__PURE__ */ u4("span", { class: "mic-spinner", "aria-hidden": "true" }) : "\u{1F399}\uFE0F"
+              }
+            ) : null,
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "submit",
+                id: "chat-send",
+                "aria-label": "Send",
+                title: "Send",
+                disabled: composerDisabled || recording,
+                onMouseDown: (e4) => e4.preventDefault(),
+                children: "\u2191"
+              }
+            )
+          ] })
+        ]
+      }
+    ),
+    quickCapture ? /* @__PURE__ */ u4(
+      QuickCapture,
+      {
+        onCapture: (file) => {
+          setQuickCapture(false);
+          ingestFiles([file]).catch(console.error);
+        },
+        onClose: () => setQuickCapture(false)
+      }
+    ) : null
+  ] });
 }
 function ReadonlyBanner() {
   const isWeb = !channelType.value || channelType.value === "web";
