@@ -406,6 +406,23 @@ function Composer() {
   }, []);
   const onSubmit = (ev: JSX.TargetedEvent<HTMLFormElement>): void => {
     ev.preventDefault();
+    // Mic recording in flight → stop, transcribe, then submit. The
+    // finishRecording / transcribe-callback paths trigger maybeAutoSend()
+    // once the transcript (if any) is folded into the composer.
+    if (recording && recordingModeRef.current === 'mic') {
+      autoSendRef.current = true;
+      finishRecording().catch(console.error);
+      return;
+    }
+    // User already stopped, transcription still in flight → queue submit
+    // for when onDone/onError fires.
+    if (transcribingRef.current) {
+      autoSendRef.current = true;
+      return;
+    }
+    doSubmit();
+  };
+  const doSubmit = (): void => {
     const text = (inputRef.current?.value || '').trim();
     const files = pending.value.slice();
     if (!text && files.length === 0) return;
@@ -419,6 +436,14 @@ function Composer() {
     clearPending();
     clearPinnedContext();
     sendChat(fullText, files).catch(console.error);
+  };
+  // Set by onSubmit when the user presses Send while mic recording or
+  // transcribing. Consumed by maybeAutoSend(); cleared on first fire.
+  const autoSendRef = useRef(false);
+  const maybeAutoSend = (): void => {
+    if (!autoSendRef.current) return;
+    autoSendRef.current = false;
+    doSubmit();
   };
   const onKey = (ev: JSX.TargetedKeyboardEvent<HTMLTextAreaElement>): void => {
     // On mobile, Enter inserts a newline (matches platform keyboard
@@ -498,6 +523,7 @@ function Composer() {
       el.focus();
       el.setSelectionRange(caret, caret);
     }
+    maybeAutoSend();
   };
 
   // Drain pendingInsert after every render. Re-runs whenever the textarea
@@ -538,6 +564,7 @@ function Composer() {
     if (!result) {
       chatStatus.value = 'too short — discarded';
       setTimeout(() => { if (chatStatus.value === 'too short — discarded') chatStatus.value = 'connected'; }, 2000);
+      maybeAutoSend();
       return;
     }
     if (mode === 'attach') {
@@ -553,9 +580,13 @@ function Composer() {
     if (!serverTranscribeAvailable) {
       chatStatus.value = 'transcription unavailable';
       setTimeout(() => { if (chatStatus.value === 'transcription unavailable') chatStatus.value = 'connected'; }, 3000);
+      maybeAutoSend();
       return;
     }
-    if (!groupId.value || !threadId.value) return;
+    if (!groupId.value || !threadId.value) {
+      maybeAutoSend();
+      return;
+    }
     transcribingRef.current = true;
     setTranscribeStatus('transcribing…');
     transcribeViaServer(result.blob, groupId.value, threadId.value, {
@@ -569,10 +600,14 @@ function Composer() {
         transcribingRef.current = false;
         setTranscribeStatus('');
         const trimmed = fullText.trim();
-        if (!trimmed || trimmed === '[inaudible]') return;
+        if (!trimmed || trimmed === '[inaudible]') {
+          maybeAutoSend();
+          return;
+        }
         if (looksLikeRefusal(trimmed)) {
           chatStatus.value = 'transcription unclear — try again';
           setTimeout(() => { if (chatStatus.value === 'transcription unclear — try again') chatStatus.value = 'connected'; }, 3000);
+          maybeAutoSend();
           return;
         }
         insertIntoComposer(trimmed);
@@ -582,6 +617,7 @@ function Composer() {
         setTranscribeStatus('');
         chatStatus.value = `transcription failed: ${err}`;
         setTimeout(() => { if (chatStatus.value.startsWith('transcription failed')) chatStatus.value = 'connected'; }, 3000);
+        maybeAutoSend();
       },
     });
   };
@@ -729,8 +765,8 @@ function Composer() {
             type="submit"
             id="chat-send"
             aria-label="Send"
-            title="Send"
-            disabled={composerDisabled || recording}
+            title={recording || transcribeStatus ? 'Stop, transcribe, and send' : 'Send'}
+            disabled={composerDisabled}
             onMouseDown={(e) => e.preventDefault()}
           >{'\u2191'}</button>
         </div>

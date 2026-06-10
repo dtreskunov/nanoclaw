@@ -19840,6 +19840,18 @@ function Composer() {
   }, []);
   const onSubmit = (ev) => {
     ev.preventDefault();
+    if (recording && recordingModeRef.current === "mic") {
+      autoSendRef.current = true;
+      finishRecording().catch(console.error);
+      return;
+    }
+    if (transcribingRef.current) {
+      autoSendRef.current = true;
+      return;
+    }
+    doSubmit();
+  };
+  const doSubmit = () => {
     const text = (inputRef.current?.value || "").trim();
     const files = pending.value.slice();
     if (!text && files.length === 0) return;
@@ -19851,6 +19863,12 @@ function Composer() {
     clearPending();
     clearPinnedContext();
     sendChat(fullText, files).catch(console.error);
+  };
+  const autoSendRef = A2(false);
+  const maybeAutoSend = () => {
+    if (!autoSendRef.current) return;
+    autoSendRef.current = false;
+    doSubmit();
   };
   const onKey = (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey && !isMobile.value) {
@@ -19903,6 +19921,7 @@ function Composer() {
       el.focus();
       el.setSelectionRange(caret, caret);
     }
+    maybeAutoSend();
   };
   y2(() => {
     if (pendingInsertRef.current == null) return;
@@ -19936,6 +19955,7 @@ function Composer() {
       setTimeout(() => {
         if (chatStatus.value === "too short \u2014 discarded") chatStatus.value = "connected";
       }, 2e3);
+      maybeAutoSend();
       return;
     }
     if (mode === "attach") {
@@ -19951,9 +19971,13 @@ function Composer() {
       setTimeout(() => {
         if (chatStatus.value === "transcription unavailable") chatStatus.value = "connected";
       }, 3e3);
+      maybeAutoSend();
       return;
     }
-    if (!groupId.value || !threadId.value) return;
+    if (!groupId.value || !threadId.value) {
+      maybeAutoSend();
+      return;
+    }
     transcribingRef.current = true;
     setTranscribeStatus("transcribing\u2026");
     transcribeViaServer(result.blob, groupId.value, threadId.value, {
@@ -19967,12 +19991,16 @@ function Composer() {
         transcribingRef.current = false;
         setTranscribeStatus("");
         const trimmed = fullText.trim();
-        if (!trimmed || trimmed === "[inaudible]") return;
+        if (!trimmed || trimmed === "[inaudible]") {
+          maybeAutoSend();
+          return;
+        }
         if (looksLikeRefusal(trimmed)) {
           chatStatus.value = "transcription unclear \u2014 try again";
           setTimeout(() => {
             if (chatStatus.value === "transcription unclear \u2014 try again") chatStatus.value = "connected";
           }, 3e3);
+          maybeAutoSend();
           return;
         }
         insertIntoComposer(trimmed);
@@ -19984,6 +20012,7 @@ function Composer() {
         setTimeout(() => {
           if (chatStatus.value.startsWith("transcription failed")) chatStatus.value = "connected";
         }, 3e3);
+        maybeAutoSend();
       }
     });
   };
@@ -20119,8 +20148,8 @@ function Composer() {
                 type: "submit",
                 id: "chat-send",
                 "aria-label": "Send",
-                title: "Send",
-                disabled: composerDisabled || recording,
+                title: recording || transcribeStatus ? "Stop, transcribe, and send" : "Send",
+                disabled: composerDisabled,
                 onMouseDown: (e4) => e4.preventDefault(),
                 children: "\u2191"
               }
