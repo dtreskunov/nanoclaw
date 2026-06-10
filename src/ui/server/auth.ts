@@ -28,8 +28,16 @@ export function issueMagicLink(userId: string): { token: string; expiresAt: stri
 
 /** Create a session for a user that was already authenticated upstream
  * (OIDC callback, admin impersonation, etc.). Magic-link redeem uses
- * the wrapper below; both paths funnel through `createSession`. */
+ * the wrapper below; both paths funnel through `createSession`.
+ *
+ * Also seeds the web identity (channel='web', handle=<user uuid>) if
+ * missing — every entry point that mints a UI session must guarantee it,
+ * otherwise the inbound web message handler later mints a phantom user
+ * via `getOrCreateUserByIdentity`. Idempotent. */
 export function createUiSessionForUser(userId: string): { token: string; expiresAt: string } {
+  if (!getIdentity('web', userId)) {
+    insertIdentity({ userId, channel: 'web', handle: userId, primary: true });
+  }
   const session = createSession(userId, SESSION_TTL_MS);
   log.info('UI session created', { userId, expiresAt: session.expiresAt });
   return session;
@@ -39,14 +47,7 @@ export function createUiSessionForUser(userId: string): { token: string; expires
 export function redeemAndCreateSession(token: string): { token: string; userId: string; expiresAt: string } | null {
   const userId = redeemMagicLink(token);
   if (!userId) return null;
-  // First successful redeem mints the web identity (channel='web',
-  // handle=<user uuid>). Idempotent: subsequent logins are no-ops.
-  if (!getIdentity('web', userId)) {
-    insertIdentity({ userId, channel: 'web', handle: userId, primary: true });
-  }
-  const session = createSession(userId, SESSION_TTL_MS);
-  log.info('UI session created', { userId, expiresAt: session.expiresAt });
-  return { token: session.token, userId, expiresAt: session.expiresAt };
+  return { ...createUiSessionForUser(userId), userId };
 }
 
 export function authenticate(req: http.IncomingMessage): { userId: string } | null {
