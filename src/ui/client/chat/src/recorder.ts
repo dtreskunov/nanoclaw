@@ -272,6 +272,12 @@ export function transcribeViaServer(
       const decoder = new TextDecoder();
       let buf = '';
       let fullText = '';
+      let doneFired = false;
+      const fireDone = (text: string): void => {
+        if (doneFired) return;
+        doneFired = true;
+        callbacks.onDone(text);
+      };
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -292,7 +298,7 @@ export function transcribeViaServer(
                 fullText = nextText;
                 callbacks.onPartial(normalizedDelta);
               } else if (eventType === 'done' && parsed.text) {
-                callbacks.onDone(parsed.text);
+                fireDone(parsed.text);
               } else if (eventType === 'error') {
                 callbacks.onError(parsed.error || 'transcription_failed');
               }
@@ -305,7 +311,7 @@ export function transcribeViaServer(
       }
       // If we never got a done event but accumulated text, treat as done
       if (fullText && !controller.signal.aborted) {
-        callbacks.onDone(fullText);
+        fireDone(fullText);
       }
     })
     .catch((err) => {
