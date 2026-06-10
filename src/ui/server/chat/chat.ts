@@ -466,17 +466,6 @@ export async function handleChatRequest(
         }
         res.write(`event: done\ndata: ${JSON.stringify({ text: fullText })}\n\n`);
         res.end();
-        // Auto-submit the transcript as a user message
-        if (fullText.trim() && fullText.trim() !== '[inaudible]') {
-          const platformId = platformIdFor(userId, m.groupId);
-          ensureWebMessagingGroup(userId, m.groupId);
-          await submitWebInbound({
-            userId,
-            platformId,
-            threadId: m.threadId,
-            text: fullText.trim(),
-          });
-        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'transcription_failed';
         res.write(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`);
