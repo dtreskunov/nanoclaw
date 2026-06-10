@@ -19323,80 +19323,6 @@ function transcribeViaServer(blob, groupId2, threadId2, callbacks) {
   return controller;
 }
 
-// src/image-compress.ts
-var MAX_DIM = 2048;
-var JPEG_QUALITY = 0.85;
-var MIN_SIZE_TO_COMPRESS = 1 * 1024 * 1024;
-var COMPRESSIBLE = /* @__PURE__ */ new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif"
-]);
-async function maybeCompressImage(file) {
-  if (!file.type || !COMPRESSIBLE.has(file.type.toLowerCase())) return file;
-  if (file.size < MIN_SIZE_TO_COMPRESS) return file;
-  try {
-    const bitmap = await loadBitmap(file);
-    try {
-      const { width, height } = fitWithin(bitmap.width, bitmap.height, MAX_DIM);
-      if (width === bitmap.width && height === bitmap.height && file.type === "image/jpeg" && file.size < 4 * 1024 * 1024) {
-        return file;
-      }
-      const blob = await drawAndEncode(bitmap, width, height);
-      if (!blob || blob.size >= file.size) return file;
-      const baseName = file.name.replace(/\.(heic|heif|png|webp|jpe?g)$/i, "") || "photo";
-      return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
-    } finally {
-      if ("close" in bitmap && typeof bitmap.close === "function") bitmap.close();
-    }
-  } catch {
-    return file;
-  }
-}
-async function loadBitmap(file) {
-  if (typeof createImageBitmap === "function") {
-    return await createImageBitmap(file);
-  }
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("image_load_failed"));
-      el.src = url;
-    });
-    return await createImageBitmap(img);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-function fitWithin(w5, h5, max) {
-  if (w5 <= max && h5 <= max) return { width: w5, height: h5 };
-  const ratio = w5 > h5 ? max / w5 : max / h5;
-  return { width: Math.round(w5 * ratio), height: Math.round(h5 * ratio) };
-}
-async function drawAndEncode(bitmap, width, height) {
-  if (typeof OffscreenCanvas !== "undefined") {
-    const canvas2 = new OffscreenCanvas(width, height);
-    const ctx2 = canvas2.getContext("2d");
-    if (!ctx2) return null;
-    ctx2.drawImage(bitmap, 0, 0, width, height);
-    return await canvas2.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY });
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  return await new Promise((resolve) => {
-    canvas.toBlob((b5) => resolve(b5), "image/jpeg", JPEG_QUALITY);
-  });
-}
-
 // src/components/ComposerPlusMenu.tsx
 function ComposerPlusMenu({
   disabled,
@@ -19468,7 +19394,7 @@ function ComposerPlusMenu({
 // src/components/QuickCapture.tsx
 var CAPTURE_WIDTH = 1280;
 var CAPTURE_HEIGHT = 960;
-var JPEG_QUALITY2 = 0.85;
+var JPEG_QUALITY = 0.85;
 function QuickCapture({ onCapture, onClose }) {
   const videoRef = A2(null);
   const streamRef = A2(null);
@@ -19545,10 +19471,10 @@ function QuickCapture({ onCapture, onClose }) {
       ctx.drawImage(v5, 0, 0, w5, h5);
       let blob = null;
       if (canvas instanceof OffscreenCanvas) {
-        blob = await canvas.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY2 });
+        blob = await canvas.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY });
       } else {
         blob = await new Promise(
-          (resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY2)
+          (resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
         );
       }
       if (!blob) throw new Error("encode failed");
@@ -19933,28 +19859,20 @@ function Composer() {
     }
   };
   const onAttachClick = () => fileRef.current?.click();
-  const ingestFiles = async (raw) => {
-    if (raw.length === 0) return;
-    const hasLarge = raw.some((f5) => f5.type.startsWith("image/") && f5.size >= 1024 * 1024);
-    const prev = chatStatus.value;
-    if (hasLarge) chatStatus.value = "processing photo\u2026";
-    try {
-      const processed = await Promise.all(raw.map((f5) => f5.type.startsWith("image/") ? maybeCompressImage(f5) : Promise.resolve(f5)));
-      addPendingFiles(processed, UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
-    } finally {
-      if (hasLarge && chatStatus.value === "processing photo\u2026") chatStatus.value = prev;
-    }
+  const addFiles = (files) => {
+    if (files.length === 0) return;
+    addPendingFiles(files, UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
   const onFileChange = (ev) => {
     const files = Array.from(ev.currentTarget.files || []);
     ev.currentTarget.value = "";
-    ingestFiles(files).catch(console.error);
+    addFiles(files);
   };
   const onPaste = (ev) => {
     const items = ev.clipboardData && ev.clipboardData.files;
     if (!items || items.length === 0) return;
     ev.preventDefault();
-    ingestFiles(Array.from(items)).catch(console.error);
+    addFiles(Array.from(items));
   };
   const vm = voiceMode.value;
   const serverTranscribeAvailable = vm !== "off";
@@ -20216,7 +20134,7 @@ function Composer() {
       {
         onCapture: (file) => {
           setQuickCapture(false);
-          ingestFiles([file]).catch(console.error);
+          addFiles([file]);
         },
         onClose: () => setQuickCapture(false)
       }

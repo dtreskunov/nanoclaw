@@ -17,7 +17,6 @@ import {
   openChat,
 } from '../actions';
 import { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording, hasGetUserMedia, hasSpeechRecognition, transcribeViaServer } from '../recorder';
-import { maybeCompressImage } from '../image-compress';
 import { ComposerPlusMenu } from './ComposerPlusMenu';
 import { QuickCapture } from './QuickCapture';
 import { RelativeTime } from './RelativeTime';
@@ -431,33 +430,20 @@ function Composer() {
     }
   };
   const onAttachClick = (): void => fileRef.current?.click();
-  // Photo captures from a phone camera can be 10–50 MB raw HEIC/JPEG —
-  // big enough to either blow the browser's memory budget on upload or
-  // be silently dropped by the 25 MB server limit. Downscale + recompress
-  // image files before they enter the pending tray. Non-images pass
-  // through unchanged.
-  const ingestFiles = async (raw: File[]): Promise<void> => {
-    if (raw.length === 0) return;
-    const hasLarge = raw.some((f) => f.type.startsWith('image/') && f.size >= 1024 * 1024);
-    const prev = chatStatus.value;
-    if (hasLarge) chatStatus.value = 'processing photo\u2026';
-    try {
-      const processed = await Promise.all(raw.map((f) => f.type.startsWith('image/') ? maybeCompressImage(f) : Promise.resolve(f)));
-      addPendingFiles(processed, UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
-    } finally {
-      if (hasLarge && chatStatus.value === 'processing photo\u2026') chatStatus.value = prev;
-    }
+  const addFiles = (files: File[]): void => {
+    if (files.length === 0) return;
+    addPendingFiles(files, UPLOAD_MAX_FILES, UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE);
   };
   const onFileChange = (ev: JSX.TargetedEvent<HTMLInputElement>): void => {
     const files = Array.from(ev.currentTarget.files || []);
     ev.currentTarget.value = '';
-    ingestFiles(files).catch(console.error);
+    addFiles(files);
   };
   const onPaste = (ev: ClipboardEvent): void => {
     const items = ev.clipboardData && ev.clipboardData.files;
     if (!items || items.length === 0) return;
     ev.preventDefault();
-    ingestFiles(Array.from(items)).catch(console.error);
+    addFiles(Array.from(items));
   };
 
   // ── Voice capture ──────────────────────────────────────────────────
@@ -752,7 +738,7 @@ function Composer() {
     </form>
     {quickCapture ? (
       <QuickCapture
-        onCapture={(file) => { setQuickCapture(false); ingestFiles([file]).catch(console.error); }}
+        onCapture={(file) => { setQuickCapture(false); addFiles([file]); }}
         onClose={() => setQuickCapture(false)}
       />
     ) : null}
