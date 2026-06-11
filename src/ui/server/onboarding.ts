@@ -27,6 +27,7 @@ import { getUser, isUserOnboarded, markUserOnboarded, updateDisplayName } from '
 
 import { authenticate } from './auth.js';
 import { getBranding } from './branding.js';
+import { renderPageShell, escapeHtml } from './page-shell.js';
 
 const LANDING = '/ui/chat/';
 const DEFAULT_GROUP_NAME = 'My Agent';
@@ -40,17 +41,8 @@ interface OnboardingPrefill {
   needsDisplayName: boolean;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function renderPage(prefill: OnboardingPrefill, errorMessage: string | null): string {
-  const brand = getBranding().name;
+  const brand = escapeHtml(getBranding().name);
   const displayField = prefill.needsDisplayName
     ? `
       <label class="row">
@@ -63,83 +55,13 @@ function renderPage(prefill: OnboardingPrefill, errorMessage: string | null): st
     `
     : '';
   const error = errorMessage ? `<p class="error" role="alert">${escapeHtml(errorMessage)}</p>` : '';
-  return `<!doctype html><html><head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Welcome to ${escapeHtml(brand)}</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        --surface: Canvas; --surface-fg: CanvasText;
-        --border: rgba(127,127,127,0.25);
-        --muted: rgba(127,127,127,0.7);
-        --wash: rgba(127,127,127,0.12);
-        --shadow: rgba(0,0,0,0.28);
-        --accent: #1a73e8; --accent-hover: #1664c1;
-        --error: #c53030;
-      }
-      * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; min-height: 100%; }
-      body {
-        font: 15px/1.5 system-ui, -apple-system, sans-serif;
-        background: var(--surface); color: var(--surface-fg);
-        min-height: 100vh; min-height: 100dvh;
-        display: flex; align-items: center; justify-content: center;
-        padding: 24px 16px;
-      }
-      .card {
-        width: 100%; max-width: 520px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        box-shadow: 0 8px 28px var(--shadow);
-        padding: 28px 28px 24px;
-      }
-      .brand {
-        font-size: 12px; font-weight: 600;
-        letter-spacing: 0.06em; text-transform: uppercase;
-        color: var(--muted); margin-bottom: 8px;
-      }
-      h1 { font-size: 22px; margin: 0 0 6px; font-weight: 600; }
-      .lead { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
-      h2 { font-size: 14px; margin: 18px 0 8px; font-weight: 600; }
-      ul.benefits { padding: 0; margin: 0 0 4px; list-style: none; }
-      ul.benefits li {
-        padding: 6px 0 6px 22px; position: relative;
-        font-size: 14px;
-      }
-      ul.benefits li::before {
-        content: "✓"; position: absolute; left: 0; top: 6px;
-        color: var(--accent); font-weight: 700;
-      }
-      form { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
-      .row { display: flex; flex-direction: column; gap: 4px; }
-      .lbl { font-size: 13px; font-weight: 500; color: var(--surface-fg); }
-      .hint { font-size: 12px; color: var(--muted); }
-      input[type=text] {
-        font: inherit; padding: 9px 11px;
-        border: 1px solid var(--border); border-radius: 6px;
-        background: var(--surface); color: var(--surface-fg);
-      }
-      input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-      .btn {
-        display: block; width: 100%; text-align: center;
-        padding: 10px 16px; margin-top: 4px;
-        background: var(--accent); color: #fff;
-        border: 0; border-radius: 6px;
-        font: inherit; font-weight: 600;
-        cursor: pointer;
-      }
-      .btn:hover { background: var(--accent-hover); }
-      .error { color: var(--error); font-size: 13px; margin: 0 0 -4px; }
-    </style>
-  </head><body>
-    <div class="card">
-      <div class="brand">${escapeHtml(brand)}</div>
+  return renderPageShell({
+    title: 'Welcome',
+    bodyHtml: `
       <h1>Welcome — let's set up your agent</h1>
       <p class="lead">A few quick choices and you're in.</p>
 
-      <h2>Why ${escapeHtml(brand)} beats Gemini for daily work</h2>
+      <h2>Why ${brand} beats Gemini for daily work</h2>
       <ul class="benefits">
         <li><strong>Yours, end to end.</strong> Runs in your account on your hardware — your data never feeds someone else's model.</li>
         <li><strong>Reaches you anywhere.</strong> Slack, Discord, email, iMessage, web — one agent, every channel you use.</li>
@@ -165,8 +87,8 @@ function renderPage(prefill: OnboardingPrefill, errorMessage: string | null): st
         </label>
         <button class="btn" type="submit">Get started</button>
       </form>
-    </div>
-  </body></html>`;
+    `,
+  });
 }
 
 /**

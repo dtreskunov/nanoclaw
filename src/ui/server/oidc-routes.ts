@@ -33,9 +33,9 @@ import {
 import { requestUserApproval } from '../../modules/permissions/user-approval.js';
 
 import { buildSessionCookie, createUiSessionForUser } from './auth.js';
-import { getBranding } from './branding.js';
 import { getOidcProvider, listConfiguredProviders } from './oidc/registry.js';
 import { postLoginRedirect } from './onboarding.js';
+import { renderPageShell } from './page-shell.js';
 
 const STATE_COOKIE = 'oidc_state';
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -108,123 +108,66 @@ function renderHtml(res: http.ServerResponse, status: number, body: string): voi
   res.end(body);
 }
 
-const PAGE_STYLE = `
-  <style>
-    :root {
-      color-scheme: light dark;
-      --surface: Canvas;
-      --surface-fg: CanvasText;
-      --border: rgba(127, 127, 127, 0.25);
-      --muted: rgba(127, 127, 127, 0.7);
-      --wash: rgba(127, 127, 127, 0.12);
-      --shadow: rgba(0, 0, 0, 0.28);
-      --accent: #1a73e8;
-      --accent-hover: #1664c1;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; min-height: 100%; }
-    body {
-      font: 14px/1.5 system-ui, -apple-system, sans-serif;
-      background: var(--surface); color: var(--surface-fg);
-      min-height: 100vh; min-height: 100dvh;
-      display: flex; align-items: center; justify-content: center;
-      padding: 24px 16px;
-    }
-    .card {
-      width: 100%; max-width: 420px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: 0 8px 28px var(--shadow);
-      padding: 28px 28px 24px;
-    }
-    .brand {
-      font-size: 13px; font-weight: 600;
-      letter-spacing: 0.04em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 12px;
-    }
-    h1 { font-size: 20px; margin: 0 0 16px; font-weight: 600; }
-    p { margin: 8px 0; }
-    .btn {
-      display: block; width: 100%; text-align: center;
-      padding: 10px 16px; margin: 8px 0;
-      background: var(--accent); color: #fff;
-      border-radius: 6px; text-decoration: none;
-      font-weight: 500;
-    }
-    .btn:hover { background: var(--accent-hover); }
-    .muted { color: var(--muted); font-size: 13px; }
-    code {
-      background: var(--wash); padding: 1px 5px;
-      border-radius: 3px; font-size: 12.5px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-  </style>
-`;
-
 export function renderLoginPage(next: string | null): string {
-  const brand = getBranding().name;
   const providers = listConfiguredProviders();
   const safeNext = sanitizeNext(next) || LANDING;
   const buttons = providers
     .map(
       (p) =>
-        `<p><a class="btn" href="/ui/auth/oidc/${p.name}/start?next=${encodeURIComponent(safeNext)}">Sign in with ${p.label}</a></p>`,
+        `<a class="btn" href="/ui/auth/oidc/${p.name}/start?next=${encodeURIComponent(safeNext)}">Sign in with ${p.label}</a>`,
     )
     .join('');
   const fallback =
     providers.length === 0
       ? `<p>No sign-in providers configured. Ask your operator to set <code>OIDC_GOOGLE_CLIENT_ID</code> and <code>OIDC_GOOGLE_CLIENT_SECRET</code> in <code>.env</code>, or to DM you a magic link.</p>`
       : `<p class="muted">Or wait for your operator to DM you a magic link.</p>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Sign in — ${brand}</title>${PAGE_STYLE}</head><body>
-    <div class="card">
-      <div class="brand">${brand}</div>
+  return renderPageShell({
+    title: 'Sign in',
+    bodyHtml: `
       <h1>Sign in</h1>
       ${buttons}
       ${fallback}
-    </div>
-  </body></html>`;
+    `,
+  });
 }
 
 /** Page auto-refreshes every 60s so the user lands in the app the next tick after an admin approves. */
 function renderPendingPage(pendingId: string, email: string | null): string {
-  const brand = getBranding().name;
   const who = email ? `<code>${email}</code>` : 'this account';
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="60"><title>Pending approval — ${brand}</title>${PAGE_STYLE}</head><body>
-    <div class="card">
-      <div class="brand">${brand}</div>
+  return renderPageShell({
+    title: 'Pending approval',
+    refreshSeconds: 60,
+    bodyHtml: `
       <h1>Waiting for admin approval</h1>
       <p>${who} isn't recognized yet. We've sent your sign-in request to an admin.</p>
       <p class="muted">This page checks for approval every minute. You can leave it open.</p>
       <p class="muted">Reference: <code>${pendingId}</code></p>
-    </div>
-  </body></html>`;
+    `,
+  });
 }
 
 function renderDeniedPage(email: string | null): string {
-  const brand = getBranding().name;
   const who = email ? `<code>${email}</code>` : 'this account';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Access denied — ${brand}</title>${PAGE_STYLE}</head><body>
-    <div class="card">
-      <div class="brand">${brand}</div>
+  return renderPageShell({
+    title: 'Access denied',
+    bodyHtml: `
       <h1>Access denied</h1>
       <p>${who} was not approved.</p>
       <p class="muted">You can try signing in again to request another review.</p>
-      <p><a class="btn" href="/ui/login">Try again</a></p>
-    </div>
-  </body></html>`;
+      <a class="btn" href="/ui/login">Try again</a>
+    `,
+  });
 }
 
 function renderError(message: string): string {
-  const brand = getBranding().name;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Sign-in error</title>${PAGE_STYLE}</head><body>
-    <div class="card">
-      <div class="brand">${brand}</div>
+  return renderPageShell({
+    title: 'Sign-in error',
+    bodyHtml: `
       <h1>Sign-in failed</h1>
       <p>${message}</p>
-      <p><a class="btn" href="/ui/login">Try again</a></p>
-    </div>
-  </body></html>`;
+      <a class="btn" href="/ui/login">Try again</a>
+    `,
+  });
 }
 
 /**
