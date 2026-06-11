@@ -1112,7 +1112,19 @@ function serveServiceWorker(ctx: Ctx): void {
   let version = `sw-${Math.floor(swStat.mtimeMs)}`;
   try {
     const appStat = fs.statSync(appJsPath);
-    version = `${Math.max(Math.floor(swStat.mtimeMs), Math.floor(appStat.mtimeMs))}-${appStat.size}`;
+    let maxMtime = Math.max(Math.floor(swStat.mtimeMs), Math.floor(appStat.mtimeMs));
+    // Roll the cache key when a shell-cached static asset (icons, manifest)
+    // changes on disk, so installed PWAs pick up the new file on next launch
+    // instead of holding the previous version forever via stale-while-revalidate.
+    for (const name of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) {
+      try {
+        const s = fs.statSync(path.join(UI_DIR, name));
+        if (Math.floor(s.mtimeMs) > maxMtime) maxMtime = Math.floor(s.mtimeMs);
+      } catch {
+        /* missing asset is fine */
+      }
+    }
+    version = `${maxMtime}-${appStat.size}`;
   } catch {
     /* fall back to sw mtime only */
   }
