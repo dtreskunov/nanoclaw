@@ -851,27 +851,36 @@ async function processQuery(
         pendingUsage = event.data;
       } else if (event.type === 'result') {
         resultSeen = true;
-        // A result — with or without text — means the turn is done. Stop
-        // warming the heartbeat so the host marks the agent idle and the
-        // typing indicator clears. A follow-up push below will re-arm it.
-        turnActive = false;
-        // Drain queued batches. Providers may collapse multiple queued
-        // prompts into a single turn (notably OpenCode: multiple
-        // promptAsync calls on the same session can be answered by one
-        // assistant response → one session.idle → one result), so we
-        // mark all currently-queued batches completed and dispatch the
-        // reply under the most recent batch's routing. If a provider
-        // does run separate turns per push, the queue only ever has one
-        // batch when each result fires and this collapses to the
-        // single-batch case.
+        // Drain the OLDEST batch from the queue — one result corresponds
+        // to one batch of work. When providers run separate turns per
+        // pushed prompt (typical case, including OpenCode when pushes
+        // are spaced out enough that the prior turn has already
+        // finished), each result event drains its own batch, the reply
+        // is stamped with that batch's routing, and the typing
+        // indicator stays on across the gap because the queue still
+        // has the next batch.
+        //
+        // When a provider really does collapse multiple queued pushes
+        // into a single assistant response (one result event for two
+        // pushed prompts), the leftover batch stays in the queue and
+        // gets drained by the stream-end finally block below.
         let resultRouting = routing;
         const drainedIds: string[] = [];
-        while (turnBatchQueue.length > 0) {
+        if (turnBatchQueue.length > 0) {
           const head = turnBatchQueue.shift()!;
           drainedIds.push(...head.ids);
           resultRouting = head.routing;
         }
         if (drainedIds.length > 0) markCompleted(drainedIds);
+        // Only end the turn (stop warming the heartbeat, mark
+        // turn_ended_at so the host clears the typing indicator) when
+        // no more queued batches remain. If there's still pending
+        // work, the provider is about to start another turn for it
+        // and the indicator must stay lit across the gap.
+        if (turnBatchQueue.length === 0) {
+          turnActive = false;
+          try { setTurnEnded(); } catch { /* best-effort */ }
+        }
         // Update MCP send_message routing for any subsequent turn the
         // provider may run within this query (e.g. on the nudge push
         // below, or a still-queued follow-up that arrived in the gap).
@@ -960,6 +969,11 @@ async function processQuery(
     }
     if (orphanedIds.length > 0) {
       try { markCompleted(orphanedIds); } catch { /* best-effort */ }
+      // Stream closed with leftover queued batches — the result branch
+      // skipped setTurnEnded because the queue was non-empty, so do it
+      // here so the host's typing module clears the indicator promptly
+      // instead of waiting for the heartbeat to age out.
+      try { setTurnEnded(); } catch { /* best-effort */ }
     }
     // Atomic continuation rollback. The `init` handler persisted the new
     // SDK session id immediately (for mid-turn crash recovery), but if the
@@ -995,7 +1009,9 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
     case 'result':
       log(`Result: ${event.text ? event.text.slice(0, 200) : '(empty)'}`);
       try { clearProgress(); } catch { /* best-effort */ }
-      try { setTurnEnded(); } catch { /* best-effort */ }
+      // setTurnEnded is intentionally NOT called here — the caller (result
+      // branch in processQuery) decides whether the turn is truly done
+      // (queue empty) or another turn for a queued push is about to start.
       break;
     case 'error':
       log(
