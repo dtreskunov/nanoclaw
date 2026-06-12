@@ -16,13 +16,14 @@
  *     "system_prompt": "optional extra instructions",
  *     "exposed_entities": [{ entity_id, name, state, area_name, ... }],
  *     "user_id": "ha user id", "user_name": "John Doe",
- *     "language": "en-US", "stream": false
+ *     "language": "en-US"
  *   }
  *
  * Response (chat-only — we never return `tool_calls`, see buildTurn):
- *   - non-streaming → `{ "output": "<reply text>" }`
- *   - streaming (`stream: true`) → NDJSON, one JSON object per line:
- *       {"type":"item","content":"..."}\n ... {"type":"end"}\n
+ *   `{ "output": "<reply text>" }` — a single JSON body. NanoClaw produces
+ *   one complete message per turn (it has no token streaming), so the webhook
+ *   always replies non-streaming; disable "Enable streaming" on the HA
+ *   integration so it reads this plain-JSON body instead of expecting NDJSON.
  *
  * Clarifying questions: HA is synchronous request/response with no interactive
  * controls, so when the agent emits a chat-sdk `ask_question` we render the
@@ -45,8 +46,7 @@
  * already holds prior turns, so we forward only the new content (the latest
  * query plus any tool results that arrived since the last exchange). The
  * agent's reply is captured by the first `deliver` for that (platformId,
- * threadId); streaming responses are terminated by `clearTyping`, which the
- * host fires when the turn ends.
+ * threadId), which settles the held request with the reply text.
  *
  * Session continuity: HA core keeps a conversation alive (same
  * conversation_id, voice mic reopened) when the assistant's reply ends with a
@@ -102,18 +102,14 @@ interface HaPayload {
   user_id?: string;
   user_name?: string;
   language?: string;
-  stream?: boolean;
 }
 
 /** An in-flight HTTP request awaiting the agent's reply. */
 interface PendingRequest {
   res: http.ServerResponse;
-  streaming: boolean;
   timer: ReturnType<typeof setTimeout>;
   /** Set once we've started/finished responding so we never double-write. */
   settled: boolean;
-  /** Streaming only: whether at least one item chunk has been written. */
-  wroteItem: boolean;
 }
 
 function readConfig(): HaConfig | null {
@@ -385,7 +381,6 @@ function createAdapter(config: HaConfig): ChannelAdapter {
 
     const senderId = payload.user_id ? `ha-user:${payload.user_id}` : 'ha-user:default';
     const messageId = `ha-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    const streaming = payload.stream === true;
     const key = pendingKey(platformId, threadId);
 
     // Supersede any in-flight request for the same conversation (HA retries,
@@ -408,29 +403,15 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       p.settled = true;
       pending.delete(key);
       try {
-        if (p.streaming) {
-          if (!p.wroteItem) p.res.write(JSON.stringify({ type: 'item', content: '' }) + '\n');
-          p.res.write(JSON.stringify({ type: 'end' }) + '\n');
-          p.res.end();
-        } else {
-          p.res.writeHead(504, { 'Content-Type': 'application/json' });
-          p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: 'Request timed out' }));
-        }
+        p.res.writeHead(504, { 'Content-Type': 'application/json' });
+        p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: 'Request timed out' }));
       } catch (err) {
         log.warn('HA webhook timeout response failed', { err });
       }
       log.warn('HA webhook turn timed out', { threadId, timeoutMs: config.timeoutMs });
     }, config.timeoutMs);
 
-    if (streaming) {
-      res.writeHead(200, {
-        'Content-Type': 'application/x-ndjson',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      });
-    }
-
-    pending.set(key, { res, streaming, timer, settled: false, wroteItem: false });
+    pending.set(key, { res, timer, settled: false });
 
     // ── Route inbound ────────────────────────────────────────────────
     const event: InboundEvent = {
@@ -494,13 +475,8 @@ function createAdapter(config: HaConfig): ChannelAdapter {
         clearTimeout(p.timer);
         if (!p.settled) {
           try {
-            if (p.streaming) {
-              p.res.write(JSON.stringify({ type: 'end' }) + '\n');
-              p.res.end();
-            } else {
-              p.res.writeHead(503, { 'Content-Type': 'application/json' });
-              p.res.end(JSON.stringify({ error: 'shutting_down' }));
-            }
+            p.res.writeHead(503, { 'Content-Type': 'application/json' });
+            p.res.end(JSON.stringify({ error: 'shutting_down' }));
           } catch {
             // swallow
           }
@@ -522,22 +498,7 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       const text = extractOutboundText(message);
       if (text === null) return undefined; // non-text payload (card, etc.) — ignore
 
-      if (p.streaming) {
-        // Stream each delivered message as an item chunk; the turn-end
-        // signal (clearTyping) writes {"type":"end"} and closes. Chat-only:
-        // always plain text — this integration cannot execute tool_calls.
-        try {
-          p.res.write(JSON.stringify({ type: 'item', content: text }) + '\n');
-          p.wroteItem = true;
-        } catch (err) {
-          log.warn('HA webhook stream write failed', { err });
-          p.settled = true;
-          clearPending(key);
-        }
-        return undefined;
-      }
-
-      // Non-streaming: the first text reply settles the request.
+      // The first text reply settles the held request.
       p.settled = true;
       clearPending(key);
       try {
@@ -547,23 +508,6 @@ function createAdapter(config: HaConfig): ChannelAdapter {
         log.warn('HA webhook response write failed', { err });
       }
       return undefined;
-    },
-
-    async clearTyping(platformId, threadId): Promise<void> {
-      // Turn-end signal. For streaming requests this terminates the NDJSON
-      // stream. Non-streaming requests are already settled by `deliver`.
-      const key = pendingKey(platformId, threadId);
-      const p = pending.get(key);
-      if (!p || p.settled || !p.streaming) return;
-      p.settled = true;
-      clearPending(key);
-      try {
-        if (!p.wroteItem) p.res.write(JSON.stringify({ type: 'item', content: '' }) + '\n');
-        p.res.write(JSON.stringify({ type: 'end' }) + '\n');
-        p.res.end();
-      } catch (err) {
-        log.warn('HA webhook stream end failed', { err });
-      }
     },
   };
 
