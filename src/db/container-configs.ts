@@ -4,6 +4,7 @@ import { getDb } from './connection.js';
 const SCALAR_COLUMNS = new Set([
   'provider',
   'model',
+  'small_model',
   'effort',
   'image_tag',
   'assistant_name',
@@ -67,6 +68,7 @@ export function updateContainerConfigScalars(
       ContainerConfigRow,
       | 'provider'
       | 'model'
+      | 'small_model'
       | 'effort'
       | 'image_tag'
       | 'assistant_name'

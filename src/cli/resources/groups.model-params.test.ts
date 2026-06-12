@@ -35,6 +35,7 @@ function seedGroup(id: string): void {
     agent_group_id: id,
     provider: null,
     model: null,
+    small_model: null,
     effort: null,
     image_tag: null,
     assistant_name: null,

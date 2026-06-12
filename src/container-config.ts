@@ -53,6 +53,7 @@ export interface ContainerConfig {
   agentGroupId?: string;
   maxMessagesPerPrompt?: number;
   model?: string;
+  smallModel?: string;
   effort?: string;
   voiceMode?: string;
   transcriptionModel?: string;
@@ -126,6 +127,7 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     agentGroupId: group.id,
     maxMessagesPerPrompt: row.max_messages_per_prompt ?? undefined,
     model: row.model ?? envFallback('DEFAULT_MODEL'),
+    smallModel: row.small_model ?? undefined,
     effort: row.effort ?? envFallback('DEFAULT_EFFORT'),
     voiceMode: row.voice_mode,
     transcriptionModel: row.transcription_model ?? envFallback('DEFAULT_TRANSCRIPTION_MODEL'),

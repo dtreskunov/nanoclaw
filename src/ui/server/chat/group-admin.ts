@@ -70,6 +70,7 @@ import { allocateSiteSlug, isValidSlug, pagesBaseDomain, pagesEnabled, siteFqdn,
 const SCALAR_FIELDS = [
   'provider',
   'model',
+  'small_model',
   'effort',
   'image_tag',
   'assistant_name',
@@ -216,6 +217,7 @@ interface SettingsResponse {
     ContainerConfigRow,
     | 'provider'
     | 'model'
+    | 'small_model'
     | 'effort'
     | 'image_tag'
     | 'assistant_name'
@@ -305,6 +307,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
     config: {
       provider: cfg.provider,
       model: bareModelId,
+      small_model: bareIdForResponse(cfg.provider, cfg.small_model),
       effort: cfg.effort,
       image_tag: cfg.image_tag,
       assistant_name: cfg.assistant_name,
@@ -361,6 +364,7 @@ async function handlePatchSettings(
       ContainerConfigRow,
       | 'provider'
       | 'model'
+      | 'small_model'
       | 'effort'
       | 'image_tag'
       | 'assistant_name'
@@ -489,6 +493,13 @@ async function handlePatchSettings(
         }
       }
     }
+  }
+
+  // Same prefix translation for small_model.
+  if ('small_model' in updates) {
+    const existing = getContainerConfig(gid);
+    const effectiveProvider = updates.provider ?? existing?.provider ?? null;
+    updates.small_model = dbValueFromBareId(effectiveProvider, updates.small_model ?? null);
   }
 
   if ('transcription_model' in updates || 'provider' in updates || 'model' in updates) {

@@ -68,6 +68,9 @@ registerProviderContainerConfig('opencode', (ctx) => {
   if (ctx.containerConfig.model) {
     env.OPENCODE_MODEL = ctx.containerConfig.model;
   }
+  if (ctx.containerConfig.smallModel) {
+    env.OPENCODE_SMALL_MODEL = ctx.containerConfig.smallModel;
+  }
 
   return {
     mounts: [{ hostPath: opencodeDir, containerPath: '/opencode-xdg', readonly: false }],

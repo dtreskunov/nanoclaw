@@ -30,7 +30,7 @@ export interface ProviderContainerContext {
   /** `process.env` at spawn time — pull passthrough values from here. */
   hostEnv: NodeJS.ProcessEnv;
   /** Materialized container config for this agent group. */
-  containerConfig: { model?: string; effort?: string };
+  containerConfig: { model?: string; smallModel?: string; effort?: string };
 }
 
 export interface ProviderContainerContribution {
