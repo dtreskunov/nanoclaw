@@ -10,3 +10,4 @@ import './cli.js';
 import './web.js';
 import './telegram.js';
 import './resend.js';
+import './homeassistant.js';
