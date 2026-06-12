@@ -99,14 +99,35 @@ function formatDetailLine(m: ModelSuggestion): string {
   return parts.join(' · ');
 }
 
-async function fetchJson<T>(url: string): Promise<{ ok: boolean; data: T }> {
-  try {
-    const res = await fetch(url, { credentials: 'same-origin' });
-    const data = await res.json();
-    return { ok: res.ok, data };
-  } catch {
-    return { ok: false, data: {} as T };
+// ── client-side catalog cache ─────────────────────────────────────────────
+
+interface CacheEntry {
+  fetchedAt: number;
+  promise: Promise<{ ok: boolean; data: ModelsResponse }>;
+}
+
+const catalogCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function fetchModels(url: string): Promise<{ ok: boolean; data: ModelsResponse }> {
+  const now = Date.now();
+  const cached = catalogCache.get(url);
+  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.promise;
   }
+  const promise = (async () => {
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      const data = await res.json();
+      return { ok: res.ok, data: data as ModelsResponse };
+    } catch {
+      // Don't cache failures
+      catalogCache.delete(url);
+      return { ok: false, data: {} as ModelsResponse };
+    }
+  })();
+  catalogCache.set(url, { fetchedAt: now, promise });
+  return promise;
 }
 
 // ── component ─────────────────────────────────────────────────────────────
@@ -138,16 +159,22 @@ export function ModelPickerDialog({
 
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Build the catalog URL for this picker's configuration.
+  const catalogUrl = useMemo(() => {
+    if (!provider) return null;
+    const params = new URLSearchParams({ provider });
+    if (inputModality) params.set('inputModality', inputModality);
+    if (outputModality) params.set('outputModality', outputModality);
+    return `${apiBasePath}/models?${params.toString()}`;
+  }, [provider, apiBasePath, inputModality, outputModality]);
+
   // Eagerly fetch models when provider is set (even while dialog is closed)
   // so the trigger can show the detail line for the current value.
+  // Uses a module-level cache so multiple pickers with the same URL share one request.
   useEffect(() => {
-    if (!provider) { setModels([]); return; }
+    if (!catalogUrl) { setModels([]); return; }
     let cancelled = false;
-    (async () => {
-      const params = new URLSearchParams({ provider });
-      if (inputModality) params.set('inputModality', inputModality);
-      if (outputModality) params.set('outputModality', outputModality);
-      const r = await fetchJson<ModelsResponse>(`${apiBasePath}/models?${params.toString()}`);
+    fetchModels(catalogUrl).then((r) => {
       if (cancelled) return;
       if (r.ok) {
         setModels(r.data.models ?? []);
@@ -156,20 +183,16 @@ export function ModelPickerDialog({
         setModels([]);
         setSource('unavailable');
       }
-    })();
+    });
     return () => { cancelled = true; };
-  }, [provider, apiBasePath, inputModality, outputModality]);
+  }, [catalogUrl]);
 
-  // Re-fetch when dialog opens (in case catalog changed since initial load)
+  // When dialog opens, re-resolve from cache (instant if fresh) to show loading state.
   useEffect(() => {
-    if (!open || !provider) return;
+    if (!open || !catalogUrl) return;
     let cancelled = false;
     setLoading(true);
-    (async () => {
-      const params = new URLSearchParams({ provider });
-      if (inputModality) params.set('inputModality', inputModality);
-      if (outputModality) params.set('outputModality', outputModality);
-      const r = await fetchJson<ModelsResponse>(`${apiBasePath}/models?${params.toString()}`);
+    fetchModels(catalogUrl).then((r) => {
       if (cancelled) return;
       if (r.ok) {
         setModels(r.data.models ?? []);
@@ -179,9 +202,9 @@ export function ModelPickerDialog({
         setSource('unavailable');
       }
       setLoading(false);
-    })();
+    });
     return () => { cancelled = true; };
-  }, [open, provider, apiBasePath, inputModality, outputModality]);
+  }, [open, catalogUrl]);
 
   // Focus search on open
   useEffect(() => {

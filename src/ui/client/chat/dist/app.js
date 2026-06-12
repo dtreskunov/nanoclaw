@@ -22212,14 +22212,26 @@ function formatDetailLine(m6) {
   if (modIn?.length) parts.push(modIn.join("+") + " in");
   return parts.join(" \xB7 ");
 }
-async function fetchJson(url) {
-  try {
-    const res = await fetch(url, { credentials: "same-origin" });
-    const data = await res.json();
-    return { ok: res.ok, data };
-  } catch {
-    return { ok: false, data: {} };
+var catalogCache = /* @__PURE__ */ new Map();
+var CACHE_TTL_MS = 5 * 60 * 1e3;
+function fetchModels(url) {
+  const now = Date.now();
+  const cached = catalogCache.get(url);
+  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.promise;
   }
+  const promise = (async () => {
+    try {
+      const res = await fetch(url, { credentials: "same-origin" });
+      const data = await res.json();
+      return { ok: res.ok, data };
+    } catch {
+      catalogCache.delete(url);
+      return { ok: false, data: {} };
+    }
+  })();
+  catalogCache.set(url, { fetchedAt: now, promise });
+  return promise;
 }
 function ModelPickerDialog({
   value,
@@ -22242,17 +22254,20 @@ function ModelPickerDialog({
   const [selectedCtxTier, setSelectedCtxTier] = h2(null);
   const [freeformValue, setFreeformValue] = h2("");
   const searchRef = A2(null);
+  const catalogUrl = T2(() => {
+    if (!provider) return null;
+    const params = new URLSearchParams({ provider });
+    if (inputModality) params.set("inputModality", inputModality);
+    if (outputModality) params.set("outputModality", outputModality);
+    return `${apiBasePath}/models?${params.toString()}`;
+  }, [provider, apiBasePath, inputModality, outputModality]);
   y2(() => {
-    if (!provider) {
+    if (!catalogUrl) {
       setModels([]);
       return;
     }
     let cancelled = false;
-    (async () => {
-      const params = new URLSearchParams({ provider });
-      if (inputModality) params.set("inputModality", inputModality);
-      if (outputModality) params.set("outputModality", outputModality);
-      const r4 = await fetchJson(`${apiBasePath}/models?${params.toString()}`);
+    fetchModels(catalogUrl).then((r4) => {
       if (cancelled) return;
       if (r4.ok) {
         setModels(r4.data.models ?? []);
@@ -22261,20 +22276,16 @@ function ModelPickerDialog({
         setModels([]);
         setSource("unavailable");
       }
-    })();
+    });
     return () => {
       cancelled = true;
     };
-  }, [provider, apiBasePath, inputModality, outputModality]);
+  }, [catalogUrl]);
   y2(() => {
-    if (!open || !provider) return;
+    if (!open || !catalogUrl) return;
     let cancelled = false;
     setLoading(true);
-    (async () => {
-      const params = new URLSearchParams({ provider });
-      if (inputModality) params.set("inputModality", inputModality);
-      if (outputModality) params.set("outputModality", outputModality);
-      const r4 = await fetchJson(`${apiBasePath}/models?${params.toString()}`);
+    fetchModels(catalogUrl).then((r4) => {
       if (cancelled) return;
       if (r4.ok) {
         setModels(r4.data.models ?? []);
@@ -22284,11 +22295,11 @@ function ModelPickerDialog({
         setSource("unavailable");
       }
       setLoading(false);
-    })();
+    });
     return () => {
       cancelled = true;
     };
-  }, [open, provider, apiBasePath, inputModality, outputModality]);
+  }, [open, catalogUrl]);
   y2(() => {
     if (open) {
       setTimeout(() => searchRef.current?.focus(), 50);
