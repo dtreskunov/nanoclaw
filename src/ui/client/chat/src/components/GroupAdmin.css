@@ -1,5 +1,14 @@
 /* Per-group admin modal — extends Settings modal chrome. */
 
+/* Folder line: folder name + agent group id inline, allowed to wrap. */
+.group-admin-toolbar .ga-folder-line {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.group-admin-toolbar .ga-folder-line .ga-folder-id {
+  color: var(--muted);
+}
+
 /* Section selector. On desktop it's a horizontal TabBar strip; on
    mobile the TabBar is omitted entirely and the body itself acts as a
    drill-in section list (see `.group-admin-section-list` below). The

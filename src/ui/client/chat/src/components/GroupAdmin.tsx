@@ -24,8 +24,8 @@ type Tab = 'models' | 'settings' | 'packages' | 'mcp' | 'skills' | 'members' | '
 const SETTINGS_SECTIONS = new Set<Tab>(['models', 'settings', 'packages', 'mcp', 'skills']);
 
 const TAB_ITEMS: TabItem[] = [
-  { id: 'models', label: 'Models', sublabel: 'Provider, model, voice' },
   { id: 'settings', label: 'Settings', sublabel: 'Image, scope, public site' },
+  { id: 'models', label: 'Models', sublabel: 'Provider, model, voice' },
   { id: 'packages', label: 'Packages', sublabel: 'apt / npm / pip in the image' },
   { id: 'mcp', label: 'MCP servers', sublabel: 'External tools wired to the agent' },
   { id: 'skills', label: 'Skills', sublabel: 'Container skills mounted at runtime' },
@@ -212,12 +212,12 @@ export function GroupAdmin(): JSX.Element | null {
   const mobile = isMobile.value;
   // On mobile we open into a section list (no section selected). Desktop
   // always has an active tab so the body is never empty.
-  const [tab, setTab] = useState<Tab | null>(() => (isMobile.value ? null : 'models'));
+  const [tab, setTab] = useState<Tab | null>(() => (isMobile.value ? null : 'settings'));
   const actionsRef = useRef<HeaderActions | null>(null);
   const [, forceRender] = useState(0);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   useEffect(() => {
-    setTab(isMobile.value ? null : 'models');
+    setTab(isMobile.value ? null : 'settings');
     setCloseConfirmOpen(false);
   }, [open, gid]);
   useBackButtonCloses(open, () => { groupAdminOpen.value = false; });
@@ -622,8 +622,8 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
   return (
     <section>
       <div class="group-admin-toolbar">
-        <p class="muted">
-          Folder <code>{data.folder}</code>{data.updatedAt ? ` · last updated ${new Date(data.updatedAt).toLocaleString()}` : ''}
+        <p class="muted ga-folder-line">
+          Folder <code>{data.folder}</code> <code class="ga-folder-id">{data.id}</code>{data.updatedAt ? ` · last updated ${new Date(data.updatedAt).toLocaleString()}` : ''}
           {data.runningSessionCount > 0 ? ` · ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? '' : 's'}` : ' · no running sessions'}
         </p>
       </div>
@@ -1754,6 +1754,7 @@ function PackagesSection({
       <PackageListField
         label="apt packages"
         info="Debian packages installed via apt-get in the agent image. Example: ripgrep, jq, postgresql-client."
+        placeholder="apt package (e.g. ripgrep, jq, postgresql-client)"
         items={value.apt}
         disabled={busy}
         onChange={(apt) => onChange({ ...value, apt })}
@@ -1761,6 +1762,7 @@ function PackagesSection({
       <PackageListField
         label="npm packages"
         info="Node packages installed globally via pnpm/npm in the agent image. Example: typescript@5, prettier."
+        placeholder="npm package (e.g. typescript@5, prettier)"
         items={value.npm}
         disabled={busy}
         onChange={(npm) => onChange({ ...value, npm })}
@@ -1768,6 +1770,7 @@ function PackagesSection({
       <PackageListField
         label="pip packages"
         info="Python packages installed via pip in the agent image. Example: requests, pandas==2.0.0."
+        placeholder="pip package (e.g. requests, pandas==2.0.0)"
         items={value.pip}
         disabled={busy}
         onChange={(pip) => onChange({ ...value, pip })}
@@ -1779,12 +1782,14 @@ function PackagesSection({
 function PackageListField({
   label,
   info,
+  placeholder,
   items,
   disabled,
   onChange,
 }: {
   label: string;
   info: string;
+  placeholder: string;
   items: string[];
   disabled: boolean;
   onChange: (next: string[]) => void;
@@ -1832,7 +1837,7 @@ function PackageListField({
           <input
             type="text"
             class="ga-chip-input"
-            placeholder="package name (e.g. ripgrep, jq, requests==2.31)"
+            placeholder={placeholder}
             value={draft}
             disabled={disabled}
             onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => setDraft(e.currentTarget.value)}

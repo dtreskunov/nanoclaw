@@ -2983,6 +2983,13 @@ body.is-admin .files-pane.collapsed .admin-only {
 }
 
 /* src/components/GroupAdmin.css */
+.group-admin-toolbar .ga-folder-line {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.group-admin-toolbar .ga-folder-line .ga-folder-id {
+  color: var(--muted);
+}
 .tab-bar-strip.group-admin-tab-bar {
   background: var(--head-tint);
   padding: 0 8px;

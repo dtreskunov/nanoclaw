@@ -22515,8 +22515,8 @@ function ModelPickerDialog({
 // src/components/GroupAdmin.tsx
 var SETTINGS_SECTIONS = /* @__PURE__ */ new Set(["models", "settings", "packages", "mcp", "skills"]);
 var TAB_ITEMS = [
-  { id: "models", label: "Models", sublabel: "Provider, model, voice" },
   { id: "settings", label: "Settings", sublabel: "Image, scope, public site" },
+  { id: "models", label: "Models", sublabel: "Provider, model, voice" },
   { id: "packages", label: "Packages", sublabel: "apt / npm / pip in the image" },
   { id: "mcp", label: "MCP servers", sublabel: "External tools wired to the agent" },
   { id: "skills", label: "Skills", sublabel: "Container skills mounted at runtime" },
@@ -22575,12 +22575,12 @@ function GroupAdmin() {
   const open = groupAdminOpen.value;
   const gid = groupId.value;
   const mobile = isMobile.value;
-  const [tab, setTab] = h2(() => isMobile.value ? null : "models");
+  const [tab, setTab] = h2(() => isMobile.value ? null : "settings");
   const actionsRef = A2(null);
   const [, forceRender] = h2(0);
   const [closeConfirmOpen, setCloseConfirmOpen] = h2(false);
   y2(() => {
-    setTab(isMobile.value ? null : "models");
+    setTab(isMobile.value ? null : "settings");
     setCloseConfirmOpen(false);
   }, [open, gid]);
   useBackButtonCloses(open, () => {
@@ -22964,9 +22964,11 @@ function SettingsTab({ gid, section, onClose, onActions }) {
   const selectedImgAge = formatAge(selectedImg?.createdAt ?? null);
   const selectedImgSize = formatSize(selectedImg?.size ?? null);
   return /* @__PURE__ */ u4("section", { children: [
-    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "muted", children: [
+    /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "muted ga-folder-line", children: [
       "Folder ",
       /* @__PURE__ */ u4("code", { children: data.folder }),
+      " ",
+      /* @__PURE__ */ u4("code", { class: "ga-folder-id", children: data.id }),
       data.updatedAt ? ` \xB7 last updated ${new Date(data.updatedAt).toLocaleString()}` : "",
       data.runningSessionCount > 0 ? ` \xB7 ${data.runningSessionCount} running session${data.runningSessionCount === 1 ? "" : "s"}` : " \xB7 no running sessions"
     ] }) }),
@@ -23990,6 +23992,7 @@ function PackagesSection({
       {
         label: "apt packages",
         info: "Debian packages installed via apt-get in the agent image. Example: ripgrep, jq, postgresql-client.",
+        placeholder: "apt package (e.g. ripgrep, jq, postgresql-client)",
         items: value.apt,
         disabled: busy,
         onChange: (apt) => onChange({ ...value, apt })
@@ -24000,6 +24003,7 @@ function PackagesSection({
       {
         label: "npm packages",
         info: "Node packages installed globally via pnpm/npm in the agent image. Example: typescript@5, prettier.",
+        placeholder: "npm package (e.g. typescript@5, prettier)",
         items: value.npm,
         disabled: busy,
         onChange: (npm) => onChange({ ...value, npm })
@@ -24010,6 +24014,7 @@ function PackagesSection({
       {
         label: "pip packages",
         info: "Python packages installed via pip in the agent image. Example: requests, pandas==2.0.0.",
+        placeholder: "pip package (e.g. requests, pandas==2.0.0)",
         items: value.pip,
         disabled: busy,
         onChange: (pip) => onChange({ ...value, pip })
@@ -24020,6 +24025,7 @@ function PackagesSection({
 function PackageListField({
   label,
   info,
+  placeholder,
   items,
   disabled,
   onChange
@@ -24058,7 +24064,7 @@ function PackageListField({
         {
           type: "text",
           class: "ga-chip-input",
-          placeholder: "package name (e.g. ripgrep, jq, requests==2.31)",
+          placeholder,
           value: draft,
           disabled,
           onInput: (e4) => setDraft(e4.currentTarget.value),
