@@ -42,14 +42,24 @@ registerProviderContainerConfig('opencode', (ctx) => {
     NO_PROXY: mergeNoProxy(ctx.hostEnv.NO_PROXY, noProxyAdditions),
     no_proxy: mergeNoProxy(ctx.hostEnv.no_proxy, noProxyAdditions),
   };
-  for (const key of ['OPENCODE_PROVIDER', 'OPENCODE_MODEL', 'OPENCODE_SMALL_MODEL'] as const) {
+  for (const key of [
+    'OPENCODE_PROVIDER',
+    'OPENCODE_MODEL',
+    'OPENCODE_SMALL_MODEL',
+    'OPENCODE_IDLE_TIMEOUT_MS',
+  ] as const) {
     const value = ctx.hostEnv[key];
     if (value) env[key] = value;
   }
 
   // The systemd unit doesn't load .env, so process.env may be missing the
   // OPENCODE_* vars even though they're configured. Fill in from .env.
-  const fromFile = readEnvFile(['OPENCODE_PROVIDER', 'OPENCODE_MODEL', 'OPENCODE_SMALL_MODEL']);
+  const fromFile = readEnvFile([
+    'OPENCODE_PROVIDER',
+    'OPENCODE_MODEL',
+    'OPENCODE_SMALL_MODEL',
+    'OPENCODE_IDLE_TIMEOUT_MS',
+  ]);
   for (const [key, value] of Object.entries(fromFile)) {
     if (value && env[key] === undefined) env[key] = value;
   }
