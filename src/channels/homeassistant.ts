@@ -10,7 +10,7 @@
  *
  * Request body (webhook-conversation conversation schema, subset we use):
  *   {
- *     "conversation_id": "abc123",   // → threadId (one session per convo)
+ *     "conversation_id": "abc123",   // stable while HA continues the convo
  *     "query": "latest user message",
  *     "messages": [{ "role": "...", "content": "..." }, ...],
  *     "system_prompt": "optional extra instructions",
@@ -23,6 +23,16 @@
  *   - non-streaming → `{ "output": "<reply text>" }`
  *   - streaming (`stream: true`) → NDJSON, one JSON object per line:
  *       {"type":"item","content":"..."}\n ... {"type":"end"}\n
+ *
+ * Clarifying questions: HA is synchronous request/response with no interactive
+ * controls, so when the agent emits a chat-sdk `ask_question` we render the
+ * prompt with its options as a natural inline list ("Which lamp? Desk, Floor,
+ * or Corner?", see `renderAskQuestion`), always ending with a question mark.
+ * That settles the held request instead of letting it hang to the timeout,
+ * and — because HA core continues a conversation whenever the assistant's
+ * reply ends with "?" — keeps the same conversation_id (and reopens the voice
+ * mic), so the user's answer returns as the next turn in the same conversation
+ * with full prior context.
  *
  * Security: the endpoint is on the shared public HTTP server, so auth lives
  * on the mount. HTTP Basic credentials are checked against
@@ -37,6 +47,15 @@
  * agent's reply is captured by the first `deliver` for that (platformId,
  * threadId); streaming responses are terminated by `clearTyping`, which the
  * host fires when the turn ends.
+ *
+ * Session continuity: HA core keeps a conversation alive (same
+ * conversation_id, voice mic reopened) when the assistant's reply ends with a
+ * question mark; `renderAskQuestion` ends every clarifying reply with "?" to
+ * trigger that. We key the session directly off `conversation_id`, and HA
+ * resends the full transcript in `messages` on every call, so `buildTurn`
+ * plumbs the prior turns into the prompt — the agent keeps context across the
+ * round-trip even if HA opens a fresh conversation_id (and thus a fresh
+ * session) between turns.
  */
 import crypto from 'node:crypto';
 import type http from 'node:http';
@@ -179,32 +198,101 @@ function ensureMessagingGroup(agentGroupId: string): void {
 /**
  * Build a turn from an HA payload.
  *
- * Returns only the user-visible `text` (tool results + the actual query) —
- * what the web UI renders as the sender's message. We deliberately do NOT
- * forward HA's per-request `system_prompt` or the `exposed_entities` state
- * blob: that payload is multi-KB and pushes weak models toward malformed
- * output, and the agent can read live home state on demand via Home
- * Assistant's MCP server anyway.
+ * Returns the user-visible `text`: the prior conversation turns, any tool
+ * results, then the actual query. We deliberately do NOT forward HA's
+ * per-request `system_prompt` or the `exposed_entities` state blob: that
+ * payload is multi-KB and pushes weak models toward malformed output, and the
+ * agent can read live home state on demand via Home Assistant's MCP server
+ * anyway.
  *
- * We forward only *new* content each turn — the session already carries prior
- * exchanges, so we don't replay history here.
+ * HA resends the full transcript in `messages` on every call. We plumb the
+ * earlier user/assistant turns into the prompt so the agent keeps context
+ * across a clarifying-question round-trip even when HA opens a fresh
+ * conversation_id (and thus a fresh session) between turns. The trailing user
+ * turn duplicates `query`, so it's dropped from the replayed history.
  */
 export function buildTurn(payload: HaPayload): { text: string } {
-  // ── Visible message (tool results + the user's query) ────────────────
-  const visible: string[] = [];
-  const toolResults = (payload.messages ?? []).filter((m) => m.role === 'tool_result');
-  for (const tr of toolResults) {
-    const name = tr.tool_name ? `Tool Result: ${tr.tool_name}` : 'Tool Result';
-    visible.push(`[${name}]`);
-    visible.push(tr.content ?? '');
-    visible.push('[End Tool Result]');
-    visible.push('');
+  const messages = payload.messages ?? [];
+  const query = (payload.query ?? '').trim();
+  const out: string[] = [];
+
+  // ── Prior conversation turns ─────────────────────────────────────────
+  const prior = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+  // Drop the trailing user turn that duplicates the current `query`.
+  if (query && prior.length > 0) {
+    const last = prior[prior.length - 1];
+    if (last.role === 'user' && (last.content ?? '').trim() === query) prior.pop();
+  }
+  if (prior.length > 0) {
+    out.push('[Conversation so far]');
+    for (const m of prior) {
+      out.push(`${m.role === 'user' ? 'User' : 'Assistant'}: ${(m.content ?? '').trim()}`);
+    }
+    out.push('[End conversation so far]');
+    out.push('');
   }
 
-  const query = (payload.query ?? '').trim();
-  if (query) visible.push(query);
+  // ── Tool results + the user's query ──────────────────────────────────
+  const toolResults = messages.filter((m) => m.role === 'tool_result');
+  for (const tr of toolResults) {
+    const name = tr.tool_name ? `Tool Result: ${tr.tool_name}` : 'Tool Result';
+    out.push(`[${name}]`);
+    out.push(tr.content ?? '');
+    out.push('[End Tool Result]');
+    out.push('');
+  }
 
-  return { text: visible.join('\n').trim() };
+  if (query) out.push(query);
+
+  return { text: out.join('\n').trim() };
+}
+
+/**
+ * Render a chat-sdk `ask_question` payload as plain text.
+ *
+ * HA's webhook-conversation integration is synchronous request/response and
+ * cannot show interactive option buttons — if we ignore the question the held
+ * HTTP request just hangs until it times out. We render the prompt followed by
+ * the options as a natural inline list ("Which lamp? Desk, Floor, or
+ * Corner?"), always ending with a question mark. That settles the request,
+ * lets HA speak/show the prompt, and — because HA core continues a
+ * conversation whenever the assistant's reply ends with "?" — keeps the same
+ * conversation_id (and reopens the voice mic), so the user's answer comes back
+ * as the next turn in the same conversation, where the agent resolves it from
+ * context. Returns null if the payload isn't a usable ask_question.
+ */
+export function renderAskQuestion(content: Record<string, unknown>): string | null {
+  if (content.type !== 'ask_question') return null;
+  const prompt = content.question ?? content.title;
+  const promptText = typeof prompt === 'string' ? prompt.trim() : '';
+  const labels = Array.isArray(content.options)
+    ? content.options
+        .map((o) => (o && typeof o === 'object' ? (o as Record<string, unknown>).label : undefined))
+        .filter((l): l is string => typeof l === 'string' && l.trim().length > 0)
+    : [];
+  if (!promptText && labels.length === 0) return null;
+
+  const parts: string[] = [];
+  if (promptText) {
+    // Give the prompt its own terminal punctuation so the options read as a
+    // follow-up question rather than running into it.
+    parts.push(/[?;？.!]$/.test(promptText) ? promptText : `${promptText}?`);
+  }
+  if (labels.length > 0) parts.push(`${joinOptions(labels)}?`);
+
+  let text = parts.join(' ').trim();
+  // Guarantee a trailing question mark. HA core only continues a conversation
+  // (keeping the same conversation_id and reopening the voice mic) when the
+  // assistant's reply ends with "?" / ";" / "？". See "Session continuity".
+  if (text && !/[?;？]$/.test(text)) text += '?';
+  return text || null;
+}
+
+/** Join option labels into a natural list: "A", "A or B", "A, B, or C". */
+function joinOptions(labels: string[]): string {
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, or ${labels[labels.length - 1]}`;
 }
 
 /** Extract the reply text from an outbound message's parsed content. */
@@ -215,6 +303,10 @@ export function extractOutboundText(message: OutboundMessage): string | null {
     const obj = content as Record<string, unknown>;
     const text = obj.markdown ?? obj.text;
     if (typeof text === 'string') return text;
+    // chat-sdk ask_question: flatten to text so the held HA request settles
+    // with the prompt instead of hanging until timeout.
+    const asked = renderAskQuestion(obj);
+    if (asked !== null) return asked;
   }
   return null;
 }
@@ -280,6 +372,8 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       return;
     }
 
+    // Key the session directly off HA's conversation_id, which stays stable
+    // while HA continues a conversation; fall back to a fresh id otherwise.
     const threadId = (payload.conversation_id || `ha-${Date.now()}`).trim();
     const platformId = platformIdFor(config.agentGroupId);
     const { text } = buildTurn(payload);

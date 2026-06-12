@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTurn, extractOutboundText, safeEqual } from './homeassistant.js';
+import { buildTurn, extractOutboundText, renderAskQuestion, safeEqual } from './homeassistant.js';
 
 describe('buildTurn', () => {
   it('returns just the query as visible text', () => {
@@ -47,6 +47,32 @@ describe('buildTurn', () => {
     expect(buildTurn({}).text).toBe('');
     expect(buildTurn({ query: '   ' }).text).toBe('');
   });
+
+  it('plumbs prior user/assistant turns into the prompt', () => {
+    const { text } = buildTurn({
+      query: 'the floor one',
+      messages: [
+        { role: 'user', content: 'turn off the lamp' },
+        { role: 'assistant', content: 'Which lamp?' },
+        { role: 'user', content: 'the floor one' },
+      ],
+    });
+    expect(text).toContain('[Conversation so far]');
+    expect(text).toContain('User: turn off the lamp');
+    expect(text).toContain('Assistant: Which lamp?');
+    expect(text).toContain('[End conversation so far]');
+    // The current query is rendered once, after the history, not replayed in it.
+    expect(text.trim().endsWith('the floor one')).toBe(true);
+    expect(text.match(/the floor one/g)).toHaveLength(1);
+  });
+
+  it('does not replay the current query as part of the prior history', () => {
+    const { text } = buildTurn({
+      query: 'hello',
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+    expect(text).toBe('hello');
+  });
 });
 
 describe('extractOutboundText', () => {
@@ -66,6 +92,77 @@ describe('extractOutboundText', () => {
   it('returns null for non-text payloads', () => {
     expect(extractOutboundText({ kind: 'chat', content: { type: 'card' } })).toBeNull();
     expect(extractOutboundText({ kind: 'chat', content: null })).toBeNull();
+  });
+
+  it('renders an ask_question payload as an inline prompt + options so the HA request settles', () => {
+    const text = extractOutboundText({
+      kind: 'chat-sdk',
+      content: {
+        type: 'ask_question',
+        questionId: 'q1',
+        title: 'Which office lamp?',
+        question: 'Which office lamp did you want to turn on?',
+        options: [
+          { label: 'Office Desk Lamp', value: 'Office Desk Lamp' },
+          { label: 'Office Floor Lamp', value: 'Office Floor Lamp' },
+        ],
+      },
+    });
+    expect(text).toBe('Which office lamp did you want to turn on? Office Desk Lamp or Office Floor Lamp?');
+  });
+});
+
+describe('renderAskQuestion', () => {
+  it('renders the prompt first with options as a natural inline list', () => {
+    expect(
+      renderAskQuestion({
+        type: 'ask_question',
+        title: 'Pick one',
+        question: 'Which lamp?',
+        options: [{ label: 'Desk' }, { label: 'Floor' }, { label: 'Corner' }],
+      }),
+    ).toBe('Which lamp? Desk, Floor, or Corner?');
+  });
+
+  it('joins two options with "or"', () => {
+    expect(
+      renderAskQuestion({ type: 'ask_question', question: 'Which one?', options: [{ label: 'A' }, { label: 'B' }] }),
+    ).toBe('Which one? A or B?');
+  });
+
+  it('falls back to title when question is missing and gives the prompt a question mark', () => {
+    expect(
+      renderAskQuestion({
+        type: 'ask_question',
+        title: 'Pick one',
+        options: [{ label: 'A' }, { label: 'B' }],
+      }),
+    ).toBe('Pick one? A or B?');
+  });
+
+  it('renders the prompt alone when there are no usable option labels', () => {
+    expect(renderAskQuestion({ type: 'ask_question', question: 'Free form?', options: [] })).toBe('Free form?');
+    expect(renderAskQuestion({ type: 'ask_question', question: 'Free form?' })).toBe('Free form?');
+  });
+
+  it('appends a question mark when the prompt does not already end with one', () => {
+    expect(renderAskQuestion({ type: 'ask_question', question: 'Pick a lamp' })).toBe('Pick a lamp?');
+  });
+
+  it('renders options alone when there is no prompt', () => {
+    expect(renderAskQuestion({ type: 'ask_question', options: [{ label: 'A' }, { label: 'B' }, { label: 'C' }] })).toBe(
+      'A, B, or C?',
+    );
+  });
+
+  it('returns null for non ask_question payloads', () => {
+    expect(renderAskQuestion({ type: 'send_card', text: 'x' })).toBeNull();
+    expect(renderAskQuestion({ title: 'no type' })).toBeNull();
+  });
+
+  it('returns null when an ask_question has neither prompt nor options', () => {
+    expect(renderAskQuestion({ type: 'ask_question' })).toBeNull();
+    expect(renderAskQuestion({ type: 'ask_question', options: [{ value: 'x' }] })).toBeNull();
   });
 });
 
