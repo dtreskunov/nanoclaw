@@ -1,0 +1,142 @@
+/* ModelPickerDialog — full-screen-on-mobile dialog with sidebar filters
+   and a scrollable two-line model list. */
+
+.mpd-trigger {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 6px 8px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: transparent; color: inherit; font: inherit;
+  text-align: left; min-height: 36px;
+}
+.mpd-trigger:hover { border-color: var(--primary); }
+.mpd-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+.mpd-trigger:disabled:hover { border-color: var(--border); }
+.mpd-trigger .mpd-trigger-label { flex: 1; min-width: 0; }
+.mpd-trigger .mpd-trigger-name { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mpd-trigger .mpd-trigger-detail { display: block; font-size: var(--font-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mpd-trigger .mpd-trigger-placeholder { color: var(--muted); }
+.mpd-trigger .mpd-trigger-icon { flex: none; color: var(--muted); font-size: var(--font-lg); }
+
+/* Dialog chrome — reuses settings-backdrop for scrim + z-index */
+.mpd-backdrop {
+  position: fixed; inset: 0; background: var(--scrim);
+  z-index: 25; display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px; overflow-y: auto;
+}
+.mpd-dialog {
+  background: var(--surface); color: var(--surface-fg);
+  border: 1px solid var(--border); border-radius: var(--radius-xl);
+  box-shadow: 0 10px 32px var(--shadow-color-strong);
+  width: 100%; max-width: 720px; max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.mpd-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  background: var(--head-tint);
+}
+.mpd-head .mpd-title { flex: 1; font-weight: 600; font-size: var(--font-xl); }
+.mpd-head .mpd-close {
+  flex: none; background: transparent; border: none; color: inherit;
+  font-size: var(--font-xl); cursor: pointer; padding: 4px; line-height: 1;
+}
+
+.mpd-content {
+  display: flex; flex: 1; min-height: 0; overflow: hidden;
+}
+
+/* Sidebar filters */
+.mpd-sidebar {
+  width: 180px; flex: none;
+  border-right: 1px solid var(--border);
+  padding: 12px; overflow-y: auto;
+  font-size: var(--font-sm);
+}
+.mpd-filter-group { margin-bottom: 16px; }
+.mpd-filter-group:last-child { margin-bottom: 0; }
+.mpd-filter-group-title {
+  font-weight: 600; font-size: var(--font-xs);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); margin-bottom: 6px;
+}
+.mpd-filter-option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0; cursor: pointer;
+}
+.mpd-filter-option input[type="checkbox"] { margin: 0; flex: none; }
+.mpd-filter-option label { cursor: pointer; user-select: none; }
+
+/* Main list area */
+.mpd-main {
+  flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+}
+.mpd-search {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.mpd-search input {
+  width: 100%; font: inherit; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: transparent; color: inherit;
+}
+.mpd-search input:focus { outline: none; border-color: var(--primary); }
+
+.mpd-list {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+}
+
+.mpd-item {
+  display: block; width: 100%; padding: 8px 14px;
+  cursor: pointer; border: none; background: transparent;
+  text-align: left; color: inherit; font: inherit;
+}
+.mpd-item:hover { background: var(--wash); }
+.mpd-item.selected { background: var(--wash-strong); }
+.mpd-item-name {
+  font-weight: 500; font-size: var(--font-base);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mpd-item-detail {
+  font-size: var(--font-xs); color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.mpd-empty {
+  padding: 24px 14px; text-align: center; color: var(--muted);
+  font-size: var(--font-base);
+}
+
+.mpd-freeform {
+  padding: 10px 14px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: center;
+}
+.mpd-freeform input {
+  flex: 1; font: inherit; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: transparent; color: inherit;
+}
+.mpd-freeform button {
+  flex: none; padding: 6px 12px; font: inherit;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--primary); color: var(--primary-fg);
+  cursor: pointer;
+}
+.mpd-freeform button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Mobile: sidebar collapses to horizontal filter bar */
+@media (max-width: 720px) {
+  .mpd-backdrop { padding: 0; align-items: stretch; overflow: hidden; }
+  .mpd-dialog {
+    width: 100%; max-width: 100%; max-height: 100%; height: 100%;
+    border-radius: 0; border: 0; box-shadow: none;
+  }
+  .mpd-content { flex-direction: column; }
+  .mpd-sidebar {
+    width: auto; border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px; overflow-x: auto; overflow-y: hidden;
+    display: flex; gap: 16px; flex-wrap: nowrap;
+  }
+  .mpd-filter-group { margin-bottom: 0; flex: none; white-space: nowrap; }
+  .mpd-filter-group-title { margin-bottom: 4px; }
+}

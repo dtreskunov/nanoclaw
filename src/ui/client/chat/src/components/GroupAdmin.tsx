@@ -13,7 +13,7 @@ import {
 } from '../state';
 import { selectGroup } from '../actions';
 import { Combobox, type ComboboxOption } from './Combobox';
-import { ModelSelector } from './ModelSelector';
+import { ModelPickerDialog } from './ModelPickerDialog';
 import { InfoIcon, Tooltip } from './Tooltip';
 import { showToast } from './Toast';
 import { useBackButtonCloses } from '../modalBackButton';
@@ -68,6 +68,7 @@ interface SettingsResponse {
   config: {
     provider: string | null;
     model: string | null;
+    small_model: string | null;
     effort: string | null;
     image_tag: string | null;
     assistant_name: string | null;
@@ -421,7 +422,7 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
   // model_params, mcp_servers, skills, and packages all need restart; only
   // packages require an image rebuild (handled separately via needsRebuild).
   const RESTART_REQUIRING_FIELDS = new Set([
-    'provider', 'model', 'effort', 'image_tag', 'assistant_name', 'max_messages_per_prompt',
+    'provider', 'model', 'small_model', 'effort', 'image_tag', 'assistant_name', 'max_messages_per_prompt',
     'model_params', 'mcp_servers', 'skills', 'packages_apt', 'packages_npm', 'packages_pip',
   ]);
 
@@ -657,7 +658,7 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           </Field>
 
           <Field label="Model">
-            <ModelSelector
+            <ModelPickerDialog
               value={draft.model}
               provider={provider ?? data.defaults.provider}
               placeholder={data.defaults.model ? `default: ${data.defaults.model}` : 'pick or type a model id'}
@@ -669,10 +670,25 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           </Field>
 
           <Field
+            label="Small model"
+            info="Lighter model for background tasks like compaction and summaries (cost optimization). Used by OpenCode; other providers may use in future."
+          >
+            <ModelPickerDialog
+              value={draft.small_model}
+              provider={provider ?? data.defaults.provider}
+              placeholder="same as main model"
+              disabled={busy}
+              apiBasePath={apiPath(gid, '')}
+              outputModality="text"
+              onChange={(v) => update('small_model', v)}
+            />
+          </Field>
+
+          <Field
             label="Transcription model"
             info={'OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.'}
           >
-            <ModelSelector
+            <ModelPickerDialog
               value={draft.transcription_model}
               provider="openrouter"
               placeholder={data.defaults.transcription_model || 'google/gemini-2.0-flash-lite-001'}

@@ -14803,6 +14803,11 @@ function T2(n3, r4) {
   var u5 = d2(t2++, 7);
   return C2(u5.__H, r4) && (u5.__ = n3(), u5.__H = r4, u5.__h = n3), u5.__;
 }
+function q2(n3, t4) {
+  return o2 = 8, T2(function() {
+    return n3;
+  }, t4);
+}
 function j2() {
   for (var n3; n3 = f2.shift(); ) if (n3.__P && n3.__H) try {
     n3.__H.__h.forEach(z2), n3.__H.__h.forEach(B2), n3.__H.__h = [];
@@ -16642,7 +16647,7 @@ var P2 = class {
     return e4 ? b3.parse : b3.parseInline;
   }
 };
-var q2 = class {
+var q3 = class {
   defaults = M2();
   options = this.setOptions;
   parse = this.parseMarkdown(true);
@@ -16803,7 +16808,7 @@ Please report this to https://github.com/markedjs/marked.`, e4) {
     };
   }
 };
-var z3 = new q2();
+var z3 = new q3();
 function g5(l7, e4) {
   return z3.parse(l7, e4);
 }
@@ -22174,21 +22179,72 @@ function Combobox({
   ] });
 }
 
-// src/components/ModelSelector.tsx
+// src/components/ModelPickerDialog.tsx
+var COST_TIERS = [
+  { id: "free", label: "Free", test: (m6) => (m6.inputCostPerMTok ?? 0) === 0 && (m6.outputCostPerMTok ?? 0) === 0 },
+  { id: "low", label: "< $1/Mtok", test: (m6) => (m6.outputCostPerMTok ?? Infinity) > 0 && (m6.outputCostPerMTok ?? Infinity) < 1 },
+  { id: "mid", label: "$1 \u2013 $5", test: (m6) => (m6.outputCostPerMTok ?? 0) >= 1 && (m6.outputCostPerMTok ?? Infinity) <= 5 },
+  { id: "high", label: "$5 \u2013 $20", test: (m6) => (m6.outputCostPerMTok ?? 0) > 5 && (m6.outputCostPerMTok ?? Infinity) <= 20 },
+  { id: "premium", label: "> $20", test: (m6) => (m6.outputCostPerMTok ?? 0) > 20 }
+];
+var CTX_TIERS = [
+  { id: "32k", label: "\u2265 32k", min: 32e3 },
+  { id: "128k", label: "\u2265 128k", min: 128e3 },
+  { id: "200k", label: "\u2265 200k", min: 2e5 },
+  { id: "1m", label: "\u2265 1M", min: 1e6 }
+];
+var ALL_INPUT_MODALITIES = ["text", "image", "audio", "video"];
+var ALL_OUTPUT_MODALITIES = ["text", "image"];
+function formatDetailLine(m6) {
+  const parts = [];
+  if (m6.contextWindow) {
+    const k4 = m6.contextWindow >= 1e6 ? `${(m6.contextWindow / 1e6).toFixed(1).replace(/\.0$/, "")}M` : `${Math.round(m6.contextWindow / 1024)}k`;
+    parts.push(`${k4} ctx`);
+  }
+  if (m6.inputCostPerMTok != null && m6.outputCostPerMTok != null) {
+    if (m6.inputCostPerMTok === 0 && m6.outputCostPerMTok === 0) {
+      parts.push("free");
+    } else {
+      parts.push(`$${m6.inputCostPerMTok}/$${m6.outputCostPerMTok} per Mtok`);
+    }
+  }
+  const modIn = m6.modalitiesIn?.filter((x6) => x6 !== "text");
+  if (modIn?.length) parts.push(modIn.join("+") + " in");
+  return parts.join(" \xB7 ");
+}
 async function fetchJson(url) {
   try {
     const res = await fetch(url, { credentials: "same-origin" });
     const data = await res.json();
-    return { ok: res.ok, data, status: res.status };
+    return { ok: res.ok, data };
   } catch {
-    return { ok: false, data: {}, status: 0 };
+    return { ok: false, data: {} };
   }
 }
-function ModelSelector({ value, provider, placeholder, disabled, apiBasePath, inputModality, outputModality, onChange }) {
-  const [models, setModels] = h2(null);
+function ModelPickerDialog({
+  value,
+  provider,
+  placeholder,
+  disabled,
+  apiBasePath,
+  inputModality,
+  outputModality,
+  onChange
+}) {
+  const [open, setOpen] = h2(false);
+  const [models, setModels] = h2([]);
+  const [source, setSource] = h2("unavailable");
+  const [loading, setLoading] = h2(false);
+  const [search, setSearch] = h2("");
+  const [selectedInputMods, setSelectedInputMods] = h2(/* @__PURE__ */ new Set());
+  const [selectedOutputMods, setSelectedOutputMods] = h2(/* @__PURE__ */ new Set());
+  const [selectedCostTiers, setSelectedCostTiers] = h2(/* @__PURE__ */ new Set());
+  const [selectedCtxTier, setSelectedCtxTier] = h2(null);
+  const [freeformValue, setFreeformValue] = h2("");
+  const searchRef = A2(null);
   y2(() => {
     if (!provider) {
-      setModels(null);
+      setModels([]);
       return;
     }
     let cancelled = false;
@@ -22196,55 +22252,252 @@ function ModelSelector({ value, provider, placeholder, disabled, apiBasePath, in
       const params = new URLSearchParams({ provider });
       if (inputModality) params.set("inputModality", inputModality);
       if (outputModality) params.set("outputModality", outputModality);
-      const r4 = await fetchJson(
-        `${apiBasePath}/models?${params.toString()}`
-      );
+      const r4 = await fetchJson(`${apiBasePath}/models?${params.toString()}`);
       if (cancelled) return;
-      setModels(r4.ok ? r4.data : { models: [], source: "unavailable", upstream: null });
+      if (r4.ok) {
+        setModels(r4.data.models ?? []);
+        setSource(r4.data.source ?? "unavailable");
+      } else {
+        setModels([]);
+        setSource("unavailable");
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [provider, apiBasePath, inputModality, outputModality]);
-  const options = (models?.models ?? []).map((m6) => ({
-    value: m6.id,
-    label: m6.label,
-    detail: m6.detail,
-    tooltip: m6.tooltip
-  }));
-  const matched = options.find((o4) => o4.value === value);
-  return /* @__PURE__ */ u4("div", { class: "group-admin-stack", children: [
+  y2(() => {
+    if (!open || !provider) return;
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const params = new URLSearchParams({ provider });
+      if (inputModality) params.set("inputModality", inputModality);
+      if (outputModality) params.set("outputModality", outputModality);
+      const r4 = await fetchJson(`${apiBasePath}/models?${params.toString()}`);
+      if (cancelled) return;
+      if (r4.ok) {
+        setModels(r4.data.models ?? []);
+        setSource(r4.data.source ?? "unavailable");
+      } else {
+        setModels([]);
+        setSource("unavailable");
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, provider, apiBasePath, inputModality, outputModality]);
+  y2(() => {
+    if (open) {
+      setTimeout(() => searchRef.current?.focus(), 50);
+    }
+  }, [open]);
+  const filtered = T2(() => {
+    let result = models;
+    if (search.trim()) {
+      const q5 = search.trim().toLowerCase();
+      result = result.filter(
+        (m6) => m6.id.toLowerCase().includes(q5) || m6.label.toLowerCase().includes(q5)
+      );
+    }
+    if (selectedInputMods.size > 0) {
+      result = result.filter(
+        (m6) => [...selectedInputMods].every((mod) => m6.modalitiesIn?.includes(mod))
+      );
+    }
+    if (selectedOutputMods.size > 0) {
+      result = result.filter(
+        (m6) => [...selectedOutputMods].every((mod) => m6.modalitiesOut?.includes(mod))
+      );
+    }
+    if (selectedCostTiers.size > 0) {
+      const activeTiers = COST_TIERS.filter((t4) => selectedCostTiers.has(t4.id));
+      result = result.filter((m6) => activeTiers.some((t4) => t4.test(m6)));
+    }
+    if (selectedCtxTier) {
+      const tier = CTX_TIERS.find((t4) => t4.id === selectedCtxTier);
+      if (tier) {
+        result = result.filter((m6) => (m6.contextWindow ?? 0) >= tier.min);
+      }
+    }
+    return result;
+  }, [models, search, selectedInputMods, selectedOutputMods, selectedCostTiers, selectedCtxTier]);
+  const handleSelect = q2((id) => {
+    onChange(id);
+    setOpen(false);
+  }, [onChange]);
+  const handleFreeformSubmit = q2(() => {
+    const trimmed = freeformValue.trim();
+    if (trimmed) {
+      onChange(trimmed);
+      setOpen(false);
+      setFreeformValue("");
+    }
+  }, [freeformValue, onChange]);
+  const handleClear = q2(() => {
+    onChange(null);
+    setOpen(false);
+  }, [onChange]);
+  const toggleSet = (set, val) => {
+    const next = new Set(set);
+    if (next.has(val)) next.delete(val);
+    else next.add(val);
+    return next;
+  };
+  const matched = models.find((m6) => m6.id === value);
+  const triggerName = matched?.label ?? value;
+  const triggerDetail = matched ? formatDetailLine(matched) : null;
+  const handleKeyDown = q2((e4) => {
+    if (e4.key === "Escape") setOpen(false);
+  }, []);
+  return /* @__PURE__ */ u4(k, { children: [
     /* @__PURE__ */ u4(
-      Combobox,
+      "button",
       {
-        value,
-        options,
-        placeholder: placeholder || "pick or type a model id",
+        type: "button",
+        class: "mpd-trigger",
         disabled: disabled || !provider,
-        onChange
+        onClick: () => {
+          setOpen(true);
+          setSearch("");
+        },
+        children: [
+          /* @__PURE__ */ u4("span", { class: "mpd-trigger-label", children: value ? /* @__PURE__ */ u4(k, { children: [
+            /* @__PURE__ */ u4("span", { class: "mpd-trigger-name", children: triggerName }),
+            triggerDetail && /* @__PURE__ */ u4("span", { class: "mpd-trigger-detail", children: triggerDetail })
+          ] }) : /* @__PURE__ */ u4("span", { class: "mpd-trigger-placeholder", children: placeholder || "pick or type a model id" }) }),
+          /* @__PURE__ */ u4("span", { class: "mpd-trigger-icon", children: "\u25BE" })
+        ]
       }
     ),
-    (() => {
-      if (matched) {
-        return /* @__PURE__ */ u4("div", { class: "group-admin-selected-info", children: [
-          /* @__PURE__ */ u4("div", { class: "selected-title", children: [
-            matched.label,
-            matched.detail ? /* @__PURE__ */ u4("span", { class: "selected-detail", children: [
-              " \xB7 ",
-              matched.detail
-            ] }) : null
+    open && /* @__PURE__ */ u4(
+      "div",
+      {
+        class: "mpd-backdrop",
+        onMouseDown: (e4) => {
+          if (e4.target === e4.currentTarget) setOpen(false);
+        },
+        onKeyDown: handleKeyDown,
+        children: /* @__PURE__ */ u4("div", { class: "mpd-dialog", role: "dialog", "aria-label": "Pick a model", children: [
+          /* @__PURE__ */ u4("div", { class: "mpd-head", children: [
+            /* @__PURE__ */ u4("span", { class: "mpd-title", children: "Pick a model" }),
+            value && /* @__PURE__ */ u4("button", { type: "button", class: "mpd-close", title: "Clear selection", onClick: handleClear, children: "\u2715 Clear" }),
+            /* @__PURE__ */ u4("button", { type: "button", class: "mpd-close", title: "Close", onClick: () => setOpen(false), children: "\u2715" })
           ] }),
-          matched.tooltip ? /* @__PURE__ */ u4("pre", { class: "selected-tooltip", children: matched.tooltip.split("\n").slice(1).join("\n") }) : null
-        ] });
+          /* @__PURE__ */ u4("div", { class: "mpd-content", children: [
+            /* @__PURE__ */ u4("div", { class: "mpd-sidebar", children: [
+              /* @__PURE__ */ u4("div", { class: "mpd-filter-group", children: [
+                /* @__PURE__ */ u4("div", { class: "mpd-filter-group-title", children: "Input" }),
+                ALL_INPUT_MODALITIES.map((mod) => /* @__PURE__ */ u4("div", { class: "mpd-filter-option", children: [
+                  /* @__PURE__ */ u4(
+                    "input",
+                    {
+                      type: "checkbox",
+                      id: `mpd-in-${mod}`,
+                      checked: selectedInputMods.has(mod),
+                      onChange: () => setSelectedInputMods(toggleSet(selectedInputMods, mod))
+                    }
+                  ),
+                  /* @__PURE__ */ u4("label", { for: `mpd-in-${mod}`, children: mod })
+                ] }, mod))
+              ] }),
+              /* @__PURE__ */ u4("div", { class: "mpd-filter-group", children: [
+                /* @__PURE__ */ u4("div", { class: "mpd-filter-group-title", children: "Output" }),
+                ALL_OUTPUT_MODALITIES.map((mod) => /* @__PURE__ */ u4("div", { class: "mpd-filter-option", children: [
+                  /* @__PURE__ */ u4(
+                    "input",
+                    {
+                      type: "checkbox",
+                      id: `mpd-out-${mod}`,
+                      checked: selectedOutputMods.has(mod),
+                      onChange: () => setSelectedOutputMods(toggleSet(selectedOutputMods, mod))
+                    }
+                  ),
+                  /* @__PURE__ */ u4("label", { for: `mpd-out-${mod}`, children: mod })
+                ] }, mod))
+              ] }),
+              /* @__PURE__ */ u4("div", { class: "mpd-filter-group", children: [
+                /* @__PURE__ */ u4("div", { class: "mpd-filter-group-title", children: "Cost (output)" }),
+                COST_TIERS.map((tier) => /* @__PURE__ */ u4("div", { class: "mpd-filter-option", children: [
+                  /* @__PURE__ */ u4(
+                    "input",
+                    {
+                      type: "checkbox",
+                      id: `mpd-cost-${tier.id}`,
+                      checked: selectedCostTiers.has(tier.id),
+                      onChange: () => setSelectedCostTiers(toggleSet(selectedCostTiers, tier.id))
+                    }
+                  ),
+                  /* @__PURE__ */ u4("label", { for: `mpd-cost-${tier.id}`, children: tier.label })
+                ] }, tier.id))
+              ] }),
+              /* @__PURE__ */ u4("div", { class: "mpd-filter-group", children: [
+                /* @__PURE__ */ u4("div", { class: "mpd-filter-group-title", children: "Context window" }),
+                CTX_TIERS.map((tier) => /* @__PURE__ */ u4("div", { class: "mpd-filter-option", children: [
+                  /* @__PURE__ */ u4(
+                    "input",
+                    {
+                      type: "checkbox",
+                      id: `mpd-ctx-${tier.id}`,
+                      checked: selectedCtxTier === tier.id,
+                      onChange: () => setSelectedCtxTier(selectedCtxTier === tier.id ? null : tier.id)
+                    }
+                  ),
+                  /* @__PURE__ */ u4("label", { for: `mpd-ctx-${tier.id}`, children: tier.label })
+                ] }, tier.id))
+              ] })
+            ] }),
+            /* @__PURE__ */ u4("div", { class: "mpd-main", children: [
+              /* @__PURE__ */ u4("div", { class: "mpd-search", children: /* @__PURE__ */ u4(
+                "input",
+                {
+                  ref: searchRef,
+                  type: "text",
+                  placeholder: "Search models\u2026",
+                  value: search,
+                  onInput: (e4) => setSearch(e4.target.value)
+                }
+              ) }),
+              /* @__PURE__ */ u4("div", { class: "mpd-list", children: [
+                loading && /* @__PURE__ */ u4("div", { class: "mpd-empty", children: "Loading\u2026" }),
+                !loading && source === "unavailable" && /* @__PURE__ */ u4("div", { class: "mpd-empty", children: "Model catalog unavailable." }),
+                !loading && source !== "unavailable" && filtered.length === 0 && /* @__PURE__ */ u4("div", { class: "mpd-empty", children: "No models match filters." }),
+                !loading && filtered.map((m6) => /* @__PURE__ */ u4(
+                  "button",
+                  {
+                    type: "button",
+                    class: `mpd-item${m6.id === value ? " selected" : ""}`,
+                    onClick: () => handleSelect(m6.id),
+                    children: [
+                      /* @__PURE__ */ u4("div", { class: "mpd-item-name", children: m6.label }),
+                      /* @__PURE__ */ u4("div", { class: "mpd-item-detail", children: formatDetailLine(m6) })
+                    ]
+                  },
+                  m6.id
+                ))
+              ] }),
+              /* @__PURE__ */ u4("div", { class: "mpd-freeform", children: [
+                /* @__PURE__ */ u4(
+                  "input",
+                  {
+                    type: "text",
+                    placeholder: "Or type a custom model ID\u2026",
+                    value: freeformValue,
+                    onInput: (e4) => setFreeformValue(e4.target.value),
+                    onKeyDown: (e4) => {
+                      if (e4.key === "Enter") handleFreeformSubmit();
+                    }
+                  }
+                ),
+                /* @__PURE__ */ u4("button", { type: "button", disabled: !freeformValue.trim(), onClick: handleFreeformSubmit, children: "Use" })
+              ] })
+            ] })
+          ] })
+        ] })
       }
-      if (models?.source === "unavailable") {
-        return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Catalog unavailable \u2014 saved as-is." });
-      }
-      if (value) {
-        return /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Not in catalog \u2014 saved as a custom value." });
-      }
-      return null;
-    })()
+    )
   ] });
 }
 
@@ -22506,6 +22759,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
   const RESTART_REQUIRING_FIELDS = /* @__PURE__ */ new Set([
     "provider",
     "model",
+    "small_model",
     "effort",
     "image_tag",
     "assistant_name",
@@ -22735,7 +22989,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         }
       ),
       /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
-        ModelSelector,
+        ModelPickerDialog,
         {
           value: draft.model,
           provider: provider ?? data.defaults.provider,
@@ -22749,10 +23003,29 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       /* @__PURE__ */ u4(
         Field,
         {
+          label: "Small model",
+          info: "Lighter model for background tasks like compaction and summaries (cost optimization). Used by OpenCode; other providers may use in future.",
+          children: /* @__PURE__ */ u4(
+            ModelPickerDialog,
+            {
+              value: draft.small_model,
+              provider: provider ?? data.defaults.provider,
+              placeholder: "same as main model",
+              disabled: busy,
+              apiBasePath: apiPath(gid, ""),
+              outputModality: "text",
+              onChange: (v5) => update("small_model", v5)
+            }
+          )
+        }
+      ),
+      /* @__PURE__ */ u4(
+        Field,
+        {
           label: "Transcription model",
           info: "OpenRouter model used when the main model cannot accept audio directly. When set, a mic button appears in the chat composer.\nLeave blank to disable voice input.",
           children: /* @__PURE__ */ u4(
-            ModelSelector,
+            ModelPickerDialog,
             {
               value: draft.transcription_model,
               provider: "openrouter",
