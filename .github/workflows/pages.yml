@@ -2,10 +2,11 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [prod]
     paths:
       - 'site/**'
       - 'assets/screenshots/**'
+      - 'assets/bananaclaw-logo.png'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
