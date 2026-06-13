@@ -23,7 +23,7 @@ python3 -m http.server 8000
 
 In the repo settings → Pages → **Source: GitHub Actions**. Then push a change
 under `site/` (or trigger the workflow manually). The deployed URL is
-`https://dtreskunov.github.io/nanoclaw/`.
+`https://denis.adsoconsulting.org/nanoclaw/`.
 
 ## Editing
 

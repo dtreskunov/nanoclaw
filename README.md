@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://dtreskunov.github.io/nanoclaw/">Marketing site & full feature tour →</a>
+  <a href="https://denis.adsoconsulting.org/nanoclaw/">Marketing site & full feature tour →</a>
 </p>
 
 <p align="center">
@@ -58,7 +58,7 @@ BananaClaw.
 | **License** | MIT | MIT |
 | **Upstream merges** | n/a | NanoClaw half merges cleanly; BananaClaw half is additive |
 
-See the [marketing site](https://dtreskunov.github.io/nanoclaw/) for screenshots and a full feature tour.
+See the [marketing site](https://denis.adsoconsulting.org/nanoclaw/) for screenshots and a full feature tour.
 
 ## Quick start
 
