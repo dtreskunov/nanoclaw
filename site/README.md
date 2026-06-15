@@ -1,8 +1,9 @@
 # BananaClaw marketing site
 
-Single-page landing site for [BananaClaw](https://github.com/dtreskunov/nanoclaw).
+Single-page landing site for [BananaClaw](https://github.com/dtreskunov/bananaclaw).
 Deployed to GitHub Pages by `.github/workflows/pages.yml` on every push to
-`main` that touches `site/`, `assets/screenshots/`, or the workflow itself.
+the `bananaclaw` branch that touches `site/`, `assets/screenshots/`, or the
+workflow itself.
 
 ## Local preview
 
@@ -23,7 +24,7 @@ python3 -m http.server 8000
 
 In the repo settings → Pages → **Source: GitHub Actions**. Then push a change
 under `site/` (or trigger the workflow manually). The deployed URL is
-`https://denis.adsoconsulting.org/nanoclaw/`.
+`https://denis.adsoconsulting.org/bananaclaw/`.
 
 ## Editing
 

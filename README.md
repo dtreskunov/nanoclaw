@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://denis.adsoconsulting.org/nanoclaw/">Marketing site & full feature tour →</a>
+  <a href="https://denis.adsoconsulting.org/bananaclaw/">Marketing site & full feature tour →</a>
 </p>
 
 <p align="center">
@@ -58,12 +58,12 @@ BananaClaw.
 | **License** | MIT | MIT |
 | **Upstream merges** | n/a | NanoClaw half merges cleanly; BananaClaw half is additive |
 
-See the [marketing site](https://denis.adsoconsulting.org/nanoclaw/) for screenshots and a full feature tour.
+See the [marketing site](https://denis.adsoconsulting.org/bananaclaw/) for screenshots and a full feature tour.
 
 ## Quick start
 
 ```bash
-git clone https://github.com/dtreskunov/nanoclaw.git bananaclaw
+git clone https://github.com/dtreskunov/bananaclaw.git
 cd bananaclaw
 bash nanoclaw.sh
 ```

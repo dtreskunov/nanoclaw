@@ -2,11 +2,12 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [prod]
+    branches: [bananaclaw]
     paths:
       - 'site/**'
       - 'assets/screenshots/**'
       - 'assets/bananaclaw-logo.png'
+      - 'assets/bananaclaw-icon.png'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -34,6 +35,7 @@ jobs:
           mkdir -p _site/screenshots
           cp assets/screenshots/*.png _site/screenshots/
           cp assets/bananaclaw-logo.png _site/bananaclaw-logo.png
+          cp assets/bananaclaw-icon.png _site/bananaclaw-icon.png
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
