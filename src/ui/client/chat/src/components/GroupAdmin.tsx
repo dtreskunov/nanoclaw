@@ -660,6 +660,12 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
               freeform={false}
               onChange={(v) => update('provider', v)}
             />
+            {data.providesAgentSurfaces ? (
+              <p class="group-admin-help">
+                This provider composes its own instructions and discovers skills its own way, so the
+                Skills selection and Assistant name don't apply while it's active.
+              </p>
+            ) : null}
           </Field>
 
           <Field label="Model">
@@ -771,11 +777,6 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
           disabled={busy}
           onInput={(e: JSX.TargetedEvent<HTMLInputElement>) => update('assistant_name', e.currentTarget.value || null)}
         />
-        {data.providesAgentSurfaces ? (
-          <p class="group-admin-help">
-            This provider composes its own instructions, so the assistant name may not be applied.
-          </p>
-        ) : null}
       </Field>
 
       <Field
@@ -896,7 +897,6 @@ function SettingsTab({ gid, section, onClose, onActions }: { gid: string; sectio
         <SkillsSection
           value={draftSkills}
           busy={busy}
-          surfacesOwned={data.providesAgentSurfaces}
           onChange={setDraftSkills}
         />
       ) : null}
@@ -2225,12 +2225,10 @@ function parseJsonStringMap(text: string): ParseResult<Record<string, string>> {
 function SkillsSection({
   value,
   busy,
-  surfacesOwned,
   onChange,
 }: {
   value: string[] | 'all';
   busy: boolean;
-  surfacesOwned?: boolean;
   onChange: (next: string[] | 'all') => void;
 }): JSX.Element {
   const isAll = value === 'all';
@@ -2252,12 +2250,6 @@ function SkillsSection({
 
   return (
     <>
-      {surfacesOwned ? (
-        <div class="group-admin-banner group-admin-banner-warn">
-          This provider manages its own agent surfaces — container skills are not mounted, so
-          this selection has no effect while it is active.
-        </div>
-      ) : null}
       <div class="group-admin-toolbar">
         <p class="group-admin-help">
           Container skills mounted into every session in this group. Restart required to take

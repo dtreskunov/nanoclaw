@@ -22978,27 +22978,30 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         {
           label: "Provider",
           info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
-          children: /* @__PURE__ */ u4(
-            Combobox,
-            {
-              value: draft.provider,
-              options: (() => {
-                const selectable = data.validProviders.slice();
-                if (draft.provider && !selectable.includes(draft.provider)) {
-                  selectable.push(draft.provider);
-                }
-                return selectable.map((p5) => ({
-                  value: p5,
-                  label: p5,
-                  tooltip: PROVIDER_INFO[p5]
-                }));
-              })(),
-              placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
-              disabled: busy,
-              freeform: false,
-              onChange: (v5) => update("provider", v5)
-            }
-          )
+          children: [
+            /* @__PURE__ */ u4(
+              Combobox,
+              {
+                value: draft.provider,
+                options: (() => {
+                  const selectable = data.validProviders.slice();
+                  if (draft.provider && !selectable.includes(draft.provider)) {
+                    selectable.push(draft.provider);
+                  }
+                  return selectable.map((p5) => ({
+                    value: p5,
+                    label: p5,
+                    tooltip: PROVIDER_INFO[p5]
+                  }));
+                })(),
+                placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
+                disabled: busy,
+                freeform: false,
+                onChange: (v5) => update("provider", v5)
+              }
+            ),
+            data.providesAgentSurfaces ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "This provider composes its own instructions and discovers skills its own way, so the Skills selection and Assistant name don't apply while it's active." }) : null
+          ]
         }
       ),
       /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
@@ -23109,18 +23112,15 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           ] }) : null
         ] }) : draft.image_tag && images ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
       ] }) }),
-      /* @__PURE__ */ u4(Field, { label: "Assistant name", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "text",
-            value: draft.assistant_name ?? "",
-            disabled: busy,
-            onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
-          }
-        ),
-        data.providesAgentSurfaces ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "This provider composes its own instructions, so the assistant name may not be applied." }) : null
-      ] }),
+      /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
+        "input",
+        {
+          type: "text",
+          value: draft.assistant_name ?? "",
+          disabled: busy,
+          onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
+        }
+      ) }),
       /* @__PURE__ */ u4(
         Field,
         {
@@ -23240,7 +23240,6 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       {
         value: draftSkills,
         busy,
-        surfacesOwned: data.providesAgentSurfaces,
         onChange: setDraftSkills
       }
     ) : null,
@@ -24430,7 +24429,6 @@ function parseJsonStringMap(text) {
 function SkillsSection({
   value,
   busy,
-  surfacesOwned,
   onChange
 }) {
   const isAll = value === "all";
@@ -24449,7 +24447,6 @@ function SkillsSection({
     onChange(list.filter((_6, i5) => i5 !== idx));
   }
   return /* @__PURE__ */ u4(k, { children: [
-    surfacesOwned ? /* @__PURE__ */ u4("div", { class: "group-admin-banner group-admin-banner-warn", children: "This provider manages its own agent surfaces \u2014 container skills are not mounted, so this selection has no effect while it is active." }) : null,
     /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
       'Container skills mounted into every session in this group. Restart required to take effect \u2014 skill mounts are computed at container spawn. Use "all" to mount every available container skill, or pick specific slugs from ',
       /* @__PURE__ */ u4("code", { children: "container/skills/" }),
