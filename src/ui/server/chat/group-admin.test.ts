@@ -46,6 +46,10 @@ vi.mock('../auth.js', () => ({
 import { initTestDb, closeDb, runMigrations, getDb, getAgentGroup } from '../../../db/index.js';
 import { grantRole } from '../../../modules/permissions/db/user-roles.js';
 import { addMember } from '../../../modules/permissions/db/agent-group-members.js';
+import {
+  registerProviderContainerConfig,
+  listProviderContainerConfigNames,
+} from '../../../providers/provider-container-registry.js';
 import { handle } from './routes.js';
 
 const NOW = () => new Date().toISOString();
@@ -425,5 +429,32 @@ describe('GET /api/groups/:gid/admin/settings (extended fields)', () => {
     expect(body.packages.apt).toEqual(['jq']);
     expect(Object.keys(body.mcpServers)).toEqual(['fetch']);
     expect(body.skills).toEqual(['welcome']);
+  });
+
+  it('reports providesAgentSurfaces=false for the default (claude) provider', async () => {
+    seedOwnedGroup('ag-surf-default', 'surf-default-grp');
+
+    const res = await call('GET', '/ui/chat/api/groups/ag-surf-default/admin/settings');
+    expect(res.status()).toBe(200);
+    const body = res.body() as { providesAgentSurfaces: boolean };
+    expect(body.providesAgentSurfaces).toBe(false);
+  });
+
+  it('reports providesAgentSurfaces=true when the group uses a surfaces-owning provider', async () => {
+    // Register a throwaway provider that owns its agent surfaces.
+    if (!listProviderContainerConfigNames().includes('test-surfaces-provider')) {
+      registerProviderContainerConfig('test-surfaces-provider', () => ({}), {
+        providesAgentSurfaces: true,
+      });
+    }
+    seedOwnedGroup('ag-surf-owned', 'surf-owned-grp');
+    getDb()
+      .prepare(`UPDATE container_configs SET provider = ? WHERE agent_group_id = ?`)
+      .run('test-surfaces-provider', 'ag-surf-owned');
+
+    const res = await call('GET', '/ui/chat/api/groups/ag-surf-owned/admin/settings');
+    expect(res.status()).toBe(200);
+    const body = res.body() as { providesAgentSurfaces: boolean };
+    expect(body.providesAgentSurfaces).toBe(true);
   });
 });

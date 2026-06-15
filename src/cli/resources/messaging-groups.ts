@@ -24,6 +24,13 @@ registerResource({
       required: true,
     },
     {
+      name: 'instance',
+      type: 'string',
+      description:
+        'Adapter instance that owns this chat — lets N adapters of one platform (e.g. two Slack apps) each own their own rows. Defaults to channel_type (the single-instance case). Identity is (channel_type, platform_id, instance), which must be unique.',
+      defaultFrom: 'channel_type',
+    },
+    {
       name: 'name',
       type: 'string',
       description: 'Display name. Often auto-populated by the channel adapter.',

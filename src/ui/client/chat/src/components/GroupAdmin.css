@@ -167,6 +167,21 @@
   font-size: var(--font-sm);
 }
 
+.group-admin-banner {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-sm);
+  line-height: 1.4;
+  background: var(--wash-subtle);
+  color: var(--surface-fg);
+}
+
+.group-admin-banner-warn {
+  border: 1px solid var(--warning, #e90);
+  color: var(--warning, #e90);
+}
+
 .group-admin-actions {
   align-items: center;
   gap: 12px;

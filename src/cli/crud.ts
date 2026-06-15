@@ -30,6 +30,14 @@ export interface ColumnDef {
   updatable?: boolean;
   /** Default value on create when not provided. */
   default?: unknown;
+  /**
+   * On create, when this column is not provided and has no static `default`,
+   * fall back to the resolved value of the named sibling column. Lets a
+   * NOT NULL column (e.g. messaging_groups.instance) mirror another column's
+   * value (channel_type) without a static default. The source column must
+   * appear earlier in the `columns` array so it is resolved first.
+   */
+  defaultFrom?: string;
   /** Allowed values (shown in help). */
   enum?: string[];
 }
@@ -150,6 +158,8 @@ function genericCreate(def: ResourceDef) {
         throw new Error(`--${col.name.replace(/_/g, '-')} is required`);
       } else if (col.default !== undefined) {
         values[col.name] = col.default;
+      } else if (col.defaultFrom !== undefined && values[col.defaultFrom] !== undefined) {
+        values[col.name] = values[col.defaultFrom];
       }
     }
 

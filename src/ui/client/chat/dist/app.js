@@ -23109,15 +23109,18 @@ function SettingsTab({ gid, section, onClose, onActions }) {
           ] }) : null
         ] }) : draft.image_tag && images ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "Tag not in local image list \u2014 will fail at container start if not pulled." }) : null
       ] }) }),
-      /* @__PURE__ */ u4(Field, { label: "Assistant name", children: /* @__PURE__ */ u4(
-        "input",
-        {
-          type: "text",
-          value: draft.assistant_name ?? "",
-          disabled: busy,
-          onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
-        }
-      ) }),
+      /* @__PURE__ */ u4(Field, { label: "Assistant name", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "text",
+            value: draft.assistant_name ?? "",
+            disabled: busy,
+            onInput: (e4) => update("assistant_name", e4.currentTarget.value || null)
+          }
+        ),
+        data.providesAgentSurfaces ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "This provider composes its own instructions, so the assistant name may not be applied." }) : null
+      ] }),
       /* @__PURE__ */ u4(
         Field,
         {
@@ -23237,6 +23240,7 @@ function SettingsTab({ gid, section, onClose, onActions }) {
       {
         value: draftSkills,
         busy,
+        surfacesOwned: data.providesAgentSurfaces,
         onChange: setDraftSkills
       }
     ) : null,
@@ -24426,6 +24430,7 @@ function parseJsonStringMap(text) {
 function SkillsSection({
   value,
   busy,
+  surfacesOwned,
   onChange
 }) {
   const isAll = value === "all";
@@ -24444,6 +24449,7 @@ function SkillsSection({
     onChange(list.filter((_6, i5) => i5 !== idx));
   }
   return /* @__PURE__ */ u4(k, { children: [
+    surfacesOwned ? /* @__PURE__ */ u4("div", { class: "group-admin-banner group-admin-banner-warn", children: "This provider manages its own agent surfaces \u2014 container skills are not mounted, so this selection has no effect while it is active." }) : null,
     /* @__PURE__ */ u4("div", { class: "group-admin-toolbar", children: /* @__PURE__ */ u4("p", { class: "group-admin-help", children: [
       'Container skills mounted into every session in this group. Restart required to take effect \u2014 skill mounts are computed at container spawn. Use "all" to mount every available container skill, or pick specific slugs from ',
       /* @__PURE__ */ u4("code", { children: "container/skills/" }),

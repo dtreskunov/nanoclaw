@@ -58,6 +58,7 @@ import type { Session } from '../../../types.js';
 import type { AgentGroup, ContainerConfigRow } from '../../../types.js';
 import { authenticate } from '../auth.js';
 import type { McpServerConfig } from '../../../container-config.js';
+import { providerProvidesAgentSurfaces } from '../../../providers/provider-container-registry.js';
 import { SELECTABLE_AGENT_PROVIDERS, VALID_AGENT_PROVIDERS } from './agent-providers.js';
 import { recordAdminAction } from './audit.js';
 import { listImages } from './image-catalog.js';
@@ -260,6 +261,14 @@ interface SettingsResponse {
   /** True iff the acting admin is owner or global admin (controls UI gating
    * of privilege-escalating options like cli_scope=global). */
   actorIsElevated: boolean;
+  /**
+   * True iff the effective provider owns its own agent-facing surfaces
+   * (instructions, skills, project doc) — see `providesAgentSurfaces` on the
+   * provider capability seam. When true the host does NOT compose CLAUDE.md /
+   * mount container skills / seed CLAUDE.local.md, so the Skills tab and
+   * assistant-name field are no-ops; the client annotates them accordingly.
+   */
+  providesAgentSurfaces: boolean;
 }
 
 async function handleGetSettings(res: http.ServerResponse, gid: string, actorUserId: string): Promise<void> {
@@ -345,6 +354,7 @@ async function handleGetSettings(res: http.ServerResponse, gid: string, actorUse
     selectedModelDetail,
     selectedImageDetail,
     actorIsElevated: isOwner(actorUserId) || isGlobalAdmin(actorUserId),
+    providesAgentSurfaces: providerProvidesAgentSurfaces(cfg.provider ?? defaultProvider),
   };
   writeJson(res, 200, body);
 }
