@@ -43,3 +43,10 @@ groups/*
 agents-sdk-docs
 backups/
 container/skills/algorithmic-art
+.agents
+AGENTS.md
+
+# Internal working docs, never committed
+docs/maintainer-guide.md
+docs/drafts/
+forks.md

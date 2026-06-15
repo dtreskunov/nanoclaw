@@ -29,10 +29,11 @@ export function createDeliveryBridge(opts: DeliveryBridgeOptions) {
       content: string,
       files?: OutboundFile[],
       id?: string,
+      instance?: string,
     ): Promise<string | undefined> {
-      const adapter = getChannelAdapter(channelType);
+      const adapter = getChannelAdapter(instance ?? channelType);
       if (!adapter) {
-        log.warn('No adapter for channel type', { channelType });
+        log.warn('No adapter for channel type', { channelType, instance });
         return;
       }
       if (files && files.length > 1 && !adapter.supportsMultiFile) {
@@ -53,8 +54,8 @@ export function createDeliveryBridge(opts: DeliveryBridgeOptions) {
       }
       return adapter.deliver(platformId, threadId, { kind, content: JSON.parse(content), files, id });
     },
-    async setTyping(channelType: string, platformId: string, threadId: string | null, hint?: string): Promise<void> {
-      const adapter = getChannelAdapter(channelType);
+    async setTyping(channelType: string, platformId: string, threadId: string | null, hint?: string, instance?: string): Promise<void> {
+      const adapter = getChannelAdapter(instance ?? channelType);
       await adapter?.setTyping?.(platformId, threadId, hint);
     },
     async clearTyping(channelType: string, platformId: string, threadId: string | null): Promise<void> {

@@ -19,7 +19,7 @@ import {
 import { isUploadTraceCommand, uploadTrace } from './upload-trace.js';
 import { isAudioMime, transcribeAudio } from './transcribe.js';
 import { getConfig } from './config.js';
-import type { AgentProvider, AgentQuery, FileAttachment, ProviderEvent } from './providers/types.js';
+import type { AgentProvider, AgentQuery, FileAttachment, ProviderEvent, ProviderExchange } from './providers/types.js';
 
 const POLL_INTERVAL_MS = 1000;
 const ACTIVE_POLL_INTERVAL_MS = 500;
@@ -81,6 +81,12 @@ export interface PollLoopConfig {
   systemContext?: {
     instructions?: string;
   };
+  /**
+   * Optional stop signal. In production the loop runs until the container
+   * dies; tests pass a signal so an abandoned loop actually exits instead of
+   * polling forever and stealing messages from the next test's DB.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -132,6 +138,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
   let pollCount = 0;
   let isFirstPoll = true;
   while (true) {
+    if (config.signal?.aborted) return;
     // Skip system messages — they're responses for MCP tools (e.g., ask_user_question)
     const messages = getPendingMessages(isFirstPoll).filter((m) => m.kind !== 'system');
     isFirstPoll = false;
@@ -315,6 +322,8 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
             continuation,
             true,
             promptTracker,
+            config.provider.onExchangeComplete?.bind(config.provider),
+            prompt,
           );
           if (result.continuation && result.continuation !== continuation) {
             continuation = result.continuation;
@@ -580,6 +589,8 @@ async function processQuery(
   priorContinuation: string | undefined,
   persistContinuation = true,
   promptTracker?: { latest: string },
+  onExchangeComplete?: (exchange: ProviderExchange) => void,
+  initialPrompt = '',
 ): Promise<QueryResult> {
   let queryContinuation: string | undefined;
   let resultSeen = false;
@@ -632,9 +643,10 @@ async function processQuery(
       // chat-kind rows can carry either content (text/markdown/files) or a
       // bare operation (reaction/edit). Only the former counts as a reply.
       if (r.kind === 'chat') {
-        let parsed: { operation?: unknown; text?: unknown; markdown?: unknown; files?: unknown } | null = null;
+        type ContentShape = { operation?: unknown; text?: unknown; markdown?: unknown; files?: unknown };
+        let parsed: ContentShape | null = null;
         try {
-          parsed = JSON.parse(r.content) as typeof parsed;
+          parsed = JSON.parse(r.content) as ContentShape;
         } catch {
           parsed = null;
         }
@@ -644,6 +656,12 @@ async function processQuery(
     }
     return n;
   };
+
+  // Prompt queue for the exchange hook — each result event consumes the
+  // oldest unanswered prompt, except a wrapping-retry result, which answers
+  // the same prompt again. Unused (and unmaintained) when the provider
+  // doesn't implement `onExchangeComplete`.
+  const archivePrompts: string[] = [initialPrompt];
 
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open avoids
@@ -669,13 +687,16 @@ async function processQuery(
         // resume id (fixed at sdkQuery() time); admin/passthrough commands
         // (/compact, /cost, …) only dispatch when they're the first input
         // of a query — pushed mid-stream they arrive as plain text and
-        // the SDK never runs them. End the stream and leave the rows
-        // pending; the outer loop handles them on next iteration via the
-        // canonical command path + formatMessagesWithCommands.
+        // the SDK never runs them. Abort the active stream and leave the
+        // rows pending; the outer loop handles them on next iteration via
+        // the canonical command path + formatMessagesWithCommands. Abort,
+        // not end: end() lets an in-flight turn run to completion, which
+        // can block the command (e.g. /clear during a long task) for as
+        // long as the turn takes.
         if (pending.some((m) => isRunnerCommand(m))) {
-          log('Pending slash command — ending stream so outer loop can process');
+          log('Pending slash command — aborting active stream so outer loop can process');
           endedForCommand = true;
-          query.end();
+          query.abort();
           return;
         }
 
@@ -726,6 +747,7 @@ async function processQuery(
         turnActive = true;
         try { clearTurnEnded(); } catch { /* best-effort */ }
         query.push(prompt, followUpFiles.length > 0 ? followUpFiles : undefined);
+        archivePrompts.push(prompt);
         // Enqueue this push as its own batch. We do NOT markCompleted here —
         // that happens when the corresponding `result` event drains the
         // queue. Marking at push time loses messages whose prompts the
@@ -886,23 +908,19 @@ async function processQuery(
         // below, or a still-queued follow-up that arrived in the gap).
         setCurrentInReplyTo(resultRouting.inReplyTo);
         if (event.text) {
-          // If the agent already wrote a real user-facing reply this turn
-          // via MCP tools (send_message / send_file), treat any unwrapped
-          // final-result text as conversational scratchpad and skip the
-          // <message>-wrap nudge. Otherwise the agent's polite "sent!"
-          // confirmation gets force-wrapped and delivered as a duplicate.
-          //
-          // Operation-only rows (add_reaction, edit_message) do NOT count
-          // here — a reaction is not a substitute for answering the user.
-          // Without this distinction, a weaker model that reacts ✅ and
-          // then leaves its actual answer unwrapped would have the nudge
-          // suppressed and the answer silently dropped.
           const mcpWroteReply = countTurnContentMessages(outboundMaxAtTurnStart) > 0;
           const { sent, hasUnwrapped } = dispatchResultText(event.text, resultRouting);
           if (sent > 0) sentAny = true;
+          const willRetryWrapping = !mcpWroteReply && hasUnwrapped && !unwrappedNudged;
+          notifyExchangeComplete(onExchangeComplete, {
+            prompt: archivePrompts[0] ?? initialPrompt,
+            result: event.text,
+            continuation: queryContinuation ?? priorContinuation,
+            status: (!mcpWroteReply && hasUnwrapped) ? 'undelivered' : 'completed',
+          });
           if (mcpWroteReply) {
             sentAny = true;
-          } else if (hasUnwrapped && !unwrappedNudged) {
+          } else if (willRetryWrapping) {
             unwrappedNudged = true;
             log(`WARNING: agent output had no <message to="..."> blocks — nothing was sent`);
             const destinations = getAllDestinations();
@@ -916,6 +934,11 @@ async function processQuery(
                 `Please re-send your response with the correct wrapping.</system>`,
             );
           }
+          // The wrapping-retry result answers the SAME user prompt — keep it
+          // queued so the retry archives against it, not the nudge text.
+          if (!willRetryWrapping) archivePrompts.shift();
+        } else {
+          archivePrompts.shift();
         }
         // One-shot calls (in-turn ack): end the stream immediately after
         // the first result. Without this, the query stays open waiting
@@ -951,6 +974,15 @@ async function processQuery(
         outboundMaxAtTurnStart = currentOutboundMax();
       }
     }
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    notifyExchangeComplete(onExchangeComplete, {
+      prompt: archivePrompts[0] ?? initialPrompt,
+      result: `Error: ${errMsg}`,
+      continuation: queryContinuation ?? priorContinuation,
+      status: 'error',
+    });
+    throw err;
   } finally {
     done = true;
     clearInterval(pollHandle);
@@ -999,6 +1031,18 @@ async function processQuery(
     // a trailing error is best left in the logs.
     unsurfacedError: !sentAny && lastProviderError ? lastProviderError : undefined,
   };
+}
+
+function notifyExchangeComplete(
+  hook: ((exchange: ProviderExchange) => void) | undefined,
+  exchange: ProviderExchange,
+): void {
+  if (!hook) return;
+  try {
+    hook(exchange);
+  } catch (err) {
+    log(`onExchangeComplete failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {

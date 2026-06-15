@@ -49,7 +49,7 @@ const TYPING_GRACE_MS = 15000;
 const HEARTBEAT_FRESH_MS = 6000;
 
 interface TypingAdapter {
-  setTyping?(channelType: string, platformId: string, threadId: string | null, hint?: string): Promise<void>;
+  setTyping?(channelType: string, platformId: string, threadId: string | null, hint?: string, instance?: string): Promise<void>;
   clearTyping?(channelType: string, platformId: string, threadId: string | null): Promise<void>;
 }
 
@@ -58,6 +58,8 @@ interface TypingTarget {
   channelType: string;
   platformId: string;
   threadId: string | null;
+  /** Adapter instance that owns the chat; undefined = default (= channelType). */
+  instance?: string;
   interval: NodeJS.Timeout;
   startedAt: number;
 }
@@ -82,10 +84,11 @@ async function triggerTyping(
   channelType: string,
   platformId: string,
   threadId: string | null,
+  instance?: string,
 ): Promise<void> {
   const hint = readSessionProgress(agentGroupId, sessionId) ?? undefined;
   try {
-    await adapter?.setTyping?.(channelType, platformId, threadId, hint);
+    await adapter?.setTyping?.(channelType, platformId, threadId, hint, instance);
   } catch {
     // Typing is best-effort — don't let it fail delivery or routing.
   }
@@ -115,6 +118,7 @@ export function startTypingRefresh(
   channelType: string,
   platformId: string,
   threadId: string | null,
+  instance?: string,
 ): void {
   const existing = typingRefreshers.get(sessionId);
   if (existing) {
@@ -123,13 +127,23 @@ export function startTypingRefresh(
     // the container-wake latency budget. Also clear any lingering
     // post-delivery pause: a new inbound means the user expects
     // typing to show immediately.
-    triggerTyping(sessionId, agentGroupId, channelType, platformId, threadId).catch(() => {});
+    triggerTyping(sessionId, agentGroupId, channelType, platformId, threadId, instance).catch(() => {});
     existing.startedAt = Date.now();
+    // Keep the stored entry self-consistent: a re-trigger can arrive from
+    // a different chat address (agent-shared sessions span messaging
+    // groups, possibly on different platforms/instances), so the address
+    // fields and the owning instance must move together — a torn entry
+    // (old address + new instance) would hand e.g. a telegram platformId
+    // to a Slack instance's setTyping on the next interval tick.
+    existing.channelType = channelType;
+    existing.platformId = platformId;
+    existing.threadId = threadId;
+    existing.instance = instance;
     return;
   }
 
   // Immediate tick + periodic refresh.
-  triggerTyping(sessionId, agentGroupId, channelType, platformId, threadId).catch(() => {});
+  triggerTyping(sessionId, agentGroupId, channelType, platformId, threadId, instance).catch(() => {});
   const startedAt = Date.now();
   const interval = setInterval(() => {
     const entry = typingRefreshers.get(sessionId);
@@ -143,7 +157,7 @@ export function startTypingRefresh(
 
     const withinGrace = Date.now() - entry.startedAt < TYPING_GRACE_MS;
     if (withinGrace || isHeartbeatFresh(entry.agentGroupId, sessionId)) {
-      triggerTyping(sessionId, entry.agentGroupId, entry.channelType, entry.platformId, entry.threadId).catch(() => {});
+      triggerTyping(sessionId, entry.agentGroupId, entry.channelType, entry.platformId, entry.threadId, entry.instance).catch(() => {});
       return;
     }
 
@@ -159,6 +173,7 @@ export function startTypingRefresh(
     channelType,
     platformId,
     threadId,
+    instance,
     interval,
     startedAt,
   });
