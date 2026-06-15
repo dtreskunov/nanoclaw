@@ -24,6 +24,7 @@ import {
   redeemAndCreateSession,
 } from './auth.js';
 import { purgeExpired } from './db.js';
+import { handleLandingPage, ASSETS_MOUNT_PREFIX } from './landing-page.js';
 import { handleOidcRoute, renderLoginPage } from './oidc-routes.js';
 import { handleOnboarding } from './onboarding.js';
 import { handleSettings } from './settings.js';
@@ -116,13 +117,11 @@ export function startUi(): void {
     withAccessLog('onboarding', (req, res) => handleOnboarding(req, res)),
   );
 
-  // Root convenience redirect — '/' → chat. Only fires on exact '/' because
-  // the mount matcher requires `pathname === prefix || startsWith(prefix + '/')`,
-  // and '//' never matches a real request path.
-  mountHandler('/', (_req, res) => {
-    res.writeHead(303, { Location: CHAT_MOUNT_PREFIX + '/' });
-    res.end();
-  });
+  // Public landing page at the apex '/' (exact-root match only) plus its
+  // imagery under '/assets/*'. The page links to /ui/chat for login, which
+  // redirects to the auth flow when the visitor isn't signed in.
+  mountHandler('/', withAccessLog('landing', handleLandingPage));
+  mountHandler(ASSETS_MOUNT_PREFIX, withAccessLog('landing-assets', handleLandingPage));
 
   mounted = true;
   log.info('UI mounted', { prefix: UI_MOUNT_PREFIX, apps: [CHAT_MOUNT_PREFIX], secure: cfg.secure });

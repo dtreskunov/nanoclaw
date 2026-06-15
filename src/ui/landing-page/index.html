@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BananaClaw — a personal AI assistant you actually own</title>
+  <meta name="description" content="Your own AI assistant, ready in your browser and on your phone. Chat with it, email it, and let it keep track of your files and notes — all on a server you control.">
+  <meta property="og:title" content="BananaClaw">
+  <meta property="og:description" content="A personal AI assistant you actually own. Ready in your browser and on your phone.">
+  <meta property="og:image" content="/assets/screenshots/chat-mobile.png">
+  <link rel="icon" type="image/png" href="/assets/bananaclaw-icon.png">
+  <link rel="apple-touch-icon" href="/assets/bananaclaw-icon.png">
+  <meta name="theme-color" content="#0b0b0c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0b0c;
+      --bg-2:#121214;
+      --bg-3:#1a1a1d;
+      --fg:#ececef;
+      --fg-2:#b8b8c0;
+      --fg-3:#7a7a85;
+      --accent:#facc15;       /* banana */
+      --accent-2:#fde047;
+      --accent-soft:#facc1518;
+      --border:#2a2a2f;
+      --good:#22c55e;
+      --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:'Inter',system-ui,-apple-system,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+    code,pre{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline;text-decoration-color:var(--accent-2)}
+    .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+    /* Nav */
+    nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(12px);background:rgba(11,11,12,.7);border-bottom:1px solid var(--border)}
+    nav .wrap{display:flex;align-items:center;gap:24px;padding-top:14px;padding-bottom:14px}
+    .brand{font-weight:800;font-size:18px;color:var(--fg);display:flex;align-items:center;gap:10px;text-decoration:none}
+    .brand img{height:36px;width:auto;display:block}
+    .brand a{color:var(--fg);text-decoration:none}
+    nav ul{display:flex;gap:20px;margin:0 0 0 auto;padding:0;list-style:none;flex-wrap:wrap}
+    nav a{color:var(--fg-2);font-size:14px;font-weight:500}
+    nav a:hover{color:var(--fg);text-decoration:none}
+    .gh-btn{background:var(--bg-3);border:1px solid var(--border);padding:7px 14px;border-radius:8px;color:var(--fg)!important}
+    .login-btn{background:var(--accent);border:1px solid var(--accent);padding:7px 16px;border-radius:8px;color:#1a1a1d!important;font-weight:700}
+    .login-btn:hover{background:var(--accent-2);border-color:var(--accent-2);text-decoration:none}
+
+    /* Hero */
+    header.hero{padding:80px 0 60px;position:relative;overflow:hidden}
+    header.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:600px;background:radial-gradient(ellipse,var(--accent-soft) 0%,transparent 60%);pointer-events:none}
+    .hero-grid{display:grid;grid-template-columns:1fr 360px;gap:60px;align-items:center;position:relative}
+    .hero h1{font-size:64px;line-height:1.05;letter-spacing:-0.03em;margin:0 0 20px;font-weight:800}
+    .hero h1 .accent{background:linear-gradient(180deg,var(--accent) 0%,var(--accent-2) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .hero .tagline{font-size:20px;color:var(--fg-2);margin:0 0 32px;max-width:520px}
+    .hero .ctas{display:flex;gap:12px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;font-weight:600;font-size:15px;transition:transform .1s ease;cursor:pointer;border:none}
+    .btn:hover{text-decoration:none;transform:translateY(-1px)}
+    .btn-primary{background:var(--accent);color:#1a1a1d!important}
+    .btn-primary:hover{background:var(--accent-2)}
+    .btn-secondary{background:var(--bg-3);color:var(--fg)!important;border:1px solid var(--border)}
+    .hero-img{justify-self:center}
+    .hero-img img{width:100%;max-width:320px;border-radius:32px;box-shadow:0 50px 100px -20px rgba(0,0,0,.5),0 0 60px var(--accent-soft);border:1px solid var(--border)}
+    .credit-line{margin-top:48px;color:var(--fg-3);font-size:14px;text-align:center}
+    .credit-line a{color:var(--fg-2)}
+
+    /* Sections */
+    section{padding:80px 0;border-top:1px solid var(--border)}
+    section h2{font-size:40px;line-height:1.1;letter-spacing:-0.02em;margin:0 0 12px;font-weight:800}
+    section h2 .accent{color:var(--accent)}
+    section .lede{font-size:18px;color:var(--fg-2);max-width:680px;margin:0 0 48px}
+
+    /* Feature blocks */
+    .feature{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;margin:64px 0}
+    .feature.reverse{direction:rtl}
+    .feature.reverse > *{direction:ltr}
+    .feature h3{font-size:28px;margin:0 0 16px;letter-spacing:-0.01em;font-weight:700}
+    .feature h3 .tag{display:inline-block;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:4px 8px;border-radius:6px;margin-right:10px;vertical-align:middle;font-weight:600}
+    .feature p{color:var(--fg-2);font-size:16px;margin:0 0 12px}
+    .feature ul{color:var(--fg-2);font-size:15px;padding-left:20px;margin:12px 0}
+    .feature ul li{margin-bottom:6px}
+    .shot{display:flex;justify-content:center;align-items:center;padding:24px;background:linear-gradient(135deg,var(--bg-2),var(--bg-3));border-radius:24px;border:1px solid var(--border)}
+    .shot img{max-width:100%;max-height:560px;border-radius:18px;box-shadow:0 30px 60px -20px rgba(0,0,0,.5);border:1px solid var(--border)}
+    .shot.tight img{border-radius:12px;max-height:200px}
+    .shot-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .shot-pair img{width:100%;border-radius:14px;border:1px solid var(--border);cursor:zoom-in}
+
+    /* Full-width showcase */
+    .showcase{margin:64px 0 0;text-align:center}
+    .showcase-frame{background:linear-gradient(135deg,var(--bg-2),var(--bg-3));border:1px solid var(--border);border-radius:24px;padding:24px;margin-top:32px}
+    .showcase-frame img{max-width:100%;width:787px;border-radius:14px;border:1px solid var(--border);box-shadow:0 30px 60px -20px rgba(0,0,0,.5);cursor:zoom-in;display:block;margin:0 auto}
+
+    /* Desktop showcase */
+    .desktop-stack{display:flex;flex-direction:column;gap:32px;margin-top:32px}
+    .desktop-card{background:linear-gradient(135deg,var(--bg-2),var(--bg-3));border:1px solid var(--border);border-radius:20px;padding:24px;display:grid;grid-template-columns:1fr 280px;gap:32px;align-items:center}
+    .desktop-card img{width:100%;border-radius:12px;border:1px solid var(--border);box-shadow:0 30px 60px -20px rgba(0,0,0,.5);cursor:zoom-in;transition:transform .15s ease}
+    .desktop-card img:hover{transform:translateY(-2px)}
+    .desktop-card h3{font-size:22px;margin:0 0 12px;font-weight:700}
+    .desktop-card .tag{display:inline-block;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:4px 8px;border-radius:6px;margin-bottom:12px;font-weight:600}
+    .desktop-card p{color:var(--fg-2);font-size:14px;margin:0}
+
+    /* Lightbox-enabled gallery */
+    .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+    .gallery-item{margin:0;padding:0;background:var(--bg-2);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;cursor:zoom-in;transition:transform .15s ease,border-color .15s ease;text-align:left;color:inherit;font:inherit}
+    .gallery-item:hover{transform:translateY(-3px);border-color:var(--accent)}
+    .gallery-item img{width:100%;display:block;background:#121212}
+    .gallery-item .cap{padding:12px 14px;font-size:13px;color:var(--fg-2);border-top:1px solid var(--border)}
+    .gallery-item .cap strong{color:var(--fg)}
+
+    /* Lightbox overlay */
+    .lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:100;display:none;align-items:center;justify-content:center;padding:40px;backdrop-filter:blur(8px)}
+    .lb.open{display:flex}
+    .lb img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+    .lb-close,.lb-prev,.lb-next{position:absolute;background:rgba(26,26,29,.85);color:var(--fg);border:1px solid var(--border);border-radius:50%;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:22px;line-height:1;transition:background .1s ease,transform .1s ease}
+    .lb-close:hover,.lb-prev:hover,.lb-next:hover{background:var(--bg-3);transform:scale(1.05)}
+    .lb-close{top:20px;right:20px}
+    .lb-prev{left:20px;top:50%;transform:translateY(-50%)}
+    .lb-prev:hover{transform:translateY(-50%) scale(1.05)}
+    .lb-next{right:20px;top:50%;transform:translateY(-50%)}
+    .lb-next:hover{transform:translateY(-50%) scale(1.05)}
+    .lb-cap{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(26,26,29,.85);color:var(--fg);padding:10px 18px;border-radius:8px;font-size:14px;max-width:80%;text-align:center;border:1px solid var(--border)}
+
+    /* Comparison table */
+    .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:var(--bg-2)}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:14px 18px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+    th{background:var(--bg-3);font-weight:600;color:var(--fg);font-size:13px;letter-spacing:0.02em}
+    tr:last-child td{border-bottom:none}
+    td.cell-no{color:var(--fg-3)}
+    td.area{font-weight:600;color:var(--fg)}
+    .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;margin-left:6px}
+
+    /* Quickstart */
+    pre.code{background:#000;border:1px solid var(--border);border-radius:12px;padding:20px;overflow-x:auto;color:#e5e7eb;font-size:14px;line-height:1.6;margin:24px 0}
+    pre.code .c{color:#6b7280}
+    pre.code .p{color:var(--accent)}
+
+    /* Footer */
+    footer{padding:60px 0 80px;border-top:1px solid var(--border);color:var(--fg-3);font-size:14px}
+    footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+    footer a{color:var(--fg-2)}
+
+    /* Mobile */
+    @media (max-width:840px){
+      .hero-grid{grid-template-columns:1fr;gap:40px;text-align:center}
+      .hero h1{font-size:44px}
+      .hero .tagline{margin-left:auto;margin-right:auto}
+      .hero .ctas{justify-content:center}
+      .feature,.feature.reverse{grid-template-columns:1fr;gap:32px;direction:ltr}
+      .gallery{grid-template-columns:1fr 1fr}
+      .desktop-card{grid-template-columns:1fr;gap:16px}
+      section{padding:60px 0}
+      section h2{font-size:32px}
+      nav ul .nav-link{display:none}
+      .lb{padding:16px}
+      .lb-close,.lb-prev,.lb-next{width:40px;height:40px;font-size:18px}
+    }
+    @media (max-width:540px){
+      .gallery{grid-template-columns:1fr}
+      .shot-pair{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="BananaClaw"><img src="/assets/bananaclaw-logo.png" alt="BananaClaw"></a>
+    <ul>
+      <li class="nav-link"><a href="#features">Features</a></li>
+      <li><a class="login-btn" href="/ui/chat">Log in →</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>A deeply personal<br>AI assistant.<br>Zero <span class="accent">BS.</span></h1>
+      <p class="tagline">Chat with it, email it, and let it build your website, all running on a server you control.</p>
+      <p class="credit-line">Built on top of <a href="https://github.com/nanocoai/nanoclaw">NanoClaw</a> by Denis Treskunov and AI. <a href="#credit">Read more →</a></p>
+    </div>
+    <div class="hero-img">
+      <img src="/assets/screenshots/chat-mobile.png" alt="BananaClaw chat UI on a phone">
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything in <span class="accent">one place.</span></h2>
+    <p class="lede">Chat with your assistant, reach it however you like, and keep your files and notes right where you can see them.</p>
+
+    <div class="feature">
+      <div>
+        <h3><span class="tag">Chat</span>Talk to it from anywhere</h3>
+        <p>Open it in your browser or add it to your home screen — it works just like any other app, on your phone, laptop, or tablet, and your conversations follow you between them.</p>
+        <ul>
+          <li>One tidy inbox for every conversation, across email, messaging, and the web</li>
+          <li>Get a notification the moment it replies, even when the app is closed</li>
+          <li>Start a new thread any time — each one keeps its own context</li>
+        </ul>
+      </div>
+      <div class="shot-pair">
+        <img src="/assets/screenshots/chat-mobile.png" alt="Chatting with the assistant on a phone" data-lb data-cap="Chat with your assistant from your phone">
+        <img src="/assets/screenshots/chat-threads.png" alt="All conversations in one list" data-lb data-cap="Every conversation gathered in one list">
+      </div>
+    </div>
+
+    <div class="feature reverse">
+      <div>
+        <h3><span class="tag">Files</span>Your files and notes, right there</h3>
+        <p>Your assistant keeps a folder of its own — notes it takes, documents you share, things it makes for you. Browse it any time: open a file to read it, upload your own, or send one straight into the chat.</p>
+        <ul>
+          <li>Notes and documents open right in the page, nicely formatted</li>
+          <li>Drag in a file to share it, or download anything back out</li>
+          <li>Send a file into the chat to ask about it</li>
+        </ul>
+      </div>
+      <div class="shot-pair">
+        <img src="/assets/screenshots/files-browser.png" alt="Browsing files" data-lb data-cap="Browse your assistant's files">
+        <img src="/assets/screenshots/files-preview-md.png" alt="Reading a note" data-lb data-cap="Open a note to read it, nicely formatted">
+      </div>
+    </div>
+
+    <div class="feature">
+      <div>
+        <h3><span class="tag">Control</span>Full control, when you want it</h3>
+        <p>Everything is tunable from your browser — pick the model that powers it, add new abilities, and choose who's allowed in.</p>
+        <ul>
+          <li>Every setting gathered in one place</li>
+          <li>Pick what powers your assistant</li>
+          <li>No command line required</li>
+        </ul>
+      </div>
+      <div class="shot-pair">
+        <img src="/assets/screenshots/admin-overview.png" alt="Settings overview" data-lb data-cap="Every setting in one place">
+        <img src="/assets/screenshots/admin-models.png" alt="Choosing a model" data-lb data-cap="Pick what powers your assistant">
+      </div>
+    </div>
+
+    <div class="feature reverse">
+      <div>
+        <h3><span class="tag">Website</span>It can build and host your site</h3>
+        <p>Ask your assistant to build you a website and it goes live instantly at a subdomain you choose — no deploy step, no separate hosting. Just write files into a folder and they're published.</p>
+        <ul>
+          <li>Enable with one checkbox, pick your subdomain</li>
+          <li>Anyone with the link can visit — no login required</li>
+          <li>The agent can update it any time you ask</li>
+        </ul>
+      </div>
+      <div class="shot">
+        <img src="/assets/serve-public-website.png" alt="Website settings showing a live subdomain" data-lb data-cap="Enable a public website — live at your own subdomain">
+      </div>
+    </div>
+
+    <div class="showcase">
+      <h3 style="font-size:28px;margin:0 0 12px;font-weight:700">Room to spread out on a big screen</h3>
+      <p style="color:var(--fg-2);font-size:16px;max-width:680px;margin:0 auto">On a phone it stays simple and focused. On a laptop it opens up — your conversations, the chat, and your files all side by side, with quick search to jump straight to anything you've talked about.</p>
+      <div class="showcase-frame">
+        <img src="/assets/screenshots/desktop-search.png" alt="Desktop layout with threads, chat, and files side by side" data-lb data-cap="On a big screen: conversations, chat, and files side by side — with search">
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="safety">
+  <div class="wrap">
+    <h2>Safety is the <span class="accent">top priority.</span></h2>
+    <p class="lede">An AI assistant with access to your files, email, and accounts has to be trustworthy. Every design choice here starts with that constraint.</p>
+
+    <div class="feature">
+      <div>
+        <h3><span class="tag">Small</span>Small enough to read yourself</h3>
+        <p>The entire codebase is intentionally tiny. No sprawling framework, no opaque dependencies — you can read and audit every line that touches your data.</p>
+      </div>
+      <div>
+        <h3><span class="tag">Isolated</span>Every session runs in a container</h3>
+        <p>Each conversation gets its own isolated container. If the agent misbehaves, the blast radius is one throwaway sandbox — not your system.</p>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div>
+        <h3><span class="tag">Credentials</span>Secrets never touch the agent</h3>
+        <p>API keys and tokens live in a vault on the host. They're injected into requests at the last moment by a proxy — the agent code never sees or stores them.</p>
+      </div>
+      <div>
+        <h3><span class="tag">Yours</span>Runs on your own server</h3>
+        <p>No cloud service, no third-party backend. Your conversations, files, and credentials stay on hardware you control.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="more">
+  <div class="wrap">
+    <h2>Reach it however you <span class="accent">like.</span></h2>
+    <p class="lede">Your assistant isn't stuck in one app. Write to it by email, talk to it through your smart home, or reach it from the apps you already use.</p>
+
+    <div class="feature">
+      <div>
+        <h3><span class="tag">Email</span>Just send it a message</h3>
+        <p>Give your assistant its own email address. Write to it like you'd write to a person, and its reply lands right in your inbox — attachments and all.</p>
+      </div>
+      <div>
+        <h3><span class="tag">Home</span>Works with your smart home</h3>
+        <p>Connect it to Home Assistant and talk to it through your voice assistant, dashboard, or everyday automations.</p>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div>
+        <h3><span class="tag">Messaging</span>The chat apps you already use</h3>
+        <p>Wire it up to your favorite messaging apps so you can reach it without opening anything new.</p>
+      </div>
+      <div>
+        <h3><span class="tag">Sign-in</span>Secure and private</h3>
+        <p>Sign in with Google or a one-tap link. Everything runs on your own server, so your conversations and files stay yours.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="credit">
+  <div class="wrap">
+    <h3 style="font-size:24px">Credit</h3>
+    <p style="color:var(--fg-2);max-width:720px">
+      BananaClaw is built on top of <a href="https://github.com/nanocoai/nanoclaw">NanoClaw</a> by <strong>Gavriel Cohen</strong> and the <a href="https://github.com/dtreskunov/bananaclaw/blob/bananaclaw/CONTRIBUTORS.md">NanoClaw contributors</a>. The agent runtime — host router, two-DB session protocol, per-session container model, Claude Agent SDK integration, skills-as-branches, OneCLI credential isolation — is upstream's, line-for-line. None of this would exist without that foundation.
+    </p>
+    <p style="color:var(--fg-2);max-width:720px">
+      If you want the minimal, audit-it-yourself runtime, run upstream NanoClaw. If you want to use it from your phone the way you'd use a normal app, run BananaClaw. Both are MIT, and the BananaClaw additions live as a tidy set of extra modules so upstream merges keep landing cleanly.
+    </p>
+    <h3 style="font-size:24px;margin-top:48px">Why “BananaClaw”?</h3>
+    <p style="color:var(--fg-2);max-width:720px">
+      <strong>Banana</strong> — as in "to go bananas."<br>
+      <strong>Claw</strong> — the lineage: <a href="https://claude.ai">Claude</a> → <a href="https://github.com/nicholasgasior/openclaw">OpenClaw</a> → <a href="https://github.com/nanocoai/nanoclaw">NanoClaw</a> → BananaClaw.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <strong>BananaClaw</strong> &middot; MIT &middot; <a href="https://github.com/dtreskunov/bananaclaw">GitHub</a> &middot; <a href="https://github.com/nanocoai/nanoclaw">Upstream NanoClaw</a>
+    </div>
+  </div>
+</footer>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <button class="lb-prev" id="lb-prev" aria-label="Previous">‹</button>
+  <img id="lb-img" alt="">
+  <button class="lb-next" id="lb-next" aria-label="Next">›</button>
+  <button class="lb-close" id="lb-close" aria-label="Close">✕</button>
+  <div class="lb-cap" id="lb-cap"></div>
+</div>
+
+<script>
+  (function(){
+    var items = Array.prototype.slice.call(document.querySelectorAll('[data-lb]'));
+    items = items.filter(function(el){
+      // For buttons with nested img, use the inner img src; for img elements, use directly
+      var img = el.tagName === 'IMG' ? el : el.querySelector('img');
+      if (!img) return false;
+      el._lbSrc = img.src;
+      el._lbCap = el.getAttribute('data-cap') || img.getAttribute('alt') || '';
+      return true;
+    });
+    if (!items.length) return;
+    var lb = document.getElementById('lb');
+    var lbImg = document.getElementById('lb-img');
+    var lbCap = document.getElementById('lb-cap');
+    var idx = 0;
+    function show(i){
+      idx = (i + items.length) % items.length;
+      lbImg.src = items[idx]._lbSrc;
+      lbCap.textContent = items[idx]._lbCap;
+    }
+    function open(i){ show(i); lb.classList.add('open'); document.body.style.overflow='hidden'; }
+    function close(){ lb.classList.remove('open'); document.body.style.overflow=''; lbImg.src=''; }
+    items.forEach(function(el, i){
+      el.addEventListener('click', function(e){ e.preventDefault(); open(i); });
+    });
+    document.getElementById('lb-close').addEventListener('click', close);
+    document.getElementById('lb-prev').addEventListener('click', function(e){ e.stopPropagation(); show(idx-1); });
+    document.getElementById('lb-next').addEventListener('click', function(e){ e.stopPropagation(); show(idx+1); });
+    lb.addEventListener('click', function(e){ if (e.target === lb) close(); });
+    document.addEventListener('keydown', function(e){
+      if (!lb.classList.contains('open')) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') show(idx-1);
+      else if (e.key === 'ArrowRight') show(idx+1);
+    });
+  })();
+</script>
+
+</body>
+</html>

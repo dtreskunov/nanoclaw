@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/bananaclaw-logo.png" alt="BananaClaw" width="480">
+  <img src="src/ui/landing-page/assets/bananaclaw-logo.png" alt="BananaClaw" width="480">
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/chat-mobile.png" alt="BananaClaw on mobile" width="280">
+  <img src="src/ui/landing-page/assets/screenshots/chat-mobile.png" alt="BananaClaw on mobile" width="280">
 </p>
 
 ---
