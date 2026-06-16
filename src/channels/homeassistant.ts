@@ -146,10 +146,18 @@ export const FILLERS: readonly string[] = [
   'Shaking the magic eight ball...',
   'Doing some light overthinking...',
   'Assembling the pieces...',
+  'Digging through the archives...',
+  'Spinning up the gears...',
+  'Running the numbers...',
+  'Crunching some thoughts...',
+  'Rifling through possibilities...',
+  'Stirring the pot...',
+  'Tuning the instruments...',
+  'Polishing the answer...',
 ];
-/** Time between filler emissions. 6s feels alive without being chatty. */
-export const FILLER_INTERVAL_MS = 6000;
-/** Safety cap: 12 fillers × 6s ≈ 72s of audible filler before we go silent. */
+/** Time between filler emissions. 10s feels alive without being chatty. */
+export const FILLER_INTERVAL_MS = 10_000;
+/** Safety cap: 12 fillers × 10s = 120s of audible filler before we go silent. */
 export const MAX_FILLERS = 12;
 
 export interface HaConfig {
@@ -468,7 +476,7 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
       }
       const word = FILLERS[Math.floor(Math.random() * FILLERS.length)];
       p.fillerCount += 1;
-      writeStreamLine(p, streamItem(`${word} `));
+      writeStreamLine(p, streamItem(`${word}\n`));
     }, FILLER_INTERVAL_MS);
   }
 
@@ -606,7 +614,7 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
         // sentence before the fillers and final reply.
         const echo = /[.!?。！？]$/.test(echoBase) ? `${echoBase} ` : `${echoBase}. `;
         const ack = ACKS[Math.floor(Math.random() * ACKS.length)];
-        writeStreamLine(p, streamItem(`${echo}${ack}. `));
+        writeStreamLine(p, streamItem(`${echo}${ack}.\n`));
       }
       startFiller(p);
     }

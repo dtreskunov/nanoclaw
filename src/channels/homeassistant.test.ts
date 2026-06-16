@@ -356,9 +356,9 @@ describe('streaming response: echo + filler timer', () => {
     expect(res.chunks.length).toBeGreaterThan(0);
     const first = JSON.parse(res.chunks[0].trim());
     expect(first.type).toBe('item');
-    expect(first.content).toMatch(/^Turn on the kitchen lights\. .+\. $/);
+    expect(first.content).toMatch(/^Turn on the kitchen lights\. .+\.\n$/);
     // The ack must be one of the known ACKS phrases.
-    const ack = first.content.replace('Turn on the kitchen lights. ', '').replace(/\. $/, '');
+    const ack = first.content.replace('Turn on the kitchen lights. ', '').replace(/\.\n$/, '');
     expect(ACKS).toContain(ack);
     expect(res.ended).toBe(false);
     vi.useRealTimers();
@@ -367,7 +367,7 @@ describe('streaming response: echo + filler timer', () => {
   it('preserves trailing terminal punctuation in the echo (no double-period)', async () => {
     const { res } = await driveHandler({ conversation_id: 'c1', query: 'What time is it?', stream: true });
     const first = JSON.parse(res.chunks[0].trim());
-    expect(first.content).toMatch(/^What time is it\? .+\. $/);
+    expect(first.content).toMatch(/^What time is it\? .+\.\n$/);
     vi.useRealTimers();
   });
 
@@ -493,7 +493,7 @@ describe('streaming response: echo + filler timer', () => {
 
     // res2 stays open with its own echo as the first chunk.
     expect(res2.ended).toBe(false);
-    expect(JSON.parse(res2.chunks[0].trim()).content).toMatch(/^second\. .+\. $/);
+    expect(JSON.parse(res2.chunks[0].trim()).content).toMatch(/^second\. .+\.\n$/);
     vi.useRealTimers();
   });
 
