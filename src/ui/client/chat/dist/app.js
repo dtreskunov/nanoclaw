@@ -19555,8 +19555,8 @@ function fmtCost(usd) {
   return "$" + usd.toFixed(4);
 }
 function fmtDur(ms) {
-  if (ms >= 6e4) return (ms / 6e4).toFixed(1) + "m";
-  return (ms / 1e3).toFixed(1) + "s";
+  if (ms >= 6e4) return Math.round(ms / 6e4) + "m";
+  return Math.round(ms / 1e3) + "s";
 }
 function shortModel(model) {
   return model.split("/").pop() || model;
@@ -19571,7 +19571,7 @@ function mediaKind(filename, contentType) {
 }
 function UsageMeta({ u: u5 }) {
   const [expanded, setExpanded] = h2(false);
-  const cost = "~" + fmtCost(u5.cost_usd);
+  const cost = fmtCost(u5.cost_usd);
   const model = u5.model ? shortModel(u5.model) : "";
   const dur = u5.duration_ms ? fmtDur(u5.duration_ms) : "";
   const short = [cost, dur, model].filter(Boolean).join(" \xB7 ");

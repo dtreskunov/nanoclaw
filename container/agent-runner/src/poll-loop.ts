@@ -745,6 +745,7 @@ async function processQuery(
         unwrappedNudged = false;
         if (promptTracker) promptTracker.latest = prompt;
         turnActive = true;
+        turnStartTime = Date.now();
         try { clearTurnEnded(); } catch { /* best-effort */ }
         query.push(prompt, followUpFiles.length > 0 ? followUpFiles : undefined);
         archivePrompts.push(prompt);

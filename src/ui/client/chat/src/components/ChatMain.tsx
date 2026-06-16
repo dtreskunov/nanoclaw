@@ -35,8 +35,8 @@ function fmtCost(usd: number): string {
 }
 
 function fmtDur(ms: number): string {
-  if (ms >= 60_000) return (ms / 60_000).toFixed(1) + 'm';
-  return (ms / 1_000).toFixed(1) + 's';
+  if (ms >= 60_000) return Math.round(ms / 60_000) + 'm';
+  return Math.round(ms / 1_000) + 's';
 }
 
 function shortModel(model: string): string {
@@ -56,7 +56,7 @@ function mediaKind(filename: string, contentType?: string | null): 'audio' | 'vi
 
 function UsageMeta({ u }: { u: TurnUsage }) {
   const [expanded, setExpanded] = useState(false);
-  const cost = '~' + fmtCost(u.cost_usd);
+  const cost = fmtCost(u.cost_usd);
   const model = u.model ? shortModel(u.model) : '';
   const dur = u.duration_ms ? fmtDur(u.duration_ms) : '';
   const short = [cost, dur, model].filter(Boolean).join(' \u00b7 ');
