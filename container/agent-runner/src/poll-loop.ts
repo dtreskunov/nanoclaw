@@ -1023,6 +1023,29 @@ async function processQuery(
     }
   }
 
+  // Stream completed cleanly, no provider error, but the agent emitted text
+  // we couldn't deliver — typically a malformed `<message>` wrap (missing
+  // closing tag, wrong destination, or pure scratchpad even after the nudge).
+  // Without this the user just sees nothing on a turn the agent thought it
+  // had answered. Surface a generic error so the conversation doesn't stall.
+  if (!sentAny && unwrappedNudged && !lastProviderError) {
+    log('Turn produced no deliverable output after wrap nudge — surfacing generic error');
+    try {
+      writeMessageOut({
+        id: generateId(),
+        kind: 'chat',
+        platform_id: routing.platformId,
+        channel_type: routing.channelType,
+        thread_id: routing.threadId,
+        content: JSON.stringify({
+          text: "⚠️ Something went wrong producing a reply. Please try again.",
+        }),
+      });
+    } catch (e) {
+      log(`Failed to write generic delivery error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   return {
     continuation: queryContinuation,
     // Only surface a provider error if the stream completed cleanly AND
