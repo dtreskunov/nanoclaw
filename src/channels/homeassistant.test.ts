@@ -33,7 +33,6 @@ import {
   extractOutboundText,
   FILLER_INTERVAL_MS,
   FILLERS,
-  MAX_FILLERS,
   renderAskQuestion,
   safeEqual,
   streamEnd,
@@ -356,9 +355,9 @@ describe('streaming response: echo + filler timer', () => {
     expect(res.chunks.length).toBeGreaterThan(0);
     const first = JSON.parse(res.chunks[0].trim());
     expect(first.type).toBe('item');
-    expect(first.content).toMatch(/^Turn on the kitchen lights\. .+\.\n$/);
+    expect(first.content).toMatch(/^Turn on the kitchen lights\. \n.+\.\.\.$/);
     // The ack must be one of the known ACKS phrases.
-    const ack = first.content.replace('Turn on the kitchen lights. ', '').replace(/\.\n$/, '');
+    const ack = first.content.replace('Turn on the kitchen lights. \n', '');
     expect(ACKS).toContain(ack);
     expect(res.ended).toBe(false);
     vi.useRealTimers();
@@ -367,7 +366,7 @@ describe('streaming response: echo + filler timer', () => {
   it('preserves trailing terminal punctuation in the echo (no double-period)', async () => {
     const { res } = await driveHandler({ conversation_id: 'c1', query: 'What time is it?', stream: true });
     const first = JSON.parse(res.chunks[0].trim());
-    expect(first.content).toMatch(/^What time is it\? .+\.\n$/);
+    expect(first.content).toMatch(/^What time is it\? \n.+\.\.\.$/);
     vi.useRealTimers();
   });
 
@@ -379,24 +378,24 @@ describe('streaming response: echo + filler timer', () => {
     expect(res.chunks).toHaveLength(2);
     const f1 = JSON.parse(res.chunks[1].trim());
     expect(f1.type).toBe('item');
-    expect(FILLERS).toContain(f1.content.trimEnd());
+    expect(FILLERS).toContain(f1.content.trim());
 
     await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
     const f2 = JSON.parse(res.chunks[2].trim());
-    expect(FILLERS).toContain(f2.content.trimEnd());
+    expect(FILLERS).toContain(f2.content.trim());
 
     await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
     const f3 = JSON.parse(res.chunks[3].trim());
-    expect(FILLERS).toContain(f3.content.trimEnd());
+    expect(FILLERS).toContain(f3.content.trim());
     vi.useRealTimers();
   });
 
-  it('caps filler emissions at MAX_FILLERS so a stuck turn does not natter forever', async () => {
+  it('continues emitting fillers until settled (no cap)', async () => {
     const { res } = await driveHandler({ conversation_id: 'c1', query: 'hi', stream: true });
-    // Tick well past the cap.
-    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS * (MAX_FILLERS + 5));
-    // 1 echo + at most MAX_FILLERS fillers.
-    expect(res.chunks.length).toBeLessThanOrEqual(MAX_FILLERS + 1);
+    // Tick many intervals — fillers should keep coming.
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS * 20);
+    // 1 echo + 20 fillers.
+    expect(res.chunks.length).toBe(21);
     expect(res.ended).toBe(false);
     vi.useRealTimers();
   });
@@ -493,12 +492,11 @@ describe('streaming response: echo + filler timer', () => {
 
     // res2 stays open with its own echo as the first chunk.
     expect(res2.ended).toBe(false);
-    expect(JSON.parse(res2.chunks[0].trim()).content).toMatch(/^second\. .+\.\n$/);
+    expect(JSON.parse(res2.chunks[0].trim()).content).toMatch(/^second\. \n.+\.\.\.$/);
     vi.useRealTimers();
   });
 
-  it('FILLERS pool has the expected size so the cap leaves rotation room', () => {
-    expect(FILLERS.length).toBeGreaterThanOrEqual(MAX_FILLERS);
-    expect(MAX_FILLERS).toBeLessThanOrEqual(FILLERS.length);
+  it('FILLERS pool has enough variety for long turns', () => {
+    expect(FILLERS.length).toBeGreaterThanOrEqual(10);
   });
 });

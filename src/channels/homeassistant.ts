@@ -99,7 +99,7 @@ import { registerChannelAdapter } from './channel-registry.js';
 
 export const HA_CHANNEL_TYPE = 'homeassistant';
 const WEBHOOK_PATH = '/webhook/homeassistant';
-const DEFAULT_TIMEOUT_MS = 180_000;
+const DEFAULT_TIMEOUT_MS = 295_000;
 const DEFAULT_OUTPUT_FIELD = 'output';
 
 /**
@@ -108,14 +108,14 @@ const DEFAULT_OUTPUT_FIELD = 'output';
  * for tests.
  */
 export const ACKS: readonly string[] = [
-  'Let me look into that',
-  'On it',
-  'Give me a sec',
-  'One moment',
-  'Working on it',
-  'Let me check',
-  'Hang on',
-  'Let me see',
+  'Let me look into that...',
+  'On it...',
+  'Give me a sec...',
+  'One moment...',
+  'Working on it...',
+  'Let me check...',
+  'Hang on...',
+  'Let me see...',
 ];
 
 /**
@@ -126,39 +126,29 @@ export const ACKS: readonly string[] = [
  * consecutive turns don't repeat. Exported for tests.
  */
 export const FILLERS: readonly string[] = [
-  'Rummaging through my neurons...',
-  'Consulting the oracle...',
-  'Brewing up something clever...',
-  'Chewing on that...',
-  'Untangling some thoughts...',
-  'Percolating...',
-  'Sifting through the universe...',
-  'Wrestling with the answer...',
-  'Dusting off the old brain cells...',
-  'Marinating on this...',
-  'Poking at the problem...',
-  'Connecting some dots...',
-  'Noodling furiously...',
-  'Rearranging some furniture in my head...',
-  'Consulting a very large spreadsheet...',
-  'Warming up the thinking muscles...',
-  'Squinting at the problem...',
-  'Shaking the magic eight ball...',
-  'Doing some light overthinking...',
-  'Assembling the pieces...',
-  'Digging through the archives...',
-  'Spinning up the gears...',
-  'Running the numbers...',
-  'Crunching some thoughts...',
-  'Rifling through possibilities...',
-  'Stirring the pot...',
-  'Tuning the instruments...',
-  'Polishing the answer...',
+  'Still working on it...',
+  'Taking a bit longer than usual...',
+  'Hang tight, still on it...',
+  'Digging deeper...',
+  'Bear with me, almost there...',
+  'Still thinking this through...',
+  "This one's taking a minute...",
+  "Haven't forgotten about you...",
+  'Still here, still working...',
+  'Pulling some threads together...',
+  'Bit of a tricky one...',
+  'Working through the details...',
+  'Still going, promise...',
+  'Getting closer...',
+  'Just a little longer...',
+  'Wrapping my head around this...',
+  'Making progress...',
+  'Almost got it...',
+  'Putting the finishing touches on...',
+  'Should have something for you soon...',
 ];
-/** Time between filler emissions. 10s feels alive without being chatty. */
-export const FILLER_INTERVAL_MS = 10_000;
-/** Safety cap: 12 fillers × 10s = 120s of audible filler before we go silent. */
-export const MAX_FILLERS = 12;
+/** Time between filler emissions. */
+export const FILLER_INTERVAL_MS = 15_000;
 
 export interface HaConfig {
   agentGroupId: string;
@@ -203,6 +193,8 @@ interface PendingRequest {
   fillerInterval?: ReturnType<typeof setInterval>;
   /** Number of fillers emitted so far; capped at MAX_FILLERS. */
   fillerCount: number;
+  /** Shuffled filler indices for this request. */
+  fillerOrder: number[];
 }
 
 function readConfig(): HaConfig | null {
@@ -470,13 +462,9 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
         stopFiller(p);
         return;
       }
-      if (p.fillerCount >= MAX_FILLERS) {
-        stopFiller(p);
-        return;
-      }
-      const word = FILLERS[Math.floor(Math.random() * FILLERS.length)];
+      const word = FILLERS[p.fillerOrder[p.fillerCount % p.fillerOrder.length]];
       p.fillerCount += 1;
-      writeStreamLine(p, streamItem(`${word}\n`));
+      writeStreamLine(p, streamItem(`\n${word}`));
     }, FILLER_INTERVAL_MS);
   }
 
@@ -600,7 +588,20 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
       log.warn('HA webhook turn timed out', { threadId, timeoutMs: config.timeoutMs });
     }, config.timeoutMs);
 
-    const p: PendingRequest = { res, timer, settled: false, streaming, streamStarted: false, fillerCount: 0 };
+    const fillerOrder = Array.from({ length: FILLERS.length }, (_, i) => i);
+    for (let i = fillerOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [fillerOrder[i], fillerOrder[j]] = [fillerOrder[j], fillerOrder[i]];
+    }
+    const p: PendingRequest = {
+      res,
+      timer,
+      settled: false,
+      streaming,
+      streamStarted: false,
+      fillerCount: 0,
+      fillerOrder,
+    };
     pending.set(key, p);
 
     // Streaming: open the response NOW and echo the user's query as the first
@@ -614,7 +615,7 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
         // sentence before the fillers and final reply.
         const echo = /[.!?。！？]$/.test(echoBase) ? `${echoBase} ` : `${echoBase}. `;
         const ack = ACKS[Math.floor(Math.random() * ACKS.length)];
-        writeStreamLine(p, streamItem(`${echo}${ack}.\n`));
+        writeStreamLine(p, streamItem(`${echo}\n${ack}`));
       }
       startFiller(p);
     }
