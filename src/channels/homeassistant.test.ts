@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTurn, extractOutboundText, renderAskQuestion, safeEqual } from './homeassistant.js';
+import {
+  buildTurn,
+  extractDisplayQuery,
+  extractOutboundText,
+  renderAskQuestion,
+  safeEqual,
+  streamEnd,
+  streamError,
+  streamItem,
+} from './homeassistant.js';
 
 describe('buildTurn', () => {
   it('returns just the query as visible text', () => {
@@ -29,7 +38,7 @@ describe('buildTurn', () => {
     expect(text).not.toContain('switch.fan');
   });
 
-  it('includes tool_result messages as labeled blocks in the visible text', () => {
+  it('ignores tool_result messages too — our adapter never emits tool_calls so HA never sends them back', () => {
     const { text } = buildTurn({
       query: 'and now?',
       messages: [
@@ -37,10 +46,9 @@ describe('buildTurn', () => {
         { role: 'tool_result', tool_name: 'switch.turn_on', content: '{"success":true}' },
       ],
     });
-    expect(text).toContain('[Tool Result: switch.turn_on]');
-    expect(text).toContain('{"success":true}');
-    expect(text).toContain('[End Tool Result]');
-    expect(text.trim().endsWith('and now?')).toBe(true);
+    expect(text).toBe('and now?');
+    expect(text).not.toContain('Tool Result');
+    expect(text).not.toContain('success');
   });
 
   it('returns empty text when there is nothing to send', () => {
@@ -48,7 +56,7 @@ describe('buildTurn', () => {
     expect(buildTurn({ query: '   ' }).text).toBe('');
   });
 
-  it('plumbs prior user/assistant turns into the prompt', () => {
+  it('never plumbs prior user/assistant turns into the prompt — the agent has them via session memory', () => {
     const { text } = buildTurn({
       query: 'the floor one',
       messages: [
@@ -57,21 +65,32 @@ describe('buildTurn', () => {
         { role: 'user', content: 'the floor one' },
       ],
     });
-    expect(text).toContain('[Conversation so far]');
-    expect(text).toContain('User: turn off the lamp');
-    expect(text).toContain('Assistant: Which lamp?');
-    expect(text).toContain('[End conversation so far]');
-    // The current query is rendered once, after the history, not replayed in it.
-    expect(text.trim().endsWith('the floor one')).toBe(true);
-    expect(text.match(/the floor one/g)).toHaveLength(1);
+    expect(text).toBe('the floor one');
+    expect(text).not.toContain('[Conversation so far]');
+    expect(text).not.toContain('turn off the lamp');
+    expect(text).not.toContain('Which lamp?');
+  });
+});
+
+describe('extractDisplayQuery', () => {
+  it('returns text unchanged when no markers are present', () => {
+    expect(extractDisplayQuery('turn on the kitchen light')).toBe('turn on the kitchen light');
   });
 
-  it('does not replay the current query as part of the prior history', () => {
-    const { text } = buildTurn({
-      query: 'hello',
-      messages: [{ role: 'user', content: 'hello' }],
-    });
-    expect(text).toBe('hello');
+  it('strips a [Conversation so far] block', () => {
+    const text = '[Conversation so far]\nUser: Hi.\nAssistant: Hello.\n[End conversation so far]\n\nWhat time is it?';
+    expect(extractDisplayQuery(text)).toBe('What time is it?');
+  });
+
+  it('strips [Tool Result] blocks', () => {
+    const text = '[Tool Result: HassRespond]\n{"speech":"hi"}\n[End Tool Result]\n\nAh.';
+    expect(extractDisplayQuery(text)).toBe('Ah.');
+  });
+
+  it('strips both blocks together', () => {
+    const text =
+      '[Conversation so far]\nUser: Hi.\nAssistant: Hello.\n[End conversation so far]\n\n[Tool Result: HassRespond]\n{"ok":true}\n[End Tool Result]\n\nWhat now?';
+    expect(extractDisplayQuery(text)).toBe('What now?');
   });
 });
 
@@ -177,5 +196,35 @@ describe('safeEqual', () => {
 
   it('returns false for different-length strings', () => {
     expect(safeEqual('short', 'longervalue')).toBe(false);
+  });
+});
+
+describe('streaming chunk encoders', () => {
+  it('emits one NDJSON line per call, newline-terminated', () => {
+    expect(streamItem('hi')).toBe('{"type":"item","content":"hi"}\n');
+    expect(streamEnd()).toBe('{"type":"end"}\n');
+    expect(streamError('boom')).toBe('{"type":"error","message":"boom"}\n');
+  });
+
+  it('escapes embedded newlines and quotes so the line stays parseable', () => {
+    const line = streamItem('line1\nline2 with "quotes"');
+    // Exactly one trailing newline — the rest must be JSON-escaped.
+    expect(line.endsWith('\n')).toBe(true);
+    expect(line.slice(0, -1).split('\n')).toHaveLength(1);
+    expect(JSON.parse(line)).toEqual({ type: 'item', content: 'line1\nline2 with "quotes"' });
+  });
+
+  it('round-trips through JSON.parse the way HA s _send_payload_streaming reads it', () => {
+    const chunks = [streamItem('thinking...'), streamItem('done'), streamEnd()];
+    const parsed = chunks
+      .join('')
+      .split('\n')
+      .filter((l) => l.length > 0)
+      .map((l) => JSON.parse(l));
+    expect(parsed).toEqual([
+      { type: 'item', content: 'thinking...' },
+      { type: 'item', content: 'done' },
+      { type: 'end' },
+    ]);
   });
 });

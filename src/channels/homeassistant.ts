@@ -16,14 +16,33 @@
  *     "system_prompt": "optional extra instructions",
  *     "exposed_entities": [{ entity_id, name, state, area_name, ... }],
  *     "user_id": "ha user id", "user_name": "John Doe",
- *     "language": "en-US"
+ *     "language": "en-US",
+ *     "stream": false              // see Streaming below
  *   }
  *
- * Response (chat-only — we never return `tool_calls`, see buildTurn):
- *   `{ "output": "<reply text>" }` — a single JSON body. NanoClaw produces
- *   one complete message per turn (it has no token streaming), so the webhook
- *   always replies non-streaming; disable "Enable streaming" on the HA
- *   integration so it reads this plain-JSON body instead of expecting NDJSON.
+ * Response — two modes, picked per request by the `stream` flag:
+ *
+ *   Non-streaming (default, `stream: false` or missing):
+ *     `{ "output": "<reply text>" }` — a single JSON body delivered when the
+ *     agent's reply lands. NanoClaw never emits `tool_calls`, so HA's tool
+ *     loop always exits after one POST. Disable "Enable streaming" on the HA
+ *     integration to use this mode.
+ *
+ *   Streaming (`stream: true`, "Enable streaming" on in HA):
+ *     Newline-delimited JSON chunks, written progressively as the agent works:
+ *       {"type":"item","content":"…"}\n   // zero or more progress items
+ *       {"type":"item","content":"…"}\n   // the final reply
+ *       {"type":"end"}\n
+ *     Progress items come from the typing module — anything written to
+ *     `session_state.progress` by the agent (via the standard
+ *     `readSessionProgress` plumbing) is forwarded as an `item` chunk, deduped
+ *     so the 4s typing refresh doesn't flood HA with repeats. The final reply
+ *     is one more `item` followed by `end`. HA's `_send_payload_streaming`
+ *     concatenates `item` contents into the assistant's reply, so producers
+ *     of progress hints should format them with their own trailing whitespace
+ *     if they want them rendered as distinct "thinking" lines.
+ *     On timeout / teardown / superseded we emit `{"type":"error",…}\n`,
+ *     which HA's parser turns into a HomeAssistantError.
  *
  * Clarifying questions: HA is synchronous request/response with no interactive
  * controls, so when the agent emits a chat-sdk `ask_question` we render the
@@ -42,20 +61,18 @@
  * set — that env var names the agent group every HA turn is routed to.
  *
  * Turn lifecycle: each HA POST is one inbound message in the conversation's
- * session. HA resends the full `messages` array each call, but the session
- * already holds prior turns, so we forward only the new content (the latest
- * query plus any tool results that arrived since the last exchange). The
+ * session. HA resends the full `messages` array each call, but our session
+ * already holds the prior turns, so we forward only the latest `query`. The
  * agent's reply is captured by the first `deliver` for that (platformId,
  * threadId), which settles the held request with the reply text.
  *
  * Session continuity: HA core keeps a conversation alive (same
  * conversation_id, voice mic reopened) when the assistant's reply ends with a
  * question mark; `renderAskQuestion` ends every clarifying reply with "?" to
- * trigger that. We key the session directly off `conversation_id`, and HA
- * resends the full transcript in `messages` on every call, so `buildTurn`
- * plumbs the prior turns into the prompt — the agent keeps context across the
- * round-trip even if HA opens a fresh conversation_id (and thus a fresh
- * session) between turns.
+ * trigger that. We key the session directly off `conversation_id`, so a
+ * continuing HA conversation maps to the same agent session and the agent's
+ * own per-thread chat history carries context forward — we do NOT replay
+ * HA's `messages` array into the prompt (see `buildTurn`).
  */
 import crypto from 'node:crypto';
 import type http from 'node:http';
@@ -102,6 +119,8 @@ interface HaPayload {
   user_id?: string;
   user_name?: string;
   language?: string;
+  /** True when HA's "Enable streaming" is on; selects NDJSON reply mode. */
+  stream?: boolean;
 }
 
 /** An in-flight HTTP request awaiting the agent's reply. */
@@ -110,6 +129,12 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
   /** Set once we've started/finished responding so we never double-write. */
   settled: boolean;
+  /** True when the request asked for NDJSON streaming. */
+  streaming: boolean;
+  /** True once we've written streaming response headers. */
+  streamStarted: boolean;
+  /** Last hint forwarded as a streaming item — deduped to avoid 4s refresh spam. */
+  lastHint?: string;
 }
 
 function readConfig(): HaConfig | null {
@@ -194,53 +219,45 @@ function ensureMessagingGroup(agentGroupId: string): void {
 /**
  * Build a turn from an HA payload.
  *
- * Returns the user-visible `text`: the prior conversation turns, any tool
- * results, then the actual query. We deliberately do NOT forward HA's
- * per-request `system_prompt` or the `exposed_entities` state blob: that
- * payload is multi-KB and pushes weak models toward malformed output, and the
- * agent can read live home state on demand via Home Assistant's MCP server
- * anyway.
+ * Returns the user-visible `text`: just the latest `query`. We deliberately
+ * do NOT forward:
  *
- * HA resends the full transcript in `messages` on every call. We plumb the
- * earlier user/assistant turns into the prompt so the agent keeps context
- * across a clarifying-question round-trip even when HA opens a fresh
- * conversation_id (and thus a fresh session) between turns. The trailing user
- * turn duplicates `query`, so it's dropped from the replayed history.
+ * - HA's per-request `system_prompt` or `exposed_entities` state blob: that
+ *   payload is multi-KB and pushes weak models toward malformed output, and
+ *   the agent can read live home state on demand via Home Assistant's MCP
+ *   server anyway.
+ * - The prior turns HA replays in `messages` on every call. The agent's own
+ *   per-thread session already holds those turns, so re-embedding them in the
+ *   user message is at best redundant and in practice confuses the model into
+ *   responding to the embedded transcript instead of the user's actual query.
+ *   `renderAskQuestion` (always ending in "?") keeps clarifying-question
+ *   follow-ups on the same `conversation_id` — and thus the same session —
+ *   so context survives the round-trip without replay. If HA *does* open a
+ *   fresh `conversation_id` (user timed out, said "stop", etc.) that's a
+ *   deliberate new conversation, and treating it as one is the right call.
+ * - `tool_result` entries that can appear in `messages`. They only show up
+ *   when a prior assistant turn returned `tool_calls`, which our adapter
+ *   never does (`extractOutboundText` flattens everything to text), so the
+ *   integration's tool-call loop always exits after one POST.
  */
 export function buildTurn(payload: HaPayload): { text: string } {
-  const messages = payload.messages ?? [];
-  const query = (payload.query ?? '').trim();
-  const out: string[] = [];
+  return { text: (payload.query ?? '').trim() };
+}
 
-  // ── Prior conversation turns ─────────────────────────────────────────
-  const prior = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
-  // Drop the trailing user turn that duplicates the current `query`.
-  if (query && prior.length > 0) {
-    const last = prior[prior.length - 1];
-    if (last.role === 'user' && (last.content ?? '').trim() === query) prior.pop();
-  }
-  if (prior.length > 0) {
-    out.push('[Conversation so far]');
-    for (const m of prior) {
-      out.push(`${m.role === 'user' ? 'User' : 'Assistant'}: ${(m.content ?? '').trim()}`);
-    }
-    out.push('[End conversation so far]');
-    out.push('');
-  }
-
-  // ── Tool results + the user's query ──────────────────────────────────
-  const toolResults = messages.filter((m) => m.role === 'tool_result');
-  for (const tr of toolResults) {
-    const name = tr.tool_name ? `Tool Result: ${tr.tool_name}` : 'Tool Result';
-    out.push(`[${name}]`);
-    out.push(tr.content ?? '');
-    out.push('[End Tool Result]');
-    out.push('');
-  }
-
-  if (query) out.push(query);
-
-  return { text: out.join('\n').trim() };
+/**
+ * Strip the legacy `[Conversation so far]…[End conversation so far]` and
+ * `[Tool Result: …]…[End Tool Result]` blocks that earlier versions of
+ * `buildTurn` prepended, so the web chat UI shows just the user's actual
+ * query when looking back at old HA rows. Current `buildTurn` never produces
+ * these markers; this helper exists only to clean up pre-existing inbound
+ * rows. Returns the trimmed remainder, or the original text unchanged if no
+ * markers are found.
+ */
+export function extractDisplayQuery(text: string): string {
+  let s = text;
+  s = s.replace(/\[Conversation so far\][\s\S]*?\[End conversation so far\]\n*/g, '');
+  s = s.replace(/\[Tool Result(?::[^\]\n]*)?\][\s\S]*?\[End Tool Result\]\n*/g, '');
+  return s.trim();
 }
 
 /**
@@ -291,6 +308,23 @@ function joinOptions(labels: string[]): string {
   return `${labels.slice(0, -1).join(', ')}, or ${labels[labels.length - 1]}`;
 }
 
+/**
+ * Encode a single NDJSON streaming chunk (no trailing brace games — just
+ * `JSON.stringify(chunk) + "\n"`). Exported so the wire format can be unit
+ * tested without a live socket.
+ */
+export function streamItem(content: string): string {
+  return `${JSON.stringify({ type: 'item', content })}\n`;
+}
+
+export function streamEnd(): string {
+  return `${JSON.stringify({ type: 'end' })}\n`;
+}
+
+export function streamError(message: string): string {
+  return `${JSON.stringify({ type: 'error', message })}\n`;
+}
+
 /** Extract the reply text from an outbound message's parsed content. */
 export function extractOutboundText(message: OutboundMessage): string | null {
   const content = message.content;
@@ -316,6 +350,35 @@ function createAdapter(config: HaConfig): ChannelAdapter {
     if (p) {
       clearTimeout(p.timer);
       pending.delete(key);
+    }
+  }
+
+  /**
+   * Write streaming response headers if we haven't already. NDJSON over a
+   * chunked HTTP/1.1 response; `X-Accel-Buffering: no` keeps any fronting
+   * nginx from holding chunks back until the response closes.
+   */
+  function startStream(p: PendingRequest): void {
+    if (p.streamStarted) return;
+    p.streamStarted = true;
+    try {
+      p.res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+      });
+    } catch (err) {
+      log.warn('HA streaming writeHead failed', { err });
+    }
+  }
+
+  /** Best-effort write of a pre-encoded NDJSON line to the streaming response. */
+  function writeStreamLine(p: PendingRequest, line: string): void {
+    if (!p.streamStarted) startStream(p);
+    try {
+      p.res.write(line);
+    } catch (err) {
+      log.warn('HA streaming chunk write failed', { err });
     }
   }
 
@@ -379,6 +442,7 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       return;
     }
 
+    const streaming = payload.stream === true;
     const senderId = payload.user_id ? `ha-user:${payload.user_id}` : 'ha-user:default';
     const messageId = `ha-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const key = pendingKey(platformId, threadId);
@@ -390,8 +454,16 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       existing.settled = true;
       clearTimeout(existing.timer);
       try {
-        existing.res.writeHead(409, { 'Content-Type': 'application/json' });
-        existing.res.end(JSON.stringify({ error: 'superseded' }));
+        if (existing.streamStarted) {
+          existing.res.write(streamError('superseded'));
+          existing.res.end();
+        } else if (existing.streaming) {
+          existing.res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+          existing.res.end(streamError('superseded'));
+        } else {
+          existing.res.writeHead(409, { 'Content-Type': 'application/json' });
+          existing.res.end(JSON.stringify({ error: 'superseded' }));
+        }
       } catch {
         // swallow — socket may already be gone
       }
@@ -403,15 +475,21 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       p.settled = true;
       pending.delete(key);
       try {
-        p.res.writeHead(504, { 'Content-Type': 'application/json' });
-        p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: 'Request timed out' }));
+        if (p.streaming) {
+          if (!p.streamStarted) startStream(p);
+          p.res.write(streamError('Request timed out'));
+          p.res.end();
+        } else {
+          p.res.writeHead(504, { 'Content-Type': 'application/json' });
+          p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: 'Request timed out' }));
+        }
       } catch (err) {
         log.warn('HA webhook timeout response failed', { err });
       }
       log.warn('HA webhook turn timed out', { threadId, timeoutMs: config.timeoutMs });
     }, config.timeoutMs);
 
-    pending.set(key, { res, timer, settled: false });
+    pending.set(key, { res, timer, settled: false, streaming, streamStarted: false });
 
     // ── Route inbound ────────────────────────────────────────────────
     const event: InboundEvent = {
@@ -475,8 +553,16 @@ function createAdapter(config: HaConfig): ChannelAdapter {
         clearTimeout(p.timer);
         if (!p.settled) {
           try {
-            p.res.writeHead(503, { 'Content-Type': 'application/json' });
-            p.res.end(JSON.stringify({ error: 'shutting_down' }));
+            if (p.streamStarted) {
+              p.res.write(streamError('shutting_down'));
+              p.res.end();
+            } else if (p.streaming) {
+              p.res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+              p.res.end(streamError('shutting_down'));
+            } else {
+              p.res.writeHead(503, { 'Content-Type': 'application/json' });
+              p.res.end(JSON.stringify({ error: 'shutting_down' }));
+            }
           } catch {
             // swallow
           }
@@ -488,6 +574,27 @@ function createAdapter(config: HaConfig): ChannelAdapter {
 
     isConnected(): boolean {
       return setupCallbacks !== null;
+    },
+
+    /**
+     * Bridge the framework's progress hints to HA streaming items.
+     *
+     * The host's typing module re-fires `setTyping` every ~4s while the
+     * agent is working and passes whatever the agent wrote to
+     * `session_state.progress` as the hint. In non-streaming mode we ignore
+     * it (HA has no "thinking" UI). In streaming mode each new hint becomes
+     * one `{"type":"item","content":<hint>}` chunk on the held response, so
+     * HA's assistant message updates live. Identical consecutive hints are
+     * deduped — the 4s refresh would otherwise flood HA with the same line.
+     */
+    async setTyping(platformId, threadId, hint): Promise<void> {
+      if (!hint) return;
+      const key = pendingKey(platformId, threadId);
+      const p = pending.get(key);
+      if (!p || p.settled || !p.streaming) return;
+      if (p.lastHint === hint) return;
+      p.lastHint = hint;
+      writeStreamLine(p, streamItem(hint));
     },
 
     async deliver(platformId, threadId, message: OutboundMessage): Promise<string | undefined> {
@@ -502,8 +609,15 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       p.settled = true;
       clearPending(key);
       try {
-        p.res.writeHead(200, { 'Content-Type': 'application/json' });
-        p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: text }));
+        if (p.streaming) {
+          if (!p.streamStarted) startStream(p);
+          p.res.write(streamItem(text));
+          p.res.write(streamEnd());
+          p.res.end();
+        } else {
+          p.res.writeHead(200, { 'Content-Type': 'application/json' });
+          p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: text }));
+        }
       } catch (err) {
         log.warn('HA webhook response write failed', { err });
       }

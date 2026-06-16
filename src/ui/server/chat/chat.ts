@@ -48,6 +48,7 @@ function isElevated(userId: string): boolean {
 import { log } from '../../../log.js';
 import { getChannelAdapter } from '../../../channels/channel-registry.js';
 import { subscribeWeb, submitWebInbound, WEB_CHANNEL_TYPE, type WebSubscriber } from '../../../channels/web.js';
+import { extractDisplayQuery, HA_CHANNEL_TYPE } from '../../../channels/homeassistant.js';
 import { setResendPendingWebOverride } from '../../../channels/resend.js';
 import type { OutboundMessage } from '../../../channels/adapter.js';
 import { authenticate, COOKIE_NAME } from '../auth.js';
@@ -736,7 +737,10 @@ export function readChatHistory(
         const parsed = parseInboundContent(r.content, groupId, threadId, target.channelType === WEB_CHANNEL_TYPE);
         if (parsed != null) {
           const id = r.id.endsWith(suffix) ? r.id.slice(0, -suffix.length) : r.id;
-          messages.push({ direction: 'in', id, timestamp: r.timestamp, text: parsed.text, files: parsed.files });
+          // HA replays the full transcript on every turn (see buildTurn);
+          // show only the user's actual query in the UI.
+          const text = target.channelType === HA_CHANNEL_TYPE ? extractDisplayQuery(parsed.text) : parsed.text;
+          messages.push({ direction: 'in', id, timestamp: r.timestamp, text, files: parsed.files });
         }
       }
     } finally {
@@ -1496,7 +1500,10 @@ function extractTitle(channelType: string, content: string): string {
     }
   }
   const parsed = parseInboundContent(content);
-  return parsed?.text ?? '';
+  const text = parsed?.text ?? '';
+  // HA replays the full transcript on every turn (see buildTurn); strip it
+  // so the thread title reflects the user's actual query.
+  return channelType === HA_CHANNEL_TYPE ? extractDisplayQuery(text) : text;
 }
 
 /** Strip auto-prepended context blockquote + whitespace, cap to 60 chars. */
