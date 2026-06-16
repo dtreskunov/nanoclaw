@@ -121,32 +121,37 @@ export function clearFailedTurn(): void {
   deleteValue(FAILED_TURN_KEY);
 }
 
-const PROGRESS_KEY = 'progress';
-const TURN_ENDED_KEY = 'turn_ended_at';
+import { writeProgressFile, clearProgressFile, writeTurnEndedFile, clearTurnEndedFile } from './connection.js';
 
 /** Set the current progress hint (one-line human-readable string). Read by
  *  the host typing module on its refresh tick and forwarded to channel
  *  adapters that support a presence/typing hint. Best-effort — callers
- *  should swallow errors. */
+ *  should swallow errors.
+ *
+ *  Written to a file (not outbound.db) to avoid write contention between
+ *  the poll-loop process and the nanoclaw MCP server subprocess — both
+ *  share outbound.db with journal_mode=DELETE (exclusive locks). */
 export function setProgress(message: string): void {
-  setValue(PROGRESS_KEY, message);
+  writeProgressFile(message);
 }
 
 /** Clear the progress hint. Called when the turn produces a final result
  *  or errors out so a stale hint doesn't linger past the active work. */
 export function clearProgress(): void {
-  deleteValue(PROGRESS_KEY);
+  clearProgressFile();
 }
 
 /** Mark that the SDK turn just ended (result/error event). The host
  *  typing module clears the typing indicator immediately when this is
  *  set, so an agent that delivered a follow-up question and is now
  *  waiting for the user doesn't leave the dots spinning. Cleared on
- *  the next turn start. */
+ *  the next turn start.
+ *
+ *  Written to a file (not outbound.db) — same rationale as setProgress. */
 export function setTurnEnded(): void {
-  setValue(TURN_ENDED_KEY, String(Date.now()));
+  writeTurnEndedFile(String(Date.now()));
 }
 
 export function clearTurnEnded(): void {
-  deleteValue(TURN_ENDED_KEY);
+  clearTurnEndedFile();
 }

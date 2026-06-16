@@ -1,9 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import type http from 'node:http';
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Capture the request handler the adapter registers on setup() so we can
+// drive it with synthetic req/res objects. Must be set up before the
+// module under test is imported (vi.mock is hoisted).
+const mountHandlerSpy =
+  vi.fn<(prefix: string, handler: (req: http.IncomingMessage, res: http.ServerResponse) => void) => void>();
+vi.mock('../webhook-server.js', () => ({
+  mountHandler: (prefix: string, handler: (req: http.IncomingMessage, res: http.ServerResponse) => void) =>
+    mountHandlerSpy(prefix, handler),
+}));
+
+// Stub the DB lookups so ensureMessagingGroup is a no-op (already wired).
+vi.mock('../db/messaging-groups.js', () => ({
+  createMessagingGroup: vi.fn(),
+  createMessagingGroupAgent: vi.fn(),
+  getMessagingGroupAgents: vi.fn(() => [{ agent_group_id: 'ag-1' }]),
+  getMessagingGroupByPlatform: vi.fn(() => ({ id: 'mg-1' })),
+}));
+
+vi.mock('../env.js', () => ({ readEnvFile: vi.fn(() => ({})) }));
+vi.mock('../log.js', () => ({
+  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 
 import {
   buildTurn,
+  createAdapter,
   extractDisplayQuery,
   extractOutboundText,
+  FILLER_INTERVAL_MS,
+  FILLERS,
+  MAX_FILLERS,
   renderAskQuestion,
   safeEqual,
   streamEnd,
@@ -226,5 +255,241 @@ describe('streaming chunk encoders', () => {
       { type: 'item', content: 'done' },
       { type: 'end' },
     ]);
+  });
+});
+
+// ── Streaming integration: echo + rotating filler timer ─────────────────────
+//
+// The user gets near-instant voice feedback by streaming an immediate echo
+// of their query, then rotating filler words ("Thinking", "Pondering", …)
+// every FILLER_INTERVAL_MS until the agent's reply lands. Drive
+// `handleRequest` (captured via mountHandler) with fake req/res objects.
+
+interface FakeRes {
+  headers?: Record<string, string>;
+  status?: number;
+  chunks: string[];
+  ended: boolean;
+  writeHead: (status: number, headers?: Record<string, string>) => FakeRes;
+  write: (chunk: string) => boolean;
+  end: (chunk?: string) => FakeRes;
+  headersSent: boolean;
+}
+
+function fakeRes(): FakeRes {
+  const res: FakeRes = {
+    chunks: [],
+    ended: false,
+    headersSent: false,
+    writeHead(status, headers) {
+      res.status = status;
+      res.headers = headers;
+      res.headersSent = true;
+      return res;
+    },
+    write(chunk) {
+      res.chunks.push(String(chunk));
+      return true;
+    },
+    end(chunk) {
+      if (chunk !== undefined) res.chunks.push(String(chunk));
+      res.ended = true;
+      return res;
+    },
+  };
+  return res;
+}
+
+function fakeReq(body: unknown): http.IncomingMessage {
+  const buf = Buffer.from(JSON.stringify(body), 'utf8');
+  // Async iterable that yields the body in one chunk.
+  return {
+    method: 'POST',
+    headers: {},
+    [Symbol.asyncIterator]: async function* () {
+      yield buf;
+    },
+  } as unknown as http.IncomingMessage;
+}
+
+async function flushMicrotasks(): Promise<void> {
+  // handleRequest awaits body-iterator next() twice plus onInboundEvent;
+  // flush generously so the production code is past `pending.set` before
+  // the test moves on. Cheap and deterministic.
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
+async function driveHandler(
+  body: unknown,
+): Promise<{ res: FakeRes; handler: (req: http.IncomingMessage, res: http.ServerResponse) => void }> {
+  mountHandlerSpy.mockClear();
+  // Each test gets its own adapter so pending maps don't leak. Use a
+  // generous timeoutMs so the request-timeout setTimeout never fires
+  // during a fake-timer-driven test, no matter how far we advance.
+  const adapter = createAdapter({ agentGroupId: 'ag-1', timeoutMs: 3_600_000 });
+  const onInbound = vi.fn().mockResolvedValue(undefined);
+  await adapter.setup({
+    onInboundEvent: onInbound,
+    onAccessChange: vi.fn(),
+  } as unknown as Parameters<typeof adapter.setup>[0]);
+  const handler = mountHandlerSpy.mock.calls[0][1];
+  const res = fakeRes();
+  handler(fakeReq(body), res as unknown as http.ServerResponse);
+  await flushMicrotasks();
+  return { res, handler };
+}
+
+describe('streaming response: echo + filler timer', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it("immediately writes the user's query as the first NDJSON item (the echo) when stream:true", async () => {
+    const { res } = await driveHandler({
+      conversation_id: 'c1',
+      query: 'Turn on the kitchen lights',
+      stream: true,
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers?.['Content-Type']).toBe('application/x-ndjson');
+    expect(res.chunks.length).toBeGreaterThan(0);
+    const first = JSON.parse(res.chunks[0].trim());
+    expect(first).toEqual({ type: 'item', content: 'Turn on the kitchen lights. Let me look into that. ' });
+    expect(res.ended).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('preserves trailing terminal punctuation in the echo (no double-period)', async () => {
+    const { res } = await driveHandler({ conversation_id: 'c1', query: 'What time is it?', stream: true });
+    const first = JSON.parse(res.chunks[0].trim());
+    expect(first.content).toBe('What time is it? Let me look into that. ');
+    vi.useRealTimers();
+  });
+
+  it('rotates through FILLERS, one chunk per FILLER_INTERVAL_MS tick', async () => {
+    const { res } = await driveHandler({ conversation_id: 'c1', query: 'hi', stream: true });
+    expect(res.chunks).toHaveLength(1); // just the echo
+
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
+    expect(res.chunks).toHaveLength(2);
+    expect(JSON.parse(res.chunks[1].trim())).toEqual({ type: 'item', content: `${FILLERS[0]}. ` });
+
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
+    expect(JSON.parse(res.chunks[2].trim())).toEqual({ type: 'item', content: `${FILLERS[1]}. ` });
+
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
+    expect(JSON.parse(res.chunks[3].trim())).toEqual({ type: 'item', content: `${FILLERS[2]}. ` });
+    vi.useRealTimers();
+  });
+
+  it('caps filler emissions at MAX_FILLERS so a stuck turn does not natter forever', async () => {
+    const { res } = await driveHandler({ conversation_id: 'c1', query: 'hi', stream: true });
+    // Tick well past the cap.
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS * (MAX_FILLERS + 5));
+    // 1 echo + at most MAX_FILLERS fillers.
+    expect(res.chunks.length).toBeLessThanOrEqual(MAX_FILLERS + 1);
+    expect(res.ended).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('settles with the final reply, then end, and stops the filler timer', async () => {
+    const adapter = createAdapter({ agentGroupId: 'ag-1', timeoutMs: 3_600_000 });
+    await adapter.setup({
+      onInboundEvent: vi.fn().mockResolvedValue(undefined),
+      onAccessChange: vi.fn(),
+    } as unknown as Parameters<typeof adapter.setup>[0]);
+    const handler = mountHandlerSpy.mock.calls.at(-1)![1];
+    const res = fakeRes();
+    handler(fakeReq({ conversation_id: 'c1', query: 'hi', stream: true }), res as unknown as http.ServerResponse);
+    await flushMicrotasks();
+
+    // Fire one filler so we have something to compare against.
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
+    const lengthBeforeReply = res.chunks.length;
+    expect(lengthBeforeReply).toBeGreaterThanOrEqual(2);
+
+    await adapter.deliver!('ha:ag-1', 'c1', {
+      kind: 'chat',
+      content: { text: 'OK, turning them on.' },
+    } as Parameters<NonNullable<typeof adapter.deliver>>[2]);
+
+    // Final reply item + end marker, then close.
+    const tailParsed = res.chunks.slice(lengthBeforeReply).map((c) => JSON.parse(c.trim()));
+    expect(tailParsed).toEqual([{ type: 'item', content: 'OK, turning them on.' }, { type: 'end' }]);
+    expect(res.ended).toBe(true);
+
+    // No new chunks even after another interval window.
+    const lengthAfterDeliver = res.chunks.length;
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS * 3);
+    expect(res.chunks).toHaveLength(lengthAfterDeliver);
+    vi.useRealTimers();
+  });
+
+  it('non-streaming requests get the legacy single-JSON body and no filler timer', async () => {
+    const adapter = createAdapter({ agentGroupId: 'ag-1', timeoutMs: 3_600_000 });
+    await adapter.setup({
+      onInboundEvent: vi.fn().mockResolvedValue(undefined),
+      onAccessChange: vi.fn(),
+    } as unknown as Parameters<typeof adapter.setup>[0]);
+    const handler = mountHandlerSpy.mock.calls.at(-1)![1];
+    const res = fakeRes();
+    // No `stream` field at all → legacy mode.
+    handler(fakeReq({ conversation_id: 'c1', query: 'hi' }), res as unknown as http.ServerResponse);
+    await flushMicrotasks();
+
+    // No early chunks: legacy mode holds the request silent until deliver.
+    expect(res.chunks).toHaveLength(0);
+    expect(res.ended).toBe(false);
+
+    // Filler timer should NOT fire in legacy mode.
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS * 3);
+    expect(res.chunks).toHaveLength(0);
+
+    await adapter.deliver!('ha:ag-1', 'c1', {
+      kind: 'chat',
+      content: { text: 'done' },
+    } as Parameters<NonNullable<typeof adapter.deliver>>[2]);
+    expect(res.status).toBe(200);
+    expect(res.headers?.['Content-Type']).toBe('application/json');
+    expect(JSON.parse(res.chunks.join(''))).toEqual({ output: 'done' });
+    expect(res.ended).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('supersedes an in-flight streaming request with an error chunk and stops its filler', async () => {
+    const adapter = createAdapter({ agentGroupId: 'ag-1', timeoutMs: 3_600_000 });
+    await adapter.setup({
+      onInboundEvent: vi.fn().mockResolvedValue(undefined),
+      onAccessChange: vi.fn(),
+    } as unknown as Parameters<typeof adapter.setup>[0]);
+    const handler = mountHandlerSpy.mock.calls.at(-1)![1];
+
+    const res1 = fakeRes();
+    handler(fakeReq({ conversation_id: 'c1', query: 'first', stream: true }), res1 as unknown as http.ServerResponse);
+    await flushMicrotasks();
+
+    const res2 = fakeRes();
+    handler(fakeReq({ conversation_id: 'c1', query: 'second', stream: true }), res2 as unknown as http.ServerResponse);
+    await flushMicrotasks();
+
+    // res1 should be closed with an error chunk.
+    expect(res1.ended).toBe(true);
+    const last1 = JSON.parse(res1.chunks.at(-1)!.trim());
+    expect(last1).toEqual({ type: 'error', message: 'superseded' });
+
+    // res1's filler timer must not produce more chunks.
+    const before = res1.chunks.length;
+    await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS * 3);
+    expect(res1.chunks).toHaveLength(before);
+
+    // res2 stays open with its own echo as the first chunk.
+    expect(res2.ended).toBe(false);
+    expect(JSON.parse(res2.chunks[0].trim()).content).toBe('second. Let me look into that. ');
+    vi.useRealTimers();
+  });
+
+  it('FILLERS pool has the expected size so the cap leaves rotation room', () => {
+    expect(FILLERS.length).toBe(20);
+    expect(MAX_FILLERS).toBeLessThanOrEqual(FILLERS.length);
   });
 });

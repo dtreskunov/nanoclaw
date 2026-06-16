@@ -69,6 +69,16 @@ export function heartbeatPath(agentGroupId: string, sessionId: string): string {
   return path.join(sessionDir(agentGroupId, sessionId), '.heartbeat');
 }
 
+/** Path to the container progress file (written instead of outbound.db). */
+export function progressPath(agentGroupId: string, sessionId: string): string {
+  return path.join(sessionDir(agentGroupId, sessionId), '.progress');
+}
+
+/** Path to the container turn-ended file (written instead of outbound.db). */
+export function turnEndedPath(agentGroupId: string, sessionId: string): string {
+  return path.join(sessionDir(agentGroupId, sessionId), '.turn-ended');
+}
+
 /**
  * @deprecated Use inboundDbPath / outboundDbPath instead.
  * Kept temporarily for test compatibility during migration.
@@ -443,55 +453,37 @@ export function writeOutboundDirect(
 }
 
 /**
- * Read the container-side `progress` hint (key in session_state) for this
- * session, if any. Used by the typing module to enrich the typing
- * indicator with a one-line activity string. Best-effort — returns null
- * on any error (db missing, locked, malformed).
+ * Read the container-side progress hint from the `.progress` file.
+ * Used by the typing module to enrich the typing indicator with a
+ * one-line activity string. Best-effort — returns null on any error.
+ *
+ * Reads a file instead of outbound.db to avoid contention between the
+ * host reader and the two container-side writers (poll-loop +
+ * MCP server subprocess) that share outbound.db with journal_mode=DELETE.
  */
 export function readSessionProgress(agentGroupId: string, sessionId: string): string | null {
-  let db: Database.Database | undefined;
   try {
-    db = openOutboundDb(agentGroupId, sessionId);
-    const row = db.prepare("SELECT value FROM session_state WHERE key = 'progress'").get() as
-      | { value: string }
-      | undefined;
-    return row?.value ?? null;
+    const content = fs.readFileSync(progressPath(agentGroupId, sessionId), 'utf8');
+    return content || null;
   } catch {
     return null;
-  } finally {
-    try {
-      db?.close();
-    } catch {
-      /* ignore */
-    }
   }
 }
 
 /**
- * Read the container-side `turn_ended_at` marker (epoch ms) from
- * session_state. The container sets this on the SDK's `result` / `error`
- * event and clears it when a new turn starts. Used by the typing module
- * to drop the indicator immediately when the agent finishes (rather than
- * waiting for the heartbeat to age out). Returns 0 when unset.
+ * Read the container-side `turn_ended_at` marker (epoch ms) from the
+ * `.turn-ended` file. The container writes this on the SDK's `result` /
+ * `error` event and deletes it when a new turn starts. Used by the
+ * typing module to drop the indicator immediately when the agent
+ * finishes. Returns 0 when unset / file missing.
  */
 export function readSessionTurnEndedAt(agentGroupId: string, sessionId: string): number {
-  let db: Database.Database | undefined;
   try {
-    db = openOutboundDb(agentGroupId, sessionId);
-    const row = db.prepare("SELECT value FROM session_state WHERE key = 'turn_ended_at'").get() as
-      | { value: string }
-      | undefined;
-    if (!row) return 0;
-    const n = Number(row.value);
+    const content = fs.readFileSync(turnEndedPath(agentGroupId, sessionId), 'utf8');
+    const n = Number(content);
     return Number.isFinite(n) ? n : 0;
   } catch {
     return 0;
-  } finally {
-    try {
-      db?.close();
-    } catch {
-      /* ignore */
-    }
   }
 }
 

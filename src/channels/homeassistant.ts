@@ -29,18 +29,26 @@
  *     integration to use this mode.
  *
  *   Streaming (`stream: true`, "Enable streaming" on in HA):
- *     Newline-delimited JSON chunks, written progressively as the agent works:
- *       {"type":"item","content":"…"}\n   // zero or more progress items
- *       {"type":"item","content":"…"}\n   // the final reply
+ *     Newline-delimited JSON chunks, written progressively while the agent
+ *     works so the user gets fast voice/UI feedback instead of staring at
+ *     dead air for the whole turn:
+ *       {"type":"item","content":"<query>. "}\n     // immediate echo of the query
+ *       {"type":"item","content":"Thinking. "}\n   // rotating filler, every 6s
+ *       {"type":"item","content":"Pondering. "}\n
+ *       …
+ *       {"type":"item","content":"<reply>"}\n      // final agent reply
  *       {"type":"end"}\n
- *     Progress items come from the typing module — anything written to
- *     `session_state.progress` by the agent (via the standard
- *     `readSessionProgress` plumbing) is forwarded as an `item` chunk, deduped
- *     so the 4s typing refresh doesn't flood HA with repeats. The final reply
- *     is one more `item` followed by `end`. HA's `_send_payload_streaming`
- *     concatenates `item` contents into the assistant's reply, so producers
- *     of progress hints should format them with their own trailing whitespace
- *     if they want them rendered as distinct "thinking" lines.
+ *     The first chunk is the user's query verbatim — HA's voice pipeline
+ *     starts speaking it as soon as the bytes arrive, so the satellite
+ *     acknowledges within ~100ms of the user finishing their sentence.
+ *     The filler timer then rotates through `FILLERS` every
+ *     `FILLER_INTERVAL_MS` ms, capped at `MAX_FILLERS` per turn so a stuck
+ *     turn never produces an unbounded transcript. We deliberately do NOT
+ *     forward the framework's progress hints (`session_state.progress`) —
+ *     they leak tool names and internal model state into the user's voice
+ *     transcript. HA's `_send_payload_streaming` concatenates `item`
+ *     contents into the assistant's reply, so the final transcript reads
+ *     as: "<query>. Thinking. Pondering. <reply>".
  *     On timeout / teardown / superseded we emit `{"type":"error",…}\n`,
  *     which HA's parser turns into a HomeAssistantError.
  *
@@ -91,10 +99,43 @@ import { registerChannelAdapter } from './channel-registry.js';
 
 export const HA_CHANNEL_TYPE = 'homeassistant';
 const WEBHOOK_PATH = '/webhook/homeassistant';
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_OUTPUT_FIELD = 'output';
 
-interface HaConfig {
+/**
+ * Rotating filler phrases emitted as streaming items while the agent thinks.
+ * These get spoken aloud by HA's TTS, so they should sound natural, varied,
+ * and slightly unexpected — not robotic status updates. Order is fixed (not
+ * random) so consecutive turns don't repeat. Exported for tests.
+ */
+export const FILLERS: readonly string[] = [
+  'Let me think about that',
+  'Hmm, interesting question',
+  'Rummaging through my neurons',
+  'Consulting the oracle',
+  'One moment, this is a good one',
+  'Brewing up something clever',
+  'Chewing on that',
+  'Down the rabbit hole I go',
+  'Untangling some thoughts',
+  'Percolating',
+  'My hamster wheel is spinning',
+  'Sifting through the universe',
+  'Almost there, probably',
+  'Wrestling with the answer',
+  'Dusting off the old brain cells',
+  'Marinating on this',
+  'Poking at the problem',
+  'Connecting some dots',
+  'Noodling furiously',
+  'Bear with me, this is juicy',
+];
+/** Time between filler emissions. 6s feels alive without being chatty. */
+export const FILLER_INTERVAL_MS = 6000;
+/** Safety cap: 12 fillers × 6s ≈ 72s of audible filler before we go silent. */
+export const MAX_FILLERS = 12;
+
+export interface HaConfig {
   agentGroupId: string;
   username?: string;
   password?: string;
@@ -133,8 +174,10 @@ interface PendingRequest {
   streaming: boolean;
   /** True once we've written streaming response headers. */
   streamStarted: boolean;
-  /** Last hint forwarded as a streaming item — deduped to avoid 4s refresh spam. */
-  lastHint?: string;
+  /** Filler-word timer, only set in streaming mode. Cleared on every settle path. */
+  fillerInterval?: ReturnType<typeof setInterval>;
+  /** Number of fillers emitted so far; capped at MAX_FILLERS. */
+  fillerCount: number;
 }
 
 function readConfig(): HaConfig | null {
@@ -341,7 +384,12 @@ export function extractOutboundText(message: OutboundMessage): string | null {
   return null;
 }
 
-function createAdapter(config: HaConfig): ChannelAdapter {
+/**
+ * Exported for tests; production code goes through the channel registry
+ * factory at the bottom of the file. Tests pass a synthetic `HaConfig` and
+ * mock `mountHandler` to capture the request handler.
+ */
+export function createAdapter(config: HaConfig): ChannelAdapter {
   let setupCallbacks: ChannelSetup | null = null;
   const pending = new Map<string, PendingRequest>();
 
@@ -349,6 +397,7 @@ function createAdapter(config: HaConfig): ChannelAdapter {
     const p = pending.get(key);
     if (p) {
       clearTimeout(p.timer);
+      stopFiller(p);
       pending.delete(key);
     }
   }
@@ -379,6 +428,38 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       p.res.write(line);
     } catch (err) {
       log.warn('HA streaming chunk write failed', { err });
+    }
+  }
+
+  /**
+   * Start the rotating filler timer for a streaming request. Emits one
+   * `{type:'item', content:'<word>. '}` chunk every FILLER_INTERVAL_MS,
+   * stopping when the cap is hit. The cap matters: HA's voice TTS will
+   * actually speak each filler, so an uncapped stream on a stuck turn
+   * would natter at the user indefinitely.
+   */
+  function startFiller(p: PendingRequest): void {
+    if (p.fillerInterval) return;
+    p.fillerInterval = setInterval(() => {
+      if (p.settled) {
+        stopFiller(p);
+        return;
+      }
+      if (p.fillerCount >= MAX_FILLERS) {
+        stopFiller(p);
+        return;
+      }
+      const word = FILLERS[p.fillerCount % FILLERS.length];
+      p.fillerCount += 1;
+      writeStreamLine(p, streamItem(`${word}. `));
+    }, FILLER_INTERVAL_MS);
+  }
+
+  /** Idempotent: clear the filler interval if present. */
+  function stopFiller(p: PendingRequest): void {
+    if (p.fillerInterval) {
+      clearInterval(p.fillerInterval);
+      p.fillerInterval = undefined;
     }
   }
 
@@ -453,6 +534,7 @@ function createAdapter(config: HaConfig): ChannelAdapter {
     if (existing && !existing.settled) {
       existing.settled = true;
       clearTimeout(existing.timer);
+      stopFiller(existing);
       try {
         if (existing.streamStarted) {
           existing.res.write(streamError('superseded'));
@@ -473,15 +555,19 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       const p = pending.get(key);
       if (!p || p.settled) return;
       p.settled = true;
+      stopFiller(p);
       pending.delete(key);
       try {
         if (p.streaming) {
           if (!p.streamStarted) startStream(p);
-          p.res.write(streamError('Request timed out'));
+          p.res.write(streamItem('Sorry, I took too long on that one. Could you try again?'));
+          p.res.write(streamEnd());
           p.res.end();
         } else {
           p.res.writeHead(504, { 'Content-Type': 'application/json' });
-          p.res.end(JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: 'Request timed out' }));
+          p.res.end(
+            JSON.stringify({ [DEFAULT_OUTPUT_FIELD]: 'Sorry, I took too long on that one. Could you try again?' }),
+          );
         }
       } catch (err) {
         log.warn('HA webhook timeout response failed', { err });
@@ -489,7 +575,23 @@ function createAdapter(config: HaConfig): ChannelAdapter {
       log.warn('HA webhook turn timed out', { threadId, timeoutMs: config.timeoutMs });
     }, config.timeoutMs);
 
-    pending.set(key, { res, timer, settled: false, streaming, streamStarted: false });
+    const p: PendingRequest = { res, timer, settled: false, streaming, streamStarted: false, fillerCount: 0 };
+    pending.set(key, p);
+
+    // Streaming: open the response NOW and echo the user's query as the first
+    // item so HA's voice satellite starts speaking the ack within ~100ms
+    // instead of waiting for the agent to think. Then start the filler timer.
+    if (streaming) {
+      const echoBase = extractDisplayQuery(text);
+      if (echoBase) {
+        // If the query already ends in terminal punctuation, just add a
+        // trailing space; otherwise add ". " so the echo reads as its own
+        // sentence before the fillers and final reply.
+        const echo = /[.!?。！？]$/.test(echoBase) ? `${echoBase} ` : `${echoBase}. `;
+        writeStreamLine(p, streamItem(`${echo}Let me look into that. `));
+      }
+      startFiller(p);
+    }
 
     // ── Route inbound ────────────────────────────────────────────────
     const event: InboundEvent = {
@@ -551,6 +653,7 @@ function createAdapter(config: HaConfig): ChannelAdapter {
     async teardown(): Promise<void> {
       for (const [key, p] of pending) {
         clearTimeout(p.timer);
+        stopFiller(p);
         if (!p.settled) {
           try {
             if (p.streamStarted) {
@@ -574,27 +677,6 @@ function createAdapter(config: HaConfig): ChannelAdapter {
 
     isConnected(): boolean {
       return setupCallbacks !== null;
-    },
-
-    /**
-     * Bridge the framework's progress hints to HA streaming items.
-     *
-     * The host's typing module re-fires `setTyping` every ~4s while the
-     * agent is working and passes whatever the agent wrote to
-     * `session_state.progress` as the hint. In non-streaming mode we ignore
-     * it (HA has no "thinking" UI). In streaming mode each new hint becomes
-     * one `{"type":"item","content":<hint>}` chunk on the held response, so
-     * HA's assistant message updates live. Identical consecutive hints are
-     * deduped — the 4s refresh would otherwise flood HA with the same line.
-     */
-    async setTyping(platformId, threadId, hint): Promise<void> {
-      if (!hint) return;
-      const key = pendingKey(platformId, threadId);
-      const p = pending.get(key);
-      if (!p || p.settled || !p.streaming) return;
-      if (p.lastHint === hint) return;
-      p.lastHint = hint;
-      writeStreamLine(p, streamItem(hint));
     },
 
     async deliver(platformId, threadId, message: OutboundMessage): Promise<string | undefined> {

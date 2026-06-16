@@ -23,10 +23,14 @@ import fs from 'fs';
 const DEFAULT_INBOUND_PATH = '/workspace/inbound.db';
 const DEFAULT_OUTBOUND_PATH = '/workspace/outbound.db';
 const DEFAULT_HEARTBEAT_PATH = '/workspace/.heartbeat';
+const DEFAULT_PROGRESS_PATH = '/workspace/.progress';
+const DEFAULT_TURN_ENDED_PATH = '/workspace/.turn-ended';
 
 let _inbound: Database | null = null;
 let _outbound: Database | null = null;
 let _heartbeatPath: string = DEFAULT_HEARTBEAT_PATH;
+let _progressPath: string = DEFAULT_PROGRESS_PATH;
+let _turnEndedPath: string = DEFAULT_TURN_ENDED_PATH;
 let _testMode = false;
 
 /**
@@ -185,6 +189,55 @@ export function touchHeartbeat(): void {
     } catch {
       // Silently ignore — parent dir may not exist (e.g., in-memory test DBs)
     }
+  }
+}
+
+/**
+ * Write the progress hint to a file instead of outbound.db.
+ *
+ * The nanoclaw MCP server runs as a separate bun subprocess (spawned by
+ * OpenCode) and writes to the same outbound.db via writeMessageOut(). With
+ * journal_mode=DELETE (required for cross-mount visibility — WAL's mmap
+ * doesn't propagate on VirtioFS), every write takes an exclusive lock.
+ * Progress writes from the poll-loop at ~1/sec contend with MCP tool
+ * writes, causing "database is locked" errors after the 5s busy_timeout.
+ *
+ * File-based signaling avoids the contention entirely — same pattern as
+ * the heartbeat file above.
+ */
+export function writeProgressFile(message: string): void {
+  try {
+    fs.writeFileSync(_progressPath, message);
+  } catch {
+    // Best-effort — same as touchHeartbeat.
+  }
+}
+
+export function clearProgressFile(): void {
+  try {
+    fs.unlinkSync(_progressPath);
+  } catch {
+    // Already gone or parent dir missing — fine.
+  }
+}
+
+/**
+ * Write the turn-ended marker to a file. The host reads the file's content
+ * (epoch ms string) to detect when the agent finishes a turn.
+ */
+export function writeTurnEndedFile(epochMs: string): void {
+  try {
+    fs.writeFileSync(_turnEndedPath, epochMs);
+  } catch {
+    // Best-effort.
+  }
+}
+
+export function clearTurnEndedFile(): void {
+  try {
+    fs.unlinkSync(_turnEndedPath);
+  } catch {
+    // Already gone or parent dir missing — fine.
   }
 }
 
