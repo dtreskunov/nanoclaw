@@ -26,6 +26,7 @@ vi.mock('../log.js', () => ({
 }));
 
 import {
+  ACKS,
   buildTurn,
   createAdapter,
   extractDisplayQuery,
@@ -354,7 +355,11 @@ describe('streaming response: echo + filler timer', () => {
     expect(res.headers?.['Content-Type']).toBe('application/x-ndjson');
     expect(res.chunks.length).toBeGreaterThan(0);
     const first = JSON.parse(res.chunks[0].trim());
-    expect(first).toEqual({ type: 'item', content: 'Turn on the kitchen lights. Let me look into that. ' });
+    expect(first.type).toBe('item');
+    expect(first.content).toMatch(/^Turn on the kitchen lights\. .+\. $/);
+    // The ack must be one of the known ACKS phrases.
+    const ack = first.content.replace('Turn on the kitchen lights. ', '').replace(/\. $/, '');
+    expect(ACKS).toContain(ack);
     expect(res.ended).toBe(false);
     vi.useRealTimers();
   });
@@ -362,23 +367,27 @@ describe('streaming response: echo + filler timer', () => {
   it('preserves trailing terminal punctuation in the echo (no double-period)', async () => {
     const { res } = await driveHandler({ conversation_id: 'c1', query: 'What time is it?', stream: true });
     const first = JSON.parse(res.chunks[0].trim());
-    expect(first.content).toBe('What time is it? Let me look into that. ');
+    expect(first.content).toMatch(/^What time is it\? .+\. $/);
     vi.useRealTimers();
   });
 
-  it('rotates through FILLERS, one chunk per FILLER_INTERVAL_MS tick', async () => {
+  it('emits fillers from the pool, one chunk per FILLER_INTERVAL_MS tick', async () => {
     const { res } = await driveHandler({ conversation_id: 'c1', query: 'hi', stream: true });
     expect(res.chunks).toHaveLength(1); // just the echo
 
     await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
     expect(res.chunks).toHaveLength(2);
-    expect(JSON.parse(res.chunks[1].trim())).toEqual({ type: 'item', content: `${FILLERS[0]}. ` });
+    const f1 = JSON.parse(res.chunks[1].trim());
+    expect(f1.type).toBe('item');
+    expect(FILLERS).toContain(f1.content.trimEnd());
 
     await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
-    expect(JSON.parse(res.chunks[2].trim())).toEqual({ type: 'item', content: `${FILLERS[1]}. ` });
+    const f2 = JSON.parse(res.chunks[2].trim());
+    expect(FILLERS).toContain(f2.content.trimEnd());
 
     await vi.advanceTimersByTimeAsync(FILLER_INTERVAL_MS);
-    expect(JSON.parse(res.chunks[3].trim())).toEqual({ type: 'item', content: `${FILLERS[2]}. ` });
+    const f3 = JSON.parse(res.chunks[3].trim());
+    expect(FILLERS).toContain(f3.content.trimEnd());
     vi.useRealTimers();
   });
 
@@ -484,12 +493,12 @@ describe('streaming response: echo + filler timer', () => {
 
     // res2 stays open with its own echo as the first chunk.
     expect(res2.ended).toBe(false);
-    expect(JSON.parse(res2.chunks[0].trim()).content).toBe('second. Let me look into that. ');
+    expect(JSON.parse(res2.chunks[0].trim()).content).toMatch(/^second\. .+\. $/);
     vi.useRealTimers();
   });
 
   it('FILLERS pool has the expected size so the cap leaves rotation room', () => {
-    expect(FILLERS.length).toBe(20);
+    expect(FILLERS.length).toBeGreaterThanOrEqual(MAX_FILLERS);
     expect(MAX_FILLERS).toBeLessThanOrEqual(FILLERS.length);
   });
 });

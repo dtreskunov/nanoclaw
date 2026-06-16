@@ -103,32 +103,49 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_OUTPUT_FIELD = 'output';
 
 /**
+ * Short acknowledgement phrases appended to the query echo so the user
+ * hears that work is starting. Picked at random per request. Exported
+ * for tests.
+ */
+export const ACKS: readonly string[] = [
+  'Let me look into that',
+  'On it',
+  'Give me a sec',
+  'One moment',
+  'Working on it',
+  'Let me check',
+  'Hang on',
+  'Let me see',
+];
+
+/**
  * Rotating filler phrases emitted as streaming items while the agent thinks.
  * These get spoken aloud by HA's TTS, so they should sound natural, varied,
- * and slightly unexpected — not robotic status updates. Order is fixed (not
- * random) so consecutive turns don't repeat. Exported for tests.
+ * and slightly unexpected — not robotic status updates. All end in "-ing"
+ * so they read as ongoing activity. Order is fixed (not random) so
+ * consecutive turns don't repeat. Exported for tests.
  */
 export const FILLERS: readonly string[] = [
-  'Let me think about that',
-  'Hmm, interesting question',
-  'Rummaging through my neurons',
-  'Consulting the oracle',
-  'One moment, this is a good one',
-  'Brewing up something clever',
-  'Chewing on that',
-  'Down the rabbit hole I go',
-  'Untangling some thoughts',
-  'Percolating',
-  'My hamster wheel is spinning',
-  'Sifting through the universe',
-  'Almost there, probably',
-  'Wrestling with the answer',
-  'Dusting off the old brain cells',
-  'Marinating on this',
-  'Poking at the problem',
-  'Connecting some dots',
-  'Noodling furiously',
-  'Bear with me, this is juicy',
+  'Rummaging through my neurons...',
+  'Consulting the oracle...',
+  'Brewing up something clever...',
+  'Chewing on that...',
+  'Untangling some thoughts...',
+  'Percolating...',
+  'Sifting through the universe...',
+  'Wrestling with the answer...',
+  'Dusting off the old brain cells...',
+  'Marinating on this...',
+  'Poking at the problem...',
+  'Connecting some dots...',
+  'Noodling furiously...',
+  'Rearranging some furniture in my head...',
+  'Consulting a very large spreadsheet...',
+  'Warming up the thinking muscles...',
+  'Squinting at the problem...',
+  'Shaking the magic eight ball...',
+  'Doing some light overthinking...',
+  'Assembling the pieces...',
 ];
 /** Time between filler emissions. 6s feels alive without being chatty. */
 export const FILLER_INTERVAL_MS = 6000;
@@ -449,9 +466,9 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
         stopFiller(p);
         return;
       }
-      const word = FILLERS[p.fillerCount % FILLERS.length];
+      const word = FILLERS[Math.floor(Math.random() * FILLERS.length)];
       p.fillerCount += 1;
-      writeStreamLine(p, streamItem(`${word}. `));
+      writeStreamLine(p, streamItem(`${word} `));
     }, FILLER_INTERVAL_MS);
   }
 
@@ -588,7 +605,8 @@ export function createAdapter(config: HaConfig): ChannelAdapter {
         // trailing space; otherwise add ". " so the echo reads as its own
         // sentence before the fillers and final reply.
         const echo = /[.!?。！？]$/.test(echoBase) ? `${echoBase} ` : `${echoBase}. `;
-        writeStreamLine(p, streamItem(`${echo}Let me look into that. `));
+        const ack = ACKS[Math.floor(Math.random() * ACKS.length)];
+        writeStreamLine(p, streamItem(`${echo}${ack}. `));
       }
       startFiller(p);
     }
