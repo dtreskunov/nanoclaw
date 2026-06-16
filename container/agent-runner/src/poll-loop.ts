@@ -824,6 +824,7 @@ async function processQuery(
   // matching the behavior between processQuery calls (the outer poll
   // loop doesn't touch the heartbeat either).
   let turnActive = true;
+  let turnStartTime = Date.now();
   const liveHandle = setInterval(() => {
     if (!turnActive) return;
     try { touchHeartbeat(); } catch { /* best-effort */ }
@@ -870,6 +871,10 @@ async function processQuery(
       } else if (event.type === 'usage') {
         // Provider emits this just before `result`; stash and flush after
         // result so we can link to the last outbound row written this turn.
+        // Fill in wall-clock duration when the provider doesn't supply one.
+        if (!event.data.duration_ms) {
+          event.data.duration_ms = Date.now() - turnStartTime;
+        }
         pendingUsage = event.data;
       } else if (event.type === 'result') {
         resultSeen = true;
@@ -972,6 +977,7 @@ async function processQuery(
         // Reset the per-turn baseline so a follow-up push within the same
         // query starts a fresh "did MCP write anything?" window.
         outboundMaxAtTurnStart = currentOutboundMax();
+        turnStartTime = Date.now();
       }
     }
   } catch (err) {
