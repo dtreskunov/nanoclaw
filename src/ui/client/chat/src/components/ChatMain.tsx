@@ -231,7 +231,11 @@ function ApprovalsBanner() {
 function MessageLog() {
   const ref = useRef<HTMLDivElement | null>(null);
   const appliedHighlightRef = useRef<string | null>(null);
+  const prevMsgCountRef = useRef<number>(0);
+  const wasTypingRef = useRef<boolean>(false);
   const highlight = highlightMessageId.value;
+  const msgCount = chatMessages.value.length;
+  const typing = isTyping.value && !!threadId.value && !chatLoading.value;
   useEffect(() => {
     if (!ref.current) return;
     if (highlight) {
@@ -249,12 +253,17 @@ function MessageLog() {
       // While a highlight is active (pending or applied), don't scroll to bottom.
     } else {
       appliedHighlightRef.current = null;
-      ref.current.scrollTop = ref.current.scrollHeight;
+      const newMessages = msgCount !== prevMsgCountRef.current;
+      const typingJustStarted = typing && !wasTypingRef.current;
+      if (newMessages || typingJustStarted) {
+        prevMsgCountRef.current = msgCount;
+        ref.current.scrollTop = ref.current.scrollHeight;
+      }
     }
+    wasTypingRef.current = !!typing;
   });
   const list = chatMessages.value;
   const groups = groupMessages(list);
-  const typing = isTyping.value && threadId.value && !chatLoading.value;
   return (
     <div class="log" id="chat-log" ref={ref}>
       {chatLoading.value

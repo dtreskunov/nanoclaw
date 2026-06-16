@@ -19727,7 +19727,11 @@ function ApprovalsBanner() {
 function MessageLog() {
   const ref = A2(null);
   const appliedHighlightRef = A2(null);
+  const prevMsgCountRef = A2(0);
+  const wasTypingRef = A2(false);
   const highlight = highlightMessageId.value;
+  const msgCount = chatMessages.value.length;
+  const typing = isTyping.value && !!threadId.value && !chatLoading.value;
   y2(() => {
     if (!ref.current) return;
     if (highlight) {
@@ -19743,12 +19747,17 @@ function MessageLog() {
       }
     } else {
       appliedHighlightRef.current = null;
-      ref.current.scrollTop = ref.current.scrollHeight;
+      const newMessages = msgCount !== prevMsgCountRef.current;
+      const typingJustStarted = typing && !wasTypingRef.current;
+      if (newMessages || typingJustStarted) {
+        prevMsgCountRef.current = msgCount;
+        ref.current.scrollTop = ref.current.scrollHeight;
+      }
     }
+    wasTypingRef.current = !!typing;
   });
   const list = chatMessages.value;
   const groups2 = groupMessages(list);
-  const typing = isTyping.value && threadId.value && !chatLoading.value;
   return /* @__PURE__ */ u4("div", { class: "log", id: "chat-log", ref, children: [
     chatLoading.value ? null : !threadId.value ? /* @__PURE__ */ u4("div", { class: "empty", children: "Pick or start a chat." }) : list.length === 0 ? /* @__PURE__ */ u4("div", { class: "empty", children: "No messages yet." }) : groups2.map((g8, i5) => g8.kind === "thoughts" ? /* @__PURE__ */ u4(ThoughtGroup, { thoughts: g8.thoughts, answer: g8.answer }, i5) : /* @__PURE__ */ u4(Message, { m: g8.m }, i5)),
     typing ? /* @__PURE__ */ u4("div", { class: "typing", "aria-live": "polite", children: [
