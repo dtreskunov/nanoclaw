@@ -56,19 +56,20 @@ function mediaKind(filename: string, contentType?: string | null): 'audio' | 'vi
 
 function UsageMeta({ u }: { u: TurnUsage }) {
   const [expanded, setExpanded] = useState(false);
-  const cost = fmtCost(u.cost_usd);
+  const cost = '~' + fmtCost(u.cost_usd);
   const model = u.model ? shortModel(u.model) : '';
-  const tokens = `${fmtTok(u.input_tokens)}\u2192${fmtTok(u.output_tokens)}`;
   const dur = u.duration_ms ? fmtDur(u.duration_ms) : '';
+  const short = [cost, dur, model].filter(Boolean).join(' \u00b7 ');
+  const tokens = `${fmtTok(u.input_tokens)}\u2192${fmtTok(u.output_tokens)}`;
   const cache = [
     u.cache_read_tokens > 0 ? `cache read ${fmtTok(u.cache_read_tokens)}` : '',
     u.cache_write_tokens > 0 ? `cache write ${fmtTok(u.cache_write_tokens)}` : '',
     u.reasoning_tokens ? `reasoning ${fmtTok(u.reasoning_tokens)}` : '',
   ].filter(Boolean).join(' \u00b7 ');
-  const detail = [model, tokens, dur, cache].filter(Boolean).join(' \u00b7 ');
+  const detail = [tokens, cache].filter(Boolean).join(' \u00b7 ');
   return (
     <span class="usage" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }} title="Click for details">
-      {cost}{expanded && detail ? ` \u00b7 ${detail}` : ''}
+      {short}{expanded && detail ? ` \u00b7 ${detail}` : ''}
     </span>
   );
 }
