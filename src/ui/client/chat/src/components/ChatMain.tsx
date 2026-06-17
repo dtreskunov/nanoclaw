@@ -238,12 +238,17 @@ function MessageLog() {
   const msgCount = chatMessages.value.length;
   const typing = isTyping.value && !!threadId.value && !chatLoading.value;
   const scrollTick = scrollToBottomTick.value;
+
+  const scrollToBottom = () => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  };
+
   useEffect(() => {
     if (!ref.current) return;
     // Check for explicit scroll-to-bottom request (e.g. user sent a message)
     if (scrollTick !== prevScrollTickRef.current) {
       prevScrollTickRef.current = scrollTick;
-      ref.current.scrollTop = ref.current.scrollHeight;
+      scrollToBottom();
       return;
     }
     if (highlight) {
@@ -263,9 +268,11 @@ function MessageLog() {
       appliedHighlightRef.current = null;
       const newMessages = msgCount !== prevMsgCountRef.current;
       const typingJustStarted = typing && !wasTypingRef.current;
+      // Scroll on new messages or when typing indicator first appears.
+      // Skip scroll for typing hint text changes (progress updates).
       if (newMessages || typingJustStarted) {
         prevMsgCountRef.current = msgCount;
-        ref.current.scrollTop = ref.current.scrollHeight;
+        scrollToBottom();
       }
     }
     wasTypingRef.current = !!typing;

@@ -15531,6 +15531,7 @@ var searchResults = y3(null);
 var searchLoading = y3(false);
 var searchOpen = y3(false);
 var highlightMessageId = y3(null);
+var scrollToBottomTick = y3(0);
 var paneOpen = {
   threads: y3(false),
   files: y3(false)
@@ -17387,6 +17388,9 @@ function focusComposerSoon() {
   };
   requestAnimationFrame(attempt);
 }
+function requestScrollToBottom() {
+  scrollToBottomTick.value++;
+}
 async function loadThreads(_gid) {
   await runSync();
 }
@@ -17879,6 +17883,7 @@ function connectChatWs() {
 }
 async function sendChat(text, files) {
   if (!groupId.value || !threadId.value) return;
+  requestScrollToBottom();
   const isWeb = !channelType.value || channelType.value === "web";
   const hasFiles = Array.isArray(files) && files.length > 0;
   if (!isWeb) {
@@ -19729,11 +19734,21 @@ function MessageLog() {
   const appliedHighlightRef = A2(null);
   const prevMsgCountRef = A2(0);
   const wasTypingRef = A2(false);
+  const prevScrollTickRef = A2(scrollToBottomTick.value);
   const highlight = highlightMessageId.value;
   const msgCount = chatMessages.value.length;
   const typing = isTyping.value && !!threadId.value && !chatLoading.value;
+  const scrollTick = scrollToBottomTick.value;
+  const scrollToBottom = () => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  };
   y2(() => {
     if (!ref.current) return;
+    if (scrollTick !== prevScrollTickRef.current) {
+      prevScrollTickRef.current = scrollTick;
+      scrollToBottom();
+      return;
+    }
     if (highlight) {
       if (appliedHighlightRef.current && appliedHighlightRef.current !== highlight) {
         appliedHighlightRef.current = null;
@@ -19751,7 +19766,7 @@ function MessageLog() {
       const typingJustStarted = typing && !wasTypingRef.current;
       if (newMessages || typingJustStarted) {
         prevMsgCountRef.current = msgCount;
-        ref.current.scrollTop = ref.current.scrollHeight;
+        scrollToBottom();
       }
     }
     wasTypingRef.current = !!typing;
@@ -22988,27 +23003,30 @@ function SettingsTab({ gid, section, onClose, onActions }) {
         {
           label: "Provider",
           info: draft.provider ? PROVIDER_INFO[draft.provider] ?? `Provider "${draft.provider}".` : void 0,
-          children: /* @__PURE__ */ u4(
-            Combobox,
-            {
-              value: draft.provider,
-              options: (() => {
-                const selectable = data.validProviders.slice();
-                if (draft.provider && !selectable.includes(draft.provider)) {
-                  selectable.push(draft.provider);
-                }
-                return selectable.map((p5) => ({
-                  value: p5,
-                  label: p5,
-                  tooltip: PROVIDER_INFO[p5]
-                }));
-              })(),
-              placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
-              disabled: busy,
-              freeform: false,
-              onChange: (v5) => update("provider", v5)
-            }
-          )
+          children: [
+            /* @__PURE__ */ u4(
+              Combobox,
+              {
+                value: draft.provider,
+                options: (() => {
+                  const selectable = data.validProviders.slice();
+                  if (draft.provider && !selectable.includes(draft.provider)) {
+                    selectable.push(draft.provider);
+                  }
+                  return selectable.map((p5) => ({
+                    value: p5,
+                    label: p5,
+                    tooltip: PROVIDER_INFO[p5]
+                  }));
+                })(),
+                placeholder: data.defaults.provider ? `default: ${data.defaults.provider}` : "pick a provider",
+                disabled: busy,
+                freeform: false,
+                onChange: (v5) => update("provider", v5)
+              }
+            ),
+            data.providesAgentSurfaces ? /* @__PURE__ */ u4("p", { class: "group-admin-help", children: "This provider composes its own instructions and discovers skills its own way, so the Skills selection and Assistant name don't apply while it's active." }) : null
+          ]
         }
       ),
       /* @__PURE__ */ u4(Field, { label: "Model", children: /* @__PURE__ */ u4(
