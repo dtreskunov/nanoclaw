@@ -7,7 +7,7 @@ import {
   chatMessages, chatStatus, chatLoading, isTyping, typingHint, threadId, channelType, canSend, pending,
   threads, groupId, channelMeta, pinnedContext, pendingApprovals, respondingApprovalIds,
   pendingQuestions, respondingQuestionIds,
-  highlightMessageId, searchQuery, voiceMode, isMobile,
+  highlightMessageId, searchQuery, voiceMode, isMobile, scrollToBottomTick,
   UPLOAD_MAX_FILE_SIZE, UPLOAD_MAX_TOTAL_SIZE, UPLOAD_MAX_FILES,
 } from '../state';
 import { renderMarkdown, rewriteFileLinks, highlightTextNodes, fmtBytesShort } from '../utils';
@@ -233,11 +233,19 @@ function MessageLog() {
   const appliedHighlightRef = useRef<string | null>(null);
   const prevMsgCountRef = useRef<number>(0);
   const wasTypingRef = useRef<boolean>(false);
+  const prevScrollTickRef = useRef<number>(scrollToBottomTick.value);
   const highlight = highlightMessageId.value;
   const msgCount = chatMessages.value.length;
   const typing = isTyping.value && !!threadId.value && !chatLoading.value;
+  const scrollTick = scrollToBottomTick.value;
   useEffect(() => {
     if (!ref.current) return;
+    // Check for explicit scroll-to-bottom request (e.g. user sent a message)
+    if (scrollTick !== prevScrollTickRef.current) {
+      prevScrollTickRef.current = scrollTick;
+      ref.current.scrollTop = ref.current.scrollHeight;
+      return;
+    }
     if (highlight) {
       // If the highlight changed, reset so we can apply the new one.
       if (appliedHighlightRef.current && appliedHighlightRef.current !== highlight) {

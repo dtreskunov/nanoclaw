@@ -68,6 +68,8 @@ export const searchResults: Signal<SearchResult[] | null> = signal<SearchResult[
 export const searchLoading: Signal<boolean> = signal(false);
 export const searchOpen: Signal<boolean> = signal(false);
 export const highlightMessageId: Signal<string | null> = signal<string | null>(null);
+// Scroll trigger — incremented to force scroll-to-bottom (e.g. after send)
+export const scrollToBottomTick: Signal<number> = signal(0);
 
 // Panels / drawers
 // Desktop panes default to collapsed on every load — the user wanted a

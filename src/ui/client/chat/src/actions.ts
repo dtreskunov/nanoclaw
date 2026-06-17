@@ -34,6 +34,7 @@ import {
   searchLoading,
   searchOpen,
   highlightMessageId,
+  scrollToBottomTick,
   SYNC_INTERVAL_MS,
 } from './state';
 import { api, postJson } from './api';
@@ -87,6 +88,15 @@ function focusComposerSoon(): void {
     if (++tries < 180) requestAnimationFrame(attempt);
   };
   requestAnimationFrame(attempt);
+}
+
+/**
+ * Request the chat log to scroll to bottom. Used when sending a message
+ * so the user sees their just-sent message without waiting for the
+ * server round-trip to update chatMessages.
+ */
+export function requestScrollToBottom(): void {
+  scrollToBottomTick.value++;
 }
 
 // ── threads ─────────────────────────────────────────────────────────
@@ -688,6 +698,8 @@ function connectChatWs(): void {
 
 export async function sendChat(text: string, files: PendingFile[] | null | undefined): Promise<void> {
   if (!groupId.value || !threadId.value) return;
+  // Scroll to bottom immediately so user sees their message area
+  requestScrollToBottom();
   const isWeb = !channelType.value || channelType.value === 'web';
   const hasFiles = Array.isArray(files) && files.length > 0;
   if (!isWeb) {
