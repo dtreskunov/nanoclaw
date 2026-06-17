@@ -1419,6 +1419,11 @@ function viewerHandlesForChannel(userId: string, channelType: string): string[] 
 export function viewerHasContent(userId: string, agentGroupId: string): boolean {
   const ctxs = listUserMessagingContexts(userId, agentGroupId);
   if (ctxs.length === 0) return false;
+  // Web contexts always count — the user can start a new thread even
+  // without existing sessions. Non-web contexts require a session to
+  // exist (we can't know if ANY thread belongs to the viewer without
+  // opening every session DB).
+  if (ctxs.some((c) => c.channelType === WEB_CHANNEL_TYPE)) return true;
   const stmt = getDb().prepare(
     'SELECT 1 AS x FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? LIMIT 1',
   );
