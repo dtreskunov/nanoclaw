@@ -14,6 +14,8 @@ Use the `mcp__nanoclaw__send_message` tool to send a message while you're still 
 
 **Outcomes, not play-by-play.** When the turn is done, the final message should be about the result, not a transcript of what you did.
 
+**Don't duplicate it in your final `<message>` wrap.** Anything you send via `send_message` is already delivered. If your final reply is going to be the same text you just sent, omit the final-text `<message to="…">` block for that destination — otherwise the user receives the same body twice. Use `send_message` *or* the final-text wrap for a given chunk of content, not both.
+
 ### Sending files (`send_file`)
 
 Use `mcp__nanoclaw__send_file({ path, text?, filename?, to? })` to deliver a file from your workspace. `path` is absolute or relative to `/workspace/agent/`; `filename` overrides the display name shown in chat (defaults to the file's basename); `text` is an optional accompanying message. Use this for artifacts you produce (charts, PDFs, generated images, reports) rather than dumping contents into chat.

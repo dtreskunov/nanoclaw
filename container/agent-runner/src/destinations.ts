@@ -154,6 +154,10 @@ function buildDestinationsSection(): string {
   lines.push(
     'The `send_message` MCP tool is the same delivery, available mid-turn — handy for a quick acknowledgment ("on it") before a slow tool call. Each `send_message` call and each final-response `<message>` block lands as its own message in the conversation, so they read as a sequence rather than as one combined reply.',
   );
+  lines.push('');
+  lines.push(
+    '**Do not duplicate content between `send_message` and the final `<message>` wrap.** If you have already delivered the answer via `send_message`, do not also include the same body in a final-text `<message to="…">` block — the user will see it twice. Either send the full reply via `send_message` *or* via the final-text `<message>` wrap, not both. Mixing the two is only correct when they carry different content (e.g. an "on it" `send_message` followed by the actual answer in the final `<message>`).',
+  );
   return lines.join('\n');
 }
 
